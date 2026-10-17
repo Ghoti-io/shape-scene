@@ -1,0 +1,7 @@
+Name: Ghoti.io Shape Scene(BRANCH)
+Description: The shape family waist: resources and lists, and the versioned scene above them.
+Version: (VERSION)
+URL: https://github.com/Ghoti-io/shape-scene
+Libs: -L(PC_LIB_DIR) -l(SUITE)-(PROJECT)(BRANCH)
+CFlags: -I(PC_INCLUDE_DIR)
+Requires: (REQUIRES)
