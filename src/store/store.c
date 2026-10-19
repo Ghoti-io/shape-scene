@@ -43,23 +43,23 @@
 /* --- the store's own count ------------------------------------------------- */
 
 void gshscene_store_ref(GSHSCENE_Store * store) {
-  atomic_fetch_add_explicit(&store->refs, 1, memory_order_relaxed);
+  gcu_atomic_size_fetch_add(&store->refs, 1);
 }
 
 static void listeners_unref(const GSHSCENE_Allocator * alloc, GSHSCENE_Listeners * listeners) {
-  if (listeners && atomic_fetch_sub_explicit(&listeners->refs, 1, memory_order_acq_rel) == 1) {
+  if (listeners && gcu_atomic_size_fetch_sub(&listeners->refs, 1) == 1) {
     gshscene_free(alloc, listeners);
   }
 }
 
 void gshscene_store_unref(GSHSCENE_Store * store) {
-  if (atomic_fetch_sub_explicit(&store->refs, 1, memory_order_acq_rel) != 1) {
+  if (gcu_atomic_size_fetch_sub(&store->refs, 1) != 1) {
     return;
   }
   GSHSCENE_Allocator alloc = store->alloc;
   listeners_unref(&alloc, store->listeners);
   gshscene_free(&alloc, store->buckets);
-  gshscene_lock_destroy(&store->lock);
+  GCU_MUTEX_DESTROY(store->lock);
   gshscene_free(&alloc, store);
 }
 
@@ -82,14 +82,14 @@ GSHSCENE_Result gshscene_store_create_with_index_hash(const GSHSCENE_Allocator *
   gshscene_limits_effective(limits, &store->limits);
   store->index_fn = index_hash;
   store->index_ctx = index_ctx;
-  atomic_init(&store->refs, 1);
+  gcu_atomic_size_init(&store->refs, 1);
   store->bucket_count = INITIAL_BUCKETS;
   store->buckets = gshscene_calloc(&store->alloc, store->bucket_count, sizeof *store->buckets);
   if (!store->buckets) {
     gshscene_free(&store->alloc, store);
     return GSHSCENE_ERR_OOM;
   }
-  if (gshscene_lock_init(&store->lock) != 0) {
+  if (GCU_MUTEX_CREATE(store->lock) != 0) {
     gshscene_free(&store->alloc, store->buckets);
     gshscene_free(&store->alloc, store);
     return GSHSCENE_ERR_INTERNAL;
@@ -114,13 +114,13 @@ GSHSCENE_Result gshscene_store_stats(const GSHSCENE_Store * store, GSHSCENE_Stor
     return GSHSCENE_ERR_INVALID;
   }
   GSHSCENE_Store * mutable_store = (GSHSCENE_Store *)store;
-  gshscene_lock_acquire(&mutable_store->lock);
+  GCU_MUTEX_LOCK(mutable_store->lock);
   out->live = store->live;
   out->created = store->next_id;
   out->hits = store->hits;
   out->collisions = store->collisions;
   out->buckets = store->bucket_count;
-  gshscene_lock_release(&mutable_store->lock);
+  GCU_MUTEX_UNLOCK(mutable_store->lock);
   return GSHSCENE_OK;
 }
 
@@ -133,7 +133,7 @@ GSHSCENE_Resource * gshscene_store_new_resource(GSHSCENE_Store * store, GSHSCENE
   }
   resource->store = store;
   resource->kind = kind;
-  atomic_init(&resource->refs, 1);
+  gcu_atomic_size_init(&resource->refs, 1);
   gshscene_store_ref(store);
   return resource;
 }
@@ -151,10 +151,9 @@ void gshscene_store_discard_resource(GSHSCENE_Resource * resource) {
 /* Take a reference on a resource found in the table, unless its count is
  * already zero: then its last release is in progress and it is as good as gone. */
 static int try_retain(GSHSCENE_Resource * resource) {
-  size_t count = atomic_load_explicit(&resource->refs, memory_order_relaxed);
+  size_t count = gcu_atomic_size_load(&resource->refs);
   while (count != 0) {
-    if (atomic_compare_exchange_weak_explicit(
-            &resource->refs, &count, count + 1, memory_order_acquire, memory_order_relaxed)) {
+    if (gcu_atomic_size_compare_exchange(&resource->refs, &count, count + 1)) {
       return 1;
     }
   }
@@ -206,15 +205,15 @@ GSHSCENE_Result gshscene_store_intern(
     GSHSCENE_Store * store, const GSHSCENE_Probe * probe, const GSHSCENE_Resource ** out) {
   uint64_t index = store->index_fn ? store->index_fn(probe->hash, store->index_ctx) : probe->hash;
 
-  gshscene_lock_acquire(&store->lock);
+  GCU_MUTEX_LOCK(store->lock);
   GSHSCENE_Resource * found = lookup(store, probe, index);
   if (found) {
     store->hits++;
-    gshscene_lock_release(&store->lock);
+    GCU_MUTEX_UNLOCK(store->lock);
     *out = found;
     return GSHSCENE_OK;
   }
-  gshscene_lock_release(&store->lock);
+  GCU_MUTEX_UNLOCK(store->lock);
 
   /* A miss: build outside the lock, then look again, because another thread
    * may have interned the same content meanwhile. */
@@ -226,17 +225,17 @@ GSHSCENE_Result gshscene_store_intern(
   built->hash = probe->hash;
   built->index = index;
 
-  gshscene_lock_acquire(&store->lock);
+  GCU_MUTEX_LOCK(store->lock);
   found = lookup(store, probe, index);
   if (found) {
     store->hits++;
-    gshscene_lock_release(&store->lock);
+    GCU_MUTEX_UNLOCK(store->lock);
     gshscene_store_discard_resource(built);
     *out = found;
     return GSHSCENE_OK;
   }
   if (store->live >= store->limits.max_resources) {
-    gshscene_lock_release(&store->lock);
+    GCU_MUTEX_UNLOCK(store->lock);
     gshscene_store_discard_resource(built);
     return GSHSCENE_ERR_LIMIT;
   }
@@ -248,7 +247,7 @@ GSHSCENE_Result gshscene_store_intern(
   if (store->live > store->bucket_count) {
     grow(store);
   }
-  gshscene_lock_release(&store->lock);
+  GCU_MUTEX_UNLOCK(store->lock);
   *out = built;
   return GSHSCENE_OK;
 }
@@ -257,7 +256,7 @@ GSHSCENE_Result gshscene_store_intern(
 
 const GSHSCENE_Resource * gshscene_resource_retain(const GSHSCENE_Resource * resource) {
   if (resource) {
-    atomic_fetch_add_explicit(&((GSHSCENE_Resource *)resource)->refs, 1, memory_order_relaxed);
+    gcu_atomic_size_fetch_add(&((GSHSCENE_Resource *)resource)->refs, 1);
   }
   return resource;
 }
@@ -267,12 +266,12 @@ void gshscene_resource_release(const GSHSCENE_Resource * handle) {
     return;
   }
   GSHSCENE_Resource * resource = (GSHSCENE_Resource *)handle;
-  if (atomic_fetch_sub_explicit(&resource->refs, 1, memory_order_acq_rel) != 1) {
+  if (gcu_atomic_size_fetch_sub(&resource->refs, 1) != 1) {
     return;
   }
   /* The last reference.  Leave the table first, so that nothing can find it. */
   GSHSCENE_Store * store = resource->store;
-  gshscene_lock_acquire(&store->lock);
+  GCU_MUTEX_LOCK(store->lock);
   GSHSCENE_Resource ** link = &store->buckets[resource->index & (store->bucket_count - 1)];
   while (*link != resource) {
     link = &(*link)->next;
@@ -281,9 +280,9 @@ void gshscene_resource_release(const GSHSCENE_Resource * handle) {
   store->live--;
   GSHSCENE_Listeners * listeners = store->listeners;
   if (listeners) {
-    atomic_fetch_add_explicit(&listeners->refs, 1, memory_order_relaxed);
+    gcu_atomic_size_fetch_add(&listeners->refs, 1);
   }
-  gshscene_lock_release(&store->lock);
+  GCU_MUTEX_UNLOCK(store->lock);
 
   GSHSCENE_Allocator alloc = store->alloc;
   if (listeners) {
@@ -308,7 +307,7 @@ uint64_t gshscene_resource_hash(const GSHSCENE_Resource * resource) {
 }
 
 size_t gshscene_resource_refcount(const GSHSCENE_Resource * resource) {
-  return resource ? atomic_load_explicit(&((GSHSCENE_Resource *)resource)->refs, memory_order_relaxed) : 0;
+  return resource ? gcu_atomic_size_load(&((GSHSCENE_Resource *)resource)->refs) : 0;
 }
 
 /* --- release listeners ----------------------------------------------------- */
@@ -317,7 +316,7 @@ static GSHSCENE_Listeners * listeners_make(const GSHSCENE_Allocator * alloc, siz
   GSHSCENE_Listeners * listeners =
       gshscene_alloc(alloc, sizeof *listeners + count * sizeof(GSHSCENE_Listener));
   if (listeners) {
-    atomic_init(&listeners->refs, 1);
+    gcu_atomic_size_init(&listeners->refs, 1);
     listeners->count = count;
   }
   return listeners;
@@ -328,11 +327,11 @@ GSHSCENE_Result gshscene_store_add_release_listener(
   if (!store || !fn || !out_token) {
     return GSHSCENE_ERR_INVALID;
   }
-  gshscene_lock_acquire(&store->lock);
+  GCU_MUTEX_LOCK(store->lock);
   size_t old_count = store->listeners ? store->listeners->count : 0;
   GSHSCENE_Listeners * grown = listeners_make(&store->alloc, old_count + 1);
   if (!grown) {
-    gshscene_lock_release(&store->lock);
+    GCU_MUTEX_UNLOCK(store->lock);
     return GSHSCENE_ERR_OOM;
   }
   if (old_count) {
@@ -344,7 +343,7 @@ GSHSCENE_Result gshscene_store_add_release_listener(
   grown->items[old_count].ctx = ctx;
   GSHSCENE_Listeners * old = store->listeners;
   store->listeners = grown;
-  gshscene_lock_release(&store->lock);
+  GCU_MUTEX_UNLOCK(store->lock);
   listeners_unref(&store->alloc, old);
   *out_token = token;
   return GSHSCENE_OK;
@@ -354,7 +353,7 @@ GSHSCENE_Result gshscene_store_remove_release_listener(GSHSCENE_Store * store, u
   if (!store) {
     return GSHSCENE_ERR_INVALID;
   }
-  gshscene_lock_acquire(&store->lock);
+  GCU_MUTEX_LOCK(store->lock);
   GSHSCENE_Listeners * old = store->listeners;
   size_t at = 0;
   size_t count = old ? old->count : 0;
@@ -362,21 +361,21 @@ GSHSCENE_Result gshscene_store_remove_release_listener(GSHSCENE_Store * store, u
     at++;
   }
   if (at == count) {
-    gshscene_lock_release(&store->lock);
+    GCU_MUTEX_UNLOCK(store->lock);
     return GSHSCENE_ERR_INVALID;
   }
   GSHSCENE_Listeners * shrunk = NULL;
   if (count > 1) {
     shrunk = listeners_make(&store->alloc, count - 1);
     if (!shrunk) {
-      gshscene_lock_release(&store->lock);
+      GCU_MUTEX_UNLOCK(store->lock);
       return GSHSCENE_ERR_OOM;
     }
     memcpy(shrunk->items, old->items, at * sizeof(GSHSCENE_Listener));
     memcpy(shrunk->items + at, old->items + at + 1, (count - at - 1) * sizeof(GSHSCENE_Listener));
   }
   store->listeners = shrunk;
-  gshscene_lock_release(&store->lock);
+  GCU_MUTEX_UNLOCK(store->lock);
   listeners_unref(&store->alloc, old);
   return GSHSCENE_OK;
 }

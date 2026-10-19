@@ -32,7 +32,8 @@
 
 #include <ghoti.io/shape-scene/shape-scene.h>
 
-#include "store/sync.h"
+#include <ghoti.io/cutil/atomic.h>
+#include <ghoti.io/cutil/mutex.h>
 
 #include <ghoti.io/shape-geometry/hash.h>
 
@@ -67,7 +68,7 @@ typedef struct GSHSCENE_Listener {
 
 /** A copy-on-write array of listeners, counted. */
 typedef struct GSHSCENE_Listeners {
-  atomic_size_t refs;
+  GCU_Atomic_Size refs;
   size_t count;
   GSHSCENE_Listener items[]; /* count of them */
 } GSHSCENE_Listeners;
@@ -75,7 +76,7 @@ typedef struct GSHSCENE_Listeners {
 struct GSHSCENE_Resource {
   GSHSCENE_Store * store;
   struct GSHSCENE_Resource * next; /* the table's chain */
-  atomic_size_t refs;
+  GCU_Atomic_Size refs;
   uint64_t id;
   uint64_t hash;  /* the content hash */
   uint64_t index; /* what the table is indexed by */
@@ -98,8 +99,8 @@ struct GSHSCENE_Store {
   GSHSCENE_Limits limits; /* effective: no zero field */
   GSHSCENE_Index_Hash_Fn index_fn;
   void * index_ctx;
-  atomic_size_t refs; /* the creator and every resource */
-  GSHSCENE_Lock lock;
+  GCU_Atomic_Size refs; /* the creator and every resource */
+  GCU_MUTEX_T lock;
   struct GSHSCENE_Resource ** buckets;
   size_t bucket_count; /* a power of two */
   uint64_t next_id;

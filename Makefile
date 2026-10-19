@@ -36,10 +36,12 @@ PROJECT := shape-scene
 
 # The libraries this one's sources include: the fourth field of its line in
 # suite/libraries.txt, without the optional ones. Each is found by pkg-config
-# and is a hard error when it is not. color and image return with the stories
+# and is a hard error when it is not. cutil supplies the mutex and the atomic
+# counts the store's reference counting needs, on every target (it is the
+# suite's one cross-platform layer); color and image return with the stories
 # that first include them (paint, raster targets); EDGES_ALLOWED below stays
 # the end-of-milestone policy.
-DEPS := shape-geometry
+DEPS := cutil shape-geometry
 
 # The libraries whose headers this one may include and whose shared objects it
 # may link (check-edges), as a regular expression alternation. Itself is always
