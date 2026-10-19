@@ -116,6 +116,7 @@ GSHSCENE_Result gshscene_store_stats(const GSHSCENE_Store * store, GSHSCENE_Stor
   GSHSCENE_Store * mutable_store = (GSHSCENE_Store *)store;
   GCU_MUTEX_LOCK(mutable_store->lock);
   out->live = store->live;
+  out->bytes = store->bytes;
   out->created = store->next_id;
   out->hits = store->hits;
   out->collisions = store->collisions;
@@ -179,6 +180,11 @@ static GSHSCENE_Resource * lookup(
   return NULL;
 }
 
+/* Whether @p bytes more accounted bytes fit.  Called with the lock held. */
+static int fits(const GSHSCENE_Store * store, size_t bytes) {
+  return store->bytes <= store->limits.max_bytes && bytes <= store->limits.max_bytes - (size_t)store->bytes;
+}
+
 /* Double the table.  A failure leaves it as it was: a long chain is slow, not wrong. */
 static void grow(GSHSCENE_Store * store) {
   size_t count = store->bucket_count * 2;
@@ -213,7 +219,12 @@ GSHSCENE_Result gshscene_store_intern(
     *out = found;
     return GSHSCENE_OK;
   }
+  /* A miss that cannot fit is refused before anything is copied. */
+  int room = fits(store, probe->bytes);
   GCU_MUTEX_UNLOCK(store->lock);
+  if (!room) {
+    return GSHSCENE_ERR_LIMIT;
+  }
 
   /* A miss: build outside the lock, then look again, because another thread
    * may have interned the same content meanwhile. */
@@ -224,6 +235,7 @@ GSHSCENE_Result gshscene_store_intern(
   }
   built->hash = probe->hash;
   built->index = index;
+  built->bytes = probe->bytes;
 
   GCU_MUTEX_LOCK(store->lock);
   found = lookup(store, probe, index);
@@ -234,7 +246,7 @@ GSHSCENE_Result gshscene_store_intern(
     *out = found;
     return GSHSCENE_OK;
   }
-  if (store->live >= store->limits.max_resources) {
+  if (store->live >= store->limits.max_resources || !fits(store, probe->bytes)) {
     GCU_MUTEX_UNLOCK(store->lock);
     gshscene_store_discard_resource(built);
     return GSHSCENE_ERR_LIMIT;
@@ -244,6 +256,7 @@ GSHSCENE_Result gshscene_store_intern(
   built->next = store->buckets[slot];
   store->buckets[slot] = built;
   store->live++;
+  store->bytes += probe->bytes;
   if (store->live > store->bucket_count) {
     grow(store);
   }
@@ -278,6 +291,7 @@ void gshscene_resource_release(const GSHSCENE_Resource * handle) {
   }
   *link = resource->next;
   store->live--;
+  store->bytes -= resource->bytes;
   GSHSCENE_Listeners * listeners = store->listeners;
   if (listeners) {
     gcu_atomic_size_fetch_add(&listeners->refs, 1);
@@ -304,6 +318,10 @@ uint64_t gshscene_resource_id(const GSHSCENE_Resource * resource) {
 
 uint64_t gshscene_resource_hash(const GSHSCENE_Resource * resource) {
   return resource ? resource->hash : GSHGEOM_FNV_OFFSET_BASIS;
+}
+
+size_t gshscene_resource_bytes(const GSHSCENE_Resource * resource) {
+  return resource ? resource->bytes : 0;
 }
 
 size_t gshscene_resource_refcount(const GSHSCENE_Resource * resource) {

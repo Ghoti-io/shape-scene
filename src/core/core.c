@@ -59,6 +59,8 @@ const char * gshscene_result_string(GSHSCENE_Result result) {
       return "invalid argument";
     case GSHSCENE_ERR_INTERNAL:
       return "internal error";
+    case GSHSCENE_ERR_REFUSED:
+      return "refused";
     case GSHSCENE_RESULT_COUNT:
       break;
   }
@@ -76,6 +78,9 @@ void gshscene_limits_default(GSHSCENE_Limits * limits) {
   limits->max_depth = GSHSCENE_LIMITS_DEFAULT_MAX_DEPTH;
   limits->max_picture_depth = GSHSCENE_LIMITS_DEFAULT_MAX_PICTURE_DEPTH;
   limits->max_expansion = GSHSCENE_LIMITS_DEFAULT_MAX_EXPANSION;
+  limits->max_bytes = GSHSCENE_LIMITS_DEFAULT_MAX_BYTES;
+  limits->max_nodes = GSHSCENE_LIMITS_DEFAULT_MAX_NODES;
+  limits->max_node_depth = GSHSCENE_LIMITS_DEFAULT_MAX_NODE_DEPTH;
   for (size_t i = 0; i < sizeof limits->_reserved; i++) {
     limits->_reserved[i] = 0;
   }

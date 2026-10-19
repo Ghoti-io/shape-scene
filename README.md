@@ -6,7 +6,7 @@ The shape family waist: resources and lists, and the versioned scene above them.
 ## What is implemented
 
 The waist: interned immutable resources, transient lists, and the immediate-mode recording path
-(no IDs, no versions, no scene).
+(no IDs, no versions, no scene); and above it, the retained scene.
 
 - **Resources** (`resource.h`). A store interns content, by hash and then by equality, so equal
   content gets one reference-counted handle. Kinds: a model path, a glyph run (glyphs named by
@@ -19,10 +19,25 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
   owns it and frees it in one call; `reset` reuses the arena for the next frame.
 - **Hash and dump** of every resource and list, in `shape-geometry`'s spelling (FNV-1a 64 over
   little-endian fields), the same on every target.
-- **Limits** on everything a caller can make unbounded, each asserted by its bound.
+- **Limits** on everything a caller can make unbounded, each asserted by its bound, including the
+  store's total bytes.
 
-`examples/frame.c` records a frame. The retained scene (versions, edits, identity, diff) is built
-above this layer in a later step, and a sink takes only a closed list and its resources.
+The retained scene (`version.h`, `edit.h`, `scene.h`, `diff.h`):
+
+- **Versions** are immutable and shareable: a tree of groups, shapes and instances with 64-bit IDs,
+  a key map from a front-end's keys to nodes, hidden nodes (definitions) and instances (`use`), each
+  occurrence keyed by its instance path. A version emits a list over interned resources, where an
+  instanced node is one picture, and hashes and dumps in the same spelling as the waist.
+- **Edits** are what a front-end or driver fills and returns unpublished; an upsert by key keeps IDs
+  when a document is lowered again. Only the application's **scene** publishes, alone or by merging
+  sibling edits that touch disjoint IDs (overlaps are refused, naming the IDs).
+- **Diff** names the added, removed and changed IDs and the conservative damage, in whole device
+  pixels, for a sink's map.
+- Structural limits (nodes, depth, occurrences, list items, push and picture nesting) are enforced
+  at publish; `make fuzz-replay` replays a committed corpus through the recording API.
+
+`examples/frame.c` records a frame in immediate mode; `examples/retained.c` is an application, a
+front-end and a driver. A sink takes only a closed list and its resources.
 
 ## Building
 

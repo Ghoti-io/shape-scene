@@ -141,6 +141,18 @@ void gshscene_limits_effective(const GSHSCENE_Limits * limits, GSHSCENE_Limits *
   if (limits->max_expansion) {
     out->max_expansion = limits->max_expansion;
   }
+  if (limits->max_bytes) {
+    out->max_bytes = limits->max_bytes;
+  }
+  if (limits->max_nodes) {
+    out->max_nodes = limits->max_nodes;
+  }
+  if (limits->max_node_depth) {
+    out->max_node_depth = limits->max_node_depth;
+  }
+  if (out->max_node_depth > GSHSCENE_NODE_DEPTH_CEILING) {
+    out->max_node_depth = GSHSCENE_NODE_DEPTH_CEILING;
+  }
   if (out->max_list_items > GSHSCENE_LIST_ITEMS_CEILING) {
     out->max_list_items = GSHSCENE_LIST_ITEMS_CEILING;
   }
@@ -389,6 +401,19 @@ static GSHSCENE_Result canonical_group(const GSHSCENE_Group * group, GSHSCENE_Gr
   }
   out->opacity = group->opacity;
   return GSHSCENE_OK;
+}
+
+/* The same checks for a retained scene's nodes (src/scene), which share the rules of a fill. */
+GSHSCENE_Result gshscene_list_canonical_map(const GSHGEOM_Map * map, GSHGEOM_Map * out) {
+  return canonical_map(map, out);
+}
+
+GSHSCENE_Result gshscene_list_canonical_paint(const GSHSCENE_Paint * paint, GSHSCENE_Paint * out) {
+  return canonical_paint(paint, out);
+}
+
+GSHSCENE_Result gshscene_list_check_rule(GSHGEOM_Fill_Rule rule) {
+  return check_rule(rule);
 }
 
 /* --- the push stack ------------------------------------------------------------ */

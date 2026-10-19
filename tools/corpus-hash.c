@@ -26,6 +26,9 @@
  * their hashes, counts and the store's counters folded into one hash in
  * shape-geometry's spelling.  Every target must print the committed value in
  * tests/corpus/scene.hash: x86-64, i686 (SSE), arm64, big-endian and Windows.
+ * Since story 11 it also builds a retained scene (nodes, a key map, instances of hidden definitions, a merge of
+ * sibling edits, a diff with its damage through a general map) and folds in its version hashes, IDs, emitted lists,
+ * pictures, occurrences with their composed maps and the damage rectangles.
  * It is built by `make check-corpus-hash` on the host and by
  * suite/tools/xarch/shape.sh and suite/tools/xwin/shape.sh for the others.
  *
@@ -197,6 +200,260 @@ static GSHSCENE_Paint random_paint(void) {
   return p;
 }
 
+
+/* --- the retained scene (story 11) ------------------------------------------------------------------ */
+
+#define SCENE_PATHS 12
+#define SCENE_GROUPS 6
+#define SCENE_DEFS 3
+
+typedef struct Tree {
+  GSHSCENE_Scene * scene;
+  const GSHSCENE_Resource * paths[SCENE_PATHS];
+  const GSHSCENE_Resource * runs[2];
+  uint64_t groups[SCENE_GROUPS];
+  uint64_t defs[SCENE_DEFS];
+  uint64_t shapes[64];
+  size_t shape_count;
+  uint64_t instances[16];
+  size_t instance_count;
+} Tree;
+
+static void check_id(GSHSCENE_Result r, const char * what) {
+  check(r, what);
+}
+
+static GSHSCENE_Node random_shape(Tree * t) {
+  GSHSCENE_Node n;
+  gshscene_node_init(GSHSCENE_NODE_SHAPE, &n);
+  unsigned pick_path = between(0, SCENE_PATHS - 1);
+  unsigned pick_run = between(0, 3);
+  n.resource = (pick_run == 0) ? t->runs[next() & 1] : t->paths[pick_path];
+  n.map = random_map();
+  n.paint = random_paint();
+  n.fill_rule = (next() & 1) ? GSHGEOM_FILL_EVEN_ODD : GSHGEOM_FILL_NONZERO;
+  n.layer = (int32_t)between(0, 6) - 3;
+  return n;
+}
+
+static GSHSCENE_Node random_group(Tree * t) {
+  GSHSCENE_Node n;
+  gshscene_node_init(GSHSCENE_NODE_GROUP, &n);
+  static const double opacity[4] = {1.0, 1.0, 0.5, 0.25};
+  n.opacity = opacity[between(0, 3)];
+  n.map = random_map();
+  n.layer = (int32_t)between(0, 4);
+  if (between(0, 2) == 0) {
+    n.clip = t->paths[between(0, SCENE_PATHS - 1)];
+    n.clip_map = random_map();
+    n.clip_rule = (next() & 1) ? GSHGEOM_FILL_EVEN_ODD : GSHGEOM_FILL_NONZERO;
+  }
+  return n;
+}
+
+static uint64_t add_node(GSHSCENE_Edit * e, uint64_t parent, const GSHSCENE_Node * n, const GSHSCENE_Key * key) {
+  uint64_t id = 0;
+  check_id(gshscene_edit_add(e, parent, GSHSCENE_APPEND, n, key, &id), "edit add");
+  return id;
+}
+
+static void feed_version(const GSHSCENE_Version * v) {
+  feed(gshscene_version_hash(v));
+  feed((uint64_t)gshscene_version_node_count(v));
+  feed(gshscene_version_serial(v));
+  feed((uint64_t)gshscene_version_key_count(v));
+  const GSHSCENE_List * list = NULL;
+  check(gshscene_version_list(v, &list), "version list");
+  feed(gshscene_list_hash(list));
+  feed((uint64_t)gshscene_list_count(list));
+  feed((uint64_t)gshscene_list_expansion(list));
+}
+
+typedef struct Fold {
+  uint64_t occurrences;
+} Fold;
+
+static int fold_visit(void * ctx, const GSHSCENE_Visit * visit) {
+  Fold * f = ctx;
+  f->occurrences++;
+  feed(gshscene_instance_path_key(visit->path, visit->path_count));
+  feed(gshgeom_map_hash(&visit->map));
+  return 0;
+}
+
+static void feed_diff(const GSHSCENE_Version * a, const GSHSCENE_Version * b, const GSHGEOM_Map * map) {
+  GSHSCENE_Diff * d = NULL;
+  check(gshscene_diff(a, b, map, NULL, &d), "diff");
+  feed((uint64_t)gshscene_diff_count(d));
+  for (size_t i = 0; i < gshscene_diff_count(d); i++) {
+    uint64_t id;
+    GSHSCENE_Diff_Kind kind;
+    check(gshscene_diff_get(d, i, &id, &kind), "diff get");
+    feed(id);
+    feed((uint64_t)kind);
+  }
+  GSHSCENE_Damage damage;
+  check(gshscene_diff_damage(d, &damage), "damage");
+  feed((uint64_t)damage.unbounded);
+  feed((uint64_t)damage.empty);
+  feed((uint64_t)damage.rect.x0);
+  feed((uint64_t)damage.rect.y0);
+  feed((uint64_t)damage.rect.x1);
+  feed((uint64_t)damage.rect.y1);
+  gshscene_diff_destroy(d);
+}
+
+static void scene_section(void) {
+  Tree t;
+  memset(&t, 0, sizeof t);
+  check(gshscene_scene_create(NULL, NULL, NULL, &t.scene), "scene");
+  GSHSCENE_Store * store = gshscene_scene_store(t.scene);
+  for (unsigned i = 0; i < SCENE_PATHS; i++) {
+    GSHGEOM_Path * path = random_path(2);
+    check(gshscene_store_intern_path(store, path, &t.paths[i]), "scene path");
+    gshgeom_path_destroy(path);
+  }
+  {
+    GSHSCENE_Glyph_Run run;
+    GSHSCENE_Glyph glyphs[4];
+    memset(&run, 0, sizeof run);
+    run.source = GSHSCENE_GLYPHS_FROM_FONT;
+    run.font_key = next() | 1u;
+    run.size = 14.0;
+    run.glyph_count = 4;
+    for (size_t g = 0; g < 4; g++) {
+      glyphs[g].id = (uint32_t)(next() & 0xffffu);
+      glyphs[g].x = coord();
+      glyphs[g].y = coord();
+      glyphs[g].outline = NULL;
+    }
+    run.glyphs = glyphs;
+    check(gshscene_store_intern_glyph_run(store, &run, &t.runs[0]), "scene font run");
+    memset(&run, 0, sizeof run);
+    run.source = GSHSCENE_GLYPHS_FROM_OUTLINES;
+    run.glyph_count = 3;
+    for (size_t g = 0; g < 3; g++) {
+      glyphs[g].id = (uint32_t)g;
+      glyphs[g].x = coord();
+      glyphs[g].y = coord();
+      glyphs[g].outline = t.paths[between(0, SCENE_PATHS - 1)];
+    }
+    run.glyphs = glyphs;
+    check(gshscene_store_intern_glyph_run(store, &run, &t.runs[1]), "scene outline run");
+  }
+
+  /* Version 1: groups, shapes (some hidden), three hidden definitions, instances of them. */
+  GSHSCENE_Edit * e = NULL;
+  check(gshscene_scene_open_edit(t.scene, NULL, &e), "open edit");
+  for (unsigned g = 0; g < SCENE_GROUPS; g++) {
+    GSHSCENE_Node n = random_group(&t);
+    GSHSCENE_Key key = {0x53434e45u, g};
+    t.groups[g] = add_node(e, GSHSCENE_ROOT_ID, &n, &key);
+  }
+  for (unsigned d = 0; d < SCENE_DEFS; d++) {
+    GSHSCENE_Node n = random_group(&t);
+    n.flags = GSHSCENE_NODE_HIDDEN;
+    t.defs[d] = add_node(e, GSHSCENE_ROOT_ID, &n, NULL);
+    for (unsigned k = 0; k < 3; k++) {
+      GSHSCENE_Node s = random_shape(&t);
+      add_node(e, t.defs[d], &s, NULL);
+    }
+  }
+  for (unsigned i = 0; i < 40; i++) {
+    GSHSCENE_Node n = random_shape(&t);
+    if (between(0, 9) == 0) {
+      n.flags = GSHSCENE_NODE_HIDDEN;
+    }
+    unsigned parent = between(0, SCENE_GROUPS - 1);
+    t.shapes[t.shape_count++] = add_node(e, t.groups[parent], &n, NULL);
+  }
+  for (unsigned i = 0; i < 12; i++) {
+    GSHSCENE_Node n;
+    gshscene_node_init(GSHSCENE_NODE_INSTANCE, &n);
+    n.target = t.defs[between(0, SCENE_DEFS - 1)];
+    n.map = random_map();
+    n.layer = (int32_t)between(0, 4);
+    unsigned parent = between(0, SCENE_GROUPS - 1);
+    t.instances[t.instance_count++] = add_node(e, t.groups[parent], &n, NULL);
+  }
+  const GSHSCENE_Version * v1 = NULL;
+  check(gshscene_scene_publish(t.scene, e, NULL, &v1), "publish 1");
+  gshscene_edit_destroy(e);
+  feed_version(v1);
+  for (unsigned d = 0; d < SCENE_DEFS; d++) {
+    const GSHSCENE_Resource * pic = NULL;
+    GSHSCENE_Result r = gshscene_version_picture(v1, t.defs[d], &pic);
+    feed(r == GSHSCENE_OK ? gshscene_resource_hash(pic) : 0);
+  }
+
+  /* Two sibling edits on version 1 in disjoint groups, merged. */
+  GSHSCENE_Edit * ea = NULL;
+  GSHSCENE_Edit * eb = NULL;
+  check(gshscene_scene_open_edit(t.scene, v1, &ea), "open a");
+  check(gshscene_scene_open_edit(t.scene, v1, &eb), "open b");
+  for (unsigned i = 0; i < 4; i++) {
+    GSHSCENE_Node n = random_shape(&t);
+    add_node(ea, t.groups[0], &n, NULL);
+    GSHSCENE_Node m = random_shape(&t);
+    add_node(eb, t.groups[3], &m, NULL);
+  }
+  {
+    GSHSCENE_Node_Info info;
+    GSHSCENE_Node g = random_group(&t);
+    check(gshscene_edit_node(ea, t.groups[1], &info), "read group");
+    g.flags = info.node.flags;
+    check(gshscene_edit_set(ea, t.groups[1], &g), "set group");
+    GSHSCENE_Node s = random_shape(&t);
+    check(gshscene_edit_set(eb, t.shapes[between(0, 39)], &s), "set shape");
+  }
+  GSHSCENE_Problems * problems = NULL;
+  GSHSCENE_Edit * both[2] = {eb, ea};
+  const GSHSCENE_Version * v2 = NULL;
+  GSHSCENE_Result merged = gshscene_scene_merge(t.scene, both, 2, &problems, &v2);
+  feed((uint64_t)merged);
+  if (merged == GSHSCENE_ERR_REFUSED) {
+    /* The set of a shape of group 1 or 0 can overlap an edit's group: count what is named, and publish what is left. */
+    feed((uint64_t)gshscene_problems_count(problems));
+    for (size_t i = 0; i < gshscene_problems_count(problems); i++) {
+      uint64_t id;
+      GSHSCENE_Problem_Reason reason;
+      check(gshscene_problems_get(problems, i, &id, &reason), "problem");
+      feed(id);
+      feed((uint64_t)reason);
+    }
+    gshscene_problems_destroy(problems);
+    check(gshscene_scene_publish(t.scene, ea, NULL, &v2), "publish a alone");
+  } else {
+    check(merged, "merge");
+  }
+  gshscene_edit_destroy(ea);
+  gshscene_edit_destroy(eb);
+  feed_version(v2);
+
+  /* Visit every occurrence of version 2, and diff version 1 against it through a general map. */
+  Fold fold = {0};
+  if (gshscene_version_visit(v2, fold_visit, &fold) != 0) {
+    fail("visit");
+  }
+  feed(fold.occurrences);
+  GSHGEOM_Map device = random_map();
+  feed_diff(v1, v2, &device);
+  feed_diff(v1, v2, NULL);
+
+  gshscene_version_release(v2);
+  gshscene_version_release(v1);
+  gshscene_resource_release(t.runs[0]);
+  gshscene_resource_release(t.runs[1]);
+  for (unsigned i = 0; i < SCENE_PATHS; i++) {
+    gshscene_resource_release(t.paths[i]);
+  }
+  GSHSCENE_Store_Stats stats;
+  check(gshscene_store_stats(store, &stats), "scene stats");
+  feed(stats.bytes);
+  feed(stats.created);
+  gshscene_scene_destroy(t.scene);
+}
+
 int main(void) {
   gshgeom_hash_init(&total);
   GSHSCENE_Store * store = NULL;
@@ -349,6 +606,8 @@ int main(void) {
     fail("a resource is still live after every handle was released");
   }
   gshscene_store_destroy(store);
+
+  scene_section();
 
   printf("shape-scene.hash %016" PRIx64 "\n", gshgeom_hash_value(&total));
   printf("shape-scene.count %lu\n", count);

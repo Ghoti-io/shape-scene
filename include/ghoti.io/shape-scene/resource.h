@@ -154,9 +154,32 @@ typedef struct GSHSCENE_Glyph_Run {
   const GSHSCENE_Glyph * glyphs; ///< The glyphs; may be NULL only when @p glyph_count is 0.
 } GSHSCENE_Glyph_Run;
 
+/**
+ * @name Accounted bytes
+ *
+ * `GSHSCENE_Limits.max_bytes` bounds the **accounted bytes** of the live
+ * resources of a store.  The figure is a formula, not a measurement of the
+ * allocator's blocks, so that the limit means the same on every target and with
+ * every allocator: a resource's base, plus, for a path, the per-element figure
+ * for each element (the most a path element, a rational cubic in 3D, can take),
+ * for a glyph run the per-glyph figure for each glyph, and for a picture the
+ * per-item figure for each item of its list.  What a resource holds by handle
+ * (a glyph's outline, an instanced picture) is a resource of its own and is
+ * counted there.  An intern that would pass the limit is
+ * ::GSHSCENE_ERR_LIMIT and builds and keeps nothing; a hit costs nothing; the
+ * last release gives the bytes back.
+ * @{
+ */
+#define GSHSCENE_BYTES_BASE ((size_t)128)        ///< Accounted bytes of any resource.
+#define GSHSCENE_BYTES_PER_PATH_ELEMENT ((size_t)160) ///< Added for each element of a path.
+#define GSHSCENE_BYTES_PER_GLYPH ((size_t)32)    ///< Added for each glyph of a run.
+#define GSHSCENE_BYTES_PER_ITEM ((size_t)256)    ///< Added for each item of a picture's list.
+/** @} */
+
 /** @brief Counters of a store, for tests and diagnostics. */
 typedef struct GSHSCENE_Store_Stats {
   uint64_t live;       ///< Resources in the table with a reference held.
+  uint64_t bytes;      ///< Accounted bytes of the live resources (see ::GSHSCENE_BYTES_BASE).
   uint64_t created;    ///< Resources ever made (the ids issued).
   uint64_t hits;       ///< Interns answered by an existing resource.
   uint64_t collisions; ///< Candidates with an equal index hash and unequal content that a lookup examined.
@@ -309,6 +332,9 @@ GSHSCENE_API uint64_t gshscene_resource_id(const GSHSCENE_Resource * resource);
 
 /** @brief The content hash, as the file comment spells it; the offset basis for NULL. */
 GSHSCENE_API uint64_t gshscene_resource_hash(const GSHSCENE_Resource * resource);
+
+/** @brief The accounted bytes of the resource (see ::GSHSCENE_BYTES_BASE); 0 for NULL. */
+GSHSCENE_API size_t gshscene_resource_bytes(const GSHSCENE_Resource * resource);
 
 /** @brief The current reference count, for tests (a racing thread makes it stale); 0 for NULL. */
 GSHSCENE_API size_t gshscene_resource_refcount(const GSHSCENE_Resource * resource);

@@ -27,6 +27,15 @@
 #                      each planted defect in tools/check-planted.py must fail a
 #                      test, and the unplanted control must pass
 #
+# The retained scene's gates (story 11), in TEST_GATES:
+#
+#   check-publish-types  an edit has no publish and cannot stand for the scene
+#                        (probes in tests/types; a self-test collapses the types)
+#   check-fuzz-corpus    the committed corpus is what tools/gen-fuzz-corpus.py writes
+#   fuzz-replay          every corpus file runs once through the recording-API fuzz
+#                        entry point; fails on no input and on a corpus that never
+#                        reaches a limit or a refusal (`make test-asan` replays it too)
+#
 # The test-executable rules keep section 6's shape: the static archive is a
 # normal prerequisite of every test because the recipe links it, and the .so
 # is order-only because check-symbols wants it and the tests do not link it.
@@ -272,7 +281,7 @@ TESTFLAGS := `PKG_CONFIG_PATH=$(PKG_CONFIG_LOOKUP_PATH) pkg-config --libs --cfla
 # check-symbols is right to reject in a shipping library.
 PLANT_JOBS ?= 4
 
-TEST_GATES ?= check-symbols check-aliasing check-stamps check-fp-contract check-edges check-libm check-no-x87 check-gates check-vectors check-corpus-hash examples
+TEST_GATES ?= check-symbols check-aliasing check-stamps check-fp-contract check-edges check-libm check-no-x87 check-gates check-vectors check-corpus-hash check-publish-types check-fuzz-corpus fuzz-replay examples
 
 VALGRIND_FLAGS := --leak-check=full --show-leak-kinds=definite,indirect,possible --track-origins=yes --error-exitcode=1 --suppressions=tests/valgrind.supp
 
@@ -390,7 +399,7 @@ $(APP_DIR)/examples/%$(EXE_EXTENSION): examples/%.c $(APP_DIR)/$(STATIC_TARGET) 
 
 .PHONY: clean cloc docs docs-pdf examples coverage check-symbols check-stamps check-aliasing
 .PHONY: check-fp-contract check-edges check-libm check-no-x87 check-gates libver-gen
-.PHONY: check-vectors check-corpus-hash check-planted
+.PHONY: check-vectors check-corpus-hash check-planted check-publish-types check-fuzz-corpus fuzz-replay
 .PHONY: all install test test-quiet test-asan test-valgrind test-valgrind-quiet test-watch uninstall watch
 .PHONY: all-debug install-debug test-debug test-valgrind-debug test-watch-debug uninstall-debug watch-debug
 .PHONY: fuzz fuzz-clean
@@ -480,6 +489,28 @@ check-corpus-hash: $(HASH_PROBE) ## Fail unless the probe prints the committed c
 
 check-vectors: ## Fail if tests/known_answers.h is not what the independent generator writes
 	@python3 tools/gen-scene-vectors.py --check
+
+# Only the application publishes (AD-9, CAP-11): what an edit can reach has no publish, and an edit cannot stand where
+# the scene goes.  The probes in tests/types are compiled, never linked: the control must compile, the violations must not.
+check-publish-types: ## Fail unless a front-end's headers offer no publish, and an edit cannot publish
+	@CC='$(CC)' CFLAGS='$(CFLAGS)' INCLUDE='$(INCLUDE)' tools/check-publish-types.sh
+
+check-fuzz-corpus: ## Fail if the committed fuzz corpus is not what the generator writes
+	@python3 tools/gen-fuzz-corpus.py --check
+
+# The recording-API fuzz target (CAP-15), replayed over its committed corpus in an ordinary build: no libFuzzer, no clang.
+# It fails on no input and on a corpus that reaches no limit and no refusal.
+FUZZ_INPUTS = $(shell find tests/fuzz/corpus -type f 2>/dev/null | sort)
+REPLAY := $(APP_DIR)/fuzz/replay_record$(EXE_EXTENSION)
+
+$(REPLAY): tests/fuzz/fuzz_record.c tests/fuzz/replay_main.c $(APP_DIR)/$(STATIC_TARGET) \
+		$(FLAGS_STAMP) | $(APP_DIR)/$(TARGET) $(LIBVER_GEN)
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) $(INCLUDE) -o $@ tests/fuzz/fuzz_record.c tests/fuzz/replay_main.c $(LDFLAGS) $(SELF_LIBRARY) $(DEP_LIBS)
+
+fuzz-replay: $(REPLAY) ## Feed every corpus file once through the fuzz entry point
+	@if [ -z "$(strip $(FUZZ_INPUTS))" ]; then printf 'fuzz-replay: no corpus files; this measures nothing\n' >&2; exit 1; fi
+	@LD_LIBRARY_PATH="$(TEST_LD_PATH)" $(REPLAY) $(FUZZ_INPUTS)
 
 # Each planted defect in tools/check-planted.py is built into a copy of the
 # sources and must fail a test (or the probe's hash); the unplanted copy is the
@@ -684,25 +715,44 @@ $(foreach pair,$(TEST_PAIRS),\
 	$(eval $(call asan-test-executable-rule,$(word 1,$(subst |, ,$(pair))),$(word 2,$(subst |, ,$(pair))))))
 
 ASAN_TEST_EXECUTABLES := $(addprefix $(ASAN_APP_DIR)/,$(addsuffix $(EXE_EXTENSION),$(TEST_NAMES)))
+ASAN_REPLAY := $(ASAN_APP_DIR)/fuzz/replay_record$(EXE_EXTENSION)
+
+$(ASAN_REPLAY): tests/fuzz/fuzz_record.c tests/fuzz/replay_main.c $(ASAN_ARCHIVE) $(ASAN_FLAGS_STAMP)
+	@mkdir -p $(@D)
+	$(CC) $(ASAN_CFLAGS) $(INCLUDE) -o $@ tests/fuzz/fuzz_record.c tests/fuzz/replay_main.c $(ASAN_LDFLAGS) $(ASAN_SELF_LIBRARY) $(DEP_LIBS)
 ASAN_RUNTIME := $(shell $(CC) -print-file-name=libasan.so 2>/dev/null)
 
-test-asan: $(ASAN_TEST_EXECUTABLES) ## Build with ASan+UBSan and run the tests
+test-asan: $(ASAN_TEST_EXECUTABLES) $(ASAN_REPLAY) ## Build with ASan+UBSan and run the tests, and the fuzz replay
 	@for test_exe in $(ASAN_TEST_EXECUTABLES); do \
 		printf '\n### ASan+UBSan %s ###\n\n' "$$(basename $$test_exe)"; \
 		LD_PRELOAD="$(ASAN_RUNTIME)$${LD_PRELOAD:+:$$LD_PRELOAD}" \
 		LD_LIBRARY_PATH="$(ASAN_APP_DIR):$(LIB_INSTALL_PATH)/$(SUITE)$(if $(DEP_LIB_DIRS),:$(DEP_LIB_DIRS))" \
 			$$test_exe --gtest_brief=1 || exit 1; \
 	done
+	@printf '\n### ASan+UBSan fuzz replay ###\n\n'
+	@LD_PRELOAD="$(ASAN_RUNTIME)$${LD_PRELOAD:+:$$LD_PRELOAD}" \
+		LD_LIBRARY_PATH="$(ASAN_APP_DIR):$(LIB_INSTALL_PATH)/$(SUITE)$(if $(DEP_LIB_DIRS),:$(DEP_LIB_DIRS))" \
+			$(ASAN_REPLAY) $(FUZZ_INPUTS)
 	@printf '\nASan+UBSan suite clean.\n'
 
 ####################################################################
-# Fuzzing: nothing here parses untrusted input yet
+# Fuzzing: the recording API, by call sequence (CAP-15, AD-19)
 ####################################################################
 
-fuzz: ## Build and run every fuzzer
-	@printf 'fuzz: no fuzzers in tests/fuzz, because nothing here parses untrusted\n'
-	@printf '      input. A fuzz build added later must name -ffp-contract=off in its\n'
-	@printf '      own FUZZ_CFLAGS and FUZZ_CXXFLAGS, which check-fp-contract then reads.\n'
+# libFuzzer needs clang; `make fuzz-replay` (in `make test`) needs only the compiler of the build. The sets below name
+# -ffp-contract=off, which check-fp-contract reads. The whole library is compiled into the fuzzer, instrumented.
+FUZZ_CC ?= clang
+FUZZ_TIME ?= 60
+FUZZ_CFLAGS := -std=c17 -O1 -g -ffp-contract=off $(ARCH_FP_FLAGS) -fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined -DGSHSCENE_BUILD
+FUZZ_CXXFLAGS := -std=c++20 -O1 -g -ffp-contract=off $(ARCH_FP_FLAGS)
+
+fuzz: ## Build the libFuzzer target and run it for FUZZ_TIME seconds from the committed corpus
+	@if ! command -v $(FUZZ_CC) >/dev/null 2>&1; then \
+		printf 'fuzz: needs %s (libFuzzer); `make fuzz-replay` runs the committed corpus without it\n' "$(FUZZ_CC)" >&2; exit 1; \
+	fi
+	@mkdir -p $(BUILD_DIR)/fuzz $(BUILD_DIR)/fuzz-corpus
+	$(FUZZ_CC) $(FUZZ_CFLAGS) $(INCLUDE) -o $(BUILD_DIR)/fuzz/fuzz_record tests/fuzz/fuzz_record.c $(SOURCES) $(LDFLAGS) $(DEP_LIBS)
+	LD_LIBRARY_PATH="$(TEST_LD_PATH)" $(BUILD_DIR)/fuzz/fuzz_record -max_total_time=$(FUZZ_TIME) $(BUILD_DIR)/fuzz-corpus tests/fuzz/corpus/record
 
 fuzz-clean: ## Remove the fuzz build
 	-@rm -rf $(BUILD_DIR)/fuzz

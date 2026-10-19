@@ -17,6 +17,15 @@ static const std::uint64_t kListHash = UINT64_C(0x70595f20f29803b4);
 static const std::uint64_t kMapIdentityHash = UINT64_C(0x1f5787abb2e02a06);
 static const std::uint64_t kMapTranslateHash = UINT64_C(0xd242bc481e41cf7c);
 static const std::uint64_t kMapDesignHash = UINT64_C(0xff01deda28fd860d);
+static const std::uint64_t kSceneHash = UINT64_C(0x6a5ea5776e3b0d66);
+static const std::uint64_t kEmptySceneHash = UINT64_C(0xc536a01cfbbd5a55);
+static const std::uint64_t kSceneBHash = UINT64_C(0x009f6999f2be7108);
+static const std::uint64_t kPathKeyEmpty = UINT64_C(0xa8c7f832281a39c5);
+static const std::uint64_t kPathKeyOne = UINT64_C(0x581cd0fa58d99645);
+static const std::uint64_t kPathKeyTwo = UINT64_C(0xf01990494f897526);
+static const std::uint64_t kPathKeyThree = UINT64_C(0xbc901b1391e9d165);
+static const int kSceneBLayer = 1;
+static const double kSceneBTranslate[4][2] = {{4.75, -4.75}, {9.0, -9.0}, {20.5, -20.5}, {23.25, -23.25}};
 
 static const char * const kSquareResourceDump =
 R"DUMP(gshscene.resource 1 kind=path hash=b0a83b16e6cec382
@@ -69,6 +78,27 @@ I res=picture:f2bfec7092d12ca5 map=d242bc481e41cf7c layer=1
 F res=glyph-run:99e3cf48a1beb8e0 map=1f5787abb2e02a06 rule=0 paint=0 4000000000000000 bfe0000000000000 0000000000000000 3fe0000000000000 space=0 layer=5
 g
 c
+)DUMP";
+static const char * const kSceneDump =
+R"DUMP(gshscene.version 1 nodes=7 root=1 hash=6a5ea5776e3b0d66
+G id=1 parent=0 flags=0 key=- map=1f5787abb2e02a06 opacity=3ff0000000000000 layer=0 clip=- children=2,4,7
+G id=2 parent=1 flags=0 key=5356470000000001:000000000000002a map=d242bc481e41cf7c opacity=3fe0000000000000 layer=3 clip=path:0a107c56241f4b98:ff01deda28fd860d:1 children=3
+S id=3 parent=2 flags=0 key=- res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=0 3fd0000000000000 3fe0000000000000 3fe8000000000000 3ff0000000000000 space=0 layer=-1
+G id=4 parent=1 flags=1 key=- map=1f5787abb2e02a06 opacity=3ff0000000000000 layer=0 clip=- children=5,6
+S id=5 parent=4 flags=0 key=0000000000000001:0000000000000002 res=glyph-run:99e3cf48a1beb8e0 map=d242bc481e41cf7c rule=1 paint=0 4000000000000000 bfe0000000000000 0000000000000000 3fe0000000000000 space=0 layer=5
+S id=6 parent=4 flags=0 key=- res=glyph-run:0187bb6b4cba610a map=1f5787abb2e02a06 rule=0 paint=0 0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 space=0 layer=0
+I id=7 parent=1 flags=0 key=- target=4 map=ff01deda28fd860d layer=9
+)DUMP";
+static const char * const kEmptySceneDump =
+R"DUMP(gshscene.version 1 nodes=1 root=1 hash=c536a01cfbbd5a55
+G id=1 parent=0 flags=0 key=- map=1f5787abb2e02a06 opacity=3ff0000000000000 layer=0 clip=- children=-
+)DUMP";
+static const char * const kSceneBDump =
+R"DUMP(gshscene.version 1 nodes=4 root=1 hash=009f6999f2be7108
+G id=1 parent=0 flags=0 key=- map=1f5787abb2e02a06 opacity=3ff0000000000000 layer=0 clip=- children=2,3,4
+G id=2 parent=1 flags=0 key=- map=0a898c9123cc4437 opacity=0000000000000000 layer=0 clip=path:0a107c56241f4b98:0d2da972f8d3f397:0 children=-
+S id=3 parent=1 flags=0 key=- res=path:0a107c56241f4b98 map=033c7f46c68504d7 rule=0 paint=0 0000000000000000 0000000000000000 0000000000000000 0000000000000000 space=0 layer=0
+I id=4 parent=1 flags=0 key=- target=2 map=0b0910304354fa37 layer=1
 )DUMP";
 
 }  // namespace known

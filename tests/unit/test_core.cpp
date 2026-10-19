@@ -49,6 +49,7 @@ TEST(Result, EveryCodeNamesItselfInWords) {
   EXPECT_STREQ(gshscene_result_string(GSHSCENE_ERR_OOM), "out of memory");
   EXPECT_STREQ(gshscene_result_string(GSHSCENE_ERR_INVALID), "invalid argument");
   EXPECT_STREQ(gshscene_result_string(GSHSCENE_ERR_INTERNAL), "internal error");
+  EXPECT_STREQ(gshscene_result_string(GSHSCENE_ERR_REFUSED), "refused");
 }
 
 TEST(Result, ACodeOutsideTheEnumHasAStringAndNoneOfTheRealOnes) {
@@ -70,7 +71,8 @@ TEST(Result, TheVocabularyIsTheSuitesFixedOneInItsOrder) {
   EXPECT_EQ((int)GSHSCENE_ERR_OOM, 6);
   EXPECT_EQ((int)GSHSCENE_ERR_INVALID, 7);
   EXPECT_EQ((int)GSHSCENE_ERR_INTERNAL, 8);
-  EXPECT_EQ((int)GSHSCENE_RESULT_COUNT, 9);
+  EXPECT_EQ((int)GSHSCENE_ERR_REFUSED, 9);  // AD-9, AD-11: the one addition; story 13 appends ERR_CANCELLED
+  EXPECT_EQ((int)GSHSCENE_RESULT_COUNT, 10);
 }
 
 TEST(Limits, DefaultsAreTheDocumentedOnes) {
@@ -84,10 +86,14 @@ TEST(Limits, DefaultsAreTheDocumentedOnes) {
   EXPECT_EQ(limits.max_depth, (size_t)256);
   EXPECT_EQ(limits.max_picture_depth, (size_t)32);
   EXPECT_EQ(limits.max_expansion, (size_t)1 << 24);
+  EXPECT_EQ(limits.max_bytes, (size_t)1 << 30);
+  EXPECT_EQ(limits.max_nodes, (size_t)1 << 22);
+  EXPECT_EQ(limits.max_node_depth, (size_t)256);
   for (unsigned char byte : limits._reserved) {
     EXPECT_EQ(byte, 0);
   }
   EXPECT_EQ(GSHSCENE_LIST_ITEMS_CEILING, (size_t)1 << 30);
+  EXPECT_EQ(GSHSCENE_NODE_DEPTH_CEILING, (size_t)1024);
 }
 
 TEST(Limits, DefaultIgnoresNull) {

@@ -21,8 +21,10 @@
 /**
  * @file types.h
  *
- * The three opaque types of the waist, declared together so that the headers
- * that name one in a signature need not include the one that defines it.
+ * The opaque types of the library, declared together so that the headers that
+ * name one in a signature need not include the one that defines it.  The first
+ * three are the waist (story 10); the rest are the retained scene above it
+ * (story 11).
  */
 
 #ifndef GHOTI_IO_GSHSCENE_TYPES_H
@@ -42,6 +44,21 @@ typedef struct GSHSCENE_Resource GSHSCENE_Resource;
 
 /** @brief A transient, arena-backed sequence of draw items.  Opaque.  See list.h. */
 typedef struct GSHSCENE_List GSHSCENE_List;
+
+/** @brief An immutable, reference-counted snapshot of a retained scene.  Opaque; shareable across threads.  See version.h. */
+typedef struct GSHSCENE_Version GSHSCENE_Version;
+
+/** @brief An unpublished set of changes opened on a version: what a front-end or driver is given.  Opaque.  See edit.h. */
+typedef struct GSHSCENE_Edit GSHSCENE_Edit;
+
+/** @brief The application's retained scene: the one object that can publish.  Opaque.  See scene.h. */
+typedef struct GSHSCENE_Scene GSHSCENE_Scene;
+
+/** @brief What a refused or invalid publish found wrong, naming IDs.  Opaque.  See scene.h. */
+typedef struct GSHSCENE_Problems GSHSCENE_Problems;
+
+/** @brief The difference between two versions: changed IDs and damage.  Opaque.  See diff.h. */
+typedef struct GSHSCENE_Diff GSHSCENE_Diff;
 
 #ifdef __cplusplus
 }

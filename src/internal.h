@@ -80,6 +80,7 @@ struct GSHSCENE_Resource {
   uint64_t id;
   uint64_t hash;  /* the content hash */
   uint64_t index; /* what the table is indexed by */
+  size_t bytes;   /* accounted bytes (resource.h) */
   GSHSCENE_Resource_Kind kind;
   union {
     GSHGEOM_Path * path;
@@ -106,6 +107,7 @@ struct GSHSCENE_Store {
   uint64_t next_id;
   uint64_t next_token;
   uint64_t live;
+  uint64_t bytes; /* accounted bytes of the live resources */
   uint64_t hits;
   uint64_t collisions;
   GSHSCENE_Listeners * listeners;
@@ -135,6 +137,7 @@ struct GSHSCENE_List {
 typedef struct GSHSCENE_Probe {
   GSHSCENE_Resource_Kind kind;
   uint64_t hash;
+  size_t bytes; /* the accounted bytes the resource will have */
   const void * source;
   /** Build the resource (not linked, one reference, a reference on the store). */
   GSHSCENE_Result (*build)(GSHSCENE_Store * store, const void * source, GSHSCENE_Resource ** out);
@@ -154,6 +157,16 @@ static inline void gshscene_free(const GSHSCENE_Allocator * alloc, void * pointe
   if (pointer) {
     alloc->free_fn(alloc->ctx, pointer);
   }
+}
+
+/** @p a plus @p b, saturating at the largest size_t. */
+static inline size_t gshscene_sat_add(size_t a, size_t b) {
+  return a > SIZE_MAX - b ? SIZE_MAX : a + b;
+}
+
+/** @p a times @p b, saturating at the largest size_t. */
+static inline size_t gshscene_sat_mul(size_t a, size_t b) {
+  return (b != 0 && a > SIZE_MAX / b) ? SIZE_MAX : a * b;
 }
 
 /** A finite double: not NaN, not infinite. */

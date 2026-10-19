@@ -290,7 +290,10 @@ GSHSCENE_Result gshscene_store_intern_path(
   if (!store || !path || !out) {
     return GSHSCENE_ERR_INVALID;
   }
-  GSHSCENE_Probe probe = {GSHSCENE_RESOURCE_PATH, path_content_hash(path), path, build_path};
+  GSHSCENE_Probe probe = {GSHSCENE_RESOURCE_PATH, path_content_hash(path),
+      gshscene_sat_add(GSHSCENE_BYTES_BASE,
+          gshscene_sat_mul(gshgeom_path_element_count(path), GSHSCENE_BYTES_PER_PATH_ELEMENT)),
+      path, build_path};
   return gshscene_store_intern(store, &probe, out);
 }
 
@@ -366,7 +369,9 @@ GSHSCENE_Result gshscene_store_intern_glyph_run(
   if (checked != GSHSCENE_OK) {
     return checked;
   }
-  GSHSCENE_Probe probe = {GSHSCENE_RESOURCE_GLYPH_RUN, run_content_hash(run, run->glyphs), run, build_run};
+  GSHSCENE_Probe probe = {GSHSCENE_RESOURCE_GLYPH_RUN, run_content_hash(run, run->glyphs),
+      gshscene_sat_add(GSHSCENE_BYTES_BASE, gshscene_sat_mul(run->glyph_count, GSHSCENE_BYTES_PER_GLYPH)),
+      run, build_run};
   return gshscene_store_intern(store, &probe, out);
 }
 
@@ -398,7 +403,9 @@ GSHSCENE_Result gshscene_store_intern_picture(
       gshscene_list_picture_depth(list) + 1 > store->limits.max_picture_depth) {
     return GSHSCENE_ERR_LIMIT;
   }
-  GSHSCENE_Probe probe = {GSHSCENE_RESOURCE_PICTURE, picture_content_hash(list), list, build_picture};
+  GSHSCENE_Probe probe = {GSHSCENE_RESOURCE_PICTURE, picture_content_hash(list),
+      gshscene_sat_add(GSHSCENE_BYTES_BASE, gshscene_sat_mul(gshscene_list_count(list), GSHSCENE_BYTES_PER_ITEM)),
+      list, build_picture};
   return gshscene_store_intern(store, &probe, out);
 }
 

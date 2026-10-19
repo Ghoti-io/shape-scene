@@ -41,9 +41,10 @@ extern "C" {
  *
  * Zero is success.  ::GSHSCENE_RESULT_COUNT closes the enum so that a test can
  * check the string table is complete.  This is the suite's fixed vocabulary
- * with nothing added (CONVENTIONS section 5); the sink contract's two further
- * results come with the sink contract.  Most of it is never returned by this
- * part of the library (it reads no bytes).
+ * (CONVENTIONS section 5) plus ::GSHSCENE_ERR_REFUSED, which AD-9 and AD-11
+ * add: a merge of edits that overlap is refused, naming the IDs.  The sink
+ * contract's `ERR_CANCELLED` comes with the sink contract.  Most of the
+ * vocabulary is never returned by this library (it reads no bytes).
  */
 typedef enum {
   GSHSCENE_OK = 0,          ///< The operation succeeded.
@@ -55,6 +56,8 @@ typedef enum {
   GSHSCENE_ERR_OOM,         ///< The allocator returned NULL.
   GSHSCENE_ERR_INVALID,     ///< A caller-supplied argument is wrong, or the call is out of sequence.
   GSHSCENE_ERR_INTERNAL,    ///< The library's own invariant failed.
+  /** A well-formed request that the library declines to carry out: edits that touch the same IDs (AD-9).  Nothing changed. */
+  GSHSCENE_ERR_REFUSED,
   GSHSCENE_RESULT_COUNT
 } GSHSCENE_Result;
 
@@ -92,6 +95,18 @@ GSHSCENE_API const char * gshscene_result_string(GSHSCENE_Result result);
 /** Default ::GSHSCENE_Limits.max_expansion: 16 Mi items once every instance is expanded. */
 #define GSHSCENE_LIMITS_DEFAULT_MAX_EXPANSION ((size_t)1 << 24)
 
+/** Default ::GSHSCENE_Limits.max_bytes: 1 GiB of accounted resource bytes in a store (see resource.h). */
+#define GSHSCENE_LIMITS_DEFAULT_MAX_BYTES ((size_t)1 << 30)
+
+/** Default ::GSHSCENE_Limits.max_nodes: 4 Mi nodes in a version. */
+#define GSHSCENE_LIMITS_DEFAULT_MAX_NODES ((size_t)1 << 22)
+
+/** Default ::GSHSCENE_Limits.max_node_depth: 256 levels of nodes in a version. */
+#define GSHSCENE_LIMITS_DEFAULT_MAX_NODE_DEPTH ((size_t)256)
+
+/** The deepest a version's tree can be whatever its limit says, so that no walk recurses further: 1024. */
+#define GSHSCENE_NODE_DEPTH_CEILING ((size_t)1024)
+
 /**
  * @brief Caps for the quantities a caller can make unbounded.
  *
@@ -107,7 +122,15 @@ typedef struct GSHSCENE_Limits {
   size_t max_list_bytes;        ///< Most bytes of arena chunks one list may take from its allocator.
   size_t max_depth;             ///< Most clips and groups open at once in one list.
   size_t max_picture_depth;     ///< Most levels of pictures nested in pictures.
-  size_t max_expansion;         ///< Most items a list is with every instance replaced by its picture's items.
+  /**
+   * Most items a list is with every instance replaced by its picture's items.  For a retained scene
+   * (version.h) the most occurrences of the root: every node once for each time it is drawn.
+   */
+  size_t max_expansion;
+  size_t max_bytes;             ///< Most accounted bytes of live resources one store may hold (resource.h).
+  size_t max_nodes;             ///< Most nodes one version may hold, the root included.
+  /** Most levels of nodes in a version, an instance's target counting as its child (at most ::GSHSCENE_NODE_DEPTH_CEILING). */
+  size_t max_node_depth;
   uint8_t _reserved[8];         ///< Reserved; zero.
 } GSHSCENE_Limits;
 

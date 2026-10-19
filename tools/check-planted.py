@@ -45,6 +45,16 @@ own plant is a flipped bit in one result.  Ids by file:
                and close, equality field by field, the hash spelling field by
                field, the dump text and its widths
 
+  nd-, ed-, sc-, vs-, wk-, va-, em-, df-, bs-, br-, bl-, bc-
+               the retained scene, generated rather than written: every
+               comparison, condition, statement, hash width, output letter
+               and returned status of src/scene and of the store's, resources'
+               and list's byte and limit code, mutated once (tools/gen-scene-plants.py
+               makes the candidates; tools/scene-plants.json holds the ones
+               the tests were seen to catch).  A few hand-written plants for
+               the constants stand beside them (VERSION_*, RANGE_LIMIT, the
+               byte constants, the problem reasons)
+
 What is NOT planted, and why.  A defect that no input can reach, or that
 changes no result, cannot be seen by any test:
 
@@ -70,7 +80,7 @@ changes no result, cannot be seen by any test:
     and segment-size overflow guards, and the 2^30 ceiling of ``max_list_items``:
     reaching them takes 2^30 items or a ``size_t`` of 32 bits and a request of
     2 GiB; the tests assert instead that a limit of ``SIZE_MAX`` is accepted
-  - the ``pthread_mutex_init`` failure arm: it cannot fail
+  - the mutex's initialisation, which is cutil's and cannot fail (``GCU_MUTEX_INIT``)
   - the checks of each ``fprintf`` and ``fputc`` of a dump, one by one: the
     final ``ferror`` of the stream makes each of them redundant; the sweep of
     failing writes (``Dump.EveryWriteOfEveryDumpIsChecked``) is what holds the
@@ -91,6 +101,18 @@ changes no result, cannot be seen by any test:
     ``is_closed(NULL)`` refuse them), a pop on a closed list (a list closes only
     at depth 0, so ``depth == 0`` refuses it), and the check of the path's
     own dump in ``gshscene_resource_dump`` (the sticky error flag, which the final test reads)
+  - of the generated candidates, the ones that no test fails on, by kind:
+    capacity and overflow guards that need 2^30 items; comparator ties between
+    distinct keys (the order is total, so a tie cannot occur); the internals of
+    the open-addressing indexes (a wrong probe step still finds the entry, only
+    slower); the lines that free, set a pointer to NULL after freeing, or
+    lock, memset and destroy (ASan or a race sees them, a result does not);
+    the out-of-memory and ``GSHSCENE_ERR_INTERNAL`` arms; the per-call return
+    checks of a dump that the final ``ferror`` makes redundant; ``qsort`` of an
+    input that is already ordered; the depth memo, which the level guard makes
+    redundant; the checks of an expansion that the check of its root dominates;
+    and the equality at ``RANGE_LIMIT``, which no double lies on.  A candidate
+    that does not compile is dropped rather than counted
   - the values of ``GSHSCENE_GLYPHS_FROM_OUTLINES`` and of the depth ordering
     context, and the ceiling constant: the library treats every other value as
     outlines or as unsupported alike, and the ceiling is 2^30 items
@@ -256,8 +278,8 @@ PLANTS = [
     ('st-intern-second-hit-uncounted', 'src', ST, '    store->hits++;\n    GCU_MUTEX_UNLOCK(store->lock);\n    gshscene_store_discard_resource(built);\n    *out = found;', '    GCU_MUTEX_UNLOCK(store->lock);\n    gshscene_store_discard_resource(built);\n    *out = found;', S),
     ('st-intern-no-second-lookup', 'src', ST, '  found = lookup(store, probe, index);\n  if (found) {\n    store->hits++;\n    GCU_MUTEX_UNLOCK(store->lock);\n    gshscene_store_discard_resource(built);', '  found = NULL;\n  if (found) {\n    store->hits++;\n    GCU_MUTEX_UNLOCK(store->lock);\n    gshscene_store_discard_resource(built);', S),
     ('st-intern-second-hit-leaks-built', 'src', ST, '    GCU_MUTEX_UNLOCK(store->lock);\n    gshscene_store_discard_resource(built);\n    *out = found;', '    GCU_MUTEX_UNLOCK(store->lock);\n    *out = found;', S),
-    ('st-intern-limit-inclusive', 'src', ST, '  if (store->live >= store->limits.max_resources) {', '  if (store->live > store->limits.max_resources) {', S),
-    ('st-intern-limit-ignored', 'src', ST, '  if (store->live >= store->limits.max_resources) {', '  if (0) {', S),
+    ('st-intern-limit-inclusive', 'src', ST, '  if (store->live >= store->limits.max_resources || !fits(store, probe->bytes)) {', '  if (store->live > store->limits.max_resources || !fits(store, probe->bytes)) {', S),
+    ('st-intern-limit-ignored', 'src', ST, '  if (store->live >= store->limits.max_resources || !fits(store, probe->bytes)) {', '  if (0 || !fits(store, probe->bytes)) {', S),
     ('st-intern-limit-leaks-built', 'src', ST, '    GCU_MUTEX_UNLOCK(store->lock);\n    gshscene_store_discard_resource(built);\n    return GSHSCENE_ERR_LIMIT;', '    GCU_MUTEX_UNLOCK(store->lock);\n    return GSHSCENE_ERR_LIMIT;', S),
     ('st-intern-limit-wrong-code', 'src', ST, '    gshscene_store_discard_resource(built);\n    return GSHSCENE_ERR_LIMIT;', '    gshscene_store_discard_resource(built);\n    return GSHSCENE_ERR_OOM;', S),
     ('st-intern-id-from-zero', 'src', ST, '  built->id = ++store->next_id;', '  built->id = store->next_id++;', S),
@@ -722,6 +744,64 @@ PLANTS = [
     ('hdr-paint-gradient', 'hdr', HP, '  GSHSCENE_PAINT_GRADIENT = 1, ///< Reserved:', '  GSHSCENE_PAINT_GRADIENT = 4, ///< Reserved:', L),
 ]
 
+# --- story 11: the constants, enumerations and spellings that no operator-level mutation reaches ----------------------
+HV = "include/ghoti.io/shape-scene/version.h"
+HE = "include/ghoti.io/shape-scene/edit.h"
+HSC = "include/ghoti.io/shape-scene/scene.h"
+HDF = "include/ghoti.io/shape-scene/diff.h"
+VS = "src/scene/version.c"
+DF = "src/scene/diff.c"
+IH = "src/scene/internal.h"
+
+PLANTS += [
+    ('v-kind-group', 'hdr', HV, 'GSHSCENE_NODE_GROUP = 1,', 'GSHSCENE_NODE_GROUP = 11,', ["testNode", "testScene_dump"]),
+    ('v-kind-shape', 'hdr', HV, 'GSHSCENE_NODE_SHAPE = 2,', 'GSHSCENE_NODE_SHAPE = 12,', ["testNode", "testScene_dump"]),
+    ('v-kind-instance', 'hdr', HV, 'GSHSCENE_NODE_INSTANCE = 3,', 'GSHSCENE_NODE_INSTANCE = 13,', ["testNode", "testScene_dump"]),
+    ('v-hidden-flag', 'hdr', HV, '#define GSHSCENE_NODE_HIDDEN ((uint32_t)1)', '#define GSHSCENE_NODE_HIDDEN ((uint32_t)2)', ["testNode", "testScene_dump"]),
+    ('v-root-id', 'hdr', HV, '#define GSHSCENE_ROOT_ID ((uint64_t)1)', '#define GSHSCENE_ROOT_ID ((uint64_t)2)', ["testScene", "testNode"]),
+    ('e-append', 'hdr', HE, '#define GSHSCENE_APPEND ((size_t)-1)', '#define GSHSCENE_APPEND ((size_t)-2)', ["testEdit", "testScene"]),
+    ('s-reason-overlap', 'hdr', HSC, 'GSHSCENE_PROBLEM_OVERLAP = 1,', 'GSHSCENE_PROBLEM_OVERLAP = 50,', ["testScene"]),
+    ('s-reason-key', 'hdr', HSC, 'GSHSCENE_PROBLEM_KEY_CONFLICT = 2,', 'GSHSCENE_PROBLEM_KEY_CONFLICT = 51,', ["testScene"]),
+    ('s-reason-dangling', 'hdr', HSC, 'GSHSCENE_PROBLEM_DANGLING_TARGET = 3,', 'GSHSCENE_PROBLEM_DANGLING_TARGET = 52,', ["testScene"]),
+    ('s-reason-cycle', 'hdr', HSC, 'GSHSCENE_PROBLEM_CYCLE = 4,', 'GSHSCENE_PROBLEM_CYCLE = 5,', ["testScene"]),
+    ('d-kind-added', 'hdr', HDF, 'GSHSCENE_DIFF_ADDED = 1,', 'GSHSCENE_DIFF_ADDED = 14,', ["testDiff", "testScene"]),
+    ('d-kind-removed', 'hdr', HDF, 'GSHSCENE_DIFF_REMOVED = 2,', 'GSHSCENE_DIFF_REMOVED = 15,', ["testDiff", "testScene"]),
+    ('d-kind-changed', 'hdr', HDF, 'GSHSCENE_DIFF_CHANGED = 3,', 'GSHSCENE_DIFF_CHANGED = 16,', ["testDiff", "testScene"]),
+    ('d-aa-default', 'hdr', HDF, '#define GSHSCENE_AA_SUPPORT_DEFAULT 1.0', '#define GSHSCENE_AA_SUPPORT_DEFAULT 2.0', ["testDiff"]),
+    ('c-refused-value', 'hdr', HC, '  GSHSCENE_ERR_REFUSED,', '  GSHSCENE_ERR_REFUSED = 20,', C),
+    ('c-default-bytes', 'hdr', HC, '#define GSHSCENE_LIMITS_DEFAULT_MAX_BYTES ((size_t)1 << 30)', '#define GSHSCENE_LIMITS_DEFAULT_MAX_BYTES ((size_t)1 << 29)', C),
+    ('c-default-nodes', 'hdr', HC, '#define GSHSCENE_LIMITS_DEFAULT_MAX_NODES ((size_t)1 << 22)', '#define GSHSCENE_LIMITS_DEFAULT_MAX_NODES ((size_t)1 << 21)', C),
+    ('c-default-node-depth', 'hdr', HC, '#define GSHSCENE_LIMITS_DEFAULT_MAX_NODE_DEPTH ((size_t)256)', '#define GSHSCENE_LIMITS_DEFAULT_MAX_NODE_DEPTH ((size_t)255)', C + ["testScene_limits"]),
+    ('c-depth-ceiling', 'hdr', HC, '#define GSHSCENE_NODE_DEPTH_CEILING ((size_t)1024)', '#define GSHSCENE_NODE_DEPTH_CEILING ((size_t)1025)', C + ["testScene_limits"]),
+    ('r-bytes-base', 'hdr', HR, '#define GSHSCENE_BYTES_BASE ((size_t)128)', '#define GSHSCENE_BYTES_BASE ((size_t)129)', ["testBytes"]),
+    ('r-bytes-path', 'hdr', HR, '#define GSHSCENE_BYTES_PER_PATH_ELEMENT ((size_t)160)', '#define GSHSCENE_BYTES_PER_PATH_ELEMENT ((size_t)161)', ["testBytes"]),
+    ('r-bytes-glyph', 'hdr', HR, '#define GSHSCENE_BYTES_PER_GLYPH ((size_t)32)', '#define GSHSCENE_BYTES_PER_GLYPH ((size_t)33)', ["testBytes"]),
+    ('r-bytes-item', 'hdr', HR, '#define GSHSCENE_BYTES_PER_ITEM ((size_t)256)', '#define GSHSCENE_BYTES_PER_ITEM ((size_t)257)', ["testBytes"]),
+    ('rs-bytes-path-uses-glyph-figure', 'src', RS, 'GSHSCENE_BYTES_PER_PATH_ELEMENT)),\n      path, build_path};', 'GSHSCENE_BYTES_PER_GLYPH)),\n      path, build_path};', ["testBytes"]),
+    ('rs-bytes-run-uses-item-figure', 'src', RS, 'GSHSCENE_BYTES_PER_GLYPH)),\n      run, build_run};', 'GSHSCENE_BYTES_PER_ITEM)),\n      run, build_run};', ["testBytes"]),
+    ('rs-bytes-picture-uses-glyph-figure', 'src', RS, 'GSHSCENE_BYTES_PER_ITEM)),\n      list, build_picture};', 'GSHSCENE_BYTES_PER_GLYPH)),\n      list, build_picture};', ["testBytes"]),
+    ('rs-bytes-path-no-base', 'src', RS, 'gshscene_sat_add(GSHSCENE_BYTES_BASE,\n          gshscene_sat_mul(gshgeom_path_element_count(path)', 'gshscene_sat_add(0,\n          gshscene_sat_mul(gshgeom_path_element_count(path)', ["testBytes"]),
+    ('rs-bytes-run-no-base', 'src', RS, 'gshscene_sat_add(GSHSCENE_BYTES_BASE, gshscene_sat_mul(run->glyph_count', 'gshscene_sat_add(0, gshscene_sat_mul(run->glyph_count', ["testBytes"]),
+    ('rs-bytes-picture-no-base', 'src', RS, 'gshscene_sat_add(GSHSCENE_BYTES_BASE, gshscene_sat_mul(gshscene_list_count(list)', 'gshscene_sat_add(0, gshscene_sat_mul(gshscene_list_count(list)', ["testBytes"]),
+]
+PLANTS += [
+    ('vs-format-version', 'src', IH, '#define VERSION_FORMAT_VERSION 1u', '#define VERSION_FORMAT_VERSION 2u', ["testScene_dump"]),
+    ('vs-hash-kind', 'src', IH, '#define VERSION_HASH_KIND UINT32_C(0x4e454353)', '#define VERSION_HASH_KIND UINT32_C(0x4e454354)', ["testScene_dump"]),
+    ('df-range-limit-high', 'src', DF, '#define RANGE_LIMIT 4.0e18', '#define RANGE_LIMIT 4.0e30', ["testDiff"]),
+    ('df-range-limit-low', 'src', DF, '#define RANGE_LIMIT 4.0e18', '#define RANGE_LIMIT 4.0e3', ["testDiff"]),
+]
+
+
+# The generated plants (tools/gen-scene-plants.py): the mutations of src/scene
+# the sweep was seen to catch.  PLANT_EXTRA_JSON names another file to run
+# in addition, which is how a regenerated candidate list is triaged.
+import json
+for _file in [str(ROOT / "tools" / "scene-plants.json")] + (
+        [os.environ["PLANT_EXTRA_JSON"]] if os.environ.get("PLANT_EXTRA_JSON") else []):
+    with open(_file) as _f:
+        PLANTS += [tuple(x) for x in json.load(_f)]
+
+
 def run(cmd, shell=False, env_extra=None, cwd=None):
     environment = dict(os.environ)
     if env_extra:
@@ -753,7 +833,8 @@ def link_test(test, objs, out):
 def _limits():
     """A planted defect may loop or allocate without end; bound both."""
     import resource
-    resource.setrlimit(resource.RLIMIT_AS, (3 << 30, 3 << 30))
+    limit = int(float(os.environ.get("PLANT_AS_GB", "3")) * (1 << 30))
+    resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
     resource.setrlimit(resource.RLIMIT_CPU, (120, 120))
 
 
@@ -781,6 +862,39 @@ def probe_hash(objs, d, extra=()):
     return c.returncode, (c.stdout + c.stderr).strip()
 
 
+def replay_run(objs, d):
+    """The fuzz replay over the committed corpus, built against the planted objects."""
+    exe = d / "replay"
+    cmd = "%s -o %s tests/fuzz/fuzz_record.c tests/fuzz/replay_main.c %s %s" % (
+        " ".join(CC + PROBE_CFLAGS), exe, " ".join(objs), PROBE_LIBS)
+    r = run(cmd, shell=True)
+    if r.returncode != 0:
+        raise RuntimeError("cannot build the replay:\n%s" % r.stderr)
+    inputs = sorted(str(p) for p in (ROOT / "tests" / "fuzz" / "corpus").rglob("*") if p.is_file())
+    environment = dict(os.environ)
+    environment["LD_LIBRARY_PATH"] = LD_PATH
+    try:
+        c = subprocess.run([str(exe)] + inputs, capture_output=True, text=True, env=environment, cwd=ROOT, timeout=180,
+                           preexec_fn=_limits)
+    except subprocess.TimeoutExpired:
+        return 1, "[  FAILED  ] replay timed out"
+    return c.returncode, "replay: " + (c.stdout + c.stderr).strip().splitlines()[-1] if (c.stdout + c.stderr).strip() else "replay: no output"
+
+
+def apply_line(text, spec, new, label):
+    """A plant addressed by line: spec is "LINE:FRAGMENT"; FRAGMENT must occur exactly once on that line."""
+    number, fragment = spec.split(":", 1)
+    lines = text.split("\n")
+    line = lines[int(number) - 1]
+    n = line.count(fragment)
+    if n != 1:
+        raise RuntimeError("plant %s: the fragment occurs %d times on line %s, not once:\n%s\n%s" % (label, n, number, fragment, line))
+    if fragment == new:
+        raise RuntimeError("plant %s: the replacement changes nothing" % label)
+    lines[int(number) - 1] = line.replace(fragment, new)
+    return "\n".join(lines)
+
+
 def apply(text, old, new, label):
     n = text.count(old)
     if n != 1:
@@ -796,21 +910,25 @@ def do_plant(plant, control_objs):
     shutil.rmtree(d, ignore_errors=True)
     d.mkdir(parents=True)
     srcs = sources()
-    if kind == "src":
-        text = apply((ROOT / fname).read_text(), old, new, pid)
+    if kind in ("src", "srcl"):
+        original = (ROOT / fname).read_text()
+        text = apply(original, old, new, pid) if kind == "src" else apply_line(original, old, new, pid)
         planted = d / "planted" / fname
         planted.parent.mkdir(parents=True, exist_ok=True)
         # A source may include a neighbour by a relative path ("../exact/exact.h"),
         # so the planted file sits in a copy of the whole tree.
         shutil.copytree(ROOT / "src", d / "planted" / "src", dirs_exist_ok=True)
         planted.write_text(text)
-        obj = d / "planted.o"
-        r = run(CC + CFLAGS + ["-c", str(planted), "-o", str(obj)])
-        if r.returncode != 0:
-            raise RuntimeError("plant %s does not compile:\n%s" % (pid, r.stderr))
-        base = str(ROOT / fname)
-        objs = [str(obj) if o.endswith(fname.replace("/", "_") + ".o") else o for o in control_objs]
-        assert str(obj) in objs, pid
+        if fname.endswith(".h"):
+            # A private header: every source that includes it is rebuilt from the planted copy.
+            objs = compile_all(d / "obj", [str(d / "planted" / s) for s in srcs])
+        else:
+            obj = d / "planted.o"
+            r = run(CC + CFLAGS + ["-c", str(planted), "-o", str(obj)])
+            if r.returncode != 0:
+                raise RuntimeError("plant %s does not compile:\n%s" % (pid, r.stderr))
+            objs = [str(obj) if o.endswith(fname.replace("/", "_") + ".o") else o for o in control_objs]
+            assert str(obj) in objs, pid
     else:
         text = apply((ROOT / fname).read_text(), old, new, pid)
         hdr = d / "include" / Path(fname).relative_to("include")
@@ -819,11 +937,19 @@ def do_plant(plant, control_objs):
         objs = compile_all(d / "obj", srcs, pre=["-I" + str(d / "include")])
     caught_by = []
     for test in tests:
-        exe = d / test
-        link_test(test, objs, exe)
-        rc, failing = run_test(exe)
+        if test == "fuzz-replay":
+            rc, msg = replay_run(objs, d)
+            failing = [msg]
+        elif test == "probe":
+            rc, msg = probe_hash(objs, d)
+            failing = [msg]
+        else:
+            exe = d / test
+            link_test(test, objs, exe)
+            rc, failing = run_test(exe)
         if rc != 0:
             caught_by.append((test, failing[:1]))
+            break  # one failing test is what a plant needs; the rest would only cost time
     return pid, caught_by
 
 
@@ -846,7 +972,11 @@ def main():
     if rc != 0:
         print("FAIL  control: the probe does not print the committed hash: %s" % msg)
         return 1
-    print("ok    control: %d tests and the probe pass on the unplanted build" % len(TESTS))
+    rc, msg = replay_run(control, WORK)
+    if rc != 0:
+        print("FAIL  control: the fuzz replay fails on the unplanted build: %s" % msg)
+        return 1
+    print("ok    control: %d tests, the probe and the fuzz replay pass on the unplanted build" % len(TESTS))
 
     ids = [p[0] for p in PLANTS]
     if len(set(ids)) != len(ids):

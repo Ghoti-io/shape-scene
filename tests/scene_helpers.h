@@ -110,6 +110,15 @@ struct Ref {
   ~Ref() { gshscene_resource_release(resource); }
   Ref(const Ref &) = delete;
   Ref & operator=(const Ref &) = delete;
+  Ref(Ref && other) noexcept : resource(other.resource) { other.resource = nullptr; }
+  Ref & operator=(Ref && other) noexcept {
+    if (this != &other) {
+      gshscene_resource_release(resource);
+      resource = other.resource;
+      other.resource = nullptr;
+    }
+    return *this;
+  }
   const GSHSCENE_Resource * get() const { return resource; }
 };
 
