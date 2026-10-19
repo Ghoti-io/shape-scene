@@ -31,6 +31,8 @@
 
 #include "internal.h"
 
+#include <string.h>
+
 /* The composition of two valid 2D maps: a failure is a result out of range. */
 static GSHSCENE_Result compose(const GSHGEOM_Map * outer, const GSHGEOM_Map * inner, GSHGEOM_Map * out) {
   GSHGEOM_Result result = gshgeom_map_compose(outer, inner, out);
@@ -51,8 +53,105 @@ GSHSCENE_Result gshscene_walk_compose(
 }
 
 static GSHSCENE_Result walk_node(GSHSCENE_Walk * w, const GSHSCENE_Node_Rec * node, int force,
-    const GSHGEOM_Map * base, size_t level) {
-  if (!force && (node->p.flags & GSHSCENE_NODE_HIDDEN)) {
+    const GSHGEOM_Map * base, size_t level, uint32_t context);
+
+static int node_hidden(const GSHSCENE_Node_Rec * node) {
+  return (node->p.flags & GSHSCENE_NODE_HIDDEN) != 0;
+}
+
+/* Whether the child @p b is painted strictly before the child @p a (a stable merge sort's test): N11's context, then
+ * for depth the ID, which orders siblings as their instance paths do (the paths differ in the last element only). */
+static int child_before(uint32_t context, const GSHSCENE_Node_Rec * b, const GSHSCENE_Node_Rec * a) {
+  int tied;
+  int order = gshscene_order_compare(context, b->p.layer, b->p.depth, a->p.layer, a->p.depth, &tied);
+  if (order == 0 && context == (uint32_t)GSHSCENE_ORDER_DEPTH) {
+    return b->id < a->id;
+  }
+  return order < 0;
+}
+
+static void children_sort(
+    uint32_t context, const GSHSCENE_Node_Rec ** nodes, const GSHSCENE_Node_Rec ** temp, size_t count) {
+  for (size_t width = 1; width < count; width *= 2) {
+    for (size_t lo = 0; lo < count; lo += 2 * width) {
+      size_t mid = lo + width < count ? lo + width : count;
+      size_t hi = lo + 2 * width < count ? lo + 2 * width : count;
+      size_t i = lo;
+      size_t j = mid;
+      size_t k = lo;
+      while (i < mid && j < hi) {
+        if (child_before(context, nodes[j], nodes[i])) {
+          temp[k++] = nodes[j++];
+        } else {
+          temp[k++] = nodes[i++];
+        }
+      }
+      while (i < mid) {
+        temp[k++] = nodes[i++];
+      }
+      while (j < hi) {
+        temp[k++] = nodes[j++];
+      }
+    }
+    memcpy(nodes, temp, count * sizeof *nodes);
+  }
+}
+
+/* The children of a group in the order its context gives, the ties of a depth group reported as they are found. */
+static GSHSCENE_Result walk_ordered_children(GSHSCENE_Walk * w, const GSHSCENE_Node_Rec * node,
+    const GSHGEOM_Map * group_base, size_t level) {
+  const GSHSCENE_Allocator * alloc = &w->version->core->alloc;
+  uint32_t context = node->p.ordering;
+  size_t room = node->child_count ? node->child_count : 1;
+  if (room > SIZE_MAX / (2 * sizeof(const GSHSCENE_Node_Rec *))) {
+    return GSHSCENE_ERR_OOM;
+  }
+  const GSHSCENE_Node_Rec ** list = gshscene_alloc(alloc, 2 * room * sizeof *list);
+  if (!list) {
+    return GSHSCENE_ERR_OOM;
+  }
+  const GSHSCENE_Node_Rec ** temp = list + room;
+  size_t count = 0;
+  GSHSCENE_Result result = GSHSCENE_OK;
+  for (size_t i = 0; i < node->child_count && result == GSHSCENE_OK; i++) {
+    const GSHSCENE_Node_Rec * child = gshscene_version_find(w->version, node->children[i]);
+    if (!child) {
+      result = GSHSCENE_ERR_INTERNAL;
+    } else if (!node_hidden(child)) {
+      list[count++] = child;
+    }
+  }
+  if (result == GSHSCENE_OK) {
+    children_sort(context, list, temp, count);
+  }
+  const GSHSCENE_Node_Rec * previous = NULL; /* the last child that made any items */
+  size_t previous_pos = 0;
+  for (size_t i = 0; i < count && result == GSHSCENE_OK; i++) {
+    const GSHSCENE_Node_Rec * child = list[i];
+    size_t before = w->ops->position ? w->ops->position(w->ctx) : 0;
+    result = walk_node(w, child, 0, group_base, level + 1, context);
+    if (result != GSHSCENE_OK) {
+      break;
+    }
+    size_t after = w->ops->position ? w->ops->position(w->ctx) : 0;
+    if (after == before) {
+      continue; /* it made nothing: not a unit of the sequence */
+    }
+    if (previous && context == (uint32_t)GSHSCENE_ORDER_DEPTH && w->ops->tie &&
+        previous->p.depth == child->p.depth) {
+      GSHSCENE_Tie_Reason reason = previous->p.layer != child->p.layer ? GSHSCENE_TIE_LAYER : GSHSCENE_TIE_PATH;
+      result = w->ops->tie(w->ctx, w, previous_pos, before, child->p.depth, reason);
+    }
+    previous = child;
+    previous_pos = before;
+  }
+  gshscene_free(alloc, list);
+  return result;
+}
+
+static GSHSCENE_Result walk_node(GSHSCENE_Walk * w, const GSHSCENE_Node_Rec * node, int force,
+    const GSHGEOM_Map * base, size_t level, uint32_t context) {
+  if (!force && node_hidden(node)) {
     return GSHSCENE_OK;
   }
   /* A published version is validated to be no deeper than this; the check keeps the recursion bounded if it were not. */
@@ -68,22 +167,31 @@ static GSHSCENE_Result walk_node(GSHSCENE_Walk * w, const GSHSCENE_Node_Rec * no
         return result;
       }
       if (w->ops->group_enter) {
+        w->context = context;
         result = w->ops->group_enter(w->ctx, w, node, &group_base);
         if (result != GSHSCENE_OK) {
           return result;
         }
       }
-      for (size_t i = 0; i < node->child_count; i++) {
-        const GSHSCENE_Node_Rec * child = gshscene_version_find(w->version, node->children[i]);
-        if (!child) {
-          return GSHSCENE_ERR_INTERNAL;
-        }
-        result = walk_node(w, child, 0, &group_base, level + 1);
+      if (node->p.ordering != (uint32_t)GSHSCENE_ORDER_FLAT) {
+        result = walk_ordered_children(w, node, &group_base, level);
         if (result != GSHSCENE_OK) {
           return result;
         }
+      } else {
+        for (size_t i = 0; i < node->child_count; i++) {
+          const GSHSCENE_Node_Rec * child = gshscene_version_find(w->version, node->children[i]);
+          if (!child) {
+            return GSHSCENE_ERR_INTERNAL;
+          }
+          result = walk_node(w, child, 0, &group_base, level + 1, GSHSCENE_ORDER_FLAT);
+          if (result != GSHSCENE_OK) {
+            return result;
+          }
+        }
       }
       if (w->ops->group_leave) {
+        w->context = context;
         result = w->ops->group_leave(w->ctx, w, node);
       }
       return result;
@@ -121,7 +229,7 @@ static GSHSCENE_Result walk_node(GSHSCENE_Walk * w, const GSHSCENE_Node_Rec * no
       w->chain[w->path_count] = item_map;
       w->path[w->path_count] = node->id;
       w->path_count++;
-      result = walk_node(w, target, 1, &identity, level + 1);
+      result = walk_node(w, target, 1, &identity, level + 1, GSHSCENE_ORDER_FLAT);
       w->path_count--;
       if (result == GSHSCENE_OK && w->ops->instance_leave) {
         result = w->ops->instance_leave(w->ctx, w, node);
@@ -148,7 +256,8 @@ GSHSCENE_Result gshscene_walk(const struct GSHSCENE_Version * version, const GSH
     gshscene_free(alloc, walk.chain);
     return GSHSCENE_ERR_OOM;
   }
-  GSHSCENE_Result result = walk_node(&walk, node, force, base, 1);
+  walk.context = GSHSCENE_ORDER_FLAT;
+  GSHSCENE_Result result = walk_node(&walk, node, force, base, 1, GSHSCENE_ORDER_FLAT);
   gshscene_free(alloc, walk.path);
   gshscene_free(alloc, walk.chain);
   return result;

@@ -74,6 +74,10 @@ struct Fixture {
     GSHSCENE_Key k42 = K(UINT64_C(0x5356470000000001), 42);
     GSHSCENE_Key k12 = K(1, 2);
     GSHSCENE_Node g2 = group_node(0.5, 3);
+    g2.depth = -1.25;
+    g2.blend_space = linear_srgb_space();
+    g2.composite = GSHSCENE_COMPOSITE_XOR;
+    g2.ordering = GSHSCENE_ORDER_DEPTH;
     g2.map = translate(1.5, -2.25);
     g2.clip = p2.get();
     g2.clip_map = design;
@@ -81,6 +85,8 @@ struct Fixture {
     add(e.edit, GSHSCENE_ROOT_ID, g2, &k42);                                    // 2
     GSHSCENE_Node s3 = shape_node(sq.get(), -1);
     s3.paint = solid(0.25, 0.5, 0.75, 1.0);
+    s3.paint.space = space_of(GCOL_PRIMARIES_ADOBE_RGB, GCOL_TRANSFER_GAMMA, 2.19921875);
+    s3.depth = 2.5;
     add(e.edit, 2, s3);                                                          // 3
     GSHSCENE_Node g4 = group_node();
     g4.flags = GSHSCENE_NODE_HIDDEN;
@@ -90,10 +96,16 @@ struct Fixture {
     s5.fill_rule = GSHGEOM_FILL_EVEN_ODD;
     s5.paint = solid(2.0, -0.5, 0.0, 0.5);
     add(e.edit, 4, s5, &k12);                                                    // 5
-    add(e.edit, 4, shape_node(font_run.get()));                                  // 6
+    GSHSCENE_Node s6 = shape_node(font_run.get());
+    s6.paint = solid(0.0, 0.0, 0.0, 0.25);
+    s6.paint.kind = GSHSCENE_PAINT_FOREGROUND;
+    add(e.edit, 4, s6);                                                          // 6
     GSHSCENE_Node i7 = instance_node(4, 9);
     i7.map = design;
+    i7.depth = -4.5;
     add(e.edit, GSHSCENE_ROOT_ID, i7);                                           // 7
+    GSHSCENE_Color fg = {{1.0, 0.5, 0.25, 0.75}, space_of(GCOL_PRIMARIES_DISPLAY_P3, GCOL_TRANSFER_GAMMA, 2.2)};
+    EXPECT_EQ(gshscene_edit_set_foreground(e.edit, &fg), GSHSCENE_OK);
     publish(s, e, &v);
   }
 };
@@ -218,6 +230,14 @@ TEST(VersionHash, EveryFieldOfEveryNodeKindChangesIt) {
       {"group map", [&](Fixture & f, GSHSCENE_Edit * e) { set_group2(f, e, [](GSHSCENE_Node & n) { n.map = translate(9, 9); }); }},
       {"group opacity", [&](Fixture & f, GSHSCENE_Edit * e) { set_group2(f, e, [](GSHSCENE_Node & n) { n.opacity = 0.25; }); }},
       {"group layer", [&](Fixture & f, GSHSCENE_Edit * e) { set_group2(f, e, [](GSHSCENE_Node & n) { n.layer = 4; }); }},
+      {"group depth", [&](Fixture & f, GSHSCENE_Edit * e) { set_group2(f, e, [](GSHSCENE_Node & n) { n.depth = 1.5; }); }},
+      {"group blend primaries", [&](Fixture & f, GSHSCENE_Edit * e) { set_group2(f, e, [](GSHSCENE_Node & n) { n.blend_space.primaries = GCOL_PRIMARIES_BT2020; }); }},
+      {"group blend transfer", [&](Fixture & f, GSHSCENE_Edit * e) { set_group2(f, e, [](GSHSCENE_Node & n) { n.blend_space.transfer = GCOL_TRANSFER_SRGB; }); }},
+      {"group blend gamma", [&](Fixture & f, GSHSCENE_Edit * e) { set_group2(f, e, [](GSHSCENE_Node & n) { n.blend_space = space_of(GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_GAMMA, 2.4); }); }},
+      {"group target blend", [&](Fixture & f, GSHSCENE_Edit * e) { set_group2(f, e, [](GSHSCENE_Node & n) { n.blend_space = GSHSCENE_Color_Space{}; }); }},
+      {"group composite", [&](Fixture & f, GSHSCENE_Edit * e) { set_group2(f, e, [](GSHSCENE_Node & n) { n.composite = GSHSCENE_COMPOSITE_PLUS; }); }},
+      {"group ordering", [&](Fixture & f, GSHSCENE_Edit * e) { set_group2(f, e, [](GSHSCENE_Node & n) { n.ordering = GSHSCENE_ORDER_OVERLAY; }); }},
+      {"group flat", [&](Fixture & f, GSHSCENE_Edit * e) { set_group2(f, e, [](GSHSCENE_Node & n) { n.ordering = GSHSCENE_ORDER_FLAT; }); }},
       {"group flags", [&](Fixture & f, GSHSCENE_Edit * e) { set_group2(f, e, [](GSHSCENE_Node & n) { n.flags = GSHSCENE_NODE_HIDDEN; }); }},
       {"clip resource", [&](Fixture & f, GSHSCENE_Edit * e) { set_group2(f, e, [&](GSHSCENE_Node & n) { n.clip = f.sq.get(); }); }},
       {"clip map", [&](Fixture & f, GSHSCENE_Edit * e) { set_group2(f, e, [](GSHSCENE_Node & n) { n.clip_map = translate(1, 1); }); }},
@@ -231,11 +251,24 @@ TEST(VersionHash, EveryFieldOfEveryNodeKindChangesIt) {
       {"shape blue", [&](Fixture &, GSHSCENE_Edit * e) { set_node(e, 3, [](GSHSCENE_Node & n) { n.paint.rgba[2] = 0.125; }); }},
       {"shape alpha", [&](Fixture &, GSHSCENE_Edit * e) { set_node(e, 3, [](GSHSCENE_Node & n) { n.paint.rgba[3] = 0.5; }); }},
       {"shape layer", [&](Fixture &, GSHSCENE_Edit * e) { set_node(e, 3, [](GSHSCENE_Node & n) { n.layer = 77; }); }},
+      {"shape depth", [&](Fixture &, GSHSCENE_Edit * e) { set_node(e, 3, [](GSHSCENE_Node & n) { n.depth = -2.5; }); }},
+      {"shape paint primaries", [&](Fixture &, GSHSCENE_Edit * e) { set_node(e, 3, [](GSHSCENE_Node & n) { n.paint.space.primaries = GCOL_PRIMARIES_SRGB; }); }},
+      {"shape paint transfer", [&](Fixture &, GSHSCENE_Edit * e) { set_node(e, 3, [](GSHSCENE_Node & n) { n.paint.space.transfer = GCOL_TRANSFER_LINEAR; n.paint.space.gamma = 0.0; }); }},
+      {"shape paint gamma", [&](Fixture &, GSHSCENE_Edit * e) { set_node(e, 3, [](GSHSCENE_Node & n) { n.paint.space.gamma = 2.2; }); }},
+      {"shape paint kind", [&](Fixture &, GSHSCENE_Edit * e) { set_node(e, 3, [](GSHSCENE_Node & n) { n.paint = solid(0, 0, 0, 0.25); n.paint.kind = GSHSCENE_PAINT_FOREGROUND; }); }},
+      {"foreground alpha multiplier", [&](Fixture &, GSHSCENE_Edit * e) { set_node(e, 6, [](GSHSCENE_Node & n) { n.paint.rgba[3] = 0.5; }); }},
       {"shape layer sign", [&](Fixture &, GSHSCENE_Edit * e) { set_node(e, 3, [](GSHSCENE_Node & n) { n.layer = 1; }); }},
       {"shape hidden", [&](Fixture &, GSHSCENE_Edit * e) { set_node(e, 3, [](GSHSCENE_Node & n) { n.flags = GSHSCENE_NODE_HIDDEN; }); }},
       {"instance target", [&](Fixture &, GSHSCENE_Edit * e) { set_node(e, 7, [](GSHSCENE_Node & n) { n.target = 2; }); }},
       {"instance map", [&](Fixture &, GSHSCENE_Edit * e) { set_node(e, 7, [](GSHSCENE_Node & n) { n.map = translate(2, 2); }); }},
       {"instance layer", [&](Fixture &, GSHSCENE_Edit * e) { set_node(e, 7, [](GSHSCENE_Node & n) { n.layer = 10; }); }},
+      {"instance depth", [&](Fixture &, GSHSCENE_Edit * e) { set_node(e, 7, [](GSHSCENE_Node & n) { n.depth = 4.5; }); }},
+      {"foreground red", [&](Fixture &, GSHSCENE_Edit * e) { GSHSCENE_Color c; gshscene_edit_foreground(e, &c); c.rgba[0] = 0.0; gshscene_edit_set_foreground(e, &c); }},
+      {"foreground green", [&](Fixture &, GSHSCENE_Edit * e) { GSHSCENE_Color c; gshscene_edit_foreground(e, &c); c.rgba[1] = 0.0; gshscene_edit_set_foreground(e, &c); }},
+      {"foreground blue", [&](Fixture &, GSHSCENE_Edit * e) { GSHSCENE_Color c; gshscene_edit_foreground(e, &c); c.rgba[2] = 0.0; gshscene_edit_set_foreground(e, &c); }},
+      {"foreground alpha", [&](Fixture &, GSHSCENE_Edit * e) { GSHSCENE_Color c; gshscene_edit_foreground(e, &c); c.rgba[3] = 0.5; gshscene_edit_set_foreground(e, &c); }},
+      {"foreground space", [&](Fixture &, GSHSCENE_Edit * e) { GSHSCENE_Color c; gshscene_edit_foreground(e, &c); c.space = GSHSCENE_Color_Space{}; gshscene_edit_set_foreground(e, &c); }},
+      {"foreground gamma", [&](Fixture &, GSHSCENE_Edit * e) { GSHSCENE_Color c; gshscene_edit_foreground(e, &c); c.space.gamma = 2.4; gshscene_edit_set_foreground(e, &c); }},
       {"unhide", [&](Fixture &, GSHSCENE_Edit * e) { set_node(e, 4, [](GSHSCENE_Node & n) { n.flags = 0; }); }},
       {"reorder children", [&](Fixture &, GSHSCENE_Edit * e) { ASSERT_EQ(gshscene_edit_move(e, 4, GSHSCENE_ROOT_ID, 0), GSHSCENE_OK); }},
       {"move node", [&](Fixture &, GSHSCENE_Edit * e) { ASSERT_EQ(gshscene_edit_move(e, 3, 4, 0), GSHSCENE_OK); }},
@@ -291,6 +324,15 @@ double dbl(const std::string & s) {
   return d;
 }
 
+/** A space written `P:T:<gamma hex>` into the hash: u8, u8, f64. */
+void hash_space(GSHGEOM_Hash * h, const std::string & text) {
+  size_t a = text.find(':');
+  size_t b = text.find(':', a + 1);
+  gshgeom_hash_u8(h, (uint8_t)std::stoul(text.substr(0, a)));
+  gshgeom_hash_u8(h, (uint8_t)std::stoul(text.substr(a + 1, b - a - 1)));
+  gshgeom_hash_f64(h, dbl(text.substr(b + 1)));
+}
+
 }  // namespace
 
 TEST(VersionDump, ParsesBackToTheFieldsTheHashIsOver) {
@@ -298,13 +340,33 @@ TEST(VersionDump, ParsesBackToTheFieldsTheHashIsOver) {
   std::vector<std::string> lines = lines_of(dump_version(f.v.get()));
   ASSERT_GE(lines.size(), 2u);
   auto header = fields_of(lines[0], 2);
-  ASSERT_EQ(lines[0].substr(0, 18), "gshscene.version 1");
+  ASSERT_EQ(lines[0].substr(0, 18), "gshscene.version 2");
   EXPECT_EQ(std::stoull(header["nodes"]), lines.size() - 1);
   EXPECT_EQ(header["root"], "1");
   GSHGEOM_Hash h;
   gshgeom_hash_init(&h);
-  gshgeom_hash_u32(&h, 1);
+  gshgeom_hash_u32(&h, 2);
   gshgeom_hash_u32(&h, 0x4e454353u);
+  {
+    // The foreground: four bare doubles and a space after `fg=`.
+    std::istringstream in(lines[0]);
+    std::string tok;
+    std::vector<std::string> fgtok;
+    bool after = false;
+    while (in >> tok) {
+      if (tok.rfind("fg=", 0) == 0) {
+        after = true;
+        fgtok.push_back(tok.substr(3));
+      } else if (after && tok.rfind("hash=", 0) != 0) {
+        fgtok.push_back(tok);
+      }
+    }
+    ASSERT_EQ(fgtok.size(), 5u);
+    for (int k = 0; k < 4; k++) {
+      gshgeom_hash_f64(&h, dbl(fgtok[k]));
+    }
+    hash_space(&h, fgtok[4]);
+  }
   gshgeom_hash_u64(&h, lines.size() - 1);
   uint64_t last_id = 0;
   for (size_t i = 1; i < lines.size(); i++) {
@@ -328,7 +390,11 @@ TEST(VersionDump, ParsesBackToTheFieldsTheHashIsOver) {
     if (kind == 1) {
       gshgeom_hash_u64(&h, hex(fld["map"]));
       gshgeom_hash_f64(&h, dbl(fld["opacity"]));
+      hash_space(&h, fld["blend"]);
+      gshgeom_hash_u8(&h, (uint8_t)std::stoul(fld["composite"]));
+      gshgeom_hash_u32(&h, (uint32_t)std::stoul(fld["order"]));
       gshgeom_hash_i32(&h, (int32_t)std::stol(fld["layer"]));
+      gshgeom_hash_f64(&h, dbl(fld["depth"]));
       if (fld["clip"] == "-") {
         gshgeom_hash_u8(&h, 0);
       } else {
@@ -375,12 +441,14 @@ TEST(VersionDump, ParsesBackToTheFieldsTheHashIsOver) {
       for (int k = 0; k < 4; k++) {
         gshgeom_hash_f64(&h, rgba[k]);
       }
-      gshgeom_hash_u32(&h, (uint32_t)std::stoul(fld["space"]));
+      hash_space(&h, fld["space"]);
       gshgeom_hash_i32(&h, (int32_t)std::stol(fld["layer"]));
+      gshgeom_hash_f64(&h, dbl(fld["depth"]));
     } else {
       gshgeom_hash_u64(&h, std::stoull(fld["target"]));
       gshgeom_hash_u64(&h, hex(fld["map"]));
       gshgeom_hash_i32(&h, (int32_t)std::stol(fld["layer"]));
+      gshgeom_hash_f64(&h, dbl(fld["depth"]));
     }
   }
   EXPECT_EQ(gshgeom_hash_value(&h), hex(header["hash"]));

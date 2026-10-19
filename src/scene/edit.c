@@ -252,7 +252,29 @@ void gshscene_edit_destroy(GSHSCENE_Edit * edit) {
 /* The edit's changes are spent: published into a version. */
 void gshscene_edit_spend(GSHSCENE_Edit * edit) {
   edit_release_changes(edit);
+  edit->fg_set = 0;
   edit->spent = 1;
+}
+
+GSHSCENE_Result gshscene_edit_set_foreground(GSHSCENE_Edit * edit, const GSHSCENE_Color * color) {
+  if (!edit || edit->spent || !color) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  GSHSCENE_Result result = gshscene_color_check(color);
+  if (result != GSHSCENE_OK) {
+    return result;
+  }
+  edit->fg = *color;
+  edit->fg_set = 1;
+  return GSHSCENE_OK;
+}
+
+GSHSCENE_Result gshscene_edit_foreground(const GSHSCENE_Edit * edit, GSHSCENE_Color * out) {
+  if (!edit || !out) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  *out = edit->fg_set ? edit->fg : edit->base->foreground;
+  return GSHSCENE_OK;
 }
 
 const GSHSCENE_Version * gshscene_edit_base(const GSHSCENE_Edit * edit) {

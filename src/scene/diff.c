@@ -43,7 +43,17 @@ struct GSHSCENE_Diff {
   size_t count;
   GSHSCENE_Diff_Entry * entries;
   GSHSCENE_Damage damage;
+  int foreground_changed;
 };
+
+static int foreground_differs(const GSHSCENE_Color * a, const GSHSCENE_Color * b) {
+  for (int i = 0; i < 4; i++) {
+    if (gshgeom_f64_bits(a->rgba[i]) != gshgeom_f64_bits(b->rgba[i])) {
+      return 1;
+    }
+  }
+  return !gshscene_space_equal(&a->space, &b->space);
+}
 
 /* --- the changed ids --------------------------------------------------------------------------------- */
 
@@ -274,6 +284,7 @@ typedef struct Damage_Walk {
   const unsigned char * marks;
   const GSHGEOM_Map * device;
   size_t inside;
+  int foreground; /* the foreground differs between the versions: the shapes that paint with it are damaged */
   int any;
   int unbounded;
   double min_x, min_y, max_x, max_y;
@@ -361,6 +372,10 @@ static GSHSCENE_Result damage_group_enter(
   (void)base;
   Damage_Walk * d = ctx;
   d->inside += is_marked(d, group) ? 1u : 0u;
+  /* An operator that changes the backdrop where the group has no content reaches beyond its bounds (N13). */
+  if (d->inside > 0 && gshscene_composite_is_unbounded((GSHSCENE_Composite)group->p.composite)) {
+    d->unbounded = 1;
+  }
   return GSHSCENE_OK;
 }
 
@@ -374,7 +389,7 @@ static GSHSCENE_Result damage_group_leave(void * ctx, const GSHSCENE_Walk * walk
 static GSHSCENE_Result damage_shape(
     void * ctx, const GSHSCENE_Walk * walk, const GSHSCENE_Node_Rec * shape, const GSHGEOM_Map * map) {
   Damage_Walk * d = ctx;
-  if (d->inside > 0 || is_marked(d, shape)) {
+  if (d->inside > 0 || is_marked(d, shape) || (d->foreground && shape->p.paint.kind == GSHSCENE_PAINT_FOREGROUND)) {
     return add_shape(d, walk, shape, map);
   }
   return GSHSCENE_OK;
@@ -398,7 +413,7 @@ static GSHSCENE_Result damage_instance_leave(void * ctx, const GSHSCENE_Walk * w
 }
 
 static const GSHSCENE_Walk_Ops damage_ops = {
-    damage_group_enter, damage_group_leave, damage_shape, damage_instance, damage_instance_leave};
+    damage_group_enter, damage_group_leave, damage_shape, damage_instance, damage_instance_leave, NULL, NULL};
 
 static GSHSCENE_Result walk_marked(const struct GSHSCENE_Version * v, const unsigned char * marks,
     const GSHGEOM_Map * device, Damage_Walk * d) {
@@ -421,13 +436,14 @@ static GSHSCENE_Result walk_marked(const struct GSHSCENE_Version * v, const unsi
 }
 
 static GSHSCENE_Result compute_damage(const struct GSHSCENE_Version * a, const struct GSHSCENE_Version * b,
-    const GSHGEOM_Map * device, double aa, const GSHSCENE_Diff_Entry * entries, size_t n, GSHSCENE_Damage * out) {
+    const GSHGEOM_Map * device, double aa, const GSHSCENE_Diff_Entry * entries, size_t n, int foreground,
+    GSHSCENE_Damage * out) {
   memset(out, 0, sizeof *out);
   if (device->dim != 2) {
     out->unbounded = 1;
     return GSHSCENE_OK;
   }
-  if (n == 0) {
+  if (n == 0 && !foreground) {
     out->empty = 1;
     return GSHSCENE_OK;
   }
@@ -443,6 +459,7 @@ static GSHSCENE_Result compute_damage(const struct GSHSCENE_Version * a, const s
   GSHSCENE_Result result = compute_marks(alloc, a, b, entries, n, &marks);
   Damage_Walk d;
   memset(&d, 0, sizeof d);
+  d.foreground = foreground;
   if (result == GSHSCENE_OK) {
     result = walk_marked(a, marks.a, device, &d);
   }
@@ -502,8 +519,9 @@ GSHSCENE_Result gshscene_diff(const GSHSCENE_Version * a, const GSHSCENE_Version
   }
   diff->alloc = *alloc;
   GSHSCENE_Result result = gshscene_diff_entries(a, b, &diff->entries, &diff->count);
+  diff->foreground_changed = foreground_differs(&a->foreground, &b->foreground);
   if (result == GSHSCENE_OK) {
-    result = compute_damage(a, b, &device, aa, diff->entries, diff->count, &diff->damage);
+    result = compute_damage(a, b, &device, aa, diff->entries, diff->count, diff->foreground_changed, &diff->damage);
   }
   if (result != GSHSCENE_OK) {
     gshscene_diff_destroy(diff);
@@ -525,6 +543,10 @@ GSHSCENE_Result gshscene_diff_get(
   *out_id = diff->entries[index].id;
   *out_kind = diff->entries[index].kind;
   return GSHSCENE_OK;
+}
+
+int gshscene_diff_foreground_changed(const GSHSCENE_Diff * diff) {
+  return diff ? diff->foreground_changed : 0;
 }
 
 GSHSCENE_Result gshscene_diff_damage(const GSHSCENE_Diff * diff, GSHSCENE_Damage * out) {

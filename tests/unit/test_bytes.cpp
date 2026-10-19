@@ -84,9 +84,9 @@ TEST(StoreBytes, TheAccountedBytesFollowTheFormulaForEveryKind) {
   ASSERT_EQ(gshscene_store_intern_glyph_run(s.store, &run, &text.resource), GSHSCENE_OK);
   EXPECT_EQ(gshscene_resource_bytes(text.get()), 128u + 3 * 32u);
   ListHolder l(s.store);
-  gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0);
-  gshscene_list_fill(l.list, line.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0);
-  gshscene_list_group_push(l.list, nullptr, 0);
+  gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0);
+  gshscene_list_fill(l.list, line.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0);
+  gshscene_list_group_push(l.list, nullptr, 0, 0);
   gshscene_list_group_pop(l.list);
   ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
   Ref picture;
@@ -190,7 +190,7 @@ TEST(StoreBytes, PicturesAndGlyphRunsAreAccountedAndRefusedAtTheLimit) {
   StoreHolder s(&l);
   Ref sq(intern_square(s.store));
   ListHolder list(s.store);
-  gshscene_list_fill(list.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0);
+  gshscene_list_fill(list.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0);
   gshscene_list_close(list.list);
   Ref picture;
   EXPECT_EQ(gshscene_store_intern_picture(s.store, list.list, &picture.resource), GSHSCENE_OK) << "exactly the limit";

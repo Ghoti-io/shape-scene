@@ -130,6 +130,11 @@ struct GSHSCENE_List {
   size_t depth;
   size_t expansion;
   size_t picture_depth; /* the deepest picture an instance names */
+  size_t nonflat;       /* group pushes whose ordering is not flat: close has an order to make when it is not 0 */
+  GSHSCENE_Color foreground;
+  GSHSCENE_Tie * ties;  /* the resolved depth ties, ascending by second item */
+  size_t tie_count;
+  size_t tie_capacity;
   int closed;
 };
 
@@ -214,5 +219,36 @@ GSHSCENE_Result gshscene_list_copy(
 
 /** The deepest picture the list's instances name (0 for none); the list is not NULL. */
 size_t gshscene_list_picture_depth(const GSHSCENE_List * list);
+
+/** Close a list whose items are already in paint order (a version's emission): no permutation, ties as recorded. */
+GSHSCENE_Result gshscene_list_close_ordered(GSHSCENE_List * list);
+
+/** Record a tie on an open list being emitted in paint order (not validated: the emitter owns the indices). */
+GSHSCENE_Result gshscene_list_add_tie(GSHSCENE_List * list, size_t first, size_t second, double depth,
+    GSHSCENE_Tie_Reason reason);
+
+/**
+ * How a context orders two units by their keys (N11): negative if @p a is painted before @p b, positive if after, 0 if
+ * the context cannot tell them apart.  Flat never tells.  Depth is far first, then ascending layer; overlay is ascending
+ * layer.  @p tied is set to 1 when the context is depth and the depths are equal, else 0.
+ */
+int gshscene_order_compare(uint32_t context, int32_t layer_a, double depth_a, int32_t layer_b, double depth_b,
+    int * tied);
+
+/** Whether two color spaces are the same, the gamma bit for bit. */
+int gshscene_space_equal(const GSHSCENE_Color_Space * a, const GSHSCENE_Color_Space * b);
+
+/** Whether a color is the default foreground (opaque black in the target's space), bit for bit. */
+int gshscene_color_is_default(const GSHSCENE_Color * color);
+
+/** A space, then a color, in the spelling of paint.h's N-text (hash.h's primitives): u8 primaries, u8 transfer, f64 gamma; four f64 and a space. */
+void gshscene_space_hash(GSHGEOM_Hash * h, const GSHSCENE_Color_Space * space);
+void gshscene_color_hash(GSHGEOM_Hash * h, const GSHSCENE_Color * color);
+/** A space as `P:T:G` in a dump (the gamma as 16 hexadecimal digits); the result of fprintf. */
+int gshscene_space_dump(FILE * out, const GSHSCENE_Color_Space * space);
+
+/** The same checks as a record call's, for a retained scene's nodes. */
+GSHSCENE_Result gshscene_list_canonical_group(const GSHSCENE_Group * group, GSHSCENE_Group * out);
+GSHSCENE_Result gshscene_list_canonical_depth(double depth, double * out);
 
 #endif /* GHOTI_IO_GSHSCENE_INTERNAL_H */

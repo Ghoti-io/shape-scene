@@ -15,8 +15,15 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
   64-bit id that is never reused, and a release-listener API lets a sink's cache drop an entry
   when the last reference goes. A store and its handles are thread-safe.
 - **Lists** (`list.h`). An arena-backed sequence of fills, clips, groups and instances, with a
-  map, a fill rule, a solid paint and a declared layer on the items that take them. The maker
-  owns it and frees it in one call; `reset` reuses the arena for the next frame.
+  map, a fill rule, a paint and a declared layer and depth on the items that take them. Closing
+  a list puts it in paint order (flat, overlay or depth groups) and records every resolved depth
+  tie. The maker owns it and frees it in one call; `reset` reuses the arena for the next frame.
+- **Paint, color and composition** (`paint.h`, `list.h`; the normative text is in
+  `documentation/design.md`). A solid paint is straight `double`s in a color space (four D65
+  gamuts, three transfers, from `color`); `currentColor` is a foreground paint that resolves
+  against the version's or list's foreground; a group has a blend space, an opacity, a Porter-Duff
+  operator and an ordering context. An exact reference (`tools/composite-oracle.py`) and committed
+  known answers define what two sinks must agree on.
 - **Hash and dump** of every resource and list, in `shape-geometry`'s spelling (FNV-1a 64 over
   little-endian fields), the same on every target.
 - **Limits** on everything a caller can make unbounded, each asserted by its bound, including the
@@ -47,8 +54,8 @@ make install PREFIX="$PWD/.local"
 ```
 
 Dependencies are found by pkg-config and nothing else; a missing one is an
-error that names the fix. The library this one needs: shape-geometry (`color` and `image` return with
-the paint and raster-target steps).
+error that names the fix. The libraries this one needs: cutil, color and shape-geometry (`image`
+returns with the raster-target step).
 
 Determinism is a requirement, not a hope: every `double` stage builds with
 `-ffp-contract=off` and no x87, and elementary functions come from `math`, not

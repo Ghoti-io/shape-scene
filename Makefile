@@ -20,6 +20,9 @@
 #
 #   check-vectors      tests/known_answers.h is what tools/gen-scene-vectors.py
 #                      writes (an independent statement of both hash spellings)
+#   check-composite    (story 12) the exact rational reference of the compositing
+#                      definition passes its own selftest, and tests/composite_vectors.h
+#                      is what tools/gen-composite-vectors.py writes from it
 #   check-corpus-hash  the cross-target probe prints the hash committed in
 #                      tests/corpus/scene.hash (xarch/shape.sh and xwin/shape.sh
 #                      check the other targets)
@@ -47,10 +50,10 @@ PROJECT := shape-scene
 # suite/libraries.txt, without the optional ones. Each is found by pkg-config
 # and is a hard error when it is not. cutil supplies the mutex and the atomic
 # counts the store's reference counting needs, on every target (it is the
-# suite's one cross-platform layer); color and image return with the stories
-# that first include them (paint, raster targets); EDGES_ALLOWED below stays
-# the end-of-milestone policy.
-DEPS := cutil shape-geometry
+# suite's one cross-platform layer); color supplies the types of a color
+# description and the gamut names (story 12); image returns with the raster
+# targets; EDGES_ALLOWED below stays the end-of-milestone policy.
+DEPS := cutil color shape-geometry
 
 # The libraries whose headers this one may include and whose shared objects it
 # may link (check-edges), as a regular expression alternation. Itself is always
@@ -281,7 +284,7 @@ TESTFLAGS := `PKG_CONFIG_PATH=$(PKG_CONFIG_LOOKUP_PATH) pkg-config --libs --cfla
 # check-symbols is right to reject in a shipping library.
 PLANT_JOBS ?= 4
 
-TEST_GATES ?= check-symbols check-aliasing check-stamps check-fp-contract check-edges check-libm check-no-x87 check-gates check-vectors check-corpus-hash check-publish-types check-fuzz-corpus fuzz-replay examples
+TEST_GATES ?= check-symbols check-aliasing check-stamps check-fp-contract check-edges check-libm check-no-x87 check-gates check-vectors check-composite check-corpus-hash check-publish-types check-fuzz-corpus fuzz-replay examples
 
 VALGRIND_FLAGS := --leak-check=full --show-leak-kinds=definite,indirect,possible --track-origins=yes --error-exitcode=1 --suppressions=tests/valgrind.supp
 
@@ -399,7 +402,7 @@ $(APP_DIR)/examples/%$(EXE_EXTENSION): examples/%.c $(APP_DIR)/$(STATIC_TARGET) 
 
 .PHONY: clean cloc docs docs-pdf examples coverage check-symbols check-stamps check-aliasing
 .PHONY: check-fp-contract check-edges check-libm check-no-x87 check-gates libver-gen
-.PHONY: check-vectors check-corpus-hash check-planted check-publish-types check-fuzz-corpus fuzz-replay
+.PHONY: check-vectors check-composite check-corpus-hash check-planted check-publish-types check-fuzz-corpus fuzz-replay
 .PHONY: all install test test-quiet test-asan test-valgrind test-valgrind-quiet test-watch uninstall watch
 .PHONY: all-debug install-debug test-debug test-valgrind-debug test-watch-debug uninstall-debug watch-debug
 .PHONY: fuzz fuzz-clean
@@ -489,6 +492,10 @@ check-corpus-hash: $(HASH_PROBE) ## Fail unless the probe prints the committed c
 
 check-vectors: ## Fail if tests/known_answers.h is not what the independent generator writes
 	@python3 tools/gen-scene-vectors.py --check
+
+check-composite: ## Fail if the exact reference does not agree with itself, or tests/composite_vectors.h is not what it writes
+	@python3 tools/composite-oracle.py --selftest
+	@python3 tools/gen-composite-vectors.py --check
 
 # Only the application publishes (AD-9, CAP-11): what an edit can reach has no publish, and an edit cannot stand where
 # the scene goes.  The probes in tests/types are compiled, never linked: the control must compile, the violations must not.

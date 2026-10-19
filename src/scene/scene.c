@@ -88,7 +88,9 @@ GSHSCENE_Result gshscene_scene_create(const GSHSCENE_Allocator * alloc, const GS
   }
   if (result == GSHSCENE_OK) {
     nodes[0] = root;
-    result = gshscene_version_make(core, 0, nodes, 1, NULL, &core->current);
+    GSHSCENE_Color foreground;
+    gshscene_color_init(&foreground);
+    result = gshscene_version_make(core, 0, nodes, 1, NULL, &foreground, &core->current);
   }
   if (result != GSHSCENE_OK) {
     gshscene_free(&core->alloc, nodes);
@@ -167,7 +169,17 @@ typedef struct Plan {
   size_t ch_n;
   GSHSCENE_Key_Change * kc; /* ascending by key */
   size_t kc_n;
+  int fg; /* the edit sets the foreground to something its base does not have */
 } Plan;
+
+static int color_equal(const GSHSCENE_Color * a, const GSHSCENE_Color * b) {
+  for (int i = 0; i < 4; i++) {
+    if (gshgeom_f64_bits(a->rgba[i]) != gshgeom_f64_bits(b->rgba[i])) {
+      return 0;
+    }
+  }
+  return gshscene_space_equal(&a->space, &b->space);
+}
 
 static int change_compare(const void * pa, const void * pb) {
   const GSHSCENE_Change * a = pa;
@@ -221,6 +233,7 @@ static GSHSCENE_Result plan_make(const GSHSCENE_Allocator * alloc, GSHSCENE_Edit
   if (plan->kc_n > 1) {
     qsort(plan->kc, plan->kc_n, sizeof *plan->kc, key_change_compare);
   }
+  plan->fg = edit->fg_set && !color_equal(&edit->fg, &base->foreground);
   return GSHSCENE_OK;
 }
 
@@ -292,6 +305,22 @@ static void key_conflicts(Conflicts * c, const Plan * plans, size_t n, const str
           }
         }
       }
+    }
+  }
+}
+
+/* The version's parameters: two plans that both set the foreground, or one that does where a publish since its base did. */
+static void parameter_conflicts(Conflicts * c, const Plan * plans, size_t n, const struct GSHSCENE_Version * current) {
+  for (size_t i = 0; i < n; i++) {
+    if (!plans[i].fg) {
+      continue;
+    }
+    int clash = !color_equal(&plans[i].edit->base->foreground, &current->foreground);
+    for (size_t j = i + 1; j < n && !clash; j++) {
+      clash = plans[j].fg;
+    }
+    if (clash) {
+      conflict(c, GSHSCENE_ROOT_ID, GSHSCENE_PROBLEM_PARAMETER);
     }
   }
 }
@@ -458,7 +487,7 @@ static GSHSCENE_Result publish_locked(GSHSCENE_Core * core, GSHSCENE_Edit * cons
     result = plan_make(alloc, edits[i], &plans[i]);
     if (result == GSHSCENE_OK) {
       made++;
-      touched += plans[i].ch_n + plans[i].kc_n;
+      touched += plans[i].ch_n + plans[i].kc_n + (plans[i].fg ? 1u : 0u);
     }
   }
   GSHSCENE_Diff_Entry * since = NULL;
@@ -491,6 +520,7 @@ static GSHSCENE_Result publish_locked(GSHSCENE_Core * core, GSHSCENE_Edit * cons
         overlap_diff(&conflicts, plans[i].ch, plans[i].ch_n, since, since_n);
       }
       key_conflicts(&conflicts, plans, n, current);
+      parameter_conflicts(&conflicts, plans, n, current);
       if (conflicts.oom != GSHSCENE_OK) {
         result = conflicts.oom;
         gshscene_free(alloc, conflicts.list.items);
@@ -517,7 +547,13 @@ static GSHSCENE_Result publish_locked(GSHSCENE_Core * core, GSHSCENE_Edit * cons
     result = gshscene_validate(core, nodes, node_n, &found);
   }
   if (result == GSHSCENE_OK) {
-    result = gshscene_version_make(core, core->versions + 1, nodes, node_n, keys, &version);
+    GSHSCENE_Color foreground = current->foreground;
+    for (size_t i = 0; i < n; i++) {
+      if (plans[i].fg) {
+        foreground = plans[i].edit->fg;
+      }
+    }
+    result = gshscene_version_make(core, core->versions + 1, nodes, node_n, keys, &foreground, &version);
   }
   if (result == GSHSCENE_OK) {
     /* Commit: nothing below fails. */

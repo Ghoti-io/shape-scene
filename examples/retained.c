@@ -95,6 +95,9 @@ static int lower(GSHSCENE_Edit * edit, const Document * doc) {
   def.flags = GSHSCENE_NODE_HIDDEN;
   failed |= check(gshscene_edit_upsert(edit, &k_symbol, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, &def, &symbol), "symbol");
   GSHSCENE_Node shape = shape_of(square, 0, 0, 0);
+  /* The symbol is an icon painted with currentColor: its paint is the version's foreground, not a color of its own. */
+  shape.paint.kind = GSHSCENE_PAINT_FOREGROUND;
+  shape.paint.rgba[0] = shape.paint.rgba[1] = shape.paint.rgba[2] = 0.0;
   failed |= check(gshscene_edit_upsert(edit, &k_symbol_shape, symbol, GSHSCENE_APPEND, &shape, &ignored), "symbol shape");
 
   /* A faint group holding the badge. */
@@ -203,6 +206,23 @@ int main(void) {
   gshscene_diff_destroy(diff);
   gshscene_edit_destroy(from_front_end);
   gshscene_edit_destroy(from_driver);
+
+  /* The foreground is a parameter of a version: an edit sets it, and the damage is the shapes that paint with it. */
+  GSHSCENE_Edit * recolor = NULL;
+  failed |= check(gshscene_scene_open_edit(scene, v2, &recolor), "open");
+  GSHSCENE_Color teal = {.rgba = {0.0, 0.5, 0.5, 1.0}};
+  failed |= check(gshscene_edit_set_foreground(recolor, &teal), "foreground");
+  const GSHSCENE_Version * v3 = NULL;
+  failed |= check(gshscene_scene_publish(scene, recolor, NULL, &v3), "publish the foreground");
+  gshscene_edit_destroy(recolor);
+  GSHSCENE_Diff * recolored = NULL;
+  failed |= check(gshscene_diff(v2, v3, &device, NULL, &recolored), "diff");
+  printf("a new foreground: %zu changed IDs, foreground changed: %d\n", gshscene_diff_count(recolored),
+      gshscene_diff_foreground_changed(recolored));
+  print_damage(recolored);
+  failed |= gshscene_diff_count(recolored) != 0 || !gshscene_diff_foreground_changed(recolored);
+  gshscene_diff_destroy(recolored);
+  gshscene_version_release(v3);
 
   /* Two edits that both touch one node are refused, naming it. */
   GSHSCENE_Edit * a = NULL;

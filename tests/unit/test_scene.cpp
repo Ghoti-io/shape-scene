@@ -152,7 +152,7 @@ TEST(SceneCreate, TheSceneOwnsAStoreItMakesAndAVersionOutlivesTheScene) {
   const GSHSCENE_List * list = nullptr;
   ASSERT_EQ(gshscene_version_list(v.get(), &list), GSHSCENE_OK);
   EXPECT_EQ(gshscene_list_count(list), 1u);
-  EXPECT_NE(dump_version(v.get()).find("gshscene.version 1 nodes=2"), std::string::npos);
+  EXPECT_NE(dump_version(v.get()).find("gshscene.version 2 nodes=2"), std::string::npos);
 }
 
 TEST(SceneEdit, OpenOnANamedVersionOrTheCurrentOne) {
@@ -827,11 +827,13 @@ TEST(ScenePublishValidation, ProblemReasonsHavePinnedValuesAndNames) {
   EXPECT_EQ((int)GSHSCENE_PROBLEM_KEY_CONFLICT, 2);
   EXPECT_EQ((int)GSHSCENE_PROBLEM_DANGLING_TARGET, 3);
   EXPECT_EQ((int)GSHSCENE_PROBLEM_CYCLE, 4);
-  EXPECT_EQ((int)GSHSCENE_PROBLEM_REASON_COUNT, 5);
+  EXPECT_EQ((int)GSHSCENE_PROBLEM_PARAMETER, 5);
+  EXPECT_EQ((int)GSHSCENE_PROBLEM_REASON_COUNT, 6);
   EXPECT_STREQ(gshscene_problem_reason_string(GSHSCENE_PROBLEM_OVERLAP), "overlap");
   EXPECT_STREQ(gshscene_problem_reason_string(GSHSCENE_PROBLEM_KEY_CONFLICT), "key-conflict");
   EXPECT_STREQ(gshscene_problem_reason_string(GSHSCENE_PROBLEM_DANGLING_TARGET), "dangling-target");
   EXPECT_STREQ(gshscene_problem_reason_string(GSHSCENE_PROBLEM_CYCLE), "cycle");
+  EXPECT_STREQ(gshscene_problem_reason_string(GSHSCENE_PROBLEM_PARAMETER), "parameter");
   EXPECT_STREQ(gshscene_problem_reason_string(GSHSCENE_PROBLEM_REASON_COUNT), "unknown problem");
   EXPECT_STREQ(gshscene_problem_reason_string((GSHSCENE_Problem_Reason)0), "unknown problem");
 }

@@ -138,28 +138,26 @@ TEST(Emit, TheListIsTheImmediateModeListThatDrawsTheSame) {
   // The picture of D: T at D's placement (the identity) composed with its own map.
   ListHolder inner(store);
   GSHSCENE_Paint black = solid(0, 0, 0, 1);
-  ASSERT_EQ(gshscene_list_fill(inner.list, d.t.get(), &d.map_t, GSHGEOM_FILL_NONZERO, &black, 6), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(inner.list, d.t.get(), &d.map_t, GSHGEOM_FILL_NONZERO, &black, 6, 0), GSHSCENE_OK);
   ASSERT_EQ(gshscene_list_close(inner.list), GSHSCENE_OK);
   Ref picture;
   ASSERT_EQ(gshscene_store_intern_picture(store, inner.list, &picture.resource), GSHSCENE_OK);
   ListHolder want(store);
   GSHSCENE_Paint red = solid(1, 0, 0, 1);
-  ASSERT_EQ(gshscene_list_fill(want.list, d.a.get(), &d.map_a, GSHGEOM_FILL_EVEN_ODD, &red, 1), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(want.list, d.a.get(), &d.map_a, GSHGEOM_FILL_EVEN_ODD, &red, 1, 0), GSHSCENE_OK);
   GSHGEOM_Map clip_map = compose(d.map_g, d.map_clip);
-  ASSERT_EQ(gshscene_list_clip_push(want.list, d.clip.get(), &clip_map, GSHGEOM_FILL_EVEN_ODD), GSHSCENE_OK);
-  GSHSCENE_Group g;
-  g.opacity = 0.5;
-  g.blend_space = 0;
-  g.ordering = GSHSCENE_ORDER_FLAT;
-  ASSERT_EQ(gshscene_list_group_push(want.list, &g, 3), GSHSCENE_OK);
+  // A group's clip push carries the group's layer and depth: the clip block is the group's unit of its sequence (N11).
+  ASSERT_EQ(gshscene_list_clip_push(want.list, d.clip.get(), &clip_map, GSHGEOM_FILL_EVEN_ODD, 3, 0), GSHSCENE_OK);
+  GSHSCENE_Group g = make_group(0.5);
+  ASSERT_EQ(gshscene_list_group_push(want.list, &g, 3, 0), GSHSCENE_OK);
   GSHGEOM_Map mb = compose(d.map_g, d.map_b);
-  ASSERT_EQ(gshscene_list_fill(want.list, d.b.get(), &mb, GSHGEOM_FILL_NONZERO, &black, 4), GSHSCENE_OK);
-  ASSERT_EQ(gshscene_list_fill(want.list, d.c.get(), &d.map_g, GSHGEOM_FILL_NONZERO, &black, 5), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(want.list, d.b.get(), &mb, GSHGEOM_FILL_NONZERO, &black, 4, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(want.list, d.c.get(), &d.map_g, GSHGEOM_FILL_NONZERO, &black, 5, 0), GSHSCENE_OK);
   ASSERT_EQ(gshscene_list_group_pop(want.list), GSHSCENE_OK);
   ASSERT_EQ(gshscene_list_clip_pop(want.list), GSHSCENE_OK);
-  ASSERT_EQ(gshscene_list_instance(want.list, picture.get(), &d.map_i1, 7), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_instance(want.list, picture.get(), &d.map_i1, 7, 0), GSHSCENE_OK);
   GSHGEOM_Map me = compose(d.map_p, d.map_e);
-  ASSERT_EQ(gshscene_list_fill(want.list, d.a.get(), &me, GSHGEOM_FILL_NONZERO, &black, 8), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(want.list, d.a.get(), &me, GSHGEOM_FILL_NONZERO, &black, 8, 0), GSHSCENE_OK);
   ASSERT_EQ(gshscene_list_close(want.list), GSHSCENE_OK);
   EXPECT_EQ(gshscene_list_count(list), 9u);
   EXPECT_EQ(gshscene_list_equal(list, want.list), 1) << dump_list(list) << "\n---\n" << dump_list(want.list);

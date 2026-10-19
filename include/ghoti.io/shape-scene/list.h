@@ -31,25 +31,68 @@
  *
  * | Kind | Resource | Map | Fill rule | Paint | Other |
  * | --- | --- | --- | --- | --- | --- |
- * | ::GSHSCENE_ITEM_FILL | path or glyph run | placement | yes | yes | layer |
- * | ::GSHSCENE_ITEM_CLIP_PUSH | path or glyph run | placement | yes | | |
+ * | ::GSHSCENE_ITEM_FILL | path or glyph run | placement | yes | yes | layer, depth |
+ * | ::GSHSCENE_ITEM_CLIP_PUSH | path or glyph run | placement | yes | | layer, depth |
  * | ::GSHSCENE_ITEM_CLIP_POP | | | | | |
- * | ::GSHSCENE_ITEM_GROUP_PUSH | | | | | opacity, blend space, ordering, layer |
+ * | ::GSHSCENE_ITEM_GROUP_PUSH | | | | | opacity, blend space, composite, ordering, layer, depth |
  * | ::GSHSCENE_ITEM_GROUP_POP | | | | | |
- * | ::GSHSCENE_ITEM_INSTANCE | picture | placement | | | layer |
+ * | ::GSHSCENE_ITEM_INSTANCE | picture | placement | | | layer, depth |
  *
  * The **map** places the resource's own coordinates (the model space of its
  * path) in the space of the list; the sink composes the maps of the enclosing
  * instances and the target's last (AD-24, `gshgeom_map_compose_chain`).  A
  * **clip push** intersects the region with the clip in force until its pop; a
- * **group push** composites what follows, until its pop, as a unit with the
- * opacity; both nest, and an **instance** draws the items of a picture under
- * its map, in order, as if the picture's items stood in the list at that place
- * (a picture's own pushes are balanced, so it leaves the clip and group stacks
- * as it found them).  `layer` is the declared layer of AD-10, an `int32`.
+ * **group push** composites what follows, until its pop, as a unit (N8); both
+ * nest, and an **instance** draws the items of a picture under its map, in order,
+ * as if the picture's items stood in the list at that place (a picture's own
+ * pushes are balanced, so it leaves the clip and group stacks as it found them).
+ * `layer` is the declared layer of AD-10, an `int32`, and `depth` its declared
+ * distance from the viewer, a finite `double` (`-0` is stored as `+0`); they
+ * order units in a group that says so (N11).
  *
  * Each field that does not apply to an item's kind is zero (the identity for a
  * map), so an item has one spelling.
+ *
+ * ### What a list means (normative; the whole text is in documentation/design.md)
+ *
+ * All of it in real arithmetic, with no rounding or clamping unless said (a
+ * sink's precision is its own).  Values are premultiplied, in a **layer** in a
+ * blend space.  **N4**: an operator maps source `S = (Cs, As)` and backdrop
+ * `D = (Cd, Ad)` to `(Fa Cs + Fb Cd, Fa As + Fb Ad)` with `(Fa, Fb)` of
+ * `CLEAR (0, 0)`, `SRC (1, 0)`, `DEST (0, 1)`, `SRC_OVER (1, 1-As)`,
+ * `DEST_OVER (1-Ad, 1)`, `SRC_IN (Ad, 0)`, `DEST_IN (0, As)`, `SRC_OUT (1-Ad, 0)`,
+ * `DEST_OUT (0, 1-As)`, `SRC_ATOP (Ad, 1-As)`, `DEST_ATOP (1-Ad, As)`,
+ * `XOR (1-Ad, 1-As)`, and `PLUS`: `min(1, Cs + Cd)` per channel and
+ * `min(1, As + Ad)`.  **N5**: `apply(D, S, m, op) = (1 - m) D + m op(S, D)` for a
+ * coverage `m`.  **N6**: the list's root layer is the target (its blend space is
+ * the target's); a group's layer starts at `(0, 0, 0, 0)` in its own blend space
+ * (its `blend_space`, or its enclosing group's if zero).  **N7**: a fill is
+ * `apply(L, S, k * c, SRC_OVER)` where `S` is the paint's color converted to the
+ * layer's space and premultiplied, `k` the coverage of the shape and `c` the
+ * product of the clips in force.  **N8**: at a group's pop, `S` is
+ * `opacity * convert(G)` and the result is `apply(P, S, m, composite)` with `m`
+ * the product of the clips that were in force in the enclosing group at the push.
+ * **N9**: the clips in force are those pushed and not popped within the same
+ * group (the root counts as one); a group push does not take them into its own
+ * layer.  **N10**: a ::GSHSCENE_PAINT_FOREGROUND fill uses the list's foreground
+ * (::gshscene_list_set_foreground).  **N11, N12**: the order is made by
+ * ::gshscene_list_close, as below.
+ *
+ * ### Order and ties (N11, N12)
+ *
+ * A **sequence** is the items directly inside the root, a group or a clip
+ * block; its **units** are its fills, instances, group blocks and clip blocks
+ * (push to matching pop); a unit's key is the layer and depth of its first item.
+ * The context of a sequence is the ordering of the group that encloses it (the
+ * root's is flat; a clip block has the context of the sequence it is in):
+ * **flat** paints in declared order; **overlay** by ascending layer, equal layers
+ * in declared order; **depth** by descending depth (far first), equal depths
+ * (exactly, as real numbers) broken by ascending layer and then by declared order
+ * (a retained scene's emission breaks them by instance path).  ::gshscene_list_close puts the
+ * list in paint order, rewriting the items, so a sink never sorts, and records
+ * every pair of adjacent tied units as a ::GSHSCENE_Tie.  The ties are an
+ * annotation for a report: they are in the dump and in neither the hash nor the
+ * equality of a list.
  *
  * ### Lifetime
  *
@@ -57,32 +100,40 @@
  * store.  ::gshscene_list_destroy releases them all and frees the arena in one
  * pass; ::gshscene_list_reset does the same and keeps the first chunk of the
  * arena, for a frame loop.  An item pointer from ::gshscene_list_item is valid
- * until the list is reset or destroyed.  A list is used from one thread at a
- * time; a closed list is immutable and may be read from many.
+ * until the list is reset, destroyed or closed (a close may rewrite the items); a
+ * list is used from one thread at a time, and a closed list is immutable and may
+ * be read from many.
  *
- * ### The hash of a list (version 1)
+ * ### The hash of a list (version 2)
  *
- * In the spelling of shape-geometry's hash.h: `u32` 1 (this format), `u32`
- * `0x5453494c`, `u64` the item count; then for each item a `u8` kind
- * (::GSHSCENE_Item_Kind, pinned) and:
+ * In the spelling of shape-geometry's hash.h: `u32` 2 (this format), `u32`
+ * `0x5453494c`, the foreground (four `f64` and a space), `u64` the item count;
+ * then for each item a `u8` kind (::GSHSCENE_Item_Kind, pinned) and:
  *
  * - **fill**: `u64` the resource's content hash, `u64` the map's hash
- *   (`gshgeom_map_hash`), `u8` the fill rule, the paint (`u8` kind, four `f64`,
- *   `u32` color space), `i32` layer.
- * - **clip push**: `u64` resource hash, `u64` map hash, `u8` fill rule.
- * - **group push**: `f64` opacity, `u32` blend space, `u32` ordering, `i32` layer.
- * - **instance**: `u64` resource hash, `u64` map hash, `i32` layer.
+ *   (`gshgeom_map_hash`), `u8` the fill rule, the paint (`u8` kind, four `f64`, a
+ *   space), `i32` layer, `f64` depth.
+ * - **clip push**: `u64` resource hash, `u64` map hash, `u8` fill rule, `i32`
+ *   layer, `f64` depth.
+ * - **group push**: `f64` opacity, a space (the blend space), `u8` composite,
+ *   `u32` ordering, `i32` layer, `f64` depth.
+ * - **instance**: `u64` resource hash, `u64` map hash, `i32` layer, `f64` depth.
  * - **clip pop**, **group pop**: nothing.
  *
- * Handles, ids and the allocator are not part of it.
+ * A **space** is `u8` primaries, `u8` transfer, `f64` gamma.  Handles, ids, the
+ * allocator and the ties are not part of it.
  *
  * ### The dump
  *
- * `gshscene.list 1 items=N hash=<16 hex digits>` and one line per item:
- * `F res=<kind>:<hash> map=<hash> rule=N paint=N <r> <g> <b> <a> space=N layer=N`,
- * `C res=<kind>:<hash> map=<hash> rule=N`, `c`, `G opacity=<hex> blend=N order=N
- * layer=N`, `g`, `I res=<kind>:<hash> map=<hash> layer=N`, with every `double`
- * as the 16 hexadecimal digits of its bit pattern and every hash as 16 digits.
+ * `gshscene.list 2 items=N ties=T fg=<r> <g> <b> <a> <space> hash=<16 hex digits>`
+ * and one line per item:
+ * `F res=<kind>:<hash> map=<hash> rule=N paint=N <r> <g> <b> <a> space=<space> layer=N depth=<hex>`,
+ * `C res=<kind>:<hash> map=<hash> rule=N layer=N depth=<hex>`, `c`,
+ * `G opacity=<hex> blend=<space> composite=N order=N layer=N depth=<hex>`, `g`,
+ * `I res=<kind>:<hash> map=<hash> layer=N depth=<hex>`, then one line per tie,
+ * `T first=I second=J depth=<hex> reason=N`, with every `double` as the 16
+ * hexadecimal digits of its bit pattern, every hash as 16 digits and a `<space>`
+ * as `P:T:<gamma hex>` (primaries and transfer in decimal).
  */
 
 #ifndef GHOTI_IO_GSHSCENE_LIST_H
@@ -118,23 +169,53 @@ typedef enum GSHSCENE_Item_Kind {
 } GSHSCENE_Item_Kind;
 
 /**
- * @brief The ordering context of a group (AD-10).
- *
- * Only flat is defined today; the others are reserved for the story that gives
- * them meaning and are ::GSHSCENE_ERR_UNSUPPORTED until then.
+ * @brief The ordering context of a group (AD-10, N11): how the units of the sequence inside it are painted.
  */
 typedef enum GSHSCENE_Ordering {
-  GSHSCENE_ORDER_FLAT = 0,    ///< Declared order.
-  GSHSCENE_ORDER_DEPTH = 1,   ///< Reserved: joins the 3D depth sort.
-  GSHSCENE_ORDER_OVERLAY = 2, ///< Reserved.
+  GSHSCENE_ORDER_FLAT = 0,    ///< Declared order; layers and depths are ignored.
+  GSHSCENE_ORDER_DEPTH = 1,   ///< Descending depth (far first); ties by ascending layer, then instance path or declared order.
+  GSHSCENE_ORDER_OVERLAY = 2, ///< Ascending layer; equal layers in declared order.
   GSHSCENE_ORDERING_COUNT     ///< Closes the enum.
 } GSHSCENE_Ordering;
 
+/**
+ * @brief How a group's result is composited onto what it is drawn over (N4).  The values are pinned (they are hashed).
+ *
+ * The twelve Porter-Duff operators and `PLUS`.  Blend modes (multiply, screen, ...) are not here: they are a later
+ * addition and the values past the end are ::GSHSCENE_ERR_INVALID until then.
+ */
+typedef enum GSHSCENE_Composite {
+  GSHSCENE_COMPOSITE_SRC_OVER = 0,  ///< `(Fa, Fb) = (1, 1-As)`: the default, and what a fill is.
+  GSHSCENE_COMPOSITE_CLEAR = 1,     ///< `(0, 0)`.
+  GSHSCENE_COMPOSITE_SRC = 2,       ///< `(1, 0)`.
+  GSHSCENE_COMPOSITE_DEST = 3,      ///< `(0, 1)`.
+  GSHSCENE_COMPOSITE_DEST_OVER = 4, ///< `(1-Ad, 1)`.
+  GSHSCENE_COMPOSITE_SRC_IN = 5,    ///< `(Ad, 0)`.
+  GSHSCENE_COMPOSITE_DEST_IN = 6,   ///< `(0, As)`.
+  GSHSCENE_COMPOSITE_SRC_OUT = 7,   ///< `(1-Ad, 0)`.
+  GSHSCENE_COMPOSITE_DEST_OUT = 8,  ///< `(0, 1-As)`.
+  GSHSCENE_COMPOSITE_SRC_ATOP = 9,  ///< `(Ad, 1-As)`.
+  GSHSCENE_COMPOSITE_DEST_ATOP = 10,///< `(1-Ad, As)`.
+  GSHSCENE_COMPOSITE_XOR = 11,      ///< `(1-Ad, 1-As)`.
+  GSHSCENE_COMPOSITE_PLUS = 12,     ///< `min(1, Cs + Cd)` per channel, `min(1, As + Ad)`.
+  GSHSCENE_COMPOSITE_COUNT          ///< Closes the enum.
+} GSHSCENE_Composite;
+
+/** @brief Name an operator ("src-over", "clear", "src", "dest", "dest-over", "src-in", "dest-in", "src-out", "dest-out", "src-atop", "dest-atop", "xor", "plus"), or "unknown composite". */
+GSHSCENE_API const char * gshscene_composite_string(GSHSCENE_Composite op);
+
+/**
+ * @brief Whether the operator changes the backdrop where the source is empty (N4): `CLEAR`, `SRC`, `SRC_IN`,
+ *   `DEST_IN`, `SRC_OUT` and `DEST_ATOP`.  0 for the rest and for a value outside the enum.
+ */
+GSHSCENE_API int gshscene_composite_is_unbounded(GSHSCENE_Composite op);
+
 /** @brief The properties of a group. */
 typedef struct GSHSCENE_Group {
-  double opacity;       ///< Finite, in `[0, 1]`.
-  uint32_t blend_space; ///< 0, the target's blend space; anything else is ::GSHSCENE_ERR_UNSUPPORTED until story 12.
-  uint32_t ordering;    ///< A ::GSHSCENE_Ordering; only ::GSHSCENE_ORDER_FLAT is accepted today.
+  double opacity;                   ///< Finite, in `[0, 1]`: the group's result is scaled by it before it is composited.
+  GSHSCENE_Color_Space blend_space; ///< The space the group composites in; zero inherits the enclosing group's (the root's is the target's).
+  uint32_t ordering;                ///< A ::GSHSCENE_Ordering: the context of the sequence inside the group.
+  uint32_t composite;               ///< A ::GSHSCENE_Composite: how the result is composited onto the enclosing layer.
 } GSHSCENE_Group;
 
 /** @brief One entry of a list, as read back. */
@@ -145,8 +226,25 @@ typedef struct GSHSCENE_Item {
   GSHGEOM_Fill_Rule fill_rule;       ///< Fill, clip push: the rule; else nonzero.
   GSHSCENE_Paint paint;              ///< Fill: the paint; else solid transparent black.
   GSHSCENE_Group group;              ///< Group push: its properties; else zero.
-  int32_t layer;                     ///< Fill, group push, instance: the declared layer; else 0.
+  int32_t layer;                     ///< Fill, clip push, group push, instance: the declared layer; else 0.
+  double depth;                      ///< The same items: the declared depth, finite; else 0.
 } GSHSCENE_Item;
+
+/** @brief What resolved a tie.  The values are pinned (they are dumped). */
+typedef enum GSHSCENE_Tie_Reason {
+  GSHSCENE_TIE_LAYER = 1,    ///< The units' layers differ: the lower layer is painted first.
+  GSHSCENE_TIE_PATH = 2,     ///< The layers are equal and the instance paths differ (a retained scene's emission).
+  GSHSCENE_TIE_DECLARED = 3, ///< Nothing but declared order did (a recorded list has no instance paths).
+  GSHSCENE_TIE_REASON_COUNT  ///< Closes the enum.
+} GSHSCENE_Tie_Reason;
+
+/** @brief A resolved depth tie: two adjacent units of a depth sequence with equal depths (N11). */
+typedef struct GSHSCENE_Tie {
+  size_t first;              ///< The index of the first item of the unit painted first, in the list as closed.
+  size_t second;             ///< The index of the first item of the unit painted after it.
+  double depth;              ///< The depth they share.
+  GSHSCENE_Tie_Reason reason; ///< What broke the tie.
+} GSHSCENE_Tie;
 
 /**
  * @brief Make an empty, open list for @p store.
@@ -184,15 +282,16 @@ GSHSCENE_API GSHSCENE_Result gshscene_list_reset(GSHSCENE_List * list);
  * @param resource A path or glyph run of the list's store.
  * @param map The placement, or NULL for the 2D identity.
  * @param rule The fill rule.
- * @param paint The paint (solid), or NULL for opaque black.
+ * @param paint The paint (solid or foreground), or NULL for opaque black.
  * @param layer The declared layer.
+ * @param depth The declared depth: finite (else ::GSHSCENE_ERR_INVALID).
  */
 GSHSCENE_API GSHSCENE_Result gshscene_list_fill(GSHSCENE_List * list, const GSHSCENE_Resource * resource,
-    const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, const GSHSCENE_Paint * paint, int32_t layer);
+    const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, const GSHSCENE_Paint * paint, int32_t layer, double depth);
 
-/** @brief Begin a clip: the region of a path or glyph run, under @p map, by @p rule. */
+/** @brief Begin a clip: the region of a path or glyph run, under @p map, by @p rule; its layer and depth order it as a unit (N11). */
 GSHSCENE_API GSHSCENE_Result gshscene_list_clip_push(GSHSCENE_List * list,
-    const GSHSCENE_Resource * resource, const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule);
+    const GSHSCENE_Resource * resource, const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, int32_t layer, double depth);
 
 /** @brief End the innermost clip; ::GSHSCENE_ERR_INVALID if the innermost open item is not one. */
 GSHSCENE_API GSHSCENE_Result gshscene_list_clip_pop(GSHSCENE_List * list);
@@ -200,24 +299,41 @@ GSHSCENE_API GSHSCENE_Result gshscene_list_clip_pop(GSHSCENE_List * list);
 /**
  * @brief Begin a group.
  *
- * @param group Its properties, or NULL for opacity 1, the target's blend space, flat.
+ * @param group Its properties, or NULL for opacity 1, the enclosing blend space, flat, source-over.
  * @param layer The declared layer.
+ * @param depth The declared depth: finite.
  */
 GSHSCENE_API GSHSCENE_Result gshscene_list_group_push(
-    GSHSCENE_List * list, const GSHSCENE_Group * group, int32_t layer);
+    GSHSCENE_List * list, const GSHSCENE_Group * group, int32_t layer, double depth);
 
 /** @brief End the innermost group; ::GSHSCENE_ERR_INVALID if the innermost open item is not one. */
 GSHSCENE_API GSHSCENE_Result gshscene_list_group_pop(GSHSCENE_List * list);
 
 /** @brief Draw a picture of the list's store under @p map (NULL: the 2D identity). */
 GSHSCENE_API GSHSCENE_Result gshscene_list_instance(GSHSCENE_List * list,
-    const GSHSCENE_Resource * picture, const GSHGEOM_Map * map, int32_t layer);
+    const GSHSCENE_Resource * picture, const GSHGEOM_Map * map, int32_t layer, double depth);
 
 /**
- * @brief Seal the list.
+ * @brief Set the list's foreground (N10), the color a ::GSHSCENE_PAINT_FOREGROUND fill resolves to.
+ *
+ * @param color The color, or NULL for the default (opaque black in the target's space); copied.
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL list, a closed list, an invalid color);
+ *   ::GSHSCENE_ERR_UNSUPPORTED (a reserved space).  A failing call changes nothing.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_list_set_foreground(GSHSCENE_List * list, const GSHSCENE_Color * color);
+
+/** @brief The list's foreground; ::GSHSCENE_ERR_INVALID for NULL.  Written only on success. */
+GSHSCENE_API GSHSCENE_Result gshscene_list_foreground(const GSHSCENE_List * list, GSHSCENE_Color * out);
+
+/**
+ * @brief Seal the list, putting it in paint order (N11, N12).
+ *
+ * The units of every sequence are permuted as its context says, the items are rewritten and every
+ * resolved depth tie is recorded.  The list a sink sees is in paint order.
  *
  * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID for NULL, a list already
- *   closed, or a clip or group still open (the list stays open).
+ *   closed, or a clip or group still open (the list stays open); ::GSHSCENE_ERR_OOM (the list stays
+ *   open and unchanged, and can be closed again).
  */
 GSHSCENE_API GSHSCENE_Result gshscene_list_close(GSHSCENE_List * list);
 
@@ -226,6 +342,17 @@ GSHSCENE_API int gshscene_list_is_closed(const GSHSCENE_List * list);
 
 /** @brief How many items; 0 for NULL. */
 GSHSCENE_API size_t gshscene_list_count(const GSHSCENE_List * list);
+
+/** @brief How many depth ties the closed list recorded; 0 for NULL and for an open list. */
+GSHSCENE_API size_t gshscene_list_tie_count(const GSHSCENE_List * list);
+
+/**
+ * @brief Read tie @p index, in ascending order of its second item.
+ *
+ * @param out The tie; written only on success; valid until the list is reset or destroyed.
+ * @return ::GSHSCENE_OK or ::GSHSCENE_ERR_INVALID (NULL, out of range).
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_list_tie(const GSHSCENE_List * list, size_t index, const GSHSCENE_Tie ** out);
 
 /**
  * @brief Read item @p index.
@@ -248,13 +375,13 @@ GSHSCENE_API size_t gshscene_list_expansion(const GSHSCENE_List * list);
 GSHSCENE_API size_t gshscene_list_bytes(const GSHSCENE_List * list);
 
 /**
- * @brief Whether two lists are the same: item for item, resources by handle, maps and doubles bit for bit.
+ * @brief Whether two lists are the same: foreground, then item for item, resources by handle, maps and doubles bit for bit (the ties are not compared).
  *
  * @return 1 if equal, 0 if not (or if either is NULL).
  */
 GSHSCENE_API int gshscene_list_equal(const GSHSCENE_List * a, const GSHSCENE_List * b);
 
-/** @brief The hash of the list (open or closed), as the file comment spells it; the offset basis for NULL. */
+/** @brief The hash of the list (open or closed), as the file comment spells it; the offset basis for NULL.  The ties are not in it. */
 GSHSCENE_API uint64_t gshscene_list_hash(const GSHSCENE_List * list);
 
 /**

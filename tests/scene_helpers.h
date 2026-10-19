@@ -188,6 +188,35 @@ inline GSHSCENE_Paint solid(double r, double g, double b, double a) {
   return paint;
 }
 
+/** A group with the given properties and the defaults of the rest (the enclosing blend space, flat, source-over). */
+inline GSHSCENE_Group make_group(double opacity, uint32_t ordering = GSHSCENE_ORDER_FLAT,
+    uint32_t composite = GSHSCENE_COMPOSITE_SRC_OVER) {
+  GSHSCENE_Group g;
+  std::memset(&g, 0, sizeof g);
+  g.opacity = opacity;
+  g.ordering = ordering;
+  g.composite = composite;
+  return g;
+}
+
+/** A color space of the given gamut and transfer. */
+inline GSHSCENE_Color_Space space_of(GCOL_Primaries primaries, GCOL_Transfer transfer, double gamma = 0.0) {
+  GSHSCENE_Color_Space s;
+  std::memset(&s, 0, sizeof s);
+  s.primaries = primaries;
+  s.transfer = transfer;
+  s.gamma = gamma;
+  return s;
+}
+
+inline GSHSCENE_Color_Space srgb_space() {
+  return space_of(GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_SRGB);
+}
+
+inline GSHSCENE_Color_Space linear_srgb_space() {
+  return space_of(GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_LINEAR);
+}
+
 /** What a dump function writes, read back from a temporary file. */
 template <typename Dump, typename Object>
 std::string dump_of(Dump dump, const Object * object) {

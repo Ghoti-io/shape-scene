@@ -79,7 +79,7 @@ TEST(NodeInit, EveryKindStartsAtTheDocumentedDefaults) {
     EXPECT_EQ(n.paint.rgba[1], 0.0);
     EXPECT_EQ(n.paint.rgba[2], 0.0);
     EXPECT_EQ(n.paint.rgba[3], 1.0) << "opaque black";
-    EXPECT_EQ(n.paint.color_space, 0u);
+    EXPECT_TRUE(gshscene_color_space_is_target(&n.paint.space));
     EXPECT_EQ(n.paint.gradient, nullptr);
   }
   gshscene_node_init(GSHSCENE_NODE_GROUP, nullptr);  // ignored
@@ -291,7 +291,7 @@ TEST(NodeRules, AShapeNeedsAPathOrGlyphRunOfTheStoreAndAValidRuleAndPaint) {
   n.fill_rule = GSHGEOM_FILL_EVEN_ODD;
   EXPECT_EQ(f.add(n), GSHSCENE_OK);
   // The paint follows the rules of a list's fill.
-  for (GSHSCENE_Paint_Kind reserved : {GSHSCENE_PAINT_GRADIENT, GSHSCENE_PAINT_FOREGROUND, GSHSCENE_PAINT_PALETTE}) {
+  for (GSHSCENE_Paint_Kind reserved : {GSHSCENE_PAINT_GRADIENT, GSHSCENE_PAINT_PALETTE}) {
     n = shape_node(f.sq.get());
     n.paint.kind = reserved;
     EXPECT_EQ(f.add(n), GSHSCENE_ERR_UNSUPPORTED) << reserved;
@@ -308,7 +308,7 @@ TEST(NodeRules, AShapeNeedsAPathOrGlyphRunOfTheStoreAndAValidRuleAndPaint) {
   n.paint = solid(kNaN, 0, 0, 1);
   EXPECT_EQ(f.add(n), GSHSCENE_ERR_INVALID);
   n.paint = solid(0, 0, 0, 1);
-  n.paint.color_space = 1;
+  n.paint.space = space_of(GCOL_PRIMARIES_PROPHOTO, GCOL_TRANSFER_SRGB);
   EXPECT_EQ(f.add(n), GSHSCENE_ERR_UNSUPPORTED);
   n.paint = solid(-0.5, 2.0, 1e9, 0.25);  // outside the gamut is allowed (AD-23)
   uint64_t id = 0;

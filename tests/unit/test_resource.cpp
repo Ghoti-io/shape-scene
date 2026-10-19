@@ -99,7 +99,7 @@ GSHSCENE_List * closed_fills(GSHSCENE_Store * store, const GSHSCENE_Resource * p
     return nullptr;
   }
   for (int i = 0; i < n; i++) {
-    if (gshscene_list_fill(list, path, nullptr, GSHGEOM_FILL_NONZERO, nullptr, i) != GSHSCENE_OK) {
+    if (gshscene_list_fill(list, path, nullptr, GSHGEOM_FILL_NONZERO, nullptr, i, 0) != GSHSCENE_OK) {
       gshscene_list_destroy(list);
       return nullptr;
     }
@@ -823,7 +823,7 @@ TEST(Picture, EqualListsFreezeToOneHandleAndADifferenceSeparatesThem) {
   GSHSCENE_List * l4 = nullptr;
   ASSERT_EQ(gshscene_list_create(nullptr, nullptr, s.store, &l4), GSHSCENE_OK);
   for (int i = 0; i < 3; i++) {
-    ASSERT_EQ(gshscene_list_fill(l4, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, i == 2 ? 9 : i), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_fill(l4, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, i == 2 ? 9 : i, 0), GSHSCENE_OK);
   }
   gshscene_list_close(l4);
   Ref p4(freeze(s.store, l4));
@@ -861,7 +861,7 @@ TEST(Picture, AListThatFillsAGlyphRunIsNotMistakenForOneThatInstancesAPicture) {
   Ref run(intern_run(s.store, fr.run));
   GSHSCENE_List * list = nullptr;
   ASSERT_EQ(gshscene_list_create(nullptr, nullptr, s.store, &list), GSHSCENE_OK);
-  ASSERT_EQ(gshscene_list_fill(list, run.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(list, run.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
   gshscene_list_close(list);
   Ref picture(freeze(s.store, list));
   gshscene_list_destroy(list);
@@ -886,7 +886,7 @@ TEST(Picture, RefusesAnOpenListAForeignListAndNull) {
   Ref sq(intern_square(s.store)), foreign(intern_square(other.store));
   GSHSCENE_List * open = nullptr;
   ASSERT_EQ(gshscene_list_create(nullptr, nullptr, s.store, &open), GSHSCENE_OK);
-  ASSERT_EQ(gshscene_list_fill(open, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(open, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
   GSHSCENE_List * foreign_list = closed_fills(other.store, foreign.get(), 1);
   GSHSCENE_Result rc;
   EXPECT_EQ(freeze(s.store, open, &rc), nullptr);
@@ -920,7 +920,7 @@ TEST(Picture, DepthCountsNestedPicturesAndTheLimitIsExact) {
   for (int d = 2; d <= 4; d++) {
     GSHSCENE_List * list = nullptr;
     ASSERT_EQ(gshscene_list_create(nullptr, nullptr, s.store, &list), GSHSCENE_OK);
-    ASSERT_EQ(gshscene_list_instance(list, level[d - 1], nullptr, 0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_instance(list, level[d - 1], nullptr, 0, 0), GSHSCENE_OK);
     ASSERT_EQ(gshscene_list_close(list), GSHSCENE_OK);
     level[d] = freeze(s.store, list, &rc);
     gshscene_list_destroy(list);
@@ -945,13 +945,13 @@ TEST(Picture, TheDepthIsTheDeepestInstanceNotTheLastOne) {
   Ref p1(freeze(s.store, base));
   GSHSCENE_List * l2 = nullptr;
   ASSERT_EQ(gshscene_list_create(nullptr, nullptr, s.store, &l2), GSHSCENE_OK);
-  ASSERT_EQ(gshscene_list_instance(l2, p1.get(), nullptr, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_instance(l2, p1.get(), nullptr, 0, 0), GSHSCENE_OK);
   gshscene_list_close(l2);
   Ref p2(freeze(s.store, l2));
   GSHSCENE_List * l3 = nullptr;
   ASSERT_EQ(gshscene_list_create(nullptr, nullptr, s.store, &l3), GSHSCENE_OK);
-  ASSERT_EQ(gshscene_list_instance(l3, p2.get(), nullptr, 0), GSHSCENE_OK);  // depth 2 first
-  ASSERT_EQ(gshscene_list_instance(l3, p1.get(), nullptr, 0), GSHSCENE_OK);  // then depth 1
+  ASSERT_EQ(gshscene_list_instance(l3, p2.get(), nullptr, 0, 0), GSHSCENE_OK);  // depth 2 first
+  ASSERT_EQ(gshscene_list_instance(l3, p1.get(), nullptr, 0, 0), GSHSCENE_OK);  // then depth 1
   gshscene_list_close(l3);
   Ref p3(freeze(s.store, l3));
   EXPECT_EQ(gshscene_resource_picture_depth(p3.get()), 3u);

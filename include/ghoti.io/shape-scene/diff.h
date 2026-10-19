@@ -37,9 +37,15 @@
  * would.  A sink may enlarge it and never shrink it.  It is computed over
  * occurrences (version.h), in both versions:
  *
- * - a node whose own properties changed (flags, map, layer, opacity, clip,
- *   resource, rule, paint, target) damages every occurrence of its whole
- *   subtree; a changed key or a changed parent alone damages nothing by itself;
+ * - a node whose own properties changed (flags, map, layer, depth, opacity, blend
+ *   space, composite operator, ordering, clip, resource, rule, paint, target)
+ *   damages every occurrence of its whole subtree; a changed key or a changed
+ *   parent alone damages nothing by itself;
+ * - a changed foreground damages every occurrence of every shape that paints with
+ *   it (N10), and nothing else;
+ * - an occurrence of a group whose composite operator is unbounded (N4: it changes
+ *   the backdrop where it has no content) that lies in a damaged subtree makes the
+ *   damage unbounded;
  * - a group whose own properties are equal and whose children differ damages the
  *   occurrences of the children added and removed, and of every child both
  *   versions have if their order differs;
@@ -133,6 +139,13 @@ GSHSCENE_API size_t gshscene_diff_count(const GSHSCENE_Diff * diff);
  */
 GSHSCENE_API GSHSCENE_Result gshscene_diff_get(
     const GSHSCENE_Diff * diff, size_t index, uint64_t * out_id, GSHSCENE_Diff_Kind * out_kind);
+
+/**
+ * @brief Whether the two versions' foregrounds differ (N10); 0 for NULL.
+ *
+ * Their nodes may be equal: the shapes that paint with the foreground are then in the damage and not in the changed IDs.
+ */
+GSHSCENE_API int gshscene_diff_foreground_changed(const GSHSCENE_Diff * diff);
 
 /** @brief The damage; ::GSHSCENE_ERR_INVALID for NULL. */
 GSHSCENE_API GSHSCENE_Result gshscene_diff_damage(const GSHSCENE_Diff * diff, GSHSCENE_Damage * out);

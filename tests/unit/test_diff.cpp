@@ -760,8 +760,24 @@ uint64_t signature_of(const GSHSCENE_Version * v, const Occurrence & o) {
   gshgeom_hash_u64(&h, gshscene_resource_hash(shape.node.resource));
   gshgeom_hash_u8(&h, (uint8_t)shape.node.fill_rule);
   gshgeom_hash_i32(&h, shape.node.layer);
+  gshgeom_hash_f64(&h, shape.node.depth);
+  gshgeom_hash_u8(&h, (uint8_t)shape.node.paint.kind);
   for (int k = 0; k < 4; k++) {
     gshgeom_hash_f64(&h, shape.node.paint.rgba[k]);
+  }
+  gshgeom_hash_u8(&h, (uint8_t)shape.node.paint.space.primaries);
+  gshgeom_hash_u8(&h, (uint8_t)shape.node.paint.space.transfer);
+  gshgeom_hash_f64(&h, shape.node.paint.space.gamma);
+  if (shape.node.paint.kind == GSHSCENE_PAINT_FOREGROUND) {
+    // What currentColor draws is the version's foreground.
+    GSHSCENE_Color fg;
+    EXPECT_EQ(gshscene_version_foreground(v, &fg), GSHSCENE_OK);
+    for (int k = 0; k < 4; k++) {
+      gshgeom_hash_f64(&h, fg.rgba[k]);
+    }
+    gshgeom_hash_u8(&h, (uint8_t)fg.space.primaries);
+    gshgeom_hash_u8(&h, (uint8_t)fg.space.transfer);
+    gshgeom_hash_f64(&h, fg.space.gamma);
   }
   gshgeom_hash_u64(&h, gshgeom_map_hash(&o.map));
   // The groups above it, and above each instance it was reached through.
@@ -770,6 +786,11 @@ uint64_t signature_of(const GSHSCENE_Version * v, const Occurrence & o) {
     while (up != 0) {
       GSHSCENE_Node_Info g = info_of(v, up);
       gshgeom_hash_f64(&h, g.node.opacity);
+      gshgeom_hash_u8(&h, (uint8_t)g.node.blend_space.primaries);
+      gshgeom_hash_u8(&h, (uint8_t)g.node.blend_space.transfer);
+      gshgeom_hash_f64(&h, g.node.blend_space.gamma);
+      gshgeom_hash_u8(&h, (uint8_t)g.node.composite);
+      gshgeom_hash_u8(&h, (uint8_t)g.node.ordering);
       gshgeom_hash_u64(&h, gshscene_resource_hash(g.node.clip));
       gshgeom_hash_u64(&h, gshgeom_map_hash(&g.node.clip_map));
       gshgeom_hash_u8(&h, (uint8_t)g.node.clip_rule);
@@ -782,6 +803,22 @@ uint64_t signature_of(const GSHSCENE_Version * v, const Occurrence & o) {
 std::vector<Op> ops_of(const GSHSCENE_Version * v, bool * unbounded) {
   std::vector<Op> ops;
   for (const Occurrence & o : occurrences(v)) {
+    if (o.kind == GSHSCENE_NODE_GROUP && gshscene_composite_is_unbounded((GSHSCENE_Composite)o.props.composite)) {
+      // A group whose operator changes the backdrop where it has no content touches every pixel (N4, N13).
+      Op everywhere;
+      everywhere.x0 = everywhere.y0 = -1e12;
+      everywhere.x1 = everywhere.y1 = 1e12;
+      GSHGEOM_Hash h;
+      gshgeom_hash_init(&h);
+      gshgeom_hash_u64(&h, o.node);
+      gshgeom_hash_f64(&h, o.props.opacity);
+      gshgeom_hash_u8(&h, (uint8_t)o.props.composite);
+      gshgeom_hash_u8(&h, (uint8_t)o.props.blend_space.primaries);
+      gshgeom_hash_u8(&h, (uint8_t)o.props.blend_space.transfer);
+      everywhere.signature = gshgeom_hash_value(&h);
+      ops.push_back(everywhere);
+      continue;
+    }
     if (o.kind != GSHSCENE_NODE_SHAPE) {
       continue;
     }
@@ -866,11 +903,27 @@ struct Case {
     n.map = map();
     n.fill_rule = rng.below(2) ? GSHGEOM_FILL_EVEN_ODD : GSHGEOM_FILL_NONZERO;
     n.paint = solid(rng.below(3) / 2.0, rng.below(2), 0.25, 1.0 - rng.below(2) * 0.5);
+    n.depth = (double)rng.below(3) * 0.5;
+    if (rng.below(4) == 0) {
+      n.paint = solid(0, 0, 0, 1.0 - rng.below(2) * 0.5);
+      n.paint.kind = GSHSCENE_PAINT_FOREGROUND;
+    } else if (rng.below(5) == 0) {
+      n.paint.space = srgb_space();
+    }
     return n;
   }
   GSHSCENE_Node group() {
     GSHSCENE_Node n = group_node(rng.below(3) == 0 ? 0.5 : 1.0, (int32_t)rng.below(3));
     n.map = rng.below(2) ? map() : translate(0, 0);
+    n.depth = (double)rng.below(3) * 0.5;
+    n.ordering = rng.below(4) == 0 ? (uint32_t)(1 + rng.below(2)) : (uint32_t)GSHSCENE_ORDER_FLAT;
+    if (rng.below(5) == 0) {
+      // Half of these operators reach beyond the group's own bounds (N4).
+      n.composite = rng.below((unsigned)GSHSCENE_COMPOSITE_COUNT);
+    }
+    if (rng.below(6) == 0) {
+      n.blend_space = linear_srgb_space();
+    }
     if (rng.below(4) == 0) {
       n.clip = path();
       n.clip_map = translate(rng.below(10), rng.below(10));
@@ -954,7 +1007,13 @@ struct Case {
           }
           break;
         }
-        case 7: {
+        case 7:
+          if (rng.below(2) == 0) {
+            GSHSCENE_Color fg = {{rng.below(3) / 2.0, 0.25, rng.below(2) * 1.0, 1.0}, rng.below(2) ? srgb_space() : GSHSCENE_Color_Space{}};
+            gshscene_edit_set_foreground(e.edit, &fg);
+            break;
+          }
+          {
           uint64_t id = any(instances);
           GSHSCENE_Node_Info info;
           if (id != 0 && gshscene_edit_node(e.edit, id, &info) == GSHSCENE_OK) {
@@ -984,7 +1043,7 @@ struct Case {
 
 TEST(DamageOracle, EveryPixelWhoseDrawingDiffersLiesInsideTheDamage) {
   const int kCases = 120;
-  int bounded = 0, nonempty = 0, tighter = 0, checked_cells = 0, differing_cells = 0, published = 0;
+  int bounded = 0, nonempty = 0, tighter = 0, checked_cells = 0, differing_cells = 0, published = 0, unbounded_cases = 0;
   for (int c = 0; c < kCases; c++) {
     Case cs((uint64_t)c + 1);
     VersionRef v1;
@@ -1009,8 +1068,17 @@ TEST(DamageOracle, EveryPixelWhoseDrawingDiffersLiesInsideTheDamage) {
     std::vector<Op> a = ops_of(v1.get(), &unbounded_a);
     std::vector<Op> b = ops_of(v2.get(), &unbounded_b);
     ASSERT_FALSE(unbounded_a || unbounded_b);
-    EXPECT_EQ(r.damage.unbounded, 0) << "case " << c << ": every shape here has bounds";
     if (r.damage.unbounded) {
+      // Every shape here has bounds, so the only reason is a group whose operator reaches beyond its own (N13).
+      bool reaches = false;
+      for (const GSHSCENE_Version * v : {v1.get(), v2.get()}) {
+        for (const Occurrence & o : occurrences(v)) {
+          reaches = reaches || (o.kind == GSHSCENE_NODE_GROUP &&
+                                   gshscene_composite_is_unbounded((GSHSCENE_Composite)o.props.composite));
+        }
+      }
+      EXPECT_TRUE(reaches) << "case " << c << ": unbounded damage with no unbounded operator in either version";
+      unbounded_cases++;
       continue;
     }
     bounded++;
@@ -1035,7 +1103,11 @@ TEST(DamageOracle, EveryPixelWhoseDrawingDiffersLiesInsideTheDamage) {
     if (any_differs && !r.damage.empty && (r.damage.rect.x1 - r.damage.rect.x0 < hi - lo - 20)) {
       tighter++;
     }
-    if (r.changes.empty()) {
+    GSHSCENE_Color fa, fb;
+    ASSERT_EQ(gshscene_version_foreground(v1.get(), &fa), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_version_foreground(v2.get(), &fb), GSHSCENE_OK);
+    bool fg_same = std::memcmp(&fa, &fb, sizeof fa) == 0;
+    if (r.changes.empty() && fg_same) {
       EXPECT_TRUE(r.damage.empty);
     }
   }
@@ -1044,6 +1116,8 @@ TEST(DamageOracle, EveryPixelWhoseDrawingDiffersLiesInsideTheDamage) {
   EXPECT_GE(nonempty, published / 2);
   EXPECT_GE(differing_cells, 2000);
   EXPECT_GE(tighter, published / 4) << "damage that is always huge would pass and say nothing";
+  EXPECT_GE(unbounded_cases, 1) << "some case must reach the operators that reach beyond their bounds";
+  EXPECT_LE(unbounded_cases, published / 2) << "and most must not, or the oracle says little";
   (void)bounded;
   (void)checked_cells;
 }

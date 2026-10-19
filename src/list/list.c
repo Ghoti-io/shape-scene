@@ -34,10 +34,11 @@
 
 #include "../internal.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 /** The format of a list's hash and dump. */
-#define LIST_FORMAT_VERSION 1u
+#define LIST_FORMAT_VERSION 2u
 
 /** The kind field of a list's hash: "LIST" in little-endian ASCII. */
 #define LIST_HASH_KIND UINT32_C(0x5453494c)
@@ -169,6 +170,7 @@ GSHSCENE_Result gshscene_list_create_effective(const GSHSCENE_Allocator * alloc,
   list->alloc = *alloc;
   list->limits = *effective;
   list->store = store;
+  gshscene_color_init(&list->foreground);
   gshscene_store_ref(store);
   *out = list;
   return GSHSCENE_OK;
@@ -209,6 +211,12 @@ static void list_clear(GSHSCENE_List * list) {
   list->depth = 0;
   list->expansion = 0;
   list->picture_depth = 0;
+  list->nonflat = 0;
+  gshscene_color_init(&list->foreground);
+  gshscene_free(&list->alloc, list->ties);
+  list->ties = NULL;
+  list->tie_count = 0;
+  list->tie_capacity = 0;
   list->closed = 0;
 }
 
@@ -227,6 +235,7 @@ void gshscene_list_destroy(GSHSCENE_List * list) {
   items_release(list);
   chunks_free(list, list->head, NULL);
   chunks_free(list, list->big, NULL);
+  gshscene_free(&list->alloc, list->ties);
   GSHSCENE_Store * store = list->store;
   GSHSCENE_Allocator alloc = list->alloc;
   gshscene_free(&alloc, list);
@@ -258,6 +267,13 @@ static void item_init(GSHSCENE_Item * item, GSHSCENE_Item_Kind kind) {
   gshgeom_map_identity(2, &item->map);
   item->fill_rule = GSHGEOM_FILL_NONZERO;
   item->paint.kind = GSHSCENE_PAINT_SOLID;
+}
+
+/* Count what close needs to know as an item joins the list. */
+static void note_item(GSHSCENE_List * list, const GSHSCENE_Item * item) {
+  if (item->kind == GSHSCENE_ITEM_GROUP_PUSH && item->group.ordering != (uint32_t)GSHSCENE_ORDER_FLAT) {
+    list->nonflat++;
+  }
 }
 
 static GSHSCENE_Result segment_alloc(GSHSCENE_List * list) {
@@ -302,6 +318,7 @@ static GSHSCENE_Result list_append(GSHSCENE_List * list, const GSHSCENE_Item * i
   }
   *item_at(list, list->count) = *item;
   gshscene_resource_retain(item->resource);
+  note_item(list, item);
   list->count++;
   list->expansion = total;
   if (item->kind == GSHSCENE_ITEM_INSTANCE && item->resource->u.picture.depth > list->picture_depth) {
@@ -359,11 +376,10 @@ static GSHSCENE_Result canonical_paint(const GSHSCENE_Paint * paint, GSHSCENE_Pa
   if (!paint) {
     return GSHSCENE_OK;
   }
-  if (paint->kind == GSHSCENE_PAINT_GRADIENT || paint->kind == GSHSCENE_PAINT_FOREGROUND ||
-      paint->kind == GSHSCENE_PAINT_PALETTE) {
+  if (paint->kind == GSHSCENE_PAINT_GRADIENT || paint->kind == GSHSCENE_PAINT_PALETTE) {
     return GSHSCENE_ERR_UNSUPPORTED;
   }
-  if (paint->kind != GSHSCENE_PAINT_SOLID || paint->gradient) {
+  if ((paint->kind != GSHSCENE_PAINT_SOLID && paint->kind != GSHSCENE_PAINT_FOREGROUND) || paint->gradient) {
     return GSHSCENE_ERR_INVALID;
   }
   for (int i = 0; i < 4; i++) {
@@ -374,32 +390,57 @@ static GSHSCENE_Result canonical_paint(const GSHSCENE_Paint * paint, GSHSCENE_Pa
   if (!(paint->rgba[3] >= 0.0 && paint->rgba[3] <= 1.0)) {
     return GSHSCENE_ERR_INVALID;
   }
-  if (paint->color_space != 0) {
-    return GSHSCENE_ERR_UNSUPPORTED;
+  if (paint->kind == GSHSCENE_PAINT_FOREGROUND) {
+    /* One spelling: the foreground's color is the version's, so only the alpha multiplier is the paint's. */
+    if (gshgeom_f64_bits(paint->rgba[0]) != 0 || gshgeom_f64_bits(paint->rgba[1]) != 0 ||
+        gshgeom_f64_bits(paint->rgba[2]) != 0 || !gshscene_color_space_is_target(&paint->space)) {
+      return GSHSCENE_ERR_INVALID;
+    }
+    out->kind = GSHSCENE_PAINT_FOREGROUND;
+    out->rgba[3] = paint->rgba[3];
+    return GSHSCENE_OK;
+  }
+  GSHSCENE_Result result = gshscene_color_space_check(&paint->space);
+  if (result != GSHSCENE_OK) {
+    return result;
   }
   for (int i = 0; i < 4; i++) {
     out->rgba[i] = paint->rgba[i];
   }
+  out->space = paint->space;
+  return GSHSCENE_OK;
+}
+
+GSHSCENE_Result gshscene_list_canonical_depth(double depth, double * out) {
+  if (!gshscene_finite(depth)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  *out = depth == 0.0 ? 0.0 : depth; /* -0 and +0 are one depth, and one spelling */
   return GSHSCENE_OK;
 }
 
 static GSHSCENE_Result canonical_group(const GSHSCENE_Group * group, GSHSCENE_Group * out) {
+  memset(out, 0, sizeof *out);
   out->opacity = 1.0;
-  out->blend_space = 0;
   out->ordering = GSHSCENE_ORDER_FLAT;
+  out->composite = GSHSCENE_COMPOSITE_SRC_OVER;
   if (!group) {
     return GSHSCENE_OK;
   }
   if (!gshscene_finite(group->opacity) || !(group->opacity >= 0.0 && group->opacity <= 1.0)) {
     return GSHSCENE_ERR_INVALID;
   }
-  if (group->ordering >= (uint32_t)GSHSCENE_ORDERING_COUNT) {
+  if (group->ordering >= (uint32_t)GSHSCENE_ORDERING_COUNT || group->composite >= (uint32_t)GSHSCENE_COMPOSITE_COUNT) {
     return GSHSCENE_ERR_INVALID;
   }
-  if (group->blend_space != 0 || group->ordering != GSHSCENE_ORDER_FLAT) {
-    return GSHSCENE_ERR_UNSUPPORTED;
+  GSHSCENE_Result result = gshscene_color_space_check(&group->blend_space);
+  if (result != GSHSCENE_OK) {
+    return result;
   }
   out->opacity = group->opacity;
+  out->blend_space = group->blend_space;
+  out->ordering = group->ordering;
+  out->composite = group->composite;
   return GSHSCENE_OK;
 }
 
@@ -410,6 +451,10 @@ GSHSCENE_Result gshscene_list_canonical_map(const GSHGEOM_Map * map, GSHGEOM_Map
 
 GSHSCENE_Result gshscene_list_canonical_paint(const GSHSCENE_Paint * paint, GSHSCENE_Paint * out) {
   return canonical_paint(paint, out);
+}
+
+GSHSCENE_Result gshscene_list_canonical_group(const GSHSCENE_Group * group, GSHSCENE_Group * out) {
+  return canonical_group(group, out);
 }
 
 GSHSCENE_Result gshscene_list_check_rule(GSHGEOM_Fill_Rule rule) {
@@ -443,7 +488,7 @@ static GSHSCENE_Result stack_reserve(GSHSCENE_List * list) {
 /* --- the record calls ---------------------------------------------------------- */
 
 GSHSCENE_Result gshscene_list_fill(GSHSCENE_List * list, const GSHSCENE_Resource * resource,
-    const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, const GSHSCENE_Paint * paint, int32_t layer) {
+    const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, const GSHSCENE_Paint * paint, int32_t layer, double depth) {
   if (!list || list->closed) {
     return GSHSCENE_ERR_INVALID;
   }
@@ -459,6 +504,9 @@ GSHSCENE_Result gshscene_list_fill(GSHSCENE_List * list, const GSHSCENE_Resource
   if (result == GSHSCENE_OK) {
     result = canonical_paint(paint, &item.paint);
   }
+  if (result == GSHSCENE_OK) {
+    result = gshscene_list_canonical_depth(depth, &item.depth);
+  }
   if (result != GSHSCENE_OK) {
     return result;
   }
@@ -469,7 +517,7 @@ GSHSCENE_Result gshscene_list_fill(GSHSCENE_List * list, const GSHSCENE_Resource
 }
 
 GSHSCENE_Result gshscene_list_clip_push(GSHSCENE_List * list, const GSHSCENE_Resource * resource,
-    const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule) {
+    const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, int32_t layer, double depth) {
   if (!list || list->closed) {
     return GSHSCENE_ERR_INVALID;
   }
@@ -483,6 +531,9 @@ GSHSCENE_Result gshscene_list_clip_push(GSHSCENE_List * list, const GSHSCENE_Res
     result = check_rule(rule);
   }
   if (result == GSHSCENE_OK) {
+    result = gshscene_list_canonical_depth(depth, &item.depth);
+  }
+  if (result == GSHSCENE_OK) {
     result = stack_reserve(list);
   }
   if (result != GSHSCENE_OK) {
@@ -490,6 +541,7 @@ GSHSCENE_Result gshscene_list_clip_push(GSHSCENE_List * list, const GSHSCENE_Res
   }
   item.resource = resource;
   item.fill_rule = rule;
+  item.layer = layer;
   result = list_append(list, &item);
   if (result == GSHSCENE_OK) {
     list->stack[list->depth++] = PUSH_CLIP;
@@ -515,13 +567,16 @@ GSHSCENE_Result gshscene_list_clip_pop(GSHSCENE_List * list) {
   return pop(list, PUSH_CLIP, GSHSCENE_ITEM_CLIP_POP);
 }
 
-GSHSCENE_Result gshscene_list_group_push(GSHSCENE_List * list, const GSHSCENE_Group * group, int32_t layer) {
+GSHSCENE_Result gshscene_list_group_push(GSHSCENE_List * list, const GSHSCENE_Group * group, int32_t layer, double depth) {
   if (!list || list->closed) {
     return GSHSCENE_ERR_INVALID;
   }
   GSHSCENE_Item item;
   item_init(&item, GSHSCENE_ITEM_GROUP_PUSH);
   GSHSCENE_Result result = canonical_group(group, &item.group);
+  if (result == GSHSCENE_OK) {
+    result = gshscene_list_canonical_depth(depth, &item.depth);
+  }
   if (result == GSHSCENE_OK) {
     result = stack_reserve(list);
   }
@@ -541,7 +596,7 @@ GSHSCENE_Result gshscene_list_group_pop(GSHSCENE_List * list) {
 }
 
 GSHSCENE_Result gshscene_list_instance(
-    GSHSCENE_List * list, const GSHSCENE_Resource * picture, const GSHGEOM_Map * map, int32_t layer) {
+    GSHSCENE_List * list, const GSHSCENE_Resource * picture, const GSHGEOM_Map * map, int32_t layer, double depth) {
   if (!list || list->closed) {
     return GSHSCENE_ERR_INVALID;
   }
@@ -551,6 +606,9 @@ GSHSCENE_Result gshscene_list_instance(
   if (result == GSHSCENE_OK) {
     result = canonical_map(map, &item.map);
   }
+  if (result == GSHSCENE_OK) {
+    result = gshscene_list_canonical_depth(depth, &item.depth);
+  }
   if (result != GSHSCENE_OK) {
     return result;
   }
@@ -559,11 +617,389 @@ GSHSCENE_Result gshscene_list_instance(
   return list_append(list, &item);
 }
 
+/* --- the foreground ------------------------------------------------------------ */
+
+GSHSCENE_Result gshscene_list_set_foreground(GSHSCENE_List * list, const GSHSCENE_Color * color) {
+  if (!list || list->closed) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  GSHSCENE_Color value;
+  gshscene_color_init(&value);
+  if (color) {
+    GSHSCENE_Result result = gshscene_color_check(color);
+    if (result != GSHSCENE_OK) {
+      return result;
+    }
+    value = *color;
+  }
+  list->foreground = value;
+  return GSHSCENE_OK;
+}
+
+GSHSCENE_Result gshscene_list_foreground(const GSHSCENE_List * list, GSHSCENE_Color * out) {
+  if (!list || !out) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  *out = list->foreground;
+  return GSHSCENE_OK;
+}
+
+/* --- composite operators ---------------------------------------------------------- */
+
+const char * gshscene_composite_string(GSHSCENE_Composite op) {
+  switch (op) {
+    case GSHSCENE_COMPOSITE_SRC_OVER:
+      return "src-over";
+    case GSHSCENE_COMPOSITE_CLEAR:
+      return "clear";
+    case GSHSCENE_COMPOSITE_SRC:
+      return "src";
+    case GSHSCENE_COMPOSITE_DEST:
+      return "dest";
+    case GSHSCENE_COMPOSITE_DEST_OVER:
+      return "dest-over";
+    case GSHSCENE_COMPOSITE_SRC_IN:
+      return "src-in";
+    case GSHSCENE_COMPOSITE_DEST_IN:
+      return "dest-in";
+    case GSHSCENE_COMPOSITE_SRC_OUT:
+      return "src-out";
+    case GSHSCENE_COMPOSITE_DEST_OUT:
+      return "dest-out";
+    case GSHSCENE_COMPOSITE_SRC_ATOP:
+      return "src-atop";
+    case GSHSCENE_COMPOSITE_DEST_ATOP:
+      return "dest-atop";
+    case GSHSCENE_COMPOSITE_XOR:
+      return "xor";
+    case GSHSCENE_COMPOSITE_PLUS:
+      return "plus";
+    case GSHSCENE_COMPOSITE_COUNT:
+      break;
+  }
+  return "unknown composite";
+}
+
+int gshscene_composite_is_unbounded(GSHSCENE_Composite op) {
+  switch (op) {
+    case GSHSCENE_COMPOSITE_CLEAR:
+    case GSHSCENE_COMPOSITE_SRC:
+    case GSHSCENE_COMPOSITE_SRC_IN:
+    case GSHSCENE_COMPOSITE_DEST_IN:
+    case GSHSCENE_COMPOSITE_SRC_OUT:
+    case GSHSCENE_COMPOSITE_DEST_ATOP:
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+/* --- order (N11) -------------------------------------------------------------------- */
+
+int gshscene_order_compare(uint32_t context, int32_t layer_a, double depth_a, int32_t layer_b, double depth_b,
+    int * tied) {
+  *tied = 0;
+  if (context == (uint32_t)GSHSCENE_ORDER_DEPTH) {
+    if (depth_a > depth_b) {
+      return -1; /* the farther unit is painted first */
+    }
+    if (depth_a < depth_b) {
+      return 1;
+    }
+    *tied = 1;
+  } else if (context != (uint32_t)GSHSCENE_ORDER_OVERLAY) {
+    return 0;
+  }
+  if (layer_a != layer_b) {
+    return layer_a < layer_b ? -1 : 1;
+  }
+  return 0;
+}
+
+/* A unit of a sequence: the first item and, for a push, its pop (else the same index). */
+typedef struct Unit {
+  size_t start;
+  size_t end;
+} Unit;
+
+/* A sequence being put in order: its units, the next to emit, and what to emit when it is done. */
+typedef struct Frame {
+  Unit * units;
+  size_t base;
+  size_t count;
+  size_t next;
+  size_t prev_pos; /* where the previous unit's first item went */
+  size_t closing;  /* the pop to emit when the sequence is finished, or SIZE_MAX */
+  uint32_t context;
+} Frame;
+
+/* The scratch memory of a resolution: every piece is taken before anything changes. */
+typedef struct Scratch {
+  size_t * match;
+  size_t * out;
+  size_t * open;
+  Unit * units;
+  Unit * temp;
+  Frame * frames;
+  GSHSCENE_Tie * ties;
+} Scratch;
+
+static void scratch_free(const GSHSCENE_Allocator * alloc, Scratch * s) {
+  gshscene_free(alloc, s->match);
+  gshscene_free(alloc, s->out);
+  gshscene_free(alloc, s->open);
+  gshscene_free(alloc, s->units);
+  gshscene_free(alloc, s->temp);
+  gshscene_free(alloc, s->frames);
+  gshscene_free(alloc, s->ties);
+}
+
+static void * array_alloc(const GSHSCENE_Allocator * alloc, size_t count, size_t size) {
+  if (count == 0) {
+    count = 1;
+  }
+  if (count > SIZE_MAX / size) {
+    return NULL;
+  }
+  return gshscene_alloc(alloc, count * size);
+}
+
+/* Whether unit @p a is painted strictly before unit @p b in @p context (the sort's predicate). */
+static int unit_before(const GSHSCENE_List * list, uint32_t context, const Unit * a, const Unit * b, int * tied) {
+  const GSHSCENE_Item * ia = item_at(list, a->start);
+  const GSHSCENE_Item * ib = item_at(list, b->start);
+  return gshscene_order_compare(context, ia->layer, ia->depth, ib->layer, ib->depth, tied);
+}
+
+/* A stable merge sort of @p units (@p temp is as long): equal units keep their declared order. */
+static void units_sort(const GSHSCENE_List * list, uint32_t context, Unit * units, Unit * temp, size_t count) {
+  for (size_t width = 1; width < count; width *= 2) {
+    for (size_t lo = 0; lo < count; lo += 2 * width) {
+      size_t mid = lo + width < count ? lo + width : count;
+      size_t hi = lo + 2 * width < count ? lo + 2 * width : count;
+      size_t i = lo;
+      size_t j = mid;
+      size_t k = lo;
+      while (i < mid && j < hi) {
+        int tied;
+        /* The right unit goes first only if it is strictly before the left one. */
+        if (unit_before(list, context, &units[j], &units[i], &tied) < 0) {
+          temp[k++] = units[j++];
+        } else {
+          temp[k++] = units[i++];
+        }
+      }
+      while (i < mid) {
+        temp[k++] = units[i++];
+      }
+      while (j < hi) {
+        temp[k++] = units[j++];
+      }
+    }
+    memcpy(units, temp, count * sizeof *units);
+  }
+}
+
+/* Put a new sequence of items [lo, hi) on the frame stack, its units sorted. */
+static void frame_open(const GSHSCENE_List * list, Scratch * s, size_t * frame_count, size_t * unit_top, size_t lo,
+    size_t hi, uint32_t context, size_t closing) {
+  Frame * f = &s->frames[(*frame_count)++];
+  f->base = *unit_top;
+  f->units = &s->units[*unit_top];
+  f->count = 0;
+  f->next = 0;
+  f->prev_pos = 0;
+  f->closing = closing;
+  f->context = context;
+  size_t i = lo;
+  while (i < hi) {
+    const GSHSCENE_Item * item = item_at(list, i);
+    Unit u = {i, i};
+    if (item->kind == GSHSCENE_ITEM_CLIP_PUSH || item->kind == GSHSCENE_ITEM_GROUP_PUSH) {
+      u.end = s->match[i];
+    }
+    f->units[f->count++] = u;
+    i = u.end + 1;
+  }
+  *unit_top += f->count;
+  if (context != (uint32_t)GSHSCENE_ORDER_FLAT && f->count > 1) {
+    units_sort(list, context, f->units, s->temp, f->count);
+  }
+}
+
+/* Make the order of a closed-to-be list: the permutation of its items and its ties, in @p s. */
+static void resolve_order(const GSHSCENE_List * list, Scratch * s, size_t * out_ties) {
+  size_t n = list->count;
+  /* The matching pop of every push. */
+  size_t open_n = 0;
+  for (size_t i = 0; i < n; i++) {
+    const GSHSCENE_Item * item = item_at(list, i);
+    if (item->kind == GSHSCENE_ITEM_CLIP_PUSH || item->kind == GSHSCENE_ITEM_GROUP_PUSH) {
+      s->open[open_n++] = i;
+    } else if (item->kind == GSHSCENE_ITEM_CLIP_POP || item->kind == GSHSCENE_ITEM_GROUP_POP) {
+      s->match[s->open[--open_n]] = i;
+    }
+  }
+  size_t out_n = 0;
+  size_t unit_top = 0;
+  size_t frame_count = 0;
+  size_t tie_n = 0;
+  frame_open(list, s, &frame_count, &unit_top, 0, n, GSHSCENE_ORDER_FLAT, SIZE_MAX);
+  while (frame_count > 0) {
+    Frame * f = &s->frames[frame_count - 1];
+    if (f->next == f->count) {
+      if (f->closing != SIZE_MAX) {
+        s->out[out_n++] = f->closing;
+      }
+      unit_top = f->base;
+      frame_count--;
+      continue;
+    }
+    Unit u = f->units[f->next++];
+    size_t pos = out_n;
+    const GSHSCENE_Item * item = item_at(list, u.start);
+    if (f->context == (uint32_t)GSHSCENE_ORDER_DEPTH && f->next > 1) {
+      const Unit * prev = &f->units[f->next - 2];
+      const GSHSCENE_Item * before = item_at(list, prev->start);
+      if (before->depth == item->depth) {
+        GSHSCENE_Tie * tie = &s->ties[tie_n++];
+        tie->first = f->prev_pos;
+        tie->second = pos;
+        tie->depth = item->depth;
+        tie->reason = before->layer != item->layer ? GSHSCENE_TIE_LAYER : GSHSCENE_TIE_DECLARED;
+      }
+    }
+    f->prev_pos = pos;
+    s->out[out_n++] = u.start;
+    if (u.end != u.start) {
+      uint32_t inner = item->kind == GSHSCENE_ITEM_GROUP_PUSH ? item->group.ordering : f->context;
+      frame_open(list, s, &frame_count, &unit_top, u.start + 1, u.end, inner, u.end);
+    }
+  }
+  *out_ties = tie_n;
+}
+
+/* Rewrite the items so that item i is what was item @p out[i] (cycle by cycle; @p out is consumed). */
+static void items_permute(GSHSCENE_List * list, size_t * out) {
+  size_t n = list->count;
+  for (size_t i = 0; i < n; i++) {
+    if (out[i] == i) {
+      continue;
+    }
+    GSHSCENE_Item hold = *item_at(list, i);
+    size_t j = i;
+    while (out[j] != i) {
+      size_t k = out[j];
+      *item_at(list, j) = *item_at(list, k);
+      out[j] = j;
+      j = k;
+    }
+    *item_at(list, j) = hold;
+    out[j] = j;
+  }
+}
+
+static GSHSCENE_Result list_resolve(GSHSCENE_List * list) {
+  size_t n = list->count;
+  if (list->nonflat == 0 || n == 0) {
+    return GSHSCENE_OK;
+  }
+  const GSHSCENE_Allocator * alloc = &list->alloc;
+  Scratch s;
+  memset(&s, 0, sizeof s);
+  s.match = array_alloc(alloc, n, sizeof *s.match);
+  s.out = array_alloc(alloc, n, sizeof *s.out);
+  s.open = array_alloc(alloc, n, sizeof *s.open);
+  s.units = array_alloc(alloc, n, sizeof *s.units);
+  s.temp = array_alloc(alloc, n, sizeof *s.temp);
+  s.frames = array_alloc(alloc, n + 1, sizeof *s.frames);
+  s.ties = array_alloc(alloc, n, sizeof *s.ties);
+  if (!s.match || !s.out || !s.open || !s.units || !s.temp || !s.frames || !s.ties) {
+    scratch_free(alloc, &s);
+    return GSHSCENE_ERR_OOM;
+  }
+  size_t tie_n = 0;
+  resolve_order(list, &s, &tie_n);
+  GSHSCENE_Tie * ties = NULL;
+  if (tie_n > 0) {
+    ties = array_alloc(alloc, tie_n, sizeof *ties);
+    if (!ties) {
+      scratch_free(alloc, &s);
+      return GSHSCENE_ERR_OOM;
+    }
+    memcpy(ties, s.ties, tie_n * sizeof *ties);
+  }
+  items_permute(list, s.out);
+  scratch_free(alloc, &s);
+  gshscene_free(alloc, list->ties);
+  list->ties = ties;
+  list->tie_count = tie_n;
+  list->tie_capacity = tie_n;
+  return GSHSCENE_OK;
+}
+
 GSHSCENE_Result gshscene_list_close(GSHSCENE_List * list) {
   if (!list || list->closed || list->depth != 0) {
     return GSHSCENE_ERR_INVALID;
   }
+  GSHSCENE_Result result = list_resolve(list);
+  if (result != GSHSCENE_OK) {
+    return result;
+  }
   list->closed = 1;
+  return GSHSCENE_OK;
+}
+
+static int tie_compare(const void * pa, const void * pb) {
+  const GSHSCENE_Tie * a = pa;
+  const GSHSCENE_Tie * b = pb;
+  return a->second < b->second ? -1 : (a->second > b->second ? 1 : 0);
+}
+
+GSHSCENE_Result gshscene_list_close_ordered(GSHSCENE_List * list) {
+  if (!list || list->closed || list->depth != 0) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  /* The emitter finds a tie after the units inside the later one: ascending by second item, as close makes them. */
+  if (list->tie_count > 1) {
+    qsort(list->ties, list->tie_count, sizeof *list->ties, tie_compare);
+  }
+  list->closed = 1;
+  return GSHSCENE_OK;
+}
+
+GSHSCENE_Result gshscene_list_add_tie(
+    GSHSCENE_List * list, size_t first, size_t second, double depth, GSHSCENE_Tie_Reason reason) {
+  if (list->tie_count == list->tie_capacity) {
+    size_t capacity = list->tie_capacity ? list->tie_capacity * 2 : 8;
+    GSHSCENE_Tie * grown = array_alloc(&list->alloc, capacity, sizeof *grown);
+    if (!grown) {
+      return GSHSCENE_ERR_OOM;
+    }
+    if (list->tie_count) {
+      memcpy(grown, list->ties, list->tie_count * sizeof *grown);
+    }
+    gshscene_free(&list->alloc, list->ties);
+    list->ties = grown;
+    list->tie_capacity = capacity;
+  }
+  GSHSCENE_Tie * tie = &list->ties[list->tie_count++];
+  tie->first = first;
+  tie->second = second;
+  tie->depth = depth;
+  tie->reason = reason;
+  return GSHSCENE_OK;
+}
+
+size_t gshscene_list_tie_count(const GSHSCENE_List * list) {
+  return list && list->closed ? list->tie_count : 0;
+}
+
+GSHSCENE_Result gshscene_list_tie(const GSHSCENE_List * list, size_t index, const GSHSCENE_Tie ** out) {
+  if (!list || !out || !list->closed || index >= list->tie_count) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  *out = &list->ties[index];
   return GSHSCENE_OK;
 }
 
@@ -606,6 +1042,10 @@ GSHSCENE_Result gshscene_list_copy(
   for (size_t i = 0; result == GSHSCENE_OK && i < source->count; i++) {
     result = list_append(copy, item_at(source, i));
   }
+  for (size_t i = 0; result == GSHSCENE_OK && i < source->tie_count; i++) {
+    const GSHSCENE_Tie * t = &source->ties[i];
+    result = gshscene_list_add_tie(copy, t->first, t->second, t->depth, t->reason);
+  }
   if (result != GSHSCENE_OK) {
     gshscene_list_destroy(copy);
     return result;
@@ -634,12 +1074,27 @@ static int map_equal(const GSHGEOM_Map * a, const GSHGEOM_Map * b) {
   return 1;
 }
 
+int gshscene_space_equal(const GSHSCENE_Color_Space * a, const GSHSCENE_Color_Space * b) {
+  return a->primaries == b->primaries && a->transfer == b->transfer &&
+         gshgeom_f64_bits(a->gamma) == gshgeom_f64_bits(b->gamma);
+}
+
+static int color_equal(const GSHSCENE_Color * a, const GSHSCENE_Color * b) {
+  for (int i = 0; i < 4; i++) {
+    if (gshgeom_f64_bits(a->rgba[i]) != gshgeom_f64_bits(b->rgba[i])) {
+      return 0;
+    }
+  }
+  return gshscene_space_equal(&a->space, &b->space);
+}
+
 static int item_equal(const GSHSCENE_Item * a, const GSHSCENE_Item * b) {
   if (a->kind != b->kind || a->resource != b->resource || !map_equal(&a->map, &b->map) ||
-      a->fill_rule != b->fill_rule || a->layer != b->layer) {
+      a->fill_rule != b->fill_rule || a->layer != b->layer ||
+      gshgeom_f64_bits(a->depth) != gshgeom_f64_bits(b->depth)) {
     return 0;
   }
-  if (a->paint.kind != b->paint.kind || a->paint.color_space != b->paint.color_space ||
+  if (a->paint.kind != b->paint.kind || !gshscene_space_equal(&a->paint.space, &b->paint.space) ||
       a->paint.gradient != b->paint.gradient) {
     return 0;
   }
@@ -649,11 +1104,12 @@ static int item_equal(const GSHSCENE_Item * a, const GSHSCENE_Item * b) {
     }
   }
   return gshgeom_f64_bits(a->group.opacity) == gshgeom_f64_bits(b->group.opacity) &&
-         a->group.blend_space == b->group.blend_space && a->group.ordering == b->group.ordering;
+         gshscene_space_equal(&a->group.blend_space, &b->group.blend_space) &&
+         a->group.composite == b->group.composite && a->group.ordering == b->group.ordering;
 }
 
 int gshscene_list_equal(const GSHSCENE_List * a, const GSHSCENE_List * b) {
-  if (!a || !b || a->count != b->count) {
+  if (!a || !b || a->count != b->count || !color_equal(&a->foreground, &b->foreground)) {
     return 0;
   }
   for (size_t i = 0; i < a->count; i++) {
@@ -671,6 +1127,19 @@ static void hash_resource_and_map(GSHGEOM_Hash * h, const GSHSCENE_Item * item) 
   gshgeom_hash_u64(h, gshgeom_map_hash(&item->map));
 }
 
+void gshscene_space_hash(GSHGEOM_Hash * h, const GSHSCENE_Color_Space * space) {
+  gshgeom_hash_u8(h, (uint8_t)space->primaries);
+  gshgeom_hash_u8(h, (uint8_t)space->transfer);
+  gshgeom_hash_f64(h, space->gamma);
+}
+
+void gshscene_color_hash(GSHGEOM_Hash * h, const GSHSCENE_Color * color) {
+  for (int k = 0; k < 4; k++) {
+    gshgeom_hash_f64(h, color->rgba[k]);
+  }
+  gshscene_space_hash(h, &color->space);
+}
+
 uint64_t gshscene_list_hash(const GSHSCENE_List * list) {
   GSHGEOM_Hash h;
   gshgeom_hash_init(&h);
@@ -679,6 +1148,7 @@ uint64_t gshscene_list_hash(const GSHSCENE_List * list) {
   }
   gshgeom_hash_u32(&h, LIST_FORMAT_VERSION);
   gshgeom_hash_u32(&h, LIST_HASH_KIND);
+  gshscene_color_hash(&h, &list->foreground);
   gshgeom_hash_u64(&h, (uint64_t)list->count);
   for (size_t i = 0; i < list->count; i++) {
     const GSHSCENE_Item * item = item_at(list, i);
@@ -691,22 +1161,28 @@ uint64_t gshscene_list_hash(const GSHSCENE_List * list) {
         for (int k = 0; k < 4; k++) {
           gshgeom_hash_f64(&h, item->paint.rgba[k]);
         }
-        gshgeom_hash_u32(&h, item->paint.color_space);
+        gshscene_space_hash(&h, &item->paint.space);
         gshgeom_hash_i32(&h, item->layer);
+        gshgeom_hash_f64(&h, item->depth);
         break;
       case GSHSCENE_ITEM_CLIP_PUSH:
         hash_resource_and_map(&h, item);
         gshgeom_hash_u8(&h, (uint8_t)item->fill_rule);
+        gshgeom_hash_i32(&h, item->layer);
+        gshgeom_hash_f64(&h, item->depth);
         break;
       case GSHSCENE_ITEM_GROUP_PUSH:
         gshgeom_hash_f64(&h, item->group.opacity);
-        gshgeom_hash_u32(&h, item->group.blend_space);
+        gshscene_space_hash(&h, &item->group.blend_space);
+        gshgeom_hash_u8(&h, (uint8_t)item->group.composite);
         gshgeom_hash_u32(&h, item->group.ordering);
         gshgeom_hash_i32(&h, item->layer);
+        gshgeom_hash_f64(&h, item->depth);
         break;
       case GSHSCENE_ITEM_INSTANCE:
         hash_resource_and_map(&h, item);
         gshgeom_hash_i32(&h, item->layer);
+        gshgeom_hash_f64(&h, item->depth);
         break;
       default:
         break;
@@ -725,14 +1201,28 @@ static int dump_resource_and_map(FILE * out, const GSHSCENE_Item * item) {
       HEX(gshscene_resource_hash(item->resource)), HEX(gshgeom_map_hash(&item->map)));
 }
 
+/* A space as P:T:G, the gamma as its 16 hexadecimal digits. */
+int gshscene_space_dump(FILE * out, const GSHSCENE_Color_Space * space) {
+  return fprintf(out, "%u:%u:%016llx", (unsigned)space->primaries, (unsigned)space->transfer,
+      HEX(gshgeom_f64_bits(space->gamma)));
+}
+
+static int dump_layer_depth(FILE * out, const GSHSCENE_Item * item) {
+  return fprintf(out, " layer=%lld depth=%016llx", (long long)item->layer, HEX(gshgeom_f64_bits(item->depth)));
+}
+
 GSHSCENE_Result gshscene_list_dump(const GSHSCENE_List * list, FILE * out) {
   if (!list || !out) {
     return GSHSCENE_ERR_INVALID;
   }
-  /* The count is printed through an unsigned long long: the width of size_t is
+  /* The counts are printed through an unsigned long long: the width of size_t is
    * a property of the host. */
-  if (fprintf(out, "gshscene.list %u items=%llu hash=%016llx\n", LIST_FORMAT_VERSION,
-          HEX(list->count), HEX(gshscene_list_hash(list))) < 0) {
+  const GSHSCENE_Color * fg = &list->foreground;
+  if (fprintf(out, "gshscene.list %u items=%llu ties=%llu fg=%016llx %016llx %016llx %016llx ", LIST_FORMAT_VERSION,
+          HEX(list->count), HEX(list->closed ? list->tie_count : 0), HEX(gshgeom_f64_bits(fg->rgba[0])),
+          HEX(gshgeom_f64_bits(fg->rgba[1])), HEX(gshgeom_f64_bits(fg->rgba[2])), HEX(gshgeom_f64_bits(fg->rgba[3]))) < 0 ||
+      gshscene_space_dump(out, &fg->space) < 0 ||
+      fprintf(out, " hash=%016llx\n", HEX(gshscene_list_hash(list))) < 0) {
     return GSHSCENE_ERR_IO;
   }
   for (size_t i = 0; i < list->count; i++) {
@@ -742,11 +1232,16 @@ GSHSCENE_Result gshscene_list_dump(const GSHSCENE_List * list, FILE * out) {
       case GSHSCENE_ITEM_FILL:
         written = fputc('F', out) == EOF ? -1 : dump_resource_and_map(out, item);
         if (written >= 0) {
-          written = fprintf(out, " rule=%u paint=%u %016llx %016llx %016llx %016llx space=%u layer=%lld",
-              (unsigned)item->fill_rule, (unsigned)item->paint.kind, HEX(gshgeom_f64_bits(item->paint.rgba[0])),
+          written = fprintf(out, " rule=%u paint=%u %016llx %016llx %016llx %016llx space=", (unsigned)item->fill_rule,
+              (unsigned)item->paint.kind, HEX(gshgeom_f64_bits(item->paint.rgba[0])),
               HEX(gshgeom_f64_bits(item->paint.rgba[1])), HEX(gshgeom_f64_bits(item->paint.rgba[2])),
-              HEX(gshgeom_f64_bits(item->paint.rgba[3])), (unsigned)item->paint.color_space,
-              (long long)item->layer);
+              HEX(gshgeom_f64_bits(item->paint.rgba[3])));
+        }
+        if (written >= 0) {
+          written = gshscene_space_dump(out, &item->paint.space);
+        }
+        if (written >= 0) {
+          written = dump_layer_depth(out, item);
         }
         break;
       case GSHSCENE_ITEM_CLIP_PUSH:
@@ -754,13 +1249,24 @@ GSHSCENE_Result gshscene_list_dump(const GSHSCENE_List * list, FILE * out) {
         if (written >= 0) {
           written = fprintf(out, " rule=%u", (unsigned)item->fill_rule);
         }
+        if (written >= 0) {
+          written = dump_layer_depth(out, item);
+        }
         break;
       case GSHSCENE_ITEM_CLIP_POP:
         written = fputc('c', out) == EOF ? -1 : 0;
         break;
       case GSHSCENE_ITEM_GROUP_PUSH:
-        written = fprintf(out, "G opacity=%016llx blend=%u order=%u layer=%lld", HEX(gshgeom_f64_bits(item->group.opacity)),
-            (unsigned)item->group.blend_space, (unsigned)item->group.ordering, (long long)item->layer);
+        written = fprintf(out, "G opacity=%016llx blend=", HEX(gshgeom_f64_bits(item->group.opacity)));
+        if (written >= 0) {
+          written = gshscene_space_dump(out, &item->group.blend_space);
+        }
+        if (written >= 0) {
+          written = fprintf(out, " composite=%u order=%u", (unsigned)item->group.composite, (unsigned)item->group.ordering);
+        }
+        if (written >= 0) {
+          written = dump_layer_depth(out, item);
+        }
         break;
       case GSHSCENE_ITEM_GROUP_POP:
         written = fputc('g', out) == EOF ? -1 : 0;
@@ -768,7 +1274,7 @@ GSHSCENE_Result gshscene_list_dump(const GSHSCENE_List * list, FILE * out) {
       case GSHSCENE_ITEM_INSTANCE:
         written = fputc('I', out) == EOF ? -1 : dump_resource_and_map(out, item);
         if (written >= 0) {
-          written = fprintf(out, " layer=%lld", (long long)item->layer);
+          written = dump_layer_depth(out, item);
         }
         break;
       default:
@@ -776,6 +1282,15 @@ GSHSCENE_Result gshscene_list_dump(const GSHSCENE_List * list, FILE * out) {
     }
     if (written < 0 || fputc('\n', out) == EOF) {
       return GSHSCENE_ERR_IO;
+    }
+  }
+  if (list->closed) {
+    for (size_t i = 0; i < list->tie_count; i++) {
+      const GSHSCENE_Tie * tie = &list->ties[i];
+      if (fprintf(out, "T first=%llu second=%llu depth=%016llx reason=%u\n", HEX(tie->first), HEX(tie->second),
+              HEX(gshgeom_f64_bits(tie->depth)), (unsigned)tie->reason) < 0) {
+        return GSHSCENE_ERR_IO;
+      }
     }
   }
   /* A buffered stream reports a write error at the flush, and a stream's error flag is sticky:

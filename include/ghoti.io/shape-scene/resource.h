@@ -301,7 +301,9 @@ GSHSCENE_API GSHSCENE_Result gshscene_store_intern_glyph_run(GSHSCENE_Store * st
 /**
  * @brief Freeze a closed list into a picture and intern it.
  *
- * The list is copied (items, and a reference on each resource they name).
+ * The list is copied (items, ties, and a reference on each resource they name).  A picture has no
+ * foreground of its own (N10): a foreground paint in it resolves against the list that draws it, so a
+ * list whose foreground is not the default is ::GSHSCENE_ERR_INVALID here.
  * ::GSHSCENE_ERR_INVALID for an open list or one made for another store;
  * ::GSHSCENE_ERR_LIMIT when the picture's depth passes `max_picture_depth` or
  * its expansion passes `max_expansion`.

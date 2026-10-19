@@ -33,9 +33,10 @@
  * it did not touch.  The root is a group of ID ::GSHSCENE_ROOT_ID.
  *
  * A node is one of three kinds (::GSHSCENE_Node_Kind): a **group** (children in
- * draw order, a placement map, an opacity, a layer, an optional clip), a
- * **shape** (a path or glyph run under a map, with a fill rule, a solid paint
- * and a layer) and an **instance** (a node of the same version drawn again
+ * draw order, a placement map, an opacity, a blend space, a composite operator, an
+ * ordering context, a layer and a depth, an optional clip), a
+ * **shape** (a path or glyph run under a map, with a fill rule, a paint, a layer
+ * and a depth) and an **instance** (a node of the same version drawn again
  * under a map: what SVG `use` and `symbol` lower to).  Any node may be
  * **hidden** (::GSHSCENE_NODE_HIDDEN): it is not drawn in place, only where an
  * instance reaches it (what SVG `defs` lowers to).  An instance ignores the
@@ -58,48 +59,66 @@
  * 64-bit key for a report.  ::gshscene_version_visit visits every occurrence in
  * draw order.
  *
+ * ### The foreground
+ *
+ * A version carries the **foreground** (N10, paint.h): a ::GSHSCENE_Color, opaque
+ * black in the target's space until an edit sets it (::gshscene_edit_set_foreground).
+ * It is what a ::GSHSCENE_PAINT_FOREGROUND shape resolves to, it belongs to the version
+ * and not to any node, and the version's list carries it.  Changing it publishes a new
+ * version whose diff reports it and whose damage is the shapes that paint with it.
+ *
  * ### The emitted list
  *
  * ::gshscene_version_list builds, on the first call, the version's list over
- * interned resources (list.h): each shape is a fill; a group with a clip is a
- * clip push and pop around its content; a group with opacity below 1 is a group
- * push and pop; a hidden node is skipped; an instance is an instance item of
- * the **picture** of its target (the target's own emission, placed at the
+ * interned resources (list.h), **in paint order** (N11, N12): the walk puts the
+ * children of a group in the order its ordering context gives (flat: declared;
+ * overlay: by layer; depth: far to near, ties by layer and then instance path),
+ * hidden children taking no part, and records every resolved depth tie in the list.
+ * Each shape is a fill; a group with a clip is a clip push and pop around its
+ * content (the clip push carries the group's layer and depth); a group is a group
+ * push and pop when its opacity is below 1, its composite operator is not
+ * source-over, its blend space is not zero, its ordering is not flat, or the
+ * sequence it is in is not flat (so that it stays one unit of that sequence and
+ * carries its own context); a hidden node is skipped; an instance is an instance
+ * item of the **picture** of its target (the target's own emission, placed at the
  * identity, interned once per target).  Every item carries its full placement
  * relative to its list: the maps of the groups above it, composed.  The list is
  * the version's, borrowed by the caller, valid while a reference to the version
- * is held (AD-9, AD-27).  ::gshscene_version_item_node says which node an item
+ * is held (AD-9, AD-27), and equals (::gshscene_list_equal) the recorded list
+ * that draws the same.  ::gshscene_version_item_node says which node an item
  * came from.
  *
- * ### The hash of a version (version 1)
+ * ### The hash of a version (version 2)
  *
- * FNV-1a 64 in the spelling of shape-geometry's hash.h, over the nodes in
- * ascending ID order and over nothing else: not the version number, the
+ * FNV-1a 64 in the spelling of shape-geometry's hash.h, over the foreground and the
+ * nodes in ascending ID order and over nothing else: not the version number, the
  * allocator, a handle or the ID counter, so it reproduces run to run and across
- * targets.  The stream is `u32` 1 (this format), `u32` `0x4e454353`, `u64` the
- * node count, then for each node: `u64` id, `u8` kind (::GSHSCENE_Node_Kind,
+ * targets.  The stream is `u32` 2 (this format), `u32` `0x4e454353`, the
+ * foreground (four `f64` and a space), `u64` the node count, then for each node: `u64` id, `u8` kind (::GSHSCENE_Node_Kind,
  * pinned), `u8` flags, `u64` parent (0 for the root), `u8` 1 if the node has a
  * key and then `u64` domain and `u64` value; and, by kind,
- *
- * - **group**: `u64` the map's hash (`gshgeom_map_hash`), `f64` opacity, `i32`
- *   layer, `u8` 1 if there is a clip and then `u64` the clip resource's content
- *   hash, `u64` the clip map's hash and `u8` the clip's fill rule, then `u64`
- *   the number of children and each child's `u64` ID in draw order;
+ * - **group**: `u64` the map's hash (`gshgeom_map_hash`), `f64` opacity, the blend
+ *   space, `u8` composite, `u32` ordering, `i32` layer, `f64` depth, `u8` 1 if
+ *   there is a clip and then `u64` the clip resource's content hash, `u64` the clip
+ *   map's hash and `u8` the clip's fill rule, then `u64` the number of children and
+ *   each child's `u64` ID in draw order;
  * - **shape**: `u64` the resource's content hash, `u64` the map's hash, `u8` the
- *   fill rule, `u8` the paint kind, four `f64` (the straight `r, g, b, a`), `u32`
- *   the color space, `i32` layer;
- * - **instance**: `u64` the target's ID, `u64` the map's hash, `i32` layer.
+ *   fill rule, `u8` the paint kind, four `f64` (the straight `r, g, b, a`), the
+ *   paint's space, `i32` layer, `f64` depth;
+ * - **instance**: `u64` the target's ID, `u64` the map's hash, `i32` layer, `f64` depth.
+ *
+ * A **space** is `u8` primaries, `u8` transfer, `f64` gamma.
  *
  * ### The dump
  *
- * `gshscene.version 1 nodes=N root=1 hash=<16 hex digits>` and one line per node
- * in ascending ID order, tokens separated by one space, every `double` as the 16
- * hexadecimal digits of its bit pattern, every hash as 16 digits, every ID,
- * layer, flag and rule in decimal:
+ * `gshscene.version 2 nodes=N root=1 fg=<r> <g> <b> <a> <space> hash=<16 hex digits>`
+ * and one line per node in ascending ID order, tokens separated by one space, every
+ * `double` as the 16 hexadecimal digits of its bit pattern, every hash as 16 digits,
+ * every ID, layer, flag and rule in decimal, a `<space>` as `P:T:<gamma hex>`:
  *
- * - `G id=I parent=P flags=F key=K map=H opacity=X layer=L clip=C children=LIST`
- * - `S id=I parent=P flags=F key=K res=KIND:H map=H rule=R paint=PK r g b a space=S layer=L`
- * - `I id=I parent=P flags=F key=K target=T map=H layer=L`
+ * - `G id=I parent=P flags=F key=K map=H opacity=X blend=<space> composite=N order=N layer=L depth=D clip=C children=LIST`
+ * - `S id=I parent=P flags=F key=K res=KIND:H map=H rule=R paint=PK r g b a space=<space> layer=L depth=D`
+ * - `I id=I parent=P flags=F key=K target=T map=H layer=L depth=D`
  *
  * where `K` is `-` or `DOMAIN:VALUE` as 16 digits each, `C` is `-` or
  * `KIND:RESOURCEHASH:MAPHASH:RULE`, and `LIST` is `-` or the child IDs separated
@@ -167,13 +186,17 @@ typedef struct GSHSCENE_Node {
   /** Group: places its children (and its clip) in its parent's space.  Shape: places the path or run.  Instance: places the target's content.  2D. */
   GSHGEOM_Map map;
   int32_t layer;                     ///< The declared layer (AD-10); group, shape and instance.
+  double depth;                      ///< The declared depth (AD-10): finite; `-0` is stored as `+0`.  Group, shape and instance.
   double opacity;                    ///< Group: finite, in `[0, 1]`; below 1 the group is composited as a unit.  Else 1.
+  GSHSCENE_Color_Space blend_space;  ///< Group: the space it composites in; zero inherits the enclosing group's.  Else zero.
+  uint32_t composite;                ///< Group: a ::GSHSCENE_Composite (N4).  Else ::GSHSCENE_COMPOSITE_SRC_OVER.
+  uint32_t ordering;                 ///< Group: a ::GSHSCENE_Ordering, the context of its children.  Else ::GSHSCENE_ORDER_FLAT.
   const GSHSCENE_Resource * clip;    ///< Group: a path or glyph run clipping the group, or NULL.  Else NULL.
   GSHGEOM_Map clip_map;              ///< Group with a clip: the clip's placement in the group's own space.  Else the identity.
   GSHGEOM_Fill_Rule clip_rule;       ///< Group with a clip: its rule.  Else nonzero.
   const GSHSCENE_Resource * resource; ///< Shape: the path or glyph run.  Else NULL.
   GSHGEOM_Fill_Rule fill_rule;       ///< Shape: the rule.  Else nonzero.
-  GSHSCENE_Paint paint;              ///< Shape: the paint (solid, story 10's rules).  Else as ::gshscene_node_init leaves it.
+  GSHSCENE_Paint paint;              ///< Shape: the paint (solid or foreground).  Else as ::gshscene_node_init leaves it.
   uint64_t target;                   ///< Instance: the ID of the node it draws.  Else 0.
 } GSHSCENE_Node;
 
@@ -231,6 +254,9 @@ GSHSCENE_API GSHSCENE_Result gshscene_version_lookup_key(
 
 /** @brief How many keys are bound; 0 for NULL. */
 GSHSCENE_API size_t gshscene_version_key_count(const GSHSCENE_Version * version);
+
+/** @brief The version's foreground (N10); ::GSHSCENE_ERR_INVALID for NULL.  Written only on success. */
+GSHSCENE_API GSHSCENE_Result gshscene_version_foreground(const GSHSCENE_Version * version, GSHSCENE_Color * out);
 
 /** @brief The hash of the version, as the file comment spells it; the offset basis for NULL. */
 GSHSCENE_API uint64_t gshscene_version_hash(const GSHSCENE_Version * version);

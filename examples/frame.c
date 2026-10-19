@@ -76,8 +76,8 @@ int main(void) {
   /* A picture: a closed list that instances draw under a map (what SVG's use and symbol lower to). */
   GSHSCENE_List * badge = NULL;
   failed |= check(gshscene_list_create(NULL, NULL, store, &badge), "badge list");
-  GSHSCENE_Paint red = {GSHSCENE_PAINT_SOLID, {0.8, 0.1, 0.1, 1.0}, 0, NULL};
-  failed |= check(gshscene_list_fill(badge, square, NULL, GSHGEOM_FILL_NONZERO, &red, 0), "badge fill");
+  GSHSCENE_Paint red = {.kind = GSHSCENE_PAINT_SOLID, .rgba = {0.8, 0.1, 0.1, 1.0}};
+  failed |= check(gshscene_list_fill(badge, square, NULL, GSHGEOM_FILL_NONZERO, &red, 0, 0), "badge fill");
   failed |= check(gshscene_list_close(badge), "badge close");
   const GSHSCENE_Resource * badge_picture = NULL;
   failed |= check(gshscene_store_intern_picture(store, badge, &badge_picture), "freeze badge");
@@ -89,14 +89,19 @@ int main(void) {
   for (int frame = 0; frame < 2; frame++) {
     GSHGEOM_Map place;
     gshgeom_map_translate(2, 10.0 * (frame + 1), 20.0, 0.0, &place);
-    GSHSCENE_Paint blue = {GSHSCENE_PAINT_SOLID, {0.1, 0.2, 0.9, 1.0}, 0, NULL};
-    GSHSCENE_Paint ink = {GSHSCENE_PAINT_SOLID, {0.0, 0.0, 0.0, 1.0}, 0, NULL};
-    GSHSCENE_Group half = {0.5, 0, GSHSCENE_ORDER_FLAT};
-    failed |= check(gshscene_list_clip_push(list, square, &place, GSHGEOM_FILL_NONZERO), "clip");
-    failed |= check(gshscene_list_fill(list, square, &place, GSHGEOM_FILL_NONZERO, &blue, 0), "fill");
-    failed |= check(gshscene_list_group_push(list, &half, 1), "group");
-    failed |= check(gshscene_list_instance(list, badge_picture, &place, 1), "instance");
-    failed |= check(gshscene_list_fill(list, text, &place, GSHGEOM_FILL_NONZERO, &ink, 2), "text");
+    GSHSCENE_Paint blue = {.kind = GSHSCENE_PAINT_SOLID, .rgba = {0.1, 0.2, 0.9, 1.0}};
+    /* currentColor: the ink is the list's foreground, so changing the foreground changes the ink without re-recording. */
+    GSHSCENE_Paint ink = {.kind = GSHSCENE_PAINT_FOREGROUND, .rgba = {0.0, 0.0, 0.0, 1.0}};
+    GSHSCENE_Color foreground = {.rgba = {0.05, 0.1, 0.4, 1.0},
+        .space = {.primaries = GCOL_PRIMARIES_SRGB, .transfer = GCOL_TRANSFER_SRGB}};
+    failed |= check(gshscene_list_set_foreground(list, &foreground), "foreground");
+    /* The group orders its content by depth, far to near: the text (depth 3) is painted before the badge (depth 2). */
+    GSHSCENE_Group half = {.opacity = 0.5, .ordering = GSHSCENE_ORDER_DEPTH};
+    failed |= check(gshscene_list_clip_push(list, square, &place, GSHGEOM_FILL_NONZERO, 0, 0), "clip");
+    failed |= check(gshscene_list_fill(list, square, &place, GSHGEOM_FILL_NONZERO, &blue, 0, 0), "fill");
+    failed |= check(gshscene_list_group_push(list, &half, 1, 0), "group");
+    failed |= check(gshscene_list_instance(list, badge_picture, &place, 1, 2.0), "instance");
+    failed |= check(gshscene_list_fill(list, text, &place, GSHGEOM_FILL_NONZERO, &ink, 2, 3.0), "text");
     failed |= check(gshscene_list_group_pop(list), "group pop");
     failed |= check(gshscene_list_clip_pop(list), "clip pop");
     failed |= check(gshscene_list_close(list), "close");

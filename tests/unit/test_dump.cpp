@@ -49,6 +49,7 @@ struct Fixture {
   const GSHSCENE_Resource * outline_run = nullptr;
   const GSHSCENE_Resource * picture = nullptr;
   GSHSCENE_List * list = nullptr;
+  GSHSCENE_List * order_list = nullptr;  // recorded in declared order, closed into paint order
 
   explicit Fixture(GSHSCENE_Store * s) : store(s) {
     sq = intern_square(store);
@@ -75,11 +76,11 @@ struct Fixture {
     GSHGEOM_Map tr = translate(1.5, -2.25);
     GSHSCENE_List * inner = nullptr;
     gshscene_list_create(nullptr, nullptr, store, &inner);
-    gshscene_list_fill(inner, sq, nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0);
-    GSHSCENE_Group half = {0.5, 0, 0};
-    gshscene_list_group_push(inner, &half, 0);
+    gshscene_list_fill(inner, sq, nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0);
+    GSHSCENE_Group half = make_group(0.5);
+    gshscene_list_group_push(inner, &half, 0, 0);
     GSHSCENE_Paint orange = solid(1.0, 0.5, 0.25, 0.75);
-    gshscene_list_fill(inner, p2, &tr, GSHGEOM_FILL_EVEN_ODD, &orange, 2);
+    gshscene_list_fill(inner, p2, &tr, GSHGEOM_FILL_EVEN_ODD, &orange, 2, 0);
     gshscene_list_group_pop(inner);
     gshscene_list_close(inner);
     gshscene_store_intern_picture(store, inner, &picture);
@@ -89,18 +90,60 @@ struct Fixture {
     GSHGEOM_Map design;
     gshgeom_map_design_to_model(2.5, 10, 20, &design);
     GSHSCENE_Paint blue = solid(0.25, 0.5, 0.75, 1.0);
+    blue.space = space_of(GCOL_PRIMARIES_DISPLAY_P3, GCOL_TRANSFER_GAMMA, 2.2);
     GSHSCENE_Paint wide = solid(2.0, -0.5, 0.0, 0.5);
-    gshscene_list_fill(list, sq, &design, GSHGEOM_FILL_NONZERO, &blue, -3);
-    gshscene_list_fill(list, font_run, nullptr, GSHGEOM_FILL_EVEN_ODD, nullptr, 0);
-    gshscene_list_clip_push(list, p2, &tr, GSHGEOM_FILL_EVEN_ODD);
-    gshscene_list_group_push(list, &half, 7);
-    gshscene_list_instance(list, picture, &tr, 1);
-    gshscene_list_fill(list, outline_run, nullptr, GSHGEOM_FILL_NONZERO, &wide, 5);
+    GSHSCENE_Paint currentcolor = solid(0.0, 0.0, 0.0, 0.75);
+    currentcolor.kind = GSHSCENE_PAINT_FOREGROUND;
+    GSHSCENE_Color fg = {{0.1, 0.2, 0.3, 0.5}, linear_srgb_space()};
+    gshscene_list_set_foreground(list, &fg);
+    gshscene_list_fill(list, sq, &design, GSHGEOM_FILL_NONZERO, &blue, -3, 0.5);
+    gshscene_list_fill(list, font_run, nullptr, GSHGEOM_FILL_EVEN_ODD, nullptr, 0, 0);
+    gshscene_list_clip_push(list, p2, &tr, GSHGEOM_FILL_EVEN_ODD, 4, -2.0);
+    GSHSCENE_Group blend = make_group(0.5, GSHSCENE_ORDER_FLAT, GSHSCENE_COMPOSITE_SRC_IN);
+    blend.blend_space = linear_srgb_space();
+    gshscene_list_group_push(list, &blend, 7, 1.5);
+    gshscene_list_instance(list, picture, &tr, 1, 3.25);
+    gshscene_list_fill(list, outline_run, nullptr, GSHGEOM_FILL_NONZERO, &wide, 5, 0);
+    gshscene_list_fill(list, sq, nullptr, GSHGEOM_FILL_NONZERO, &currentcolor, 6, 0);
     gshscene_list_group_pop(list);
     gshscene_list_clip_pop(list);
     gshscene_list_close(list);
+
+    // The order fixture, in declared order (tools/gen-scene-vectors.py: ORDER_ITEMS_DECLARED).
+    gshscene_list_create(nullptr, nullptr, store, &order_list);
+    auto orderfill = [&](int id, int32_t layer = 0, double depth = 0.0) {
+      GSHSCENE_Paint p = solid(id / 16.0, 0.0, 0.0, 1.0);
+      ASSERT_EQ(gshscene_list_fill(order_list, sq, nullptr, GSHGEOM_FILL_NONZERO, &p, layer, depth), GSHSCENE_OK);
+    };
+    GSHSCENE_Group depth_group = make_group(1.0, GSHSCENE_ORDER_DEPTH);
+    GSHSCENE_Group overlay_group = make_group(1.0, GSHSCENE_ORDER_OVERLAY);
+    GSHSCENE_Group flat_group = make_group(0.5);
+    orderfill(1);
+    gshscene_list_group_push(order_list, &depth_group, 0, 0.0);
+    orderfill(2, 0, 1.0);
+    orderfill(3, 1, 2.0);
+    orderfill(4, 0, 2.0);
+    orderfill(5, 0, 2.0);
+    orderfill(6, 0, 3.0);
+    gshscene_list_clip_push(order_list, p2, &tr, GSHGEOM_FILL_EVEN_ODD, 0, 2.0);
+    orderfill(7);
+    gshscene_list_clip_pop(order_list);
+    gshscene_list_group_push(order_list, &overlay_group, 0, 0.0);
+    orderfill(8, 3);
+    orderfill(9, 1);
+    orderfill(10, 3);
+    orderfill(11, 2);
+    gshscene_list_group_pop(order_list);
+    gshscene_list_group_push(order_list, &flat_group, 5, 2.0);
+    orderfill(12);
+    orderfill(13);
+    gshscene_list_group_pop(order_list);
+    gshscene_list_group_pop(order_list);
+    orderfill(14);
+    gshscene_list_close(order_list);
   }
   ~Fixture() {
+    gshscene_list_destroy(order_list);
     gshscene_list_destroy(list);
     gshscene_resource_release(picture);
     gshscene_resource_release(outline_run);
@@ -154,8 +197,12 @@ TEST(KnownAnswers, EveryResourceHashesAsTheIndependentGeneratorSays) {
 TEST(KnownAnswers, TheListHashesAsTheIndependentGeneratorSays) {
   StoreHolder s;
   Fixture f(s.store);
-  ASSERT_EQ(gshscene_list_count(f.list), 8u);
+  ASSERT_EQ(gshscene_list_count(f.list), 9u);
   EXPECT_EQ(gshscene_list_hash(f.list), known::kListHash);
+  ASSERT_EQ(gshscene_list_count(f.order_list), 22u);
+  EXPECT_EQ(gshscene_list_hash(f.order_list), known::kOrderListHash)
+      << "the closed list is the independent generator's paint order";
+  EXPECT_EQ(gshscene_list_tie_count(f.order_list), 4u);
 }
 
 TEST(KnownAnswers, EveryDumpIsTheIndependentGeneratorsText) {
@@ -167,6 +214,7 @@ TEST(KnownAnswers, EveryDumpIsTheIndependentGeneratorsText) {
   EXPECT_EQ(dump_resource(f.outline_run), known::kOutlineRunDump);
   EXPECT_EQ(dump_resource(f.picture), known::kPictureDump);
   EXPECT_EQ(dump_list(f.list), known::kListDump);
+  EXPECT_EQ(dump_list(f.order_list), known::kOrderListDump);
 }
 
 TEST(Hash, DoesNotDependOnTheStoreTheIdsTheAllocatorOrTheTableIndex) {
@@ -197,70 +245,71 @@ TEST(Hash, DoesNotDependOnTheStoreTheIdsTheAllocatorOrTheTableIndex) {
   EXPECT_TRUE(t.live.empty());
 }
 
+namespace {
+
+std::string space_text(const GSHSCENE_Color_Space & sp) {
+  return std::to_string((int)sp.primaries) + ":" + std::to_string((int)sp.transfer) + ":" +
+         hex16(gshgeom_f64_bits(sp.gamma));
+}
+
+std::string layer_depth_text(const GSHSCENE_Item * item) {
+  return " layer=" + std::to_string(item->layer) + " depth=" + hex16(gshgeom_f64_bits(item->depth));
+}
+
+/** The dump line of an item, built from the fields the dump says it prints. */
+std::string item_text(const GSHSCENE_Item * item) {
+  std::string res = std::string(" res=") + gshscene_resource_kind_string(gshscene_resource_kind(item->resource)) +
+                    ":" + (item->resource ? hex16(gshscene_resource_hash(item->resource)) : "");
+  std::string map = " map=" + hex16(gshgeom_map_hash(&item->map));
+  switch (item->kind) {
+    case GSHSCENE_ITEM_FILL:
+      return "F" + res + map + " rule=" + std::to_string((int)item->fill_rule) +
+             " paint=" + std::to_string((int)item->paint.kind) + " " + hex16(gshgeom_f64_bits(item->paint.rgba[0])) +
+             " " + hex16(gshgeom_f64_bits(item->paint.rgba[1])) + " " + hex16(gshgeom_f64_bits(item->paint.rgba[2])) +
+             " " + hex16(gshgeom_f64_bits(item->paint.rgba[3])) + " space=" + space_text(item->paint.space) +
+             layer_depth_text(item);
+    case GSHSCENE_ITEM_CLIP_PUSH:
+      return "C" + res + map + " rule=" + std::to_string((int)item->fill_rule) + layer_depth_text(item);
+    case GSHSCENE_ITEM_CLIP_POP:
+      return "c";
+    case GSHSCENE_ITEM_GROUP_PUSH:
+      return "G opacity=" + hex16(gshgeom_f64_bits(item->group.opacity)) +
+             " blend=" + space_text(item->group.blend_space) + " composite=" + std::to_string(item->group.composite) +
+             " order=" + std::to_string(item->group.ordering) + layer_depth_text(item);
+    case GSHSCENE_ITEM_GROUP_POP:
+      return "g";
+    default:
+      return "I" + res + map + layer_depth_text(item);
+  }
+}
+
+}  // namespace
+
 TEST(Dump, ParsesBackToTheHashedFields) {
   StoreHolder s;
   Fixture f(s.store);
-  std::vector<std::string> lines = lines_of(dump_list(f.list));
-  ASSERT_EQ(lines.size(), 9u);
-  EXPECT_EQ(lines[0], "gshscene.list 1 items=8 hash=" + hex16(gshscene_list_hash(f.list)));
-  for (size_t i = 0; i < 8; i++) {
-    const GSHSCENE_Item * item = nullptr;
-    ASSERT_EQ(gshscene_list_item(f.list, i, &item), GSHSCENE_OK);
-    std::istringstream in(lines[i + 1]);
-    std::string tag;
-    in >> tag;
-    switch (item->kind) {
-      case GSHSCENE_ITEM_FILL: {
-        EXPECT_EQ(tag, "F");
-        std::string res, map, rule, paint, c0, c1, c2, c3, space, layer;
-        in >> res >> map >> rule >> paint >> c0 >> c1 >> c2 >> c3 >> space >> layer;
-        EXPECT_EQ(res, std::string("res=") + gshscene_resource_kind_string(gshscene_resource_kind(item->resource)) +
-                           ":" + hex16(gshscene_resource_hash(item->resource)));
-        EXPECT_EQ(map, "map=" + hex16(gshgeom_map_hash(&item->map)));
-        EXPECT_EQ(rule, "rule=" + std::to_string((int)item->fill_rule));
-        EXPECT_EQ(paint, "paint=" + std::to_string((int)item->paint.kind));
-        EXPECT_EQ(c0, hex16(gshgeom_f64_bits(item->paint.rgba[0])));
-        EXPECT_EQ(c1, hex16(gshgeom_f64_bits(item->paint.rgba[1])));
-        EXPECT_EQ(c2, hex16(gshgeom_f64_bits(item->paint.rgba[2])));
-        EXPECT_EQ(c3, hex16(gshgeom_f64_bits(item->paint.rgba[3])));
-        EXPECT_EQ(space, "space=" + std::to_string(item->paint.color_space));
-        EXPECT_EQ(layer, "layer=" + std::to_string(item->layer));
-        break;
-      }
-      case GSHSCENE_ITEM_CLIP_PUSH: {
-        EXPECT_EQ(tag, "C");
-        std::string res, map, rule;
-        in >> res >> map >> rule;
-        EXPECT_EQ(rule, "rule=" + std::to_string((int)item->fill_rule));
-        EXPECT_EQ(map, "map=" + hex16(gshgeom_map_hash(&item->map)));
-        break;
-      }
-      case GSHSCENE_ITEM_GROUP_PUSH: {
-        EXPECT_EQ(tag, "G");
-        std::string opacity, blend, order, layer;
-        in >> opacity >> blend >> order >> layer;
-        EXPECT_EQ(opacity, "opacity=" + hex16(gshgeom_f64_bits(item->group.opacity)));
-        EXPECT_EQ(blend, "blend=0");
-        EXPECT_EQ(order, "order=0");
-        EXPECT_EQ(layer, "layer=" + std::to_string(item->layer));
-        break;
-      }
-      case GSHSCENE_ITEM_INSTANCE: {
-        EXPECT_EQ(tag, "I");
-        std::string res, map, layer;
-        in >> res >> map >> layer;
-        EXPECT_EQ(res, "res=picture:" + hex16(gshscene_resource_hash(item->resource)));
-        EXPECT_EQ(layer, "layer=" + std::to_string(item->layer));
-        break;
-      }
-      case GSHSCENE_ITEM_CLIP_POP:
-        EXPECT_EQ(lines[i + 1], "c");
-        break;
-      case GSHSCENE_ITEM_GROUP_POP:
-        EXPECT_EQ(lines[i + 1], "g");
-        break;
-      default:
-        ADD_FAILURE() << "unexpected kind";
+  for (const GSHSCENE_List * list : {f.list, f.order_list}) {
+    size_t n = gshscene_list_count(list);
+    size_t ties = gshscene_list_tie_count(list);
+    std::vector<std::string> lines = lines_of(dump_list(list));
+    ASSERT_EQ(lines.size(), 1 + n + ties);
+    GSHSCENE_Color fg;
+    ASSERT_EQ(gshscene_list_foreground(list, &fg), GSHSCENE_OK);
+    EXPECT_EQ(lines[0], "gshscene.list 2 items=" + std::to_string(n) + " ties=" + std::to_string(ties) + " fg=" +
+                            hex16(gshgeom_f64_bits(fg.rgba[0])) + " " + hex16(gshgeom_f64_bits(fg.rgba[1])) + " " +
+                            hex16(gshgeom_f64_bits(fg.rgba[2])) + " " + hex16(gshgeom_f64_bits(fg.rgba[3])) + " " +
+                            space_text(fg.space) + " hash=" + hex16(gshscene_list_hash(list)));
+    for (size_t i = 0; i < n; i++) {
+      const GSHSCENE_Item * item = nullptr;
+      ASSERT_EQ(gshscene_list_item(list, i, &item), GSHSCENE_OK);
+      EXPECT_EQ(lines[i + 1], item_text(item)) << "item " << i;
+    }
+    for (size_t i = 0; i < ties; i++) {
+      const GSHSCENE_Tie * tie = nullptr;
+      ASSERT_EQ(gshscene_list_tie(list, i, &tie), GSHSCENE_OK);
+      EXPECT_EQ(lines[1 + n + i], "T first=" + std::to_string(tie->first) + " second=" + std::to_string(tie->second) +
+                                      " depth=" + hex16(gshgeom_f64_bits(tie->depth)) +
+                                      " reason=" + std::to_string((int)tie->reason));
     }
   }
 }
@@ -268,9 +317,11 @@ TEST(Dump, ParsesBackToTheHashedFields) {
 TEST(Dump, ADumpOfAnOpenAndAnEmptyListIsWellFormed) {
   StoreHolder s;
   ListHolder l(s.store);
-  EXPECT_EQ(dump_list(l.list), "gshscene.list 1 items=0 hash=" + hex16(gshscene_list_hash(l.list)) + "\n");
+  EXPECT_EQ(dump_list(l.list), "gshscene.list 2 items=0 ties=0 fg=0000000000000000 0000000000000000 0000000000000000 "
+                                   "3ff0000000000000 0:0:0000000000000000 hash=" +
+                                   hex16(gshscene_list_hash(l.list)) + "\n");
   Ref sq(intern_square(s.store));
-  ASSERT_EQ(gshscene_list_group_push(l.list, nullptr, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_group_push(l.list, nullptr, 0, 0), GSHSCENE_OK);
   std::vector<std::string> lines = lines_of(dump_list(l.list));
   ASSERT_EQ(lines.size(), 2u);
   EXPECT_EQ(lines[1].substr(0, 2), "G ");
@@ -303,7 +354,7 @@ bool is_hex(const std::string & s) {
 
 /** Every hash and every double of a dump is exactly 16 hexadecimal digits, zeros included. */
 void expect_sixteen_digits(const std::string & dump, const char * what) {
-  static const char * const hex_names[] = {"hash", "map", "res", "opacity", "font", "size", "var", "outline", "x", "y"};
+  static const char * const hex_names[] = {"hash", "map", "res", "opacity", "font", "size", "var", "outline", "x", "y", "depth", "fg"};
   std::istringstream lines(dump);
   std::string line;
   int checked = 0;
@@ -323,16 +374,20 @@ void expect_sixteen_digits(const std::string & dump, const char * what) {
         value = token.substr(eq + 1);
         size_t colon = value.find(':');
         if (colon != std::string::npos) {
-          value = value.substr(colon + 1);
+          value = value.substr(value.rfind(':') + 1);  // a resource's hash, or a space's gamma
         }
-        bool hex = false;
+        bool hex = name == "space" || name == "blend";
         for (const char * n : hex_names) {
           hex = hex || name == n;
         }
         if (!hex) {
           continue;
         }
-      }  // a value with no name is one of a paint's four components or a coordinate: a double
+      } else if (token.find(':') != std::string::npos) {
+        value = token.substr(token.rfind(':') + 1);  // the foreground's space
+        name = "fg";
+      }
+      // a value with no name is one of a paint's four components or a coordinate: a double
       EXPECT_EQ(value.size(), 16u) << what << ": " << token << " in: " << line;
       EXPECT_TRUE(is_hex(value)) << what << ": " << token;
       checked++;
@@ -373,10 +428,10 @@ TEST(Dump, EveryHashAndDoubleIsSixteenDigitsEvenWhenItStartsWithZeros) {
   bool found = false;
   for (int layer = 0; layer < 5000 && !found; layer++) {
     ASSERT_EQ(gshscene_list_reset(l.list), GSHSCENE_OK);
-    GSHSCENE_Group transparent = {0.0, 0, 0};
-    ASSERT_EQ(gshscene_list_group_push(l.list, &transparent, layer), GSHSCENE_OK);
+    GSHSCENE_Group transparent = make_group(0.0);
+    ASSERT_EQ(gshscene_list_group_push(l.list, &transparent, layer, 0), GSHSCENE_OK);
     GSHSCENE_Paint clear = solid(0.0, 0.0, 0.0, 0.0);
-    ASSERT_EQ(gshscene_list_fill(l.list, zero_path, &zero_map, GSHGEOM_FILL_NONZERO, &clear, layer), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_fill(l.list, zero_path, &zero_map, GSHGEOM_FILL_NONZERO, &clear, layer, 0), GSHSCENE_OK);
     ASSERT_EQ(gshscene_list_group_pop(l.list), GSHSCENE_OK);
     found = (gshscene_list_hash(l.list) >> 60) == 0;
   }

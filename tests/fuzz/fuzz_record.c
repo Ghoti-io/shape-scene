@@ -42,6 +42,11 @@
  * - nothing leaks: at the end every object is released and a counting allocator
  *   says nothing is live.
  *
+ * Story 12 adds six ops at the end of the table (a fill, a clip push and a group push
+ * with the new fields, a list's foreground, a node's new properties, an edit's
+ * foreground), so the older ops and the scripted inputs that use them are unchanged.
+ * Every closed list is checked to be in paint order (N11) and its ties to be real.
+ *
  * The op numbers below are mirrored by tools/gen-fuzz-corpus.py; the replay
  * also fails if the corpus never reaches an outcome (a limit, a refusal, an
  * invalid publish), which is what keeps a corpus from measuring nothing.
@@ -71,18 +76,22 @@ enum {
   OP_LIST_CREATE = 0, OP_FILL, OP_CLIP_PUSH, OP_CLIP_POP, OP_GROUP_PUSH, OP_GROUP_POP, OP_INSTANCE, OP_CLOSE, OP_RESET,
   OP_FREEZE, OP_LIST_DESTROY, OP_INTERN_PATH, OP_INTERN_RUN, OP_INTERN_OUTLINES, OP_RELEASE_RES, OP_SCENE_CREATE,
   OP_SCENE_DESTROY, OP_OPEN_EDIT, OP_DESTROY_EDIT, OP_ADD, OP_SET, OP_REMOVE, OP_MOVE, OP_UPSERT, OP_REMOVE_KEY,
-  OP_PUBLISH, OP_MERGE, OP_HOLD, OP_RELEASE_VERSION, OP_DIFF, OP_EMIT, OP_VISIT, OP_DUMP, OP_SCENE_INTERN, OP_COUNT
+  OP_PUBLISH, OP_MERGE, OP_HOLD, OP_RELEASE_VERSION, OP_DIFF, OP_EMIT, OP_VISIT, OP_DUMP, OP_SCENE_INTERN,
+  OP_FILL_EX, OP_CLIP_PUSH_EX, OP_GROUP_PUSH_EX, OP_LIST_FOREGROUND, OP_NODE_PROPS, OP_EDIT_FOREGROUND, OP_COUNT
 };
 
 /* --- the outcomes the corpus must reach ------------------------------------------------------------ */
 
 enum {
   OUT_LIST_LIMIT = 0, OUT_INTERN_LIMIT, OUT_EDIT_LIMIT, OUT_PUBLISH_LIMIT, OUT_PUBLISH_REFUSED, OUT_PUBLISH_INVALID,
-  OUT_PUBLISH_OK, OUT_MERGE_OK, OUT_EMIT_OK, OUT_DIFF_OK, OUT_INSTANCE_PICTURE, OUT_COUNT
+  OUT_PUBLISH_OK, OUT_MERGE_OK, OUT_EMIT_OK, OUT_DIFF_OK, OUT_INSTANCE_PICTURE, OUT_LIST_TIES, OUT_FOREGROUND_VERSION,
+  OUT_PARAMETER_REFUSED, OUT_EMIT_TIES, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limit", "edit limit", "publish limit",
-    "publish refused", "publish invalid", "publish ok", "merge ok", "emit ok", "diff ok", "instance of a picture"};
+    "publish refused", "publish invalid", "publish ok", "merge ok", "emit ok", "diff ok", "instance of a picture",
+    "a closed list with ties", "a version whose foreground changed", "a merge refused over the foreground",
+    "an emitted list with ties"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -272,6 +281,68 @@ static GSHSCENE_Paint pool_paint(unsigned k) {
   return paint;
 }
 
+/* Spaces of the table: the target's, the four gamuts with the three transfers, and values the library refuses. */
+static GSHSCENE_Color_Space pool_space(unsigned k) {
+  GSHSCENE_Color_Space sp;
+  memset(&sp, 0, sizeof sp);
+  switch (k % 10) {
+    case 0:
+      break;
+    case 1:
+      sp.primaries = GCOL_PRIMARIES_SRGB;
+      sp.transfer = GCOL_TRANSFER_SRGB;
+      break;
+    case 2:
+      sp.primaries = GCOL_PRIMARIES_SRGB;
+      sp.transfer = GCOL_TRANSFER_LINEAR;
+      break;
+    case 3:
+      sp.primaries = GCOL_PRIMARIES_DISPLAY_P3;
+      sp.transfer = GCOL_TRANSFER_GAMMA;
+      sp.gamma = 2.2;
+      break;
+    case 4:
+      sp.primaries = GCOL_PRIMARIES_ADOBE_RGB;
+      sp.transfer = GCOL_TRANSFER_LINEAR;
+      break;
+    case 5:
+      sp.primaries = GCOL_PRIMARIES_BT2020;
+      sp.transfer = GCOL_TRANSFER_SRGB;
+      break;
+    case 6:
+      sp.primaries = GCOL_PRIMARIES_PROPHOTO; /* reserved */
+      sp.transfer = GCOL_TRANSFER_SRGB;
+      break;
+    case 7:
+      sp.primaries = GCOL_PRIMARIES_SRGB; /* a gamut and no transfer */
+      break;
+    case 8:
+      sp.primaries = GCOL_PRIMARIES_SRGB;
+      sp.transfer = GCOL_TRANSFER_GAMMA; /* a gamma without its exponent */
+      break;
+    default:
+      sp.primaries = GCOL_PRIMARIES_BT2020;
+      sp.transfer = GCOL_TRANSFER_LINEAR;
+      break;
+  }
+  return sp;
+}
+
+static double pool_depth(unsigned k) {
+  return (double)(k % 5) * 0.5 - 1.0;
+}
+
+static GSHSCENE_Color pool_color(S * s) {
+  GSHSCENE_Color c;
+  c.rgba[0] = pick(s, 5) * 0.5;
+  c.rgba[1] = pick(s, 3) * 0.5;
+  c.rgba[2] = pick(s, 2) * 1.0;
+  unsigned a = pick(s, 6);
+  c.rgba[3] = a == 5 ? 2.0 : a / 4.0; /* an alpha of 2 is invalid */
+  c.space = pool_space(arg(s));
+  return c;
+}
+
 /* --- list invariants ---------------------------------------------------------------------------------------- */
 
 typedef struct ListSnap {
@@ -304,6 +375,70 @@ static void list_after(S * s, ListSnap before, GSHSCENE_Result r, int pushes, in
   }
   CHECK(count <= lim->max_list_items);
   CHECK(gshscene_list_expansion(s->list) <= lim->max_expansion);
+}
+
+/*
+ * A closed list is in paint order (N11): in every sequence the units' keys follow the context of the group that encloses
+ * it, and every tie is a real one: two items of equal depth, in order, naming the first items of adjacent units.
+ */
+typedef struct Seq {
+  uint32_t context;
+  int has_previous;
+  double depth;
+  int32_t layer;
+} Seq;
+
+static void check_closed_list(const GSHSCENE_List * list) {
+  size_t n = gshscene_list_count(list);
+  Seq * stack = malloc((n + 2) * sizeof *stack);
+  CHECK(stack);
+  size_t top = 0;
+  memset(&stack[0], 0, sizeof stack[0]);
+  for (size_t i = 0; i < n; i++) {
+    const GSHSCENE_Item * item;
+    CHECK(gshscene_list_item(list, i, &item) == GSHSCENE_OK);
+    CHECK(isfinite(item->depth) && !(item->depth == 0.0 && signbit(item->depth)));
+    if (item->kind == GSHSCENE_ITEM_CLIP_POP || item->kind == GSHSCENE_ITEM_GROUP_POP) {
+      CHECK(top > 0);
+      top--;
+      continue;
+    }
+    Seq * seq = &stack[top];
+    if (seq->has_previous) {
+      if (seq->context == GSHSCENE_ORDER_DEPTH) {
+        CHECK(item->depth < seq->depth || (item->depth == seq->depth && item->layer >= seq->layer));
+      } else if (seq->context == GSHSCENE_ORDER_OVERLAY) {
+        CHECK(item->layer >= seq->layer);
+      }
+    }
+    seq->has_previous = 1;
+    seq->depth = item->depth;
+    seq->layer = item->layer;
+    if (item->kind == GSHSCENE_ITEM_CLIP_PUSH || item->kind == GSHSCENE_ITEM_GROUP_PUSH) {
+      Seq inner;
+      memset(&inner, 0, sizeof inner);
+      inner.context = item->kind == GSHSCENE_ITEM_GROUP_PUSH ? item->group.ordering : seq->context;
+      stack[++top] = inner;
+    }
+  }
+  CHECK(top == 0);
+  free(stack);
+  size_t ties = gshscene_list_tie_count(list);
+  CHECK(ties <= n);
+  size_t last = 0;
+  for (size_t t = 0; t < ties; t++) {
+    const GSHSCENE_Tie * tie;
+    CHECK(gshscene_list_tie(list, t, &tie) == GSHSCENE_OK);
+    CHECK(tie->first < tie->second && tie->second < n && (t == 0 || tie->second > last));
+    last = tie->second;
+    const GSHSCENE_Item * a;
+    const GSHSCENE_Item * b;
+    CHECK(gshscene_list_item(list, tie->first, &a) == GSHSCENE_OK && gshscene_list_item(list, tie->second, &b) == GSHSCENE_OK);
+    CHECK(a->depth == tie->depth && b->depth == tie->depth);
+    CHECK(tie->reason >= 1 && tie->reason < GSHSCENE_TIE_REASON_COUNT);
+    CHECK(tie->reason != GSHSCENE_TIE_LAYER || a->layer != b->layer);
+    CHECK(tie->reason == GSHSCENE_TIE_LAYER || a->layer == b->layer);
+  }
 }
 
 /* --- ids -------------------------------------------------------------------------------------------------------- */
@@ -441,7 +576,7 @@ static void op(S * s, unsigned code) {
       GSHGEOM_Fill_Rule rule = pick(s, 5) == 4 ? (GSHGEOM_Fill_Rule)7 : GSHGEOM_FILL_NONZERO;
       const GSHSCENE_Resource * target = s->res[pick(s, POOL)];
       int32_t layer = (int32_t)pick(s, 5) - 2;
-      r = gshscene_list_fill(s->list, target, use ? &m : NULL, rule, &paint, layer);
+      r = gshscene_list_fill(s->list, target, use ? &m : NULL, rule, &paint, layer, 0);
       list_after(s, b, r, 0, 0);
       break;
     }
@@ -453,7 +588,7 @@ static void op(S * s, unsigned code) {
       int use;
       GSHGEOM_Map m = pool_map(arg(s), &use);
       const GSHSCENE_Resource * region = s->res[pick(s, POOL)];
-      r = gshscene_list_clip_push(s->list, region, use ? &m : NULL, GSHGEOM_FILL_EVEN_ODD);
+      r = gshscene_list_clip_push(s->list, region, use ? &m : NULL, GSHGEOM_FILL_EVEN_ODD, 0, 0);
       list_after(s, b, r, 1, 0);
       break;
     }
@@ -472,12 +607,9 @@ static void op(S * s, unsigned code) {
         break;
       }
       ListSnap b = snap(s->list);
-      GSHSCENE_Group g;
-      g.opacity = pick(s, 6) / 4.0;
-      g.blend_space = 0;
-      g.ordering = GSHSCENE_ORDER_FLAT;
+      GSHSCENE_Group g = {.opacity = pick(s, 6) / 4.0};
       int32_t layer = (int32_t)pick(s, 5);
-      r = gshscene_list_group_push(s->list, &g, layer);
+      r = gshscene_list_group_push(s->list, &g, layer, 0);
       list_after(s, b, r, 1, 0);
       break;
     }
@@ -489,7 +621,7 @@ static void op(S * s, unsigned code) {
       int use;
       GSHGEOM_Map m = pool_map(arg(s), &use);
       const GSHSCENE_Resource * pic = s->pictures[pick(s, POOL)];
-      r = gshscene_list_instance(s->list, pic, use ? &m : NULL, 0);
+      r = gshscene_list_instance(s->list, pic, use ? &m : NULL, 0, 0);
       if (r == GSHSCENE_OK) {
         outcomes[OUT_INSTANCE_PICTURE]++;
       }
@@ -503,6 +635,10 @@ static void op(S * s, unsigned code) {
         CHECK(r == GSHSCENE_OK || r == GSHSCENE_ERR_INVALID);
         CHECK(gshscene_list_count(s->list) == b.count);
         CHECK(gshscene_list_is_closed(s->list) == (r == GSHSCENE_OK ? 1 : b.closed));
+        if (r == GSHSCENE_OK) {
+          check_closed_list(s->list);
+          outcomes[OUT_LIST_TIES] += gshscene_list_tie_count(s->list) > 0;
+        }
       }
       break;
     case OP_RESET:
@@ -765,6 +901,10 @@ static void op(S * s, unsigned code) {
           CHECK(gshscene_version_hash(after) == hash_before);
         } else {
           CHECK(gshscene_version_serial(after) == serial_before + 1);
+          GSHSCENE_Color fg_before, fg_after;
+          CHECK(gshscene_version_foreground(before, &fg_before) == GSHSCENE_OK);
+          CHECK(gshscene_version_foreground(after, &fg_after) == GSHSCENE_OK);
+          outcomes[OUT_FOREGROUND_VERSION] += memcmp(&fg_before, &fg_after, sizeof fg_before) != 0;
           outcomes[n > 1 ? OUT_MERGE_OK : OUT_PUBLISH_OK]++;
           outcomes[OUT_PUBLISH_OK] += n > 1;
           version_checks(s, after);
@@ -796,6 +936,10 @@ static void op(S * s, unsigned code) {
           GSHSCENE_Problem_Reason reason;
           CHECK(gshscene_problems_get(problems, i, &id, &reason) == GSHSCENE_OK && id != 0);
           CHECK((int)reason >= 1 && reason < GSHSCENE_PROBLEM_REASON_COUNT);
+          if (reason == GSHSCENE_PROBLEM_PARAMETER) {
+            CHECK(id == GSHSCENE_ROOT_ID && r == GSHSCENE_ERR_REFUSED);
+            outcomes[OUT_PARAMETER_REFUSED]++;
+          }
         }
       }
       gshscene_problems_destroy(problems);
@@ -846,8 +990,12 @@ static void op(S * s, unsigned code) {
           last = id;
         }
         if (a == b || s->versions[a] == s->versions[b]) {
-          CHECK(gshscene_diff_count(d) == 0 && dmg.empty);
+          CHECK(gshscene_diff_count(d) == 0 && dmg.empty && !gshscene_diff_foreground_changed(d));
         }
+        GSHSCENE_Color fa, fb;
+        CHECK(gshscene_version_foreground(s->versions[a], &fa) == GSHSCENE_OK);
+        CHECK(gshscene_version_foreground(s->versions[b], &fb) == GSHSCENE_OK);
+        CHECK(gshscene_diff_foreground_changed(d) == (memcmp(&fa, &fb, sizeof fa) != 0));
         gshscene_diff_destroy(d);
       }
       break;
@@ -864,6 +1012,8 @@ static void op(S * s, unsigned code) {
       if (r == GSHSCENE_OK) {
         outcomes[OUT_EMIT_OK]++;
         CHECK(gshscene_list_is_closed(list) && gshscene_list_count(list) <= lim->max_list_items);
+        check_closed_list(list);
+        outcomes[OUT_EMIT_TIES] += gshscene_list_tie_count(list) > 0;
         for (size_t i = 0; i < gshscene_list_count(list); i++) {
           uint64_t node;
           CHECK(gshscene_version_item_node(v, 0, i, &node) == GSHSCENE_OK);
@@ -898,6 +1048,140 @@ static void op(S * s, unsigned code) {
       if (s->list) {
         CHECK(gshscene_list_dump(s->list, s->null) == GSHSCENE_OK);
       }
+      break;
+    }
+    case OP_FILL_EX: {
+      if (!s->list) {
+        break;
+      }
+      ListSnap b = snap(s->list);
+      int use;
+      GSHGEOM_Map m = pool_map(arg(s), &use);
+      GSHSCENE_Paint paint = pool_paint(arg(s));
+      unsigned kind = pick(s, 6);
+      paint.kind = kind == 0 || kind == 1 ? GSHSCENE_PAINT_FOREGROUND
+                   : kind == 2             ? GSHSCENE_PAINT_PALETTE
+                   : kind == 3             ? GSHSCENE_PAINT_GRADIENT
+                                           : GSHSCENE_PAINT_SOLID;
+      if (paint.kind == GSHSCENE_PAINT_FOREGROUND && pick(s, 4) != 0) {
+        paint.rgba[0] = paint.rgba[1] = paint.rgba[2] = 0.0; /* mostly valid, sometimes not */
+      }
+      paint.space = pool_space(arg(s));
+      const GSHSCENE_Resource * target = s->res[pick(s, POOL)];
+      int32_t layer = (int32_t)pick(s, 4) - 1;
+      double depth = pool_depth(arg(s));
+      r = gshscene_list_fill(s->list, target, use ? &m : NULL, GSHGEOM_FILL_NONZERO, &paint, layer, depth);
+      list_after(s, b, r, 0, 0);
+      break;
+    }
+    case OP_CLIP_PUSH_EX: {
+      if (!s->list) {
+        break;
+      }
+      ListSnap b = snap(s->list);
+      int use;
+      GSHGEOM_Map m = pool_map(arg(s), &use);
+      const GSHSCENE_Resource * region = s->res[pick(s, POOL)];
+      int32_t layer = (int32_t)pick(s, 4) - 1;
+      double depth = pool_depth(arg(s));
+      r = gshscene_list_clip_push(s->list, region, use ? &m : NULL, GSHGEOM_FILL_NONZERO, layer, depth);
+      list_after(s, b, r, 1, 0);
+      break;
+    }
+    case OP_GROUP_PUSH_EX: {
+      if (!s->list) {
+        break;
+      }
+      ListSnap b = snap(s->list);
+      GSHSCENE_Group g;
+      memset(&g, 0, sizeof g);
+      g.opacity = pick(s, 6) / 4.0;
+      g.blend_space = pool_space(arg(s));
+      g.ordering = pick(s, 4); /* 3 is outside the enum */
+      g.composite = pick(s, (unsigned)GSHSCENE_COMPOSITE_COUNT + 1);
+      int32_t layer = (int32_t)pick(s, 4) - 1;
+      double depth = pool_depth(arg(s));
+      r = gshscene_list_group_push(s->list, &g, layer, depth);
+      list_after(s, b, r, 1, 0);
+      break;
+    }
+    case OP_LIST_FOREGROUND: {
+      if (!s->list) {
+        break;
+      }
+      GSHSCENE_Color c = pool_color(s);
+      GSHSCENE_Color before, after;
+      CHECK(gshscene_list_foreground(s->list, &before) == GSHSCENE_OK);
+      int closed = gshscene_list_is_closed(s->list);
+      r = gshscene_list_set_foreground(s->list, &c);
+      CHECK(r == GSHSCENE_OK || r == GSHSCENE_ERR_INVALID || r == GSHSCENE_ERR_UNSUPPORTED);
+      CHECK(gshscene_list_foreground(s->list, &after) == GSHSCENE_OK);
+      if (r == GSHSCENE_OK) {
+        CHECK(!closed && memcmp(&after, &c, sizeof c) == 0);
+      } else {
+        CHECK(memcmp(&after, &before, sizeof before) == 0);
+      }
+      break;
+    }
+    case OP_NODE_PROPS: {
+      unsigned k = pick(s, EDITS);
+      if (!has_edit(s, k)) {
+        break;
+      }
+      GSHSCENE_Edit * e = s->edits[k];
+      uint64_t id = some_id(s);
+      GSHSCENE_Node_Info info;
+      unsigned depth_pick = arg(s);
+      unsigned ordering = pick(s, 4);
+      unsigned composite = pick(s, (unsigned)GSHSCENE_COMPOSITE_COUNT + 1);
+      GSHSCENE_Color_Space space = pool_space(arg(s));
+      unsigned paint_kind = pick(s, 3);
+      if (gshscene_edit_node(e, id, &info) != GSHSCENE_OK) {
+        break;
+      }
+      GSHSCENE_Node n = info.node;
+      n.depth = pool_depth(depth_pick);
+      if (n.kind == GSHSCENE_NODE_GROUP) {
+        n.ordering = ordering;
+        n.composite = composite;
+        n.blend_space = space;
+      } else if (n.kind == GSHSCENE_NODE_SHAPE) {
+        if (paint_kind == 0) {
+          n.paint.kind = GSHSCENE_PAINT_FOREGROUND;
+          n.paint.rgba[0] = n.paint.rgba[1] = n.paint.rgba[2] = 0.0;
+          memset(&n.paint.space, 0, sizeof n.paint.space);
+        } else {
+          n.paint.kind = GSHSCENE_PAINT_SOLID;
+          n.paint.space = space;
+        }
+      }
+      size_t before = gshscene_edit_node_count(e);
+      r = gshscene_edit_set(e, id, &n);
+      CHECK(r != GSHSCENE_ERR_INTERNAL && r != GSHSCENE_ERR_OOM);
+      CHECK(gshscene_edit_node_count(e) == before);
+      GSHSCENE_Node_Info now;
+      CHECK(gshscene_edit_node(e, id, &now) == GSHSCENE_OK);
+      if (r == GSHSCENE_OK) {
+        CHECK(memcmp(&now.node.depth, &n.depth, sizeof n.depth) == 0 && now.node.ordering == n.ordering &&
+              now.node.composite == n.composite);
+      } else {
+        CHECK(memcmp(&now.node.depth, &info.node.depth, sizeof now.node.depth) == 0 &&
+              now.node.ordering == info.node.ordering && now.node.composite == info.node.composite);
+      }
+      break;
+    }
+    case OP_EDIT_FOREGROUND: {
+      unsigned k = pick(s, EDITS);
+      if (!has_edit(s, k)) {
+        break;
+      }
+      GSHSCENE_Color c = pool_color(s);
+      GSHSCENE_Color before, after;
+      CHECK(gshscene_edit_foreground(s->edits[k], &before) == GSHSCENE_OK);
+      r = gshscene_edit_set_foreground(s->edits[k], &c);
+      CHECK(r == GSHSCENE_OK || r == GSHSCENE_ERR_INVALID || r == GSHSCENE_ERR_UNSUPPORTED);
+      CHECK(gshscene_edit_foreground(s->edits[k], &after) == GSHSCENE_OK);
+      CHECK(memcmp(&after, r == GSHSCENE_OK ? &c : &before, sizeof c) == 0);
       break;
     }
     default:

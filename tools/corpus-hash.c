@@ -188,6 +188,30 @@ static GSHGEOM_Map random_map(void) {
   return composed;
 }
 
+/* A color space of the table: the target's, and the gamuts with each transfer (story 12). */
+static GSHSCENE_Color_Space random_space(void) {
+  static const double gammas[3] = {1.8, 2.2, 2.4};
+  GSHSCENE_Color_Space s;
+  memset(&s, 0, sizeof s);
+  unsigned pick = between(0, 5);
+  if (pick == 0) {
+    return s; /* the target's */
+  }
+  static const GCOL_Primaries gamuts[4] = {GCOL_PRIMARIES_SRGB, GCOL_PRIMARIES_ADOBE_RGB, GCOL_PRIMARIES_DISPLAY_P3,
+      GCOL_PRIMARIES_BT2020};
+  s.primaries = gamuts[between(0, 3)];
+  unsigned transfer = between(0, 2);
+  if (transfer == 0) {
+    s.transfer = GCOL_TRANSFER_LINEAR;
+  } else if (transfer == 1) {
+    s.transfer = GCOL_TRANSFER_SRGB;
+  } else {
+    s.transfer = GCOL_TRANSFER_GAMMA;
+    s.gamma = gammas[between(0, 2)];
+  }
+  return s;
+}
+
 static GSHSCENE_Paint random_paint(void) {
   static const double levels[6] = {0.0, 0.25, 0.5, 1.0, 2.0, -0.5};
   GSHSCENE_Paint p;
@@ -197,7 +221,65 @@ static GSHSCENE_Paint random_paint(void) {
     p.rgba[i] = levels[between(0, 5)];
   }
   p.rgba[3] = levels[between(0, 3)];
+  p.space = random_space();
+  if (between(0, 9) == 0) { /* currentColor: the alpha multiplier is the paint's, the color the version's */
+    p.kind = GSHSCENE_PAINT_FOREGROUND;
+    p.rgba[0] = 0.0;
+    p.rgba[1] = 0.0;
+    p.rgba[2] = 0.0;
+    memset(&p.space, 0, sizeof p.space);
+  }
   return p;
+}
+
+static GSHSCENE_Color random_foreground(void) {
+  static const double levels[5] = {0.0, 0.25, 0.5, 1.0, 2.0};
+  GSHSCENE_Color c;
+  memset(&c, 0, sizeof c);
+  for (int i = 0; i < 3; i++) {
+    c.rgba[i] = levels[between(0, 4)];
+  }
+  c.rgba[3] = levels[between(0, 3)];
+  c.space = random_space();
+  return c;
+}
+
+/* A depth from a small table, so that ties are common. */
+static double random_depth(void) {
+  return (double)((int)between(0, 4)) * 0.5 - 1.0;
+}
+
+static GSHSCENE_Group random_group_props(void) {
+  static const double opacity[4] = {1.0, 1.0, 0.5, 0.25};
+  GSHSCENE_Group g;
+  memset(&g, 0, sizeof g);
+  g.opacity = opacity[between(0, 3)];
+  g.blend_space = random_space();
+  g.ordering = between(0, 2);
+  g.composite = between(0, (unsigned)GSHSCENE_COMPOSITE_COUNT - 1);
+  return g;
+}
+
+static void feed_color(const GSHSCENE_Color * c) {
+  for (int i = 0; i < 4; i++) {
+    feed(gshgeom_f64_bits(c->rgba[i]));
+  }
+  feed((uint64_t)c->space.primaries);
+  feed((uint64_t)c->space.transfer);
+  feed(gshgeom_f64_bits(c->space.gamma));
+}
+
+static void feed_ties(const GSHSCENE_List * list) {
+  size_t n = gshscene_list_tie_count(list);
+  feed((uint64_t)n);
+  for (size_t i = 0; i < n; i++) {
+    const GSHSCENE_Tie * tie = NULL;
+    check(gshscene_list_tie(list, i, &tie), "tie");
+    feed((uint64_t)tie->first);
+    feed((uint64_t)tie->second);
+    feed(gshgeom_f64_bits(tie->depth));
+    feed((uint64_t)tie->reason);
+  }
 }
 
 
@@ -233,16 +315,21 @@ static GSHSCENE_Node random_shape(Tree * t) {
   n.paint = random_paint();
   n.fill_rule = (next() & 1) ? GSHGEOM_FILL_EVEN_ODD : GSHGEOM_FILL_NONZERO;
   n.layer = (int32_t)between(0, 6) - 3;
+  n.depth = random_depth();
   return n;
 }
 
 static GSHSCENE_Node random_group(Tree * t) {
   GSHSCENE_Node n;
   gshscene_node_init(GSHSCENE_NODE_GROUP, &n);
-  static const double opacity[4] = {1.0, 1.0, 0.5, 0.25};
-  n.opacity = opacity[between(0, 3)];
+  GSHSCENE_Group props = random_group_props();
+  n.opacity = props.opacity;
+  n.blend_space = props.blend_space;
+  n.ordering = props.ordering;
+  n.composite = props.composite;
   n.map = random_map();
   n.layer = (int32_t)between(0, 4);
+  n.depth = random_depth();
   if (between(0, 2) == 0) {
     n.clip = t->paths[between(0, SCENE_PATHS - 1)];
     n.clip_map = random_map();
@@ -267,6 +354,10 @@ static void feed_version(const GSHSCENE_Version * v) {
   feed(gshscene_list_hash(list));
   feed((uint64_t)gshscene_list_count(list));
   feed((uint64_t)gshscene_list_expansion(list));
+  feed_ties(list);
+  GSHSCENE_Color fg;
+  check(gshscene_version_foreground(v, &fg), "version foreground");
+  feed_color(&fg);
 }
 
 typedef struct Fold {
@@ -292,6 +383,7 @@ static void feed_diff(const GSHSCENE_Version * a, const GSHSCENE_Version * b, co
     feed(id);
     feed((uint64_t)kind);
   }
+  feed((uint64_t)gshscene_diff_foreground_changed(d));
   GSHSCENE_Damage damage;
   check(gshscene_diff_damage(d, &damage), "damage");
   feed((uint64_t)damage.unbounded);
@@ -373,8 +465,13 @@ static void scene_section(void) {
     n.target = t.defs[between(0, SCENE_DEFS - 1)];
     n.map = random_map();
     n.layer = (int32_t)between(0, 4);
+    n.depth = random_depth();
     unsigned parent = between(0, SCENE_GROUPS - 1);
     t.instances[t.instance_count++] = add_node(e, t.groups[parent], &n, NULL);
+  }
+  {
+    GSHSCENE_Color fg = random_foreground();
+    check(gshscene_edit_set_foreground(e, &fg), "set foreground");
   }
   const GSHSCENE_Version * v1 = NULL;
   check(gshscene_scene_publish(t.scene, e, NULL, &v1), "publish 1");
@@ -405,6 +502,10 @@ static void scene_section(void) {
     check(gshscene_edit_set(ea, t.groups[1], &g), "set group");
     GSHSCENE_Node s = random_shape(&t);
     check(gshscene_edit_set(eb, t.shapes[between(0, 39)], &s), "set shape");
+  }
+  {
+    GSHSCENE_Color fg = random_foreground();
+    check(gshscene_edit_set_foreground(eb, &fg), "set foreground b");
   }
   GSHSCENE_Problems * problems = NULL;
   GSHSCENE_Edit * both[2] = {eb, ea};
@@ -522,6 +623,13 @@ int main(void) {
   for (unsigned l = 0; l < 40; l++) {
     GSHSCENE_List * list = NULL;
     check(gshscene_list_create(NULL, NULL, store, &list), "list");
+    {
+      /* A list frozen into a picture has the default foreground: a picture has none of its own. */
+      GSHSCENE_Color fg = random_foreground();
+      if (l % 3 != 2) {
+        check(gshscene_list_set_foreground(list, &fg), "list foreground");
+      }
+    }
     uint8_t pushes[8];
     size_t depth = 0;
     unsigned n = between(1, 30);
@@ -535,22 +643,22 @@ int main(void) {
       int32_t layer = (int32_t)between(0, 10) - 5;
       int use_map = (next() & 3) != 0;
       unsigned pick_picture = picture_count > 0 ? between(0, (unsigned)picture_count - 1) : 0;
-      unsigned opacity_steps = between(0, 4);
+      GSHSCENE_Group props = random_group_props();
+      double item_depth = random_depth();
       switch (between(0, 5)) {
         case 0:
         case 1:
-          check(gshscene_list_fill(list, res, use_map ? &map : NULL, rule, &paint, layer), "fill");
+          check(gshscene_list_fill(list, res, use_map ? &map : NULL, rule, &paint, layer, item_depth), "fill");
           break;
         case 2:
           if (depth < sizeof pushes) {
-            check(gshscene_list_clip_push(list, res, &map, rule), "clip push");
+            check(gshscene_list_clip_push(list, res, &map, rule, layer, item_depth), "clip push");
             pushes[depth++] = 1;
           }
           break;
         case 3:
           if (depth < sizeof pushes) {
-            GSHSCENE_Group g = {(double)opacity_steps / 4.0, 0, 0};
-            check(gshscene_list_group_push(list, &g, layer), "group push");
+            check(gshscene_list_group_push(list, &props, layer, item_depth), "group push");
             pushes[depth++] = 2;
           }
           break;
@@ -561,8 +669,7 @@ int main(void) {
           break;
         default:
           if (picture_count > 0) {
-            check(gshscene_list_instance(list, pictures[pick_picture], &map, layer),
-                "instance");
+            check(gshscene_list_instance(list, pictures[pick_picture], &map, layer, item_depth), "instance");
           }
           break;
       }
@@ -574,6 +681,7 @@ int main(void) {
     feed(gshscene_list_hash(list));
     feed((uint64_t)gshscene_list_count(list));
     feed((uint64_t)gshscene_list_expansion(list));
+    feed_ties(list);
     if (l % 3 == 2 && picture_count < MAX_PICTURES) {
       const GSHSCENE_Resource * picture = NULL;
       check(gshscene_store_intern_picture(store, list, &picture), "picture");

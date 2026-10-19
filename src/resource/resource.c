@@ -398,6 +398,10 @@ GSHSCENE_Result gshscene_store_intern_picture(
   if (!store || !list || !out || !gshscene_list_is_closed(list) || list->store != store) {
     return GSHSCENE_ERR_INVALID;
   }
+  /* A picture has no foreground of its own: a foreground paint in it resolves against the list that draws it. */
+  if (!gshscene_color_is_default(&list->foreground)) {
+    return GSHSCENE_ERR_INVALID;
+  }
   if (gshscene_list_count(list) > store->limits.max_resource_elements ||
       gshscene_list_expansion(list) > store->limits.max_expansion ||
       gshscene_list_picture_depth(list) + 1 > store->limits.max_picture_depth) {

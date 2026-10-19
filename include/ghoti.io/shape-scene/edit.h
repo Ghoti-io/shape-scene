@@ -141,6 +141,21 @@ GSHSCENE_API GSHSCENE_Result gshscene_edit_upsert(GSHSCENE_Edit * edit, const GS
 /** @brief Remove the node a key names; ::GSHSCENE_ERR_INVALID if none. */
 GSHSCENE_API GSHSCENE_Result gshscene_edit_remove_key(GSHSCENE_Edit * edit, const GSHSCENE_Key * key);
 
+/**
+ * @brief Set the foreground of the version this edit makes (N10): the color a ::GSHSCENE_PAINT_FOREGROUND shape resolves to.
+ *
+ * An edit that sets the foreground to what its base has changes nothing.  Two edits of one base that both set it
+ * overlap (the root is named, with ::GSHSCENE_PROBLEM_PARAMETER).
+ *
+ * @param color The color; copied.
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, a spent edit, an invalid color); ::GSHSCENE_ERR_UNSUPPORTED (a
+ *   reserved color space).  A failing call changes nothing.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_edit_set_foreground(GSHSCENE_Edit * edit, const GSHSCENE_Color * color);
+
+/** @brief The foreground of the edit's view (its own, if set, else its base's); ::GSHSCENE_ERR_INVALID for NULL.  Written only on success. */
+GSHSCENE_API GSHSCENE_Result gshscene_edit_foreground(const GSHSCENE_Edit * edit, GSHSCENE_Color * out);
+
 /** @brief Read a node of the edit's view (its base and its own changes).  As ::gshscene_version_node. */
 GSHSCENE_API GSHSCENE_Result gshscene_edit_node(
     const GSHSCENE_Edit * edit, uint64_t id, GSHSCENE_Node_Info * out);

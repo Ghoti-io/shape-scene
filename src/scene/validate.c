@@ -52,6 +52,8 @@ const char * gshscene_problem_reason_string(GSHSCENE_Problem_Reason reason) {
       return "dangling-target";
     case GSHSCENE_PROBLEM_CYCLE:
       return "cycle";
+    case GSHSCENE_PROBLEM_PARAMETER:
+      return "parameter";
     case GSHSCENE_PROBLEM_REASON_COUNT:
       break;
   }
@@ -177,7 +179,16 @@ static int hidden(const GSHSCENE_Node_Rec * node) {
 
 static GSHSCENE_Result visit_group(Check * c, size_t index, size_t level, Memo * m) {
   const GSHSCENE_Node_Rec * node = c->nodes[index];
-  size_t wrappers = (node->p.opacity < 1.0 ? 1u : 0u) + (node->p.clip ? 1u : 0u);
+  /* The most wrappers it can have: a group whose parent orders its children pushes unless it is an instance's
+   * target, where the sequence is flat, so the count is an upper bound and never an under-count. */
+  uint32_t context = GSHSCENE_ORDER_FLAT;
+  if (node->parent != 0) {
+    size_t at = gshscene_nodes_find(c->nodes, c->count, node->parent);
+    if (at != GSHSCENE_NONE) {
+      context = c->nodes[at]->p.ordering;
+    }
+  }
+  size_t wrappers = (gshscene_group_pushes(&node->p, context) ? 1u : 0u) + (node->p.clip ? 1u : 0u);
   m->depth = 1;
   m->items = 2 * wrappers;
   m->exp = 2 * wrappers;

@@ -143,10 +143,18 @@ void gshscene_node_init(GSHSCENE_Node_Kind kind, GSHSCENE_Node * node) {
   gshgeom_map_identity(2, &node->map);
   gshgeom_map_identity(2, &node->clip_map);
   node->opacity = 1.0;
+  node->composite = GSHSCENE_COMPOSITE_SRC_OVER;
+  node->ordering = GSHSCENE_ORDER_FLAT;
   node->clip_rule = GSHGEOM_FILL_NONZERO;
   node->fill_rule = GSHGEOM_FILL_NONZERO;
   node->paint.kind = GSHSCENE_PAINT_SOLID;
   node->paint.rgba[3] = 1.0;
+}
+
+int gshscene_group_pushes(const GSHSCENE_Node * group, uint32_t context) {
+  return group->opacity < 1.0 || group->composite != (uint32_t)GSHSCENE_COMPOSITE_SRC_OVER ||
+         !gshscene_color_space_is_target(&group->blend_space) || group->ordering != (uint32_t)GSHSCENE_ORDER_FLAT ||
+         context != (uint32_t)GSHSCENE_ORDER_FLAT;
 }
 
 const char * gshscene_node_kind_string(GSHSCENE_Node_Kind kind) {
@@ -201,12 +209,23 @@ GSHSCENE_Result gshscene_node_canonical(const GSHSCENE_Store * store, const GSHS
     return result;
   }
   node.layer = in->layer;
+  result = gshscene_list_canonical_depth(in->depth, &node.depth);
+  if (result != GSHSCENE_OK) {
+    return result;
+  }
   switch (in->kind) {
-    case GSHSCENE_NODE_GROUP:
-      if (!gshscene_finite(in->opacity) || !(in->opacity >= 0.0 && in->opacity <= 1.0)) {
-        return GSHSCENE_ERR_INVALID;
+    case GSHSCENE_NODE_GROUP: {
+      /* The rules of a list's group push, so that a node and its emitted item agree. */
+      GSHSCENE_Group group = {in->opacity, in->blend_space, in->ordering, in->composite};
+      GSHSCENE_Group canonical;
+      result = gshscene_list_canonical_group(&group, &canonical);
+      if (result != GSHSCENE_OK) {
+        return result;
       }
-      node.opacity = in->opacity;
+      node.opacity = canonical.opacity;
+      node.blend_space = canonical.blend_space;
+      node.ordering = canonical.ordering;
+      node.composite = canonical.composite;
       if (in->clip) {
         result = check_region(store, in->clip);
         if (result == GSHSCENE_OK) {
@@ -222,6 +241,7 @@ GSHSCENE_Result gshscene_node_canonical(const GSHSCENE_Store * store, const GSHS
         node.clip_rule = in->clip_rule;
       }
       break;
+    }
     case GSHSCENE_NODE_SHAPE:
       result = check_region(store, in->resource);
       if (result == GSHSCENE_OK) {
@@ -265,18 +285,21 @@ static int map_equal(const GSHGEOM_Map * a, const GSHGEOM_Map * b) {
 }
 
 int gshscene_props_equal(const GSHSCENE_Node * a, const GSHSCENE_Node * b) {
-  if (a->kind != b->kind || a->flags != b->flags || a->layer != b->layer || !map_equal(&a->map, &b->map)) {
+  if (a->kind != b->kind || a->flags != b->flags || a->layer != b->layer || !map_equal(&a->map, &b->map) ||
+      gshgeom_f64_bits(a->depth) != gshgeom_f64_bits(b->depth)) {
     return 0;
   }
   switch (a->kind) {
     case GSHSCENE_NODE_GROUP:
-      if (gshgeom_f64_bits(a->opacity) != gshgeom_f64_bits(b->opacity) || a->clip != b->clip) {
+      if (gshgeom_f64_bits(a->opacity) != gshgeom_f64_bits(b->opacity) || a->clip != b->clip ||
+          !gshscene_space_equal(&a->blend_space, &b->blend_space) || a->composite != b->composite ||
+          a->ordering != b->ordering) {
         return 0;
       }
       return a->clip == NULL || (a->clip_rule == b->clip_rule && map_equal(&a->clip_map, &b->clip_map));
     case GSHSCENE_NODE_SHAPE:
       if (a->resource != b->resource || a->fill_rule != b->fill_rule || a->paint.kind != b->paint.kind ||
-          a->paint.color_space != b->paint.color_space || a->paint.gradient != b->paint.gradient) {
+          !gshscene_space_equal(&a->paint.space, &b->paint.space) || a->paint.gradient != b->paint.gradient) {
         return 0;
       }
       for (int i = 0; i < 4; i++) {
@@ -436,7 +459,11 @@ void gshscene_node_hash(GSHGEOM_Hash * h, const GSHSCENE_Node_Rec * node) {
     case GSHSCENE_NODE_GROUP:
       gshgeom_hash_u64(h, gshgeom_map_hash(&p->map));
       gshgeom_hash_f64(h, p->opacity);
+      gshscene_space_hash(h, &p->blend_space);
+      gshgeom_hash_u8(h, (uint8_t)p->composite);
+      gshgeom_hash_u32(h, p->ordering);
       gshgeom_hash_i32(h, p->layer);
+      gshgeom_hash_f64(h, p->depth);
       gshgeom_hash_u8(h, p->clip ? 1 : 0);
       if (p->clip) {
         gshgeom_hash_u64(h, gshscene_resource_hash(p->clip));
@@ -456,13 +483,15 @@ void gshscene_node_hash(GSHGEOM_Hash * h, const GSHSCENE_Node_Rec * node) {
       for (int k = 0; k < 4; k++) {
         gshgeom_hash_f64(h, p->paint.rgba[k]);
       }
-      gshgeom_hash_u32(h, p->paint.color_space);
+      gshscene_space_hash(h, &p->paint.space);
       gshgeom_hash_i32(h, p->layer);
+      gshgeom_hash_f64(h, p->depth);
       break;
     default:
       gshgeom_hash_u64(h, p->target);
       gshgeom_hash_u64(h, gshgeom_map_hash(&p->map));
       gshgeom_hash_i32(h, p->layer);
+      gshgeom_hash_f64(h, p->depth);
       break;
   }
 }

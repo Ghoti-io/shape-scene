@@ -117,7 +117,6 @@ static GSHSCENE_Result ensure_picture(Sink * parent, const GSHSCENE_Walk * walk,
 
 static GSHSCENE_Result emit_group_enter(
     void * ctx, const GSHSCENE_Walk * walk, const GSHSCENE_Node_Rec * group, const GSHGEOM_Map * base) {
-  (void)walk;
   Sink * s = ctx;
   const GSHSCENE_Node * p = &group->p;
   GSHSCENE_Result result;
@@ -126,7 +125,7 @@ static GSHSCENE_Result emit_group_enter(
     if (gshgeom_map_compose(base, &p->clip_map, &clip_map) != GSHGEOM_OK) {
       return GSHSCENE_ERR_LIMIT;
     }
-    result = gshscene_list_clip_push(s->list, p->clip, &clip_map, p->clip_rule);
+    result = gshscene_list_clip_push(s->list, p->clip, &clip_map, p->clip_rule, p->layer, p->depth);
     if (result == GSHSCENE_OK) {
       result = sink_origin(s, group->id);
     }
@@ -134,9 +133,9 @@ static GSHSCENE_Result emit_group_enter(
       return result;
     }
   }
-  if (p->opacity < 1.0) {
-    GSHSCENE_Group g = {p->opacity, 0, GSHSCENE_ORDER_FLAT};
-    result = gshscene_list_group_push(s->list, &g, p->layer);
+  if (gshscene_group_pushes(p, walk->context)) {
+    GSHSCENE_Group g = {p->opacity, p->blend_space, p->ordering, p->composite};
+    result = gshscene_list_group_push(s->list, &g, p->layer, p->depth);
     if (result == GSHSCENE_OK) {
       result = sink_origin(s, group->id);
     }
@@ -148,10 +147,9 @@ static GSHSCENE_Result emit_group_enter(
 }
 
 static GSHSCENE_Result emit_group_leave(void * ctx, const GSHSCENE_Walk * walk, const GSHSCENE_Node_Rec * group) {
-  (void)walk;
   Sink * s = ctx;
   GSHSCENE_Result result = GSHSCENE_OK;
-  if (group->p.opacity < 1.0) {
+  if (gshscene_group_pushes(&group->p, walk->context)) {
     result = gshscene_list_group_pop(s->list);
     if (result == GSHSCENE_OK) {
       result = sink_origin(s, group->id);
@@ -174,7 +172,7 @@ static GSHSCENE_Result emit_shape(
   (void)walk;
   Sink * s = ctx;
   GSHSCENE_Result result = gshscene_list_fill(
-      s->list, shape->p.resource, map, shape->p.fill_rule, &shape->p.paint, shape->p.layer);
+      s->list, shape->p.resource, map, shape->p.fill_rule, &shape->p.paint, shape->p.layer, shape->p.depth);
   if (result == GSHSCENE_OK) {
     result = sink_origin(s, shape->id);
   }
@@ -190,14 +188,26 @@ static GSHSCENE_Result emit_instance(void * ctx, const GSHSCENE_Walk * walk, con
   if (result != GSHSCENE_OK) {
     return result;
   }
-  result = gshscene_list_instance(s->list, s->em->tables[table].picture, map, instance->p.layer);
+  result = gshscene_list_instance(
+      s->list, s->em->tables[table].picture, map, instance->p.layer, instance->p.depth);
   if (result == GSHSCENE_OK) {
     result = sink_origin(s, instance->id);
   }
   return result;
 }
 
-static const GSHSCENE_Walk_Ops emit_ops = {emit_group_enter, emit_group_leave, emit_shape, emit_instance, NULL};
+static size_t emit_position(void * ctx) {
+  return gshscene_list_count(((Sink *)ctx)->list);
+}
+
+static GSHSCENE_Result emit_tie(void * ctx, const GSHSCENE_Walk * walk, size_t first, size_t second, double depth,
+    GSHSCENE_Tie_Reason reason) {
+  (void)walk;
+  return gshscene_list_add_tie(((Sink *)ctx)->list, first, second, depth, reason);
+}
+
+static const GSHSCENE_Walk_Ops emit_ops = {
+    emit_group_enter, emit_group_leave, emit_shape, emit_instance, NULL, emit_position, emit_tie};
 
 /* Make a sink for a new list. */
 static GSHSCENE_Result sink_open(Sink * s, struct GSHSCENE_Emission * em, const GSHSCENE_Core * core) {
@@ -236,7 +246,7 @@ static GSHSCENE_Result ensure_picture(Sink * parent, const GSHSCENE_Walk * walk,
   gshgeom_map_identity(2, &identity);
   result = gshscene_walk(walk->version, node, 1, &identity, &emit_ops, &sink);
   if (result == GSHSCENE_OK) {
-    result = gshscene_list_close(sink.list);
+    result = gshscene_list_close_ordered(sink.list);
   }
   const GSHSCENE_Resource * picture = NULL;
   if (result == GSHSCENE_OK) {
@@ -292,12 +302,19 @@ static GSHSCENE_Result build(const struct GSHSCENE_Version * version, struct GSH
     gshscene_emission_free(em, &core->alloc);
     return result;
   }
+  /* The foreground is the version's; a picture, which any list may draw, has none of its own. */
+  result = gshscene_list_set_foreground(sink.list, &version->foreground);
+  if (result != GSHSCENE_OK) {
+    sink_discard(&sink);
+    gshscene_emission_free(em, &core->alloc);
+    return result;
+  }
   GSHGEOM_Map identity;
   gshgeom_map_identity(2, &identity);
   const GSHSCENE_Node_Rec * root = gshscene_version_find(version, GSHSCENE_ROOT_ID);
   result = root ? gshscene_walk(version, root, 0, &identity, &emit_ops, &sink) : GSHSCENE_ERR_INTERNAL;
   if (result == GSHSCENE_OK) {
-    result = gshscene_list_close(sink.list);
+    result = gshscene_list_close_ordered(sink.list);
   }
   if (result != GSHSCENE_OK) {
     sink_discard(&sink);

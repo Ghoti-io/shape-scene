@@ -43,7 +43,7 @@
 struct GSHSCENE_Version;
 
 /** The format of a version's hash and dump. */
-#define VERSION_FORMAT_VERSION 1u
+#define VERSION_FORMAT_VERSION 2u
 
 /** The kind field of a version's hash: "SCEN" in little-endian ASCII. */
 #define VERSION_HASH_KIND UINT32_C(0x4e454353)
@@ -128,6 +128,7 @@ struct GSHSCENE_Version {
   GSHSCENE_Node_Rec ** nodes; /* ascending by id */
   size_t count;
   GSHSCENE_Keys * keys;       /* may be NULL for none */
+  GSHSCENE_Color foreground;
   GCU_MUTEX_T lock;         /* guards the emission */
   struct GSHSCENE_Emission * emission;
 };
@@ -157,6 +158,8 @@ struct GSHSCENE_Edit {
   size_t kc_cap;
   GSHSCENE_Index kc_idx;
   size_t view_count;
+  int fg_set;             /* the edit has set the foreground (it may still equal the base's) */
+  GSHSCENE_Color fg;
 };
 
 /** One problem found. */
@@ -191,6 +194,13 @@ void gshscene_node_release(GSHSCENE_Node_Rec * node);
 
 /** Replace the properties (canonical) of a node that nothing else holds. */
 void gshscene_node_assign(GSHSCENE_Node_Rec * node, const GSHSCENE_Node * canonical);
+
+/**
+ * Whether a group is emitted as a group push and pop when the sequence it is in has context @p context (N11):
+ * its opacity is below 1, its operator is not source-over, its blend space is not zero, its ordering is not flat, or
+ * @p context is not flat (it stays one unit of that sequence and carries its own context).
+ */
+int gshscene_group_pushes(const GSHSCENE_Node * group, uint32_t context);
 
 /** Whether two canonical property sets are equal, bit for bit. */
 int gshscene_props_equal(const GSHSCENE_Node * a, const GSHSCENE_Node * b);
@@ -243,9 +253,12 @@ uint64_t gshscene_keys_find(const GSHSCENE_Keys * keys, const GSHSCENE_Key * key
 void gshscene_keys_ref(GSHSCENE_Keys * keys);
 void gshscene_keys_unref(GSHSCENE_Keys * keys);
 
-/** A new version over @p nodes (the version retains each and takes the array), @p keys (retained) and the core. */
+/**
+ * A new version over @p nodes (the version retains each and takes the array), @p keys (retained), the foreground and
+ * the core.
+ */
 GSHSCENE_Result gshscene_version_make(GSHSCENE_Core * core, uint64_t number, GSHSCENE_Node_Rec ** nodes,
-    size_t count, GSHSCENE_Keys * keys, const struct GSHSCENE_Version ** out);
+    size_t count, GSHSCENE_Keys * keys, const GSHSCENE_Color * foreground, const struct GSHSCENE_Version ** out);
 
 void gshscene_emission_free(struct GSHSCENE_Emission * emission, const GSHSCENE_Allocator * alloc);
 
@@ -266,6 +279,14 @@ typedef struct GSHSCENE_Walk_Ops {
       const GSHGEOM_Map * map, int * descend);
   /** After the target of an instance that was descended into has been walked. */
   GSHSCENE_Result (*instance_leave)(void * ctx, const struct GSHSCENE_Walk * walk, const GSHSCENE_Node_Rec * instance);
+  /** Optional: where the consumer is (the number of items it has made), asked before and after each child of a depth group. */
+  size_t (*position)(void * ctx);
+  /**
+   * Optional: two adjacent units of a depth sequence tied on depth, the units that began at positions @p first and
+   * @p second (as ::position gave them).  Called after the later unit has been walked, so the ties are not in order.
+   */
+  GSHSCENE_Result (*tie)(void * ctx, const struct GSHSCENE_Walk * walk, size_t first, size_t second, double depth,
+      GSHSCENE_Tie_Reason reason);
 } GSHSCENE_Walk_Ops;
 
 /** What the callbacks may read of the walk's state. */
@@ -277,6 +298,7 @@ typedef struct GSHSCENE_Walk {
   size_t path_count;     /* instances entered */
   GSHGEOM_Map * chain;   /* their item maps */
   size_t chain_cap;
+  uint32_t context;      /* while a group callback runs: the ordering context of the sequence the group is in */
 } GSHSCENE_Walk;
 
 /**

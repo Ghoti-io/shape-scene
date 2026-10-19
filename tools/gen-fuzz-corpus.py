@@ -31,7 +31,8 @@ import sys
 OPS = ["LIST_CREATE", "FILL", "CLIP_PUSH", "CLIP_POP", "GROUP_PUSH", "GROUP_POP", "INSTANCE", "CLOSE", "RESET",
        "FREEZE", "LIST_DESTROY", "INTERN_PATH", "INTERN_RUN", "INTERN_OUTLINES", "RELEASE_RES", "SCENE_CREATE",
        "SCENE_DESTROY", "OPEN_EDIT", "DESTROY_EDIT", "ADD", "SET", "REMOVE", "MOVE", "UPSERT", "REMOVE_KEY",
-       "PUBLISH", "MERGE", "HOLD", "RELEASE_VERSION", "DIFF", "EMIT", "VISIT", "DUMP", "SCENE_INTERN"]
+       "PUBLISH", "MERGE", "HOLD", "RELEASE_VERSION", "DIFF", "EMIT", "VISIT", "DUMP", "SCENE_INTERN",
+       "FILL_EX", "CLIP_PUSH_EX", "GROUP_PUSH_EX", "LIST_FOREGROUND", "NODE_PROPS", "EDIT_FOREGROUND"]
 OP = {name: i for i, name in enumerate(OPS)}
 
 BIASED = {
@@ -39,6 +40,7 @@ BIASED = {
     "LIST_CREATE": 1, "INTERN_PATH": 3, "INTERN_RUN": 1, "INTERN_OUTLINES": 1, "OPEN_EDIT": 7, "ADD": 22, "SET": 5,
     "REMOVE": 3, "MOVE": 3, "UPSERT": 5, "REMOVE_KEY": 1, "PUBLISH": 9, "MERGE": 6, "HOLD": 5, "DIFF": 5, "EMIT": 4,
     "VISIT": 1, "DUMP": 1, "SCENE_INTERN": 2, "RESET": 1, "DESTROY_EDIT": 1, "SCENE_DESTROY": 1, "SCENE_CREATE": 1,
+    "FILL_EX": 5, "CLIP_PUSH_EX": 2, "GROUP_PUSH_EX": 4, "LIST_FOREGROUND": 1, "NODE_PROPS": 5, "EDIT_FOREGROUND": 2,
 }
 
 BIASED_FILES = 160
@@ -123,6 +125,25 @@ def scripted():
     # An instance of a node that is not there: refused at publish, naming it (ADD kind 2: the target is an id pick, 1 is bogus).
     seq = bytearray([0xFF, 0xFF]) + open_edit(0) + bytes([OP["ADD"], 0, 0, 5, 2, 1, 2, 0, 0, 1, 0, 0, 0]) + publish(0)
     out["scripted-publish-invalid.bin"] = bytes(seq)
+    # A depth group in a list: two fills of one depth are a tie, which close records (GROUP_PUSH_EX: opacity 1, the target's
+    # blend space, ordering depth, source-over, layer, depth; FILL_EX: a solid fill of depth -1; GROUP_POP; CLOSE).
+    group_depth = bytes([OP["GROUP_PUSH_EX"], 4, 0, 1, 0, 1, 0])
+    depth_fill = bytes([OP["FILL_EX"], 0, 0, 4, 0, 0, 0, 0])
+    seq = bytearray([0xFF, 0xFF]) + group_depth + depth_fill + depth_fill + bytes([OP["GROUP_POP"], OP["CLOSE"]])
+    out["scripted-list-ties.bin"] = bytes(seq)
+    # An edit that sets the foreground, published: a version whose foreground differs (EDIT_FOREGROUND: red 1, green 0.5,
+    # blue 0, alpha 1, a space of the table).
+    seq = bytearray([0xFF, 0xFF]) + open_edit() + bytes([OP["EDIT_FOREGROUND"], 0, 2, 1, 0, 4, 1]) + publish()
+    out["scripted-foreground-version.bin"] = bytes(seq)
+    # Two sibling edits that both set it: the merge is refused, the root named with the parameter reason.
+    seq = (bytearray([0xFF, 0xFF]) + open_edit(0) + open_edit(1) + bytes([OP["EDIT_FOREGROUND"], 0, 2, 1, 0, 4, 1])
+           + bytes([OP["EDIT_FOREGROUND"], 1, 4, 0, 1, 4, 2]) + merge_two())
+    out["scripted-foreground-refused.bin"] = bytes(seq)
+    # A depth group in a scene with two shapes of equal layer and depth, published and emitted: the emitted list has a tie.
+    # (NODE_PROPS: edit slot, the id pick, depth, ordering depth, source-over, a space, a paint kind.)
+    seq = (bytearray([0xFF, 0xFF]) + open_edit() + add_group(0) + bytes([OP["NODE_PROPS"], 0, 2, 0, 1, 0, 0, 2])
+           + add_shape(2) + add_shape(2) + publish() + bytes([OP["EMIT"], 0]))
+    out["scripted-emit-ties.bin"] = bytes(seq)
     return out
 
 

@@ -96,13 +96,13 @@ TEST(ListCreate, AnEmptyListIsOpenCloseSealsItAndRecordingAfterCloseIsRefused) {
   gshscene_list_destroy(inner);
   ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
   EXPECT_EQ(gshscene_list_is_closed(l.list), 1);
-  EXPECT_EQ(gshscene_list_instance(l.list, picture.get(), nullptr, 0), GSHSCENE_ERR_INVALID) << "a valid instance, on a closed list";
+  EXPECT_EQ(gshscene_list_instance(l.list, picture.get(), nullptr, 0, 0), GSHSCENE_ERR_INVALID) << "a valid instance, on a closed list";
   EXPECT_EQ(gshscene_list_close(l.list), GSHSCENE_ERR_INVALID) << "twice";
   EXPECT_EQ(gshscene_list_close(nullptr), GSHSCENE_ERR_INVALID);
-  EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_ERR_INVALID);
-  EXPECT_EQ(gshscene_list_clip_push(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO), GSHSCENE_ERR_INVALID);
-  EXPECT_EQ(gshscene_list_group_push(l.list, nullptr, 0), GSHSCENE_ERR_INVALID);
-  EXPECT_EQ(gshscene_list_instance(l.list, sq.get(), nullptr, 0), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_list_clip_push(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, 0, 0), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_list_group_push(l.list, nullptr, 0, 0), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_list_instance(l.list, sq.get(), nullptr, 0, 0), GSHSCENE_ERR_INVALID);
   EXPECT_EQ(gshscene_list_clip_pop(l.list), GSHSCENE_ERR_INVALID);
   EXPECT_EQ(gshscene_list_group_pop(l.list), GSHSCENE_ERR_INVALID);
   EXPECT_EQ(gshscene_resource_refcount(sq.get()), 1u);
@@ -136,7 +136,7 @@ struct Recorded {
     p2 = intern_fixture(s.store);
     GSHSCENE_List * inner = nullptr;
     gshscene_list_create(nullptr, nullptr, s.store, &inner);
-    gshscene_list_fill(inner, sq, nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0);
+    gshscene_list_fill(inner, sq, nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0);
     gshscene_list_close(inner);
     gshscene_store_intern_picture(s.store, inner, &picture);
     gshscene_list_destroy(inner);
@@ -145,11 +145,11 @@ struct Recorded {
     gshgeom_map_design_to_model(2.5, 10, 20, &design);
     GSHGEOM_Map tr = translate(1.5, -2.25);
     GSHSCENE_Paint paint = solid(0.25, 0.5, 0.75, 1.0);
-    GSHSCENE_Group group = {0.5, 0, GSHSCENE_ORDER_FLAT};
-    gshscene_list_fill(list, sq, &design, GSHGEOM_FILL_NONZERO, &paint, -3);
-    gshscene_list_clip_push(list, p2, &tr, GSHGEOM_FILL_EVEN_ODD);
-    gshscene_list_group_push(list, &group, 7);
-    gshscene_list_instance(list, picture, &tr, 1);
+    GSHSCENE_Group group = make_group(0.5);
+    gshscene_list_fill(list, sq, &design, GSHGEOM_FILL_NONZERO, &paint, -3, 0);
+    gshscene_list_clip_push(list, p2, &tr, GSHGEOM_FILL_EVEN_ODD, 0, 0);
+    gshscene_list_group_push(list, &group, 7, 0);
+    gshscene_list_instance(list, picture, &tr, 1, 0);
     gshscene_list_group_pop(list);
     gshscene_list_clip_pop(list);
   }
@@ -181,7 +181,7 @@ TEST(ListRecord, EveryKindReadsBackInOrderWithCanonicalFields) {
   EXPECT_EQ(fill->paint.rgba[1], 0.5);
   EXPECT_EQ(fill->paint.rgba[2], 0.75);
   EXPECT_EQ(fill->paint.rgba[3], 1.0);
-  EXPECT_EQ(fill->paint.color_space, 0u);
+  EXPECT_TRUE(gshscene_color_space_is_target(&fill->paint.space));
   EXPECT_EQ(fill->paint.gradient, nullptr);
   EXPECT_EQ(fill->layer, -3);
   EXPECT_EQ(fill->group.opacity, 0.0) << "a group field that does not apply is zero";
@@ -197,7 +197,8 @@ TEST(ListRecord, EveryKindReadsBackInOrderWithCanonicalFields) {
   EXPECT_EQ(group->kind, GSHSCENE_ITEM_GROUP_PUSH);
   EXPECT_EQ(group->resource, nullptr);
   EXPECT_EQ(group->group.opacity, 0.5);
-  EXPECT_EQ(group->group.blend_space, 0u);
+  EXPECT_TRUE(gshscene_color_space_is_target(&group->group.blend_space));
+  EXPECT_EQ(group->group.composite, (uint32_t)GSHSCENE_COMPOSITE_SRC_OVER);
   EXPECT_EQ(group->group.ordering, (uint32_t)GSHSCENE_ORDER_FLAT);
   EXPECT_EQ(group->layer, 7);
   EXPECT_EQ(gshgeom_map_hash(&group->map), id) << "the identity where no map applies";
@@ -228,7 +229,7 @@ TEST(ListRecord, ANullMapIsTheTwoDimensionalIdentityAndANullPaintIsOpaqueBlack) 
   StoreHolder s;
   Ref sq(intern_square(s.store));
   ListHolder l(s.store);
-  ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
   const GSHSCENE_Item * item = item_of(l.list, 0);
   EXPECT_EQ(item->map.dim, 2);
   EXPECT_EQ(item->map.kind, 0u);
@@ -247,8 +248,8 @@ TEST(ListRecord, ATwoDimensionalMapKeepsOnlyTheEntriesItUses) {
   dirty.m[2][2] = 7.0;  // ignored on input in 2D
   dirty.m[0][2] = 5.0;
   dirty.t[2] = 9.0;
-  ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), &dirty, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK);
-  ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), &clean, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), &dirty, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), &clean, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
   const GSHSCENE_Item * a = item_of(l.list, 0);
   EXPECT_EQ(a->map.m[2][2], 1.0);
   EXPECT_EQ(a->map.m[0][2], 0.0);
@@ -272,7 +273,7 @@ TEST(ListRecord, AThreeDimensionalMapIsAcceptedAndKept) {
   composed.m[1][2] = 0.125;
   composed.m[2][1] = 0.0625;
   ASSERT_EQ(gshgeom_map_check(&composed), GSHGEOM_OK);
-  ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), &composed, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), &composed, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
   const GSHSCENE_Item * item = item_of(l.list, 0);
   EXPECT_EQ(item->map.dim, 3);
   for (int i = 0; i < 3; i++) {
@@ -289,12 +290,12 @@ TEST(ListRecord, TheListHoldsOneReferenceForEachItemThatNamesAResource) {
   GSHSCENE_List * list = nullptr;
   ASSERT_EQ(gshscene_list_create(nullptr, nullptr, s.store, &list), GSHSCENE_OK);
   EXPECT_EQ(gshscene_resource_refcount(sq.get()), 1u);
-  gshscene_list_fill(list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0);
-  gshscene_list_fill(list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 1);
+  gshscene_list_fill(list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0);
+  gshscene_list_fill(list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 1, 0);
   EXPECT_EQ(gshscene_resource_refcount(sq.get()), 3u);
-  gshscene_list_clip_push(list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO);
+  gshscene_list_clip_push(list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, 0, 0);
   EXPECT_EQ(gshscene_resource_refcount(sq.get()), 4u);
-  gshscene_list_group_push(list, nullptr, 0);
+  gshscene_list_group_push(list, nullptr, 0, 0);
   gshscene_list_group_pop(list);
   gshscene_list_clip_pop(list);
   EXPECT_EQ(gshscene_resource_refcount(sq.get()), 4u) << "pops and groups name no resource";
@@ -306,7 +307,7 @@ TEST(ListRecord, ADroppedHandleStaysAliveWhileTheListNamesIt) {
   StoreHolder s;
   const GSHSCENE_Resource * sq = intern_square(s.store);
   ListHolder l(s.store);
-  ASSERT_EQ(gshscene_list_fill(l.list, sq, nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(l.list, sq, nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
   gshscene_resource_release(sq);  // the caller lets go; the list still names it
   GSHSCENE_Store_Stats stats;
   ASSERT_EQ(gshscene_store_stats(s.store, &stats), GSHSCENE_OK);
@@ -319,10 +320,11 @@ TEST(ListRecord, ADroppedHandleStaysAliveWhileTheListNamesIt) {
 TEST(ListRecord, ANullGroupIsOpaqueFlatAndInTheTargetsBlendSpace) {
   StoreHolder s;
   ListHolder l(s.store);
-  ASSERT_EQ(gshscene_list_group_push(l.list, nullptr, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_group_push(l.list, nullptr, 0, 0), GSHSCENE_OK);
   const GSHSCENE_Item * item = item_of(l.list, 0);
   EXPECT_EQ(item->group.opacity, 1.0);
-  EXPECT_EQ(item->group.blend_space, 0u);
+  EXPECT_TRUE(gshscene_color_space_is_target(&item->group.blend_space));
+  EXPECT_EQ(item->group.composite, (uint32_t)GSHSCENE_COMPOSITE_SRC_OVER);
   EXPECT_EQ(item->group.ordering, (uint32_t)GSHSCENE_ORDER_FLAT);
 }
 
@@ -359,7 +361,7 @@ TEST(ListRecord, EveryInvalidArgumentIsRefusedAndTheListIsAsItWas) {
 
   auto fill = [&](const GSHSCENE_Resource * r, const GSHGEOM_Map * m, GSHGEOM_Fill_Rule rule, const GSHSCENE_Paint * p) {
     Snapshot before(l.list, sq.get());
-    GSHSCENE_Result rc = gshscene_list_fill(l.list, r, m, rule, p, 0);
+    GSHSCENE_Result rc = gshscene_list_fill(l.list, r, m, rule, p, 0, 0);
     Snapshot after(l.list, sq.get());
     EXPECT_EQ(before.count, after.count);
     EXPECT_EQ(before.expansion, after.expansion);
@@ -392,7 +394,7 @@ TEST(ListRecord, EveryInvalidArgumentIsRefusedAndTheListIsAsItWas) {
     p.kind = GSHSCENE_PAINT_GRADIENT;
     EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &p), UNS) << "a gradient is reserved";
     p.kind = GSHSCENE_PAINT_FOREGROUND;
-    EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &p), UNS) << "currentColor is reserved";
+    EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &p), INV) << "a foreground paint's color is the version's: only its alpha is its own";
     p.kind = GSHSCENE_PAINT_PALETTE;
     EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &p), UNS) << "a palette entry is reserved";
     p.kind = GSHSCENE_PAINT_KIND_COUNT;
@@ -400,42 +402,50 @@ TEST(ListRecord, EveryInvalidArgumentIsRefusedAndTheListIsAsItWas) {
     p.kind = (GSHSCENE_Paint_Kind)9;
     EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &p), INV) << "a paint kind outside the enum";
     p = ok_paint;
-    p.color_space = 1;
-    EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &p), UNS) << "a color space other than the target's";
+    p.space.primaries = GCOL_PRIMARIES_SRGB;
+    EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &p), INV) << "a space given in part";
+    p.space = space_of(GCOL_PRIMARIES_PROPHOTO, GCOL_TRANSFER_SRGB);
+    EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &p), UNS) << "ProPhoto is D50: reserved";
+    p.space = space_of(GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_PQ);
+    EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &p), UNS) << "PQ is reserved";
     p = ok_paint;
     p.gradient = sq.get();
     EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &p), INV) << "a solid paint names no gradient";
   }
   // The same rules for a clip push and an instance.
-  EXPECT_EQ(gshscene_list_clip_push(l.list, nullptr, &good, GSHGEOM_FILL_NONZERO), INV);
-  EXPECT_EQ(gshscene_list_clip_push(l.list, foreign.get(), &good, GSHGEOM_FILL_NONZERO), INV);
-  EXPECT_EQ(gshscene_list_clip_push(l.list, picture.get(), &good, GSHGEOM_FILL_NONZERO), INV);
-  EXPECT_EQ(gshscene_list_clip_push(l.list, sq.get(), &nan_map, GSHGEOM_FILL_NONZERO), INV);
-  EXPECT_EQ(gshscene_list_clip_push(l.list, sq.get(), &good, bad_rule), INV);
-  EXPECT_EQ(gshscene_list_instance(l.list, nullptr, &good, 0), INV);
-  EXPECT_EQ(gshscene_list_instance(l.list, sq.get(), &good, 0), INV) << "an instance draws a picture";
-  EXPECT_EQ(gshscene_list_instance(l.list, glyphs.get(), &good, 0), INV);
-  EXPECT_EQ(gshscene_list_instance(l.list, picture.get(), &nan_map, 0), INV);
-  EXPECT_EQ(gshscene_list_fill(nullptr, sq.get(), &good, GSHGEOM_FILL_NONZERO, nullptr, 0), INV);
-  EXPECT_EQ(gshscene_list_clip_push(nullptr, sq.get(), &good, GSHGEOM_FILL_NONZERO), INV);
-  EXPECT_EQ(gshscene_list_instance(nullptr, picture.get(), &good, 0), INV);
-  EXPECT_EQ(gshscene_list_group_push(nullptr, nullptr, 0), INV);
+  EXPECT_EQ(gshscene_list_clip_push(l.list, nullptr, &good, GSHGEOM_FILL_NONZERO, 0, 0), INV);
+  EXPECT_EQ(gshscene_list_clip_push(l.list, foreign.get(), &good, GSHGEOM_FILL_NONZERO, 0, 0), INV);
+  EXPECT_EQ(gshscene_list_clip_push(l.list, picture.get(), &good, GSHGEOM_FILL_NONZERO, 0, 0), INV);
+  EXPECT_EQ(gshscene_list_clip_push(l.list, sq.get(), &nan_map, GSHGEOM_FILL_NONZERO, 0, 0), INV);
+  EXPECT_EQ(gshscene_list_clip_push(l.list, sq.get(), &good, bad_rule, 0, 0), INV);
+  EXPECT_EQ(gshscene_list_instance(l.list, nullptr, &good, 0, 0), INV);
+  EXPECT_EQ(gshscene_list_instance(l.list, sq.get(), &good, 0, 0), INV) << "an instance draws a picture";
+  EXPECT_EQ(gshscene_list_instance(l.list, glyphs.get(), &good, 0, 0), INV);
+  EXPECT_EQ(gshscene_list_instance(l.list, picture.get(), &nan_map, 0, 0), INV);
+  EXPECT_EQ(gshscene_list_fill(nullptr, sq.get(), &good, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), INV);
+  EXPECT_EQ(gshscene_list_clip_push(nullptr, sq.get(), &good, GSHGEOM_FILL_NONZERO, 0, 0), INV);
+  EXPECT_EQ(gshscene_list_instance(nullptr, picture.get(), &good, 0, 0), INV);
+  EXPECT_EQ(gshscene_list_group_push(nullptr, nullptr, 0, 0), INV);
   EXPECT_EQ(gshscene_list_clip_pop(nullptr), INV);
   EXPECT_EQ(gshscene_list_group_pop(nullptr), INV);
   // Groups.
   for (double bad : {kNaN, kInf, -kInf, -0.001, 1.001, 2.0}) {
-    GSHSCENE_Group g = {bad, 0, 0};
-    EXPECT_EQ(gshscene_list_group_push(l.list, &g, 0), INV) << "opacity " << bad;
+    GSHSCENE_Group g = make_group(bad);
+    EXPECT_EQ(gshscene_list_group_push(l.list, &g, 0, 0), INV) << "opacity " << bad;
   }
   {
-    GSHSCENE_Group g = {0.5, 1, 0};
-    EXPECT_EQ(gshscene_list_group_push(l.list, &g, 0), UNS) << "a blend space other than the target's";
-    g = {0.5, 0, GSHSCENE_ORDER_DEPTH};
-    EXPECT_EQ(gshscene_list_group_push(l.list, &g, 0), UNS) << "depth ordering is reserved";
-    g = {0.5, 0, GSHSCENE_ORDER_OVERLAY};
-    EXPECT_EQ(gshscene_list_group_push(l.list, &g, 0), UNS) << "overlay ordering is reserved";
-    g = {0.5, 0, 3};
-    EXPECT_EQ(gshscene_list_group_push(l.list, &g, 0), INV) << "an ordering outside the enum";
+    GSHSCENE_Group g = make_group(0.5);
+    g.blend_space = space_of(GCOL_PRIMARIES_PROPHOTO, GCOL_TRANSFER_SRGB);
+    EXPECT_EQ(gshscene_list_group_push(l.list, &g, 0, 0), UNS) << "ProPhoto is reserved";
+    g.blend_space = space_of(GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_GAMMA, 0.0);
+    EXPECT_EQ(gshscene_list_group_push(l.list, &g, 0, 0), INV) << "a gamma transfer without its exponent";
+    g = make_group(0.5, 3);
+    EXPECT_EQ(gshscene_list_group_push(l.list, &g, 0, 0), INV) << "an ordering outside the enum";
+    g = make_group(0.5, GSHSCENE_ORDER_FLAT, GSHSCENE_COMPOSITE_COUNT);
+    EXPECT_EQ(gshscene_list_group_push(l.list, &g, 0, 0), INV) << "a composite operator outside the enum";
+    g = make_group(0.5);
+    EXPECT_EQ(gshscene_list_group_push(l.list, &g, 0, kNaN), INV) << "a depth that is not finite";
+    EXPECT_EQ(gshscene_list_group_push(l.list, &g, 0, kInf), INV);
   }
   EXPECT_EQ(gshscene_list_count(l.list), 0u) << "nothing recorded by a refused call";
   EXPECT_EQ(gshscene_resource_refcount(sq.get()), 1u);
@@ -448,17 +458,17 @@ TEST(ListRecord, TheBoundariesOfEveryRangeAreAccepted) {
   ListHolder l(s.store);
   for (double alpha : {0.0, 1.0, 0.5}) {
     GSHSCENE_Paint p = solid(0.0, 0.0, 0.0, alpha);
-    EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &p, 0), GSHSCENE_OK) << alpha;
+    EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0), GSHSCENE_OK) << alpha;
   }
   GSHSCENE_Paint wide = solid(2.0, -0.5, 1e300, 1.0);  // outside the gamut is allowed
-  EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_EVEN_ODD, &wide, 0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_EVEN_ODD, &wide, 0, 0), GSHSCENE_OK);
   for (double opacity : {0.0, 1.0}) {
-    GSHSCENE_Group g = {opacity, 0, 0};
-    EXPECT_EQ(gshscene_list_group_push(l.list, &g, 0), GSHSCENE_OK) << opacity;
+    GSHSCENE_Group g = make_group(opacity);
+    EXPECT_EQ(gshscene_list_group_push(l.list, &g, 0, 0), GSHSCENE_OK) << opacity;
     EXPECT_EQ(gshscene_list_group_pop(l.list), GSHSCENE_OK);
   }
   for (int32_t layer : {INT32_MIN, -1, 0, 1, INT32_MAX}) {
-    EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, layer), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, layer, 0), GSHSCENE_OK);
     EXPECT_EQ(item_of(l.list, gshscene_list_count(l.list) - 1)->layer, layer);
   }
   EXPECT_EQ(item_of(l.list, 3)->paint.rgba[2], 1e300);
@@ -475,8 +485,8 @@ TEST(ListRecord, AGlyphRunCanBeFilledAndUsedAsAClip) {
   ASSERT_EQ(gshscene_store_intern_glyph_run(s.store, &run, &r), GSHSCENE_OK);
   Ref ref(r);
   ListHolder l(s.store);
-  EXPECT_EQ(gshscene_list_fill(l.list, r, nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK);
-  EXPECT_EQ(gshscene_list_clip_push(l.list, r, nullptr, GSHGEOM_FILL_NONZERO), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_fill(l.list, r, nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_clip_push(l.list, r, nullptr, GSHGEOM_FILL_NONZERO, 0, 0), GSHSCENE_OK);
   EXPECT_EQ(gshscene_list_clip_pop(l.list), GSHSCENE_OK);
 }
 
@@ -488,8 +498,8 @@ TEST(ListNesting, APopMustMatchTheInnermostPushAndCloseNeedsAllOfThem) {
   ListHolder l(s.store);
   EXPECT_EQ(gshscene_list_clip_pop(l.list), GSHSCENE_ERR_INVALID) << "nothing is open";
   EXPECT_EQ(gshscene_list_group_pop(l.list), GSHSCENE_ERR_INVALID);
-  ASSERT_EQ(gshscene_list_clip_push(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO), GSHSCENE_OK);
-  ASSERT_EQ(gshscene_list_group_push(l.list, nullptr, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_clip_push(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, 0, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_group_push(l.list, nullptr, 0, 0), GSHSCENE_OK);
   EXPECT_EQ(gshscene_list_clip_pop(l.list), GSHSCENE_ERR_INVALID) << "the group is the innermost";
   EXPECT_EQ(gshscene_list_close(l.list), GSHSCENE_ERR_INVALID) << "two pushes are open";
   EXPECT_EQ(gshscene_list_is_closed(l.list), 0) << "a failed close leaves the list open";
@@ -509,9 +519,9 @@ TEST(ListNesting, DepthGrowsPastTheInitialStackAndEveryPopStillMatches) {
     bool clip = (i % 3) != 0;
     kinds.push_back(clip);
     if (clip) {
-      ASSERT_EQ(gshscene_list_clip_push(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO), GSHSCENE_OK) << i;
+      ASSERT_EQ(gshscene_list_clip_push(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, 0, 0), GSHSCENE_OK) << i;
     } else {
-      ASSERT_EQ(gshscene_list_group_push(l.list, nullptr, 0), GSHSCENE_OK) << i;
+      ASSERT_EQ(gshscene_list_group_push(l.list, nullptr, 0, 0), GSHSCENE_OK) << i;
     }
   }
   for (int i = 0; i < 200; i++) {
@@ -537,19 +547,19 @@ TEST(ListNesting, MaxDepthAcceptsExactlyTheLimitOfOpenPushes) {
   Ref sq(intern_square(s.store));
   ListHolder l(s.store, &limits);
   for (int i = 0; i < 20; i++) {
-    GSHSCENE_Result rc = (i % 2) ? gshscene_list_clip_push(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO)
-                                 : gshscene_list_group_push(l.list, nullptr, 0);
+    GSHSCENE_Result rc = (i % 2) ? gshscene_list_clip_push(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, 0, 0)
+                                 : gshscene_list_group_push(l.list, nullptr, 0, 0);
     ASSERT_EQ(rc, GSHSCENE_OK) << i;
   }
   size_t before = gshscene_list_count(l.list);
-  EXPECT_EQ(gshscene_list_group_push(l.list, nullptr, 0), GSHSCENE_ERR_LIMIT);
-  EXPECT_EQ(gshscene_list_clip_push(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO), GSHSCENE_ERR_LIMIT);
+  EXPECT_EQ(gshscene_list_group_push(l.list, nullptr, 0, 0), GSHSCENE_ERR_LIMIT);
+  EXPECT_EQ(gshscene_list_clip_push(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, 0, 0), GSHSCENE_ERR_LIMIT);
   EXPECT_EQ(gshscene_list_count(l.list), before);
   EXPECT_EQ(gshscene_resource_refcount(sq.get()), 11u) << "ten clips are held, the refused one is not";
   // A pop makes room for exactly one more.
   ASSERT_EQ(gshscene_list_clip_pop(l.list), GSHSCENE_OK);
-  EXPECT_EQ(gshscene_list_clip_push(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO), GSHSCENE_OK);
-  EXPECT_EQ(gshscene_list_clip_push(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO), GSHSCENE_ERR_LIMIT);
+  EXPECT_EQ(gshscene_list_clip_push(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, 0, 0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_clip_push(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, 0, 0), GSHSCENE_ERR_LIMIT);
 }
 
 // --- limits --------------------------------------------------------------------------------
@@ -562,11 +572,11 @@ TEST(ListLimits, MaxListItemsAcceptsExactlyTheLimit) {
   Ref sq(intern_square(s.store));
   ListHolder l(s.store, &limits);
   for (int i = 0; i < 100; i++) {
-    ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, i), GSHSCENE_OK) << i;
+    ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, i, 0), GSHSCENE_OK) << i;
   }
   Snapshot before(l.list, sq.get());
-  EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 100), GSHSCENE_ERR_LIMIT);
-  EXPECT_EQ(gshscene_list_group_push(l.list, nullptr, 0), GSHSCENE_ERR_LIMIT);
+  EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 100, 0), GSHSCENE_ERR_LIMIT);
+  EXPECT_EQ(gshscene_list_group_push(l.list, nullptr, 0, 0), GSHSCENE_ERR_LIMIT);
   EXPECT_EQ(gshscene_list_count(l.list), 100u);
   EXPECT_EQ(gshscene_resource_refcount(sq.get()), before.refs);
   EXPECT_EQ(gshscene_list_close(l.list), GSHSCENE_OK) << "a refused push is not left open";
@@ -583,7 +593,7 @@ TEST(ListLimits, ALimitAboveTheCeilingIsAcceptedAndTheListStillWorks) {
   Ref sq(intern_square(s.store));
   ListHolder l(s.store, &limits);
   ASSERT_NE(l.list, nullptr);
-  EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
 }
 
 TEST(ListLimits, MaxListBytesAcceptsExactlyTheBytesTheRecordingTook) {
@@ -591,7 +601,7 @@ TEST(ListLimits, MaxListBytesAcceptsExactlyTheBytesTheRecordingTook) {
   Ref sq(intern_square(s.store));
   auto record = [&](GSHSCENE_List * list) -> int {
     for (int i = 0; i < 70; i++) {
-      GSHSCENE_Result rc = gshscene_list_fill(list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, i);
+      GSHSCENE_Result rc = gshscene_list_fill(list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, i, 0);
       if (rc != GSHSCENE_OK) {
         EXPECT_EQ(rc, GSHSCENE_ERR_LIMIT);
         return i;
@@ -643,7 +653,7 @@ TEST(ListLimits, ExpansionCountsAnInstanceAsOnePlusItsPicturesAndTheLimitIsExact
   // Level 1: one fill.  Level k + 1: ten instances of level k, so its expansion is 10 * (1 + E_k).
   GSHSCENE_List * l1 = nullptr;
   ASSERT_EQ(gshscene_list_create(nullptr, &limits, s.store, &l1), GSHSCENE_OK);
-  ASSERT_EQ(gshscene_list_fill(l1, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(l1, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
   EXPECT_EQ(gshscene_list_expansion(l1), 1u);
   gshscene_list_close(l1);
   const GSHSCENE_Resource * level = nullptr;
@@ -654,7 +664,7 @@ TEST(ListLimits, ExpansionCountsAnInstanceAsOnePlusItsPicturesAndTheLimitIsExact
     GSHSCENE_List * list = nullptr;
     ASSERT_EQ(gshscene_list_create(nullptr, &limits, s.store, &list), GSHSCENE_OK);
     for (int i = 0; i < 10; i++) {
-      ASSERT_EQ(gshscene_list_instance(list, level, nullptr, i), GSHSCENE_OK) << depth << "," << i;
+      ASSERT_EQ(gshscene_list_instance(list, level, nullptr, i, 0), GSHSCENE_OK) << depth << "," << i;
     }
     EXPECT_EQ(gshscene_list_expansion(list), want[depth - 1]) << depth;
     EXPECT_EQ(gshscene_list_count(list), 10u);
@@ -669,20 +679,20 @@ TEST(ListLimits, ExpansionCountsAnInstanceAsOnePlusItsPicturesAndTheLimitIsExact
   GSHSCENE_List * bomb = nullptr;
   ASSERT_EQ(gshscene_list_create(nullptr, &limits, s.store, &bomb), GSHSCENE_OK);
   for (int i = 0; i < 4; i++) {
-    ASSERT_EQ(gshscene_list_instance(bomb, level, nullptr, 0), GSHSCENE_OK) << i;
+    ASSERT_EQ(gshscene_list_instance(bomb, level, nullptr, 0, 0), GSHSCENE_OK) << i;
   }
   EXPECT_EQ(gshscene_list_expansion(bomb), 844u);
   size_t refs = gshscene_resource_refcount(level);
-  EXPECT_EQ(gshscene_list_instance(bomb, level, nullptr, 0), GSHSCENE_ERR_LIMIT);
+  EXPECT_EQ(gshscene_list_instance(bomb, level, nullptr, 0, 0), GSHSCENE_ERR_LIMIT);
   EXPECT_EQ(gshscene_list_count(bomb), 4u);
   EXPECT_EQ(gshscene_list_expansion(bomb), 844u);
   EXPECT_EQ(gshscene_resource_refcount(level), refs);
   // A plain item still fits (845), up to exactly 1000.
   for (int i = 845; i <= 1000; i++) {
-    ASSERT_EQ(gshscene_list_fill(bomb, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK) << i;
+    ASSERT_EQ(gshscene_list_fill(bomb, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK) << i;
   }
   EXPECT_EQ(gshscene_list_expansion(bomb), 1000u);
-  EXPECT_EQ(gshscene_list_fill(bomb, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_ERR_LIMIT);
+  EXPECT_EQ(gshscene_list_fill(bomb, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_ERR_LIMIT);
   gshscene_list_destroy(bomb);
   gshscene_resource_release(level);
 }
@@ -695,7 +705,7 @@ TEST(ListLimits, TheExpansionSaturatesInsteadOfWrapping) {
   Ref sq(intern_square(s.store));
   GSHSCENE_List * base = nullptr;
   ASSERT_EQ(gshscene_list_create(nullptr, &limits, s.store, &base), GSHSCENE_OK);
-  ASSERT_EQ(gshscene_list_fill(base, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(base, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
   gshscene_list_close(base);
   const GSHSCENE_Resource * level = nullptr;
   ASSERT_EQ(gshscene_store_intern_picture(s.store, base, &level), GSHSCENE_OK);
@@ -707,7 +717,7 @@ TEST(ListLimits, TheExpansionSaturatesInsteadOfWrapping) {
     GSHSCENE_List * list = nullptr;
     ASSERT_EQ(gshscene_list_create(nullptr, &limits, s.store, &list), GSHSCENE_OK);
     for (int i = 0; i < 10; i++) {
-      ASSERT_EQ(gshscene_list_instance(list, level, nullptr, 0), GSHSCENE_OK) << depth;
+      ASSERT_EQ(gshscene_list_instance(list, level, nullptr, 0, 0), GSHSCENE_OK) << depth;
     }
     size_t expansion = gshscene_list_expansion(list);
     EXPECT_GE(expansion, last) << "a wrapped sum would fall at depth " << depth;
@@ -724,7 +734,7 @@ TEST(ListLimits, TheExpansionSaturatesInsteadOfWrapping) {
   // At the largest limit a saturated count is not past it: one more instance is still accepted.
   GSHSCENE_List * more = nullptr;
   ASSERT_EQ(gshscene_list_create(nullptr, &limits, s.store, &more), GSHSCENE_OK);
-  EXPECT_EQ(gshscene_list_instance(more, level, nullptr, 0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_instance(more, level, nullptr, 0, 0), GSHSCENE_OK);
   EXPECT_EQ(gshscene_list_expansion(more), SIZE_MAX);
   gshscene_list_destroy(more);
   gshscene_resource_release(level);
@@ -739,7 +749,7 @@ TEST(ListArena, AHundredThousandItemsReadBackAcrossEverySegmentBoundary) {
   const int n = 100000;
   const GSHSCENE_Item * first = nullptr;
   for (int i = 0; i < n; i++) {
-    ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, i), GSHSCENE_OK) << i;
+    ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, i, 0), GSHSCENE_OK) << i;
     if (i == 0) {
       first = item_of(l.list, 0);
     }
@@ -763,7 +773,7 @@ TEST(ListArena, ADestroyFreesEveryChunkInOnePassAndReleasesEveryReference) {
   {
     ListHolder l(s.store, nullptr, &a);
     for (int i = 0; i < 100000; i++) {
-      ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK);
+      ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
     }
     // One call for the list and one per chunk, not one per item.
     EXPECT_LE(t.calls, 24) << "the allocator is called per chunk";
@@ -782,7 +792,7 @@ TEST(ListArena, ResetReleasesEverythingKeepsTheFirstChunkAndReopensTheList) {
   ListHolder l(s.store, nullptr, &a);
   auto record = [&]() {
     for (int i = 0; i < 10; i++) {
-      ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, i), GSHSCENE_OK);
+      ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, i, 0), GSHSCENE_OK);
     }
     ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
   };
@@ -811,7 +821,7 @@ TEST(ListArena, ResetReleasesEverythingKeepsTheFirstChunkAndReopensTheList) {
   for (int round = 0; round < 3; round++) {
     ASSERT_EQ(gshscene_list_reset(l.list), GSHSCENE_OK);
     for (int i = 0; i < 5000; i++) {
-      ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, i), GSHSCENE_OK);
+      ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, i, 0), GSHSCENE_OK);
     }
   }
   size_t live_chunks = t.live.size();
@@ -829,7 +839,7 @@ TEST(ListArena, EverySegmentStartsOnTheArenasAlignment) {
     // Segment k holds 16 << k items and starts at index 16 * (2^k - 1).
     size_t start = 16 * (((size_t)1 << segment) - 1);
     while (gshscene_list_count(l.list) <= start) {
-      ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK);
+      ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
     }
     uintptr_t address = (uintptr_t)item_of(l.list, start);
     EXPECT_EQ(address % 16, 0u) << "segment " << segment << " at item " << start;
@@ -843,29 +853,29 @@ TEST(ListArena, AResetListStartsAgainWithNothingLeftOver) {
   // A frame with a push left open, an instance, and enough items to take more than the first chunk.
   GSHSCENE_List * inner = nullptr;
   ASSERT_EQ(gshscene_list_create(nullptr, nullptr, s.store, &inner), GSHSCENE_OK);
-  ASSERT_EQ(gshscene_list_fill(inner, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(inner, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
   gshscene_list_close(inner);
   Ref picture;
   ASSERT_EQ(gshscene_store_intern_picture(s.store, inner, &picture.resource), GSHSCENE_OK);
   gshscene_list_destroy(inner);
 
   ListHolder l(s.store);
-  ASSERT_EQ(gshscene_list_group_push(l.list, nullptr, 0), GSHSCENE_OK);  // first: the stack is the arena's first request
+  ASSERT_EQ(gshscene_list_group_push(l.list, nullptr, 0, 0), GSHSCENE_OK);  // first: the stack is the arena's first request
   for (int i = 0; i < 200; i++) {
-    ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, i), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, i, 0), GSHSCENE_OK);
   }
-  ASSERT_EQ(gshscene_list_instance(l.list, picture.get(), nullptr, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_instance(l.list, picture.get(), nullptr, 0, 0), GSHSCENE_OK);
   EXPECT_EQ(gshscene_list_close(l.list), GSHSCENE_ERR_INVALID) << "the group is open";
   ASSERT_EQ(gshscene_list_reset(l.list), GSHSCENE_OK);
   // After the reset the open group is forgotten, and the instance is not remembered.
-  ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK);
-  ASSERT_EQ(gshscene_list_group_push(l.list, nullptr, 0), GSHSCENE_OK);  // uses the stack again
+  ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_group_push(l.list, nullptr, 0, 0), GSHSCENE_OK);  // uses the stack again
   ASSERT_EQ(gshscene_list_group_pop(l.list), GSHSCENE_OK);
   ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK) << "no push survives a reset";
   EXPECT_EQ(gshscene_list_expansion(l.list), 3u);
   ListHolder fresh(s.store);
-  ASSERT_EQ(gshscene_list_fill(fresh.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK);
-  ASSERT_EQ(gshscene_list_group_push(fresh.list, nullptr, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(fresh.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_group_push(fresh.list, nullptr, 0, 0), GSHSCENE_OK);
   ASSERT_EQ(gshscene_list_group_pop(fresh.list), GSHSCENE_OK);
   ASSERT_EQ(gshscene_list_close(fresh.list), GSHSCENE_OK);
   EXPECT_EQ(gshscene_list_equal(l.list, fresh.list), 1) << "a reset list is the list it would have been new";
@@ -879,10 +889,10 @@ TEST(ListArena, AnItemPointerIsStableUntilTheListIsReset) {
   StoreHolder s;
   Ref sq(intern_square(s.store));
   ListHolder l(s.store);
-  ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 42), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 42, 0), GSHSCENE_OK);
   const GSHSCENE_Item * item = item_of(l.list, 0);
   for (int i = 0; i < 5000; i++) {
-    ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
   }
   EXPECT_EQ(item, item_of(l.list, 0));
   EXPECT_EQ(item->layer, 42);
@@ -922,20 +932,20 @@ GSHSCENE_List * build(GSHSCENE_Store * store, const Variant & v) {
     gshgeom_map_translate(3, v.tx, 2.0, v.tz, &m);
   }
   GSHSCENE_Paint p = solid(v.rgba[0], v.rgba[1], v.rgba[2], v.rgba[3]);
-  GSHSCENE_Group g = {v.opacity, 0, 0};
+  GSHSCENE_Group g = make_group(v.opacity);
   if (v.swap_order) {
-    gshscene_list_group_push(l, &g, v.group_layer);
-    gshscene_list_fill(l, v.res, &m, v.rule, &p, v.layer);
+    gshscene_list_group_push(l, &g, v.group_layer, 0);
+    gshscene_list_fill(l, v.res, &m, v.rule, &p, v.layer, 0);
     gshscene_list_group_pop(l);
   } else {
-    gshscene_list_fill(l, v.res, &m, v.rule, &p, v.layer);
-    gshscene_list_group_push(l, &g, v.group_layer);
+    gshscene_list_fill(l, v.res, &m, v.rule, &p, v.layer, 0);
+    gshscene_list_group_push(l, &g, v.group_layer, 0);
     gshscene_list_group_pop(l);
   }
-  gshscene_list_clip_push(l, v.res, &m, v.clip_rule);
+  gshscene_list_clip_push(l, v.res, &m, v.clip_rule, 0, 0);
   gshscene_list_clip_pop(l);
   if (v.extra_item) {
-    gshscene_list_fill(l, v.res, &m, v.rule, &p, v.layer);
+    gshscene_list_fill(l, v.res, &m, v.rule, &p, v.layer, 0);
   }
   gshscene_list_close(l);
   return l;
@@ -1014,7 +1024,7 @@ TEST(ListEquality, MapsDifferingInOneEntryOneSignOrOneDimensionAreDifferentMaps)
   auto list_of = [&](const GSHGEOM_Map & map) {
     GSHSCENE_List * l = nullptr;
     gshscene_list_create(nullptr, nullptr, s.store, &l);
-    gshscene_list_fill(l, sq.get(), &map, GSHGEOM_FILL_NONZERO, nullptr, 0);
+    gshscene_list_fill(l, sq.get(), &map, GSHGEOM_FILL_NONZERO, nullptr, 0, 0);
     gshscene_list_close(l);
     return l;
   };
@@ -1059,9 +1069,9 @@ TEST(ListEquality, MapsDifferingInOneEntryOneSignOrOneDimensionAreDifferentMaps)
 TEST(ListEquality, TheSignOfAZeroOpacityIsPartOfTheGroup) {
   StoreHolder s;
   ListHolder a(s.store), b(s.store);
-  GSHSCENE_Group pos = {0.0, 0, 0}, neg = {-0.0, 0, 0};
-  ASSERT_EQ(gshscene_list_group_push(a.list, &pos, 0), GSHSCENE_OK);
-  ASSERT_EQ(gshscene_list_group_push(b.list, &neg, 0), GSHSCENE_OK);
+  GSHSCENE_Group pos = make_group(0.0), neg = make_group(-0.0);
+  ASSERT_EQ(gshscene_list_group_push(a.list, &pos, 0, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_group_push(b.list, &neg, 0, 0), GSHSCENE_OK);
   EXPECT_EQ(gshscene_list_equal(a.list, b.list), 0);
   EXPECT_NE(gshscene_list_hash(a.list), gshscene_list_hash(b.list));
 }
@@ -1075,8 +1085,8 @@ TEST(ListEquality, TheKindTagOfAMapIsPartOfItsEqualityAndItsHash) {
   tagged.kind = GSHGEOM_MAP_QUARTER_TURNS;  // as a quarter turn followed by its inverse is tagged
   ASSERT_EQ(gshgeom_map_check(&tagged), GSHGEOM_OK);
   ListHolder a(s.store), b(s.store);
-  ASSERT_EQ(gshscene_list_fill(a.list, sq.get(), &plain, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK);
-  ASSERT_EQ(gshscene_list_fill(b.list, sq.get(), &tagged, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(a.list, sq.get(), &plain, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(b.list, sq.get(), &tagged, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
   EXPECT_EQ(item_of(b.list, 0)->map.kind, (uint32_t)GSHGEOM_MAP_QUARTER_TURNS) << "the tag is kept";
   EXPECT_EQ(gshscene_list_equal(a.list, b.list), 0);
   EXPECT_NE(gshscene_list_hash(a.list), gshscene_list_hash(b.list));
@@ -1086,13 +1096,13 @@ TEST(ListEquality, AnOpenListHashesAsItWillWhenClosedAndZeroSignsDiffer) {
   StoreHolder s;
   Ref sq(intern_square(s.store));
   ListHolder l(s.store);
-  ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
   uint64_t open = gshscene_list_hash(l.list);
   ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
   EXPECT_EQ(gshscene_list_hash(l.list), open);
   ListHolder z(s.store);
   GSHSCENE_Paint negzero = solid(-0.0, 0.0, 0.0, 1.0);
-  ASSERT_EQ(gshscene_list_fill(z.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &negzero, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(z.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &negzero, 0, 0), GSHSCENE_OK);
   EXPECT_NE(gshscene_list_hash(z.list), open) << "-0.0 is not +0.0 in a hash";
   EXPECT_EQ(gshscene_list_equal(z.list, l.list), 0);
 }
@@ -1125,12 +1135,12 @@ TEST(ListAllocation, AFailureAtEveryCallLeavesTheListConsistentAndNothingLeaked)
       if (rc == GSHSCENE_OK) {
         // The group first: the stack is then the arena's first request.  Then 40 fills, which cross
         // two segment boundaries, then a clip and the pops.
-        step(gshscene_list_group_push(list, nullptr, 0), false);
+        step(gshscene_list_group_push(list, nullptr, 0, 0), false);
         for (int i = 0; i < 40 && rc == GSHSCENE_OK; i++) {
-          step(gshscene_list_fill(list, sq, nullptr, GSHGEOM_FILL_NONZERO, nullptr, i), true);
+          step(gshscene_list_fill(list, sq, nullptr, GSHGEOM_FILL_NONZERO, nullptr, i, 0), true);
         }
         if (rc == GSHSCENE_OK) {
-          step(gshscene_list_clip_push(list, sq, nullptr, GSHGEOM_FILL_NONZERO), true);
+          step(gshscene_list_clip_push(list, sq, nullptr, GSHGEOM_FILL_NONZERO, 0, 0), true);
         }
         if (rc == GSHSCENE_OK) {
           step(gshscene_list_clip_pop(list), false);
