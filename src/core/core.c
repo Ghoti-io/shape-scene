@@ -21,11 +21,13 @@
 /**
  * @file
  *
- * The version this build reports.
+ * The version this build reports, the result strings, the default limits and
+ * the default allocator.
  */
 
 #include <ghoti.io/shape-scene/macros.h>
 
+#include <ghoti.io/shape-scene/allocator.h>
 #include <ghoti.io/shape-scene/core.h>
 #include <ghoti.io/shape-scene/libver.h>
 
@@ -35,4 +37,50 @@ const char * gshscene_version_string(void) {
 
 unsigned gshscene_version_number(void) {
   return GSHSCENE_VERSION_NUMBER;
+}
+
+const char * gshscene_result_string(GSHSCENE_Result result) {
+  switch (result) {
+    case GSHSCENE_OK:
+      return "ok";
+    case GSHSCENE_ERR_IO:
+      return "I/O error";
+    case GSHSCENE_ERR_FORMAT:
+      return "format error";
+    case GSHSCENE_ERR_UNSUPPORTED:
+      return "unsupported";
+    case GSHSCENE_ERR_LIMIT:
+      return "limit exceeded";
+    case GSHSCENE_ERR_CORRUPT:
+      return "corrupt";
+    case GSHSCENE_ERR_OOM:
+      return "out of memory";
+    case GSHSCENE_ERR_INVALID:
+      return "invalid argument";
+    case GSHSCENE_ERR_INTERNAL:
+      return "internal error";
+    case GSHSCENE_RESULT_COUNT:
+      break;
+  }
+  return "unknown result";
+}
+
+void gshscene_limits_default(GSHSCENE_Limits * limits) {
+  if (!limits) {
+    return;
+  }
+  limits->max_resources = GSHSCENE_LIMITS_DEFAULT_MAX_RESOURCES;
+  limits->max_resource_elements = GSHSCENE_LIMITS_DEFAULT_MAX_RESOURCE_ELEMENTS;
+  limits->max_list_items = GSHSCENE_LIMITS_DEFAULT_MAX_LIST_ITEMS;
+  limits->max_list_bytes = GSHSCENE_LIMITS_DEFAULT_MAX_LIST_BYTES;
+  limits->max_depth = GSHSCENE_LIMITS_DEFAULT_MAX_DEPTH;
+  limits->max_picture_depth = GSHSCENE_LIMITS_DEFAULT_MAX_PICTURE_DEPTH;
+  limits->max_expansion = GSHSCENE_LIMITS_DEFAULT_MAX_EXPANSION;
+  for (size_t i = 0; i < sizeof limits->_reserved; i++) {
+    limits->_reserved[i] = 0;
+  }
+}
+
+const GSHSCENE_Allocator * gshscene_allocator_default(void) {
+  return gshgeom_allocator_default();
 }

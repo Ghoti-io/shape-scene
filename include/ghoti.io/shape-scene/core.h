@@ -21,7 +21,7 @@
 /**
  * @file core.h
  *
- * The version this build reports.
+ * Result codes, limits and the version this build reports.
  */
 
 #ifndef GHOTI_IO_GSHSCENE_CORE_H
@@ -29,9 +29,94 @@
 
 #include <ghoti.io/shape-scene/macros.h>
 
+#include <stddef.h>
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+ * @brief Result of an operation.
+ *
+ * Zero is success.  ::GSHSCENE_RESULT_COUNT closes the enum so that a test can
+ * check the string table is complete.  This is the suite's fixed vocabulary
+ * with nothing added (CONVENTIONS section 5); the sink contract's two further
+ * results come with the sink contract.  Most of it is never returned by this
+ * part of the library (it reads no bytes).
+ */
+typedef enum {
+  GSHSCENE_OK = 0,          ///< The operation succeeded.
+  GSHSCENE_ERR_IO,          ///< A write to a caller's stream failed.
+  GSHSCENE_ERR_FORMAT,      ///< Not returned by this library.
+  GSHSCENE_ERR_UNSUPPORTED, ///< A reserved value: a kind or a field that a later story gives meaning to.
+  GSHSCENE_ERR_LIMIT,       ///< A stated cap was exceeded; nothing was truncated and the object is as it was.
+  GSHSCENE_ERR_CORRUPT,     ///< Not returned by this library.
+  GSHSCENE_ERR_OOM,         ///< The allocator returned NULL.
+  GSHSCENE_ERR_INVALID,     ///< A caller-supplied argument is wrong, or the call is out of sequence.
+  GSHSCENE_ERR_INTERNAL,    ///< The library's own invariant failed.
+  GSHSCENE_RESULT_COUNT
+} GSHSCENE_Result;
+
+/**
+ * @brief Static description of a result code.
+ *
+ * The string is never NULL, never allocated, and never contains caller data.
+ *
+ * @param result The result code, including values outside the enum.
+ * @return A static string.
+ */
+GSHSCENE_API const char * gshscene_result_string(GSHSCENE_Result result);
+
+/** Default ::GSHSCENE_Limits.max_resources: 16 Mi live resources in a store. */
+#define GSHSCENE_LIMITS_DEFAULT_MAX_RESOURCES ((size_t)1 << 24)
+
+/** Default ::GSHSCENE_Limits.max_resource_elements: 4 Mi path elements, glyphs or picture items. */
+#define GSHSCENE_LIMITS_DEFAULT_MAX_RESOURCE_ELEMENTS ((size_t)1 << 22)
+
+/** Default ::GSHSCENE_Limits.max_list_items: 1 Mi items in a list. */
+#define GSHSCENE_LIMITS_DEFAULT_MAX_LIST_ITEMS ((size_t)1 << 20)
+
+/** The most items a list can hold whatever its limit says: 2^30. */
+#define GSHSCENE_LIST_ITEMS_CEILING ((size_t)1 << 30)
+
+/** Default ::GSHSCENE_Limits.max_list_bytes: 256 MiB of arena chunks per list. */
+#define GSHSCENE_LIMITS_DEFAULT_MAX_LIST_BYTES ((size_t)256 * 1024 * 1024)
+
+/** Default ::GSHSCENE_Limits.max_depth: 256 nested clips and groups. */
+#define GSHSCENE_LIMITS_DEFAULT_MAX_DEPTH ((size_t)256)
+
+/** Default ::GSHSCENE_Limits.max_picture_depth: 32 pictures nested in pictures. */
+#define GSHSCENE_LIMITS_DEFAULT_MAX_PICTURE_DEPTH ((size_t)32)
+
+/** Default ::GSHSCENE_Limits.max_expansion: 16 Mi items once every instance is expanded. */
+#define GSHSCENE_LIMITS_DEFAULT_MAX_EXPANSION ((size_t)1 << 24)
+
+/**
+ * @brief Caps for the quantities a caller can make unbounded.
+ *
+ * A field of 0 means the default above.  NULL where a `const GSHSCENE_Limits *`
+ * is taken means every default.  Exceeding a cap is ::GSHSCENE_ERR_LIMIT, never
+ * a silent truncation, and the object is left as it was.  Each cap is checked
+ * where its quantity grows, so exactly the cap passes and one more is refused.
+ */
+typedef struct GSHSCENE_Limits {
+  size_t max_resources;         ///< Most live resources one store may hold.
+  size_t max_resource_elements; ///< Most path elements, glyphs, or items of a picture's list one resource may hold.
+  size_t max_list_items;        ///< Most items one list may hold (at most ::GSHSCENE_LIST_ITEMS_CEILING).
+  size_t max_list_bytes;        ///< Most bytes of arena chunks one list may take from its allocator.
+  size_t max_depth;             ///< Most clips and groups open at once in one list.
+  size_t max_picture_depth;     ///< Most levels of pictures nested in pictures.
+  size_t max_expansion;         ///< Most items a list is with every instance replaced by its picture's items.
+  uint8_t _reserved[8];         ///< Reserved; zero.
+} GSHSCENE_Limits;
+
+/**
+ * @brief Fill @p limits with the built-in defaults.
+ *
+ * @param limits The structure to fill; NULL is ignored.
+ */
+GSHSCENE_API void gshscene_limits_default(GSHSCENE_Limits * limits);
 
 /**
  * @brief This build's version, as the string the Makefile generated.

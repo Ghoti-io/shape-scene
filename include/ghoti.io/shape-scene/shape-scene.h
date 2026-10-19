@@ -27,7 +27,12 @@
 #ifndef GHOTI_IO_GSHSCENE_GSHSCENE_H
 #define GHOTI_IO_GSHSCENE_GSHSCENE_H
 
+#include <ghoti.io/shape-scene/allocator.h>
 #include <ghoti.io/shape-scene/core.h>
+#include <ghoti.io/shape-scene/list.h>
 #include <ghoti.io/shape-scene/macros.h>
+#include <ghoti.io/shape-scene/paint.h>
+#include <ghoti.io/shape-scene/resource.h>
+#include <ghoti.io/shape-scene/types.h>
 
 #endif // GHOTI_IO_GSHSCENE_GSHSCENE_H

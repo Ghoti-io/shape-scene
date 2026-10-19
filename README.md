@@ -5,8 +5,24 @@ The shape family waist: resources and lists, and the versioned scene above them.
 
 ## What is implemented
 
-The scaffold only: `gshscene_version_string()` and `gshscene_version_number()`, and
-the gates every library in the shape family runs in `make test`.
+The waist: interned immutable resources, transient lists, and the immediate-mode recording path
+(no IDs, no versions, no scene).
+
+- **Resources** (`resource.h`). A store interns content, by hash and then by equality, so equal
+  content gets one reference-counted handle. Kinds: a model path, a glyph run (glyphs named by
+  font key and glyph id, or given as path outlines), and a picture (a closed list, frozen, which an
+  instance draws under a map). Gradients and images are named and reserved. Each handle has a
+  64-bit id that is never reused, and a release-listener API lets a sink's cache drop an entry
+  when the last reference goes. A store and its handles are thread-safe.
+- **Lists** (`list.h`). An arena-backed sequence of fills, clips, groups and instances, with a
+  map, a fill rule, a solid paint and a declared layer on the items that take them. The maker
+  owns it and frees it in one call; `reset` reuses the arena for the next frame.
+- **Hash and dump** of every resource and list, in `shape-geometry`'s spelling (FNV-1a 64 over
+  little-endian fields), the same on every target.
+- **Limits** on everything a caller can make unbounded, each asserted by its bound.
+
+`examples/frame.c` records a frame. The retained scene (versions, edits, identity, diff) is built
+above this layer in a later step, and a sink takes only a closed list and its resources.
 
 ## Building
 
@@ -16,7 +32,8 @@ make install PREFIX="$PWD/.local"
 ```
 
 Dependencies are found by pkg-config and nothing else; a missing one is an
-error that names the fix. The libraries this one needs: shape-geometry, color, image.
+error that names the fix. The library this one needs: shape-geometry (`color` and `image` return with
+the paint and raster-target steps).
 
 Determinism is a requirement, not a hope: every `double` stage builds with
 `-ffp-contract=off` and no x87, and elementary functions come from `math`, not
