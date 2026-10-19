@@ -626,6 +626,24 @@ TEST(PaintLimits, AGroupThatNeedsAPushCountsInMaxDepthWhateverItNeedsItFor) {
   }
 }
 
+TEST(PaintLimits, AnOrderedGroupAndItsContainerAreTwoPushesNotOne) {
+  for (size_t limit = 1; limit <= 2; limit++) {
+    GSHSCENE_Limits l;
+    gshscene_limits_default(&l);
+    l.max_depth = limit;
+    Doc d(&l);
+    EditHolder e(d.s);
+    GSHSCENE_Node ordered = group_node();
+    ordered.ordering = GSHSCENE_ORDER_DEPTH;
+    uint64_t g = add(e.edit, GSHSCENE_ROOT_ID, ordered);
+    uint64_t box = add(e.edit, g, group_node());
+    add(e.edit, box, d.shape_at(0, 0));
+    const GSHSCENE_Version * out = nullptr;
+    EXPECT_EQ(gshscene_scene_publish(d.s.scene, e.edit, nullptr, &out), limit == 2 ? GSHSCENE_OK : GSHSCENE_ERR_LIMIT) << limit;
+    gshscene_version_release(out);
+  }
+}
+
 TEST(PaintLimits, AContainerInAnOrderedGroupCountsAsAPushBecauseItIsOneUnit) {
   GSHSCENE_Limits l;
   gshscene_limits_default(&l);

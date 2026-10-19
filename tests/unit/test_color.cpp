@@ -172,6 +172,14 @@ TEST(ColorSpace, ADescriptionThatNamesNothingTheLibraryCarriesIsRefusedAsStated)
   GCOL_Color_Info size_only = ok;
   size_only.icc_size = 1;
   EXPECT_EQ(gshscene_color_space_from_info(&size_only, &out), UNS);
+  unsigned char one[1] = {0};
+  GCOL_Color_Info bytes_only = ok;
+  bytes_only.icc_bytes = one;
+  EXPECT_EQ(gshscene_color_space_from_info(&bytes_only, &out), UNS) << "bytes with no size";
+  GCOL_Color_Info stray = info_of_space(GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_SRGB, 2.2);
+  GSHSCENE_Color_Space got_stray;
+  ASSERT_EQ(gshscene_color_space_from_info(&stray, &got_stray), GSHSCENE_OK);
+  EXPECT_EQ(got_stray.gamma, 0.0) << "a gamma value on a transfer that has none is not carried";
   GCOL_Color_Info gamma = info_of_space(GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_GAMMA, 0.0);
   EXPECT_EQ(gshscene_color_space_from_info(&gamma, &out), INV) << "a gamma transfer without its exponent";
   gamma.gamma_value = 11.0;
@@ -306,6 +314,12 @@ TEST(Color, AListsForegroundIsSetBeforeCloseAndRefusedWhenInvalidWithoutChange) 
   uint64_t with = gshscene_list_hash(l.list);
   ASSERT_EQ(gshscene_list_set_foreground(l.list, nullptr), GSHSCENE_OK) << "NULL is the default";
   EXPECT_NE(gshscene_list_hash(l.list), with);
+  {
+    GSHSCENE_Color def, now;
+    gshscene_color_init(&def);
+    ASSERT_EQ(gshscene_list_foreground(l.list, &now), GSHSCENE_OK);
+    EXPECT_EQ(std::memcmp(&now, &def, sizeof now), 0);
+  }
   ASSERT_EQ(gshscene_list_set_foreground(l.list, &fg), GSHSCENE_OK);
   EXPECT_EQ(gshscene_list_hash(l.list), with);
   ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
@@ -418,6 +432,16 @@ TEST(Color, APictureHasNoForegroundOfItsOwn) {
   for (ListHolder * l : {&with, &without, &same}) {
     ASSERT_EQ(gshscene_list_close(l->list), GSHSCENE_OK);
   }
+  {
+    ListHolder spaced(s.store);
+    ASSERT_EQ(gshscene_list_fill(spaced.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &cc, 0, 0.0), GSHSCENE_OK);
+    GSHSCENE_Color in_space = {{0, 0, 0, 1}, srgb_space()};
+    ASSERT_EQ(gshscene_list_set_foreground(spaced.list, &in_space), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_close(spaced.list), GSHSCENE_OK);
+    Ref r;
+    EXPECT_EQ(gshscene_store_intern_picture(s.store, spaced.list, &r.resource), GSHSCENE_ERR_INVALID)
+        << "black in a space is not the default foreground";
+  }
   Ref a, b, c;
   EXPECT_EQ(gshscene_store_intern_picture(s.store, with.list, &a.resource), GSHSCENE_ERR_INVALID)
       << "a list with a foreground of its own cannot become a picture";
@@ -469,7 +493,7 @@ TEST(ColorSpace, EveryFieldOfASpaceIsPartOfTheEqualityAndTheHashOfAList) {
   Ref sq(intern_square(s.store));
   std::vector<GSHSCENE_Color_Space> spaces = {space_of(GCOL_PRIMARIES_DISPLAY_P3, GCOL_TRANSFER_GAMMA, 2.2),
       space_of(GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_GAMMA, 2.2), space_of(GCOL_PRIMARIES_DISPLAY_P3, GCOL_TRANSFER_SRGB),
-      space_of(GCOL_PRIMARIES_DISPLAY_P3, GCOL_TRANSFER_GAMMA, 2.4)};
+      space_of(GCOL_PRIMARIES_DISPLAY_P3, GCOL_TRANSFER_GAMMA, 2.4), space_of(GCOL_PRIMARIES_DISPLAY_P3, GCOL_TRANSFER_LINEAR)};
   for (int where = 0; where < 3; where++) {  // the paint's space, a group's blend space, the foreground's
     std::vector<uint64_t> hashes;
     std::vector<std::unique_ptr<ListHolder>> lists;

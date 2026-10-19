@@ -37,6 +37,21 @@ own plant is a flipped bit in one result.  Ids by file:
                every validity rule of a glyph run (each comparison of each
                bound), the picture's limits and depth, the accessors, the dump
                text and its widths, the stream error flag
+  cs-          (story 12) the color space: its validity rules and every bound of
+               the gamma, the zero space, the mapping from a ``color`` description
+               (each ICC field, the tolerance, the gamma), the default color
+  orc-, tst-   (story 12) the reference and the evaluator of the compositing
+               definition: each factor of each operator, the clamp of PLUS, the
+               primitive's two terms, every step of a fill and of a group's
+               composite (the clips, the space of the paint and of the group, the
+               opacity, the operator, the foreground's alpha, color and space), the
+               conversion (identity, decode, matrices and their order, encode, the
+               un-premultiply), every constant of both transfers and of the four
+               gamuts and the white point, and the order of a sequence (the
+               direction of depth, the layer, stability, the ties).  An ``orc``
+               plant must fail the oracle's selftest or its vectors against the
+               committed ones; a ``tst`` plant recompiles the tests that include
+               tests/ref_composite.h with the planted copy ahead
   ls-          the list: the arena (the bump, the chunks, the limit, the first
                chunk a reset keeps, the big chunks), the segments and the
                addressing of an item, the effective limits, the append (each
@@ -86,10 +101,8 @@ changes no result, cannot be seen by any test:
     failing writes (``Dump.EveryWriteOfEveryDumpIsChecked``) is what holds the
     final check (planted), and it found that an unbuffered stream's ``fprintf``
     loses the failure's return value
-  - the three terms of ``item_equal`` over a paint that today is always solid
-    with color space 0 and no gradient, and the blend space and ordering of a
-    group (always 0), and the swap of those two in the dump: story 12 gives
-    them values and a test then
+  - the gradient term of ``item_equal`` (a gradient paint is refused until a
+    story gives it a meaning, so no list holds one)
   - the ``kind`` term of ``item_equal``: two lists can differ only in the kind
     of an item where the item's other fields differ too, except for a clip pop
     against a group pop, and those cannot stand at the same place in lists that
@@ -120,6 +133,12 @@ changes no result, cannot be seen by any test:
     stack grows to, its capacity bookkeeping, ``CHUNK_PAYLOAD``): a stack that
     grows too little writes into arena memory that is still free, which only a
     sanitizer that knew the arena would see
+  - (story 12) in the order: the ``nonflat`` counter's reset by ``list_clear`` (a
+    list reused after a reset with a stale count only does the sort's bookkeeping
+    on a list that needs none), the frame bookkeeping that only moves memory
+    (``base``, ``count``), and the comparator's third key (a tie of depth *and*
+    layer is broken by the stable sort's declared order, not by a comparison, so
+    a swapped tie in the comparator cannot show)
   - the numeric (instead of bitwise) comparison of a weight or of a font run's
     size: a weight is positive and a size is positive for a font run and +0.0 for
     an outline run, so the two comparisons cannot differ on a valid value; and
@@ -188,7 +207,11 @@ def sources():
 # (id, kind, file, old, new, tests that must catch it)
 # kind: "src" or "hdr" (the whole library is rebuilt with the changed header
 # ahead of the real one on the include path; the tests keep the real one, which
-# is how a changed constant disagrees with its pinned value).
+# is how a changed constant disagrees with its pinned value); "tst" (a replacement
+# in a header only the tests include, tests/ref_composite.h: the named tests are
+# recompiled with it ahead on the include path); "orc" (a replacement in
+# tools/composite-oracle.py: its selftest, or the vectors it writes against the
+# committed ones, must fail).
 
 CO = "src/core/core.c"
 ST = "src/store/store.c"
@@ -490,7 +513,6 @@ PLANTS = [
     ('rs-dump-glyph-y-width', 'src', RS, 'y=%016llx outline', 'y=%llx outline', D),
     ('rs-dump-final-error-flag', 'src', RS, '  return (fflush(out) == 0 && !ferror(out)) ? GSHSCENE_OK : GSHSCENE_ERR_IO;', '  return fflush(out) == 0 ? GSHSCENE_OK : GSHSCENE_ERR_IO;', D),
     ('rs-dump-final-flush', 'src', RS, '  return (fflush(out) == 0 && !ferror(out)) ? GSHSCENE_OK : GSHSCENE_ERR_IO;', '  return !ferror(out) ? GSHSCENE_OK : GSHSCENE_ERR_IO;', D),
-    ('ls-format-version', 'src', LS, '#define LIST_FORMAT_VERSION 1u', '#define LIST_FORMAT_VERSION 2u', D),
     ('ls-hash-kind', 'src', LS, '#define LIST_HASH_KIND UINT32_C(0x5453494c)', '#define LIST_HASH_KIND UINT32_C(0x5453494d)', D),
     ('ls-push-codes', 'src', LS, '#define PUSH_GROUP 2u', '#define PUSH_GROUP 1u', L),
     ('ls-takes-picture', 'src', LS, '#define TAKES_PICTURE 4u', '#define TAKES_PICTURE 1u', L),
@@ -520,8 +542,6 @@ PLANTS = [
     ('ls-create-oom-unchecked', 'src', LS, '  GSHSCENE_List * list = gshscene_calloc(alloc, 1, sizeof *list);\n  if (!list) {\n    return GSHSCENE_ERR_OOM;\n  }', '  GSHSCENE_List * list = gshscene_calloc(alloc, 1, sizeof *list);', L),
     ('ls-create-alloc', 'src', LS, '  list->alloc = *alloc;\n', '', L),
     ('ls-create-limits', 'src', LS, '  list->limits = *effective;\n', '  (void)effective;\n', L),
-    ('ls-create-store', 'src', LS, '  list->store = store;\n  gshscene_store_ref(store);', '  gshscene_store_ref(store);', L),
-    ('ls-create-no-store-ref', 'src', LS, '  list->store = store;\n  gshscene_store_ref(store);', '  list->store = store;', L),
     ('ls-create-null-store', 'src', LS, '  if (!store || !out) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  if (!alloc) {', '  if (!out) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  if (!alloc) {', L),
     ('ls-create-null-out', 'src', LS, '  if (!store || !out) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  if (!alloc) {', '  if (!store) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  if (!alloc) {', L),
     ('ls-create-default-alloc', 'src', LS, '  if (!alloc) {\n    alloc = gshscene_allocator_default();\n  }\n  GSHSCENE_Limits effective;', '  GSHSCENE_Limits effective;', L),
@@ -538,13 +558,9 @@ PLANTS = [
     ('ls-clear-stack', 'src', LS, '  list->stack = NULL;\n  list->stack_capacity = 0;\n', '', L),
     ('ls-clear-depth', 'src', LS, '  list->depth = 0;\n  list->expansion = 0;', '  list->expansion = 0;', L),
     ('ls-clear-expansion', 'src', LS, '  list->expansion = 0;\n  list->picture_depth = 0;', '  list->picture_depth = 0;', L),
-    ('ls-clear-picture-depth', 'src', LS, '  list->picture_depth = 0;\n  list->closed = 0;', '  list->closed = 0;', L),
-    ('ls-clear-closed', 'src', LS, '  list->picture_depth = 0;\n  list->closed = 0;', '  list->picture_depth = 0;', L),
     ('ls-reset-null', 'src', LS, 'GSHSCENE_Result gshscene_list_reset(GSHSCENE_List * list) {\n  if (!list) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  list_clear(list);', 'GSHSCENE_Result gshscene_list_reset(GSHSCENE_List * list) {\n  list_clear(list);', L),
     ('ls-destroy-null', 'src', LS, 'void gshscene_list_destroy(GSHSCENE_List * list) {\n  if (!list) {\n    return;\n  }', 'void gshscene_list_destroy(GSHSCENE_List * list) {', L),
     ('ls-destroy-items', 'src', LS, '  items_release(list);\n  chunks_free(list, list->head, NULL);', '  chunks_free(list, list->head, NULL);', L),
-    ('ls-destroy-standard-chunks', 'src', LS, '  chunks_free(list, list->head, NULL);\n  chunks_free(list, list->big, NULL);\n  GSHSCENE_Store * store', '  chunks_free(list, list->big, NULL);\n  GSHSCENE_Store * store', L),
-    ('ls-destroy-big-chunks', 'src', LS, '  chunks_free(list, list->head, NULL);\n  chunks_free(list, list->big, NULL);\n  GSHSCENE_Store * store', '  chunks_free(list, list->head, NULL);\n  GSHSCENE_Store * store', L),
     ('ls-destroy-store-ref', 'src', LS, '  gshscene_free(&alloc, list);\n  gshscene_store_unref(store);', '  gshscene_free(&alloc, list);\n  (void)store;', L),
     ('ls-destroy-list', 'src', LS, '  gshscene_free(&alloc, list);\n  gshscene_store_unref(store);', '  (void)alloc;\n  gshscene_store_unref(store);', L),
     ('ls-item-at-q', 'src', LS, '  size_t q = index / GSHSCENE_SEGMENT_FIRST + 1;', '  size_t q = index / GSHSCENE_SEGMENT_FIRST;', L),
@@ -567,7 +583,6 @@ PLANTS = [
     ('ls-append-no-segment', 'src', LS, '  if (list->count == list->capacity) {\n    GSHSCENE_Result result = segment_alloc(list);\n    if (result != GSHSCENE_OK) {\n      return result;\n    }\n  }', '', L),
     ('ls-append-segment-error', 'src', LS, '    GSHSCENE_Result result = segment_alloc(list);\n    if (result != GSHSCENE_OK) {\n      return result;\n    }', '    segment_alloc(list);', L),
     ('ls-append-no-store', 'src', LS, '  *item_at(list, list->count) = *item;\n', '', L),
-    ('ls-append-no-retain', 'src', LS, '  gshscene_resource_retain(item->resource);\n  list->count++;', '  list->count++;', L),
     ('ls-append-no-count', 'src', LS, '  list->count++;\n  list->expansion = total;', '  list->expansion = total;', L),
     ('ls-append-no-expansion', 'src', LS, '  list->expansion = total;\n', '', L),
     ('ls-append-picture-depth-compare', 'src', LS, 'item->resource->u.picture.depth > list->picture_depth) {', 'item->resource->u.picture.depth < list->picture_depth) {', R),
@@ -588,33 +603,19 @@ PLANTS = [
     ('ls-rule-range', 'src', LS, '  return (unsigned)rule < (unsigned)GSHGEOM_FILL_RULE_COUNT ? GSHSCENE_OK : GSHSCENE_ERR_INVALID;', '  return (unsigned)rule <= (unsigned)GSHGEOM_FILL_RULE_COUNT ? GSHSCENE_OK : GSHSCENE_ERR_INVALID;', L),
     ('ls-paint-default-alpha', 'src', LS, '  out->rgba[3] = 1.0;\n  if (!paint) {', '  if (!paint) {', L),
     ('ls-paint-null', 'src', LS, '  if (!paint) {\n    return GSHSCENE_OK;\n  }\n  if (paint->kind == GSHSCENE_PAINT_GRADIENT ||', '  if (paint->kind == GSHSCENE_PAINT_GRADIENT ||', L),
-    ('ls-paint-gradient', 'src', LS, '  if (paint->kind == GSHSCENE_PAINT_GRADIENT || paint->kind == GSHSCENE_PAINT_FOREGROUND ||\n      paint->kind == GSHSCENE_PAINT_PALETTE) {', '  if (paint->kind == GSHSCENE_PAINT_FOREGROUND ||\n      paint->kind == GSHSCENE_PAINT_PALETTE) {', L),
-    ('ls-paint-foreground', 'src', LS, '  if (paint->kind == GSHSCENE_PAINT_GRADIENT || paint->kind == GSHSCENE_PAINT_FOREGROUND ||\n      paint->kind == GSHSCENE_PAINT_PALETTE) {', '  if (paint->kind == GSHSCENE_PAINT_GRADIENT ||\n      paint->kind == GSHSCENE_PAINT_PALETTE) {', L),
-    ('ls-paint-palette', 'src', LS, '  if (paint->kind == GSHSCENE_PAINT_GRADIENT || paint->kind == GSHSCENE_PAINT_FOREGROUND ||\n      paint->kind == GSHSCENE_PAINT_PALETTE) {', '  if (paint->kind == GSHSCENE_PAINT_GRADIENT || paint->kind == GSHSCENE_PAINT_FOREGROUND) {', L),
-    ('ls-paint-kind', 'src', LS, '  if (paint->kind != GSHSCENE_PAINT_SOLID || paint->gradient) {', '  if (paint->gradient) {', L),
-    ('ls-paint-gradient-pointer', 'src', LS, '  if (paint->kind != GSHSCENE_PAINT_SOLID || paint->gradient) {', '  if (paint->kind != GSHSCENE_PAINT_SOLID) {', L),
     ('ls-paint-alpha-low', 'src', LS, '  if (!(paint->rgba[3] >= 0.0 && paint->rgba[3] <= 1.0)) {', '  if (!(paint->rgba[3] > 0.0 && paint->rgba[3] <= 1.0)) {', L),
     ('ls-paint-alpha-high', 'src', LS, '  if (!(paint->rgba[3] >= 0.0 && paint->rgba[3] <= 1.0)) {', '  if (!(paint->rgba[3] >= 0.0 && paint->rgba[3] < 1.0)) {', L),
     ('ls-paint-alpha-unchecked', 'src', LS, '  if (!(paint->rgba[3] >= 0.0 && paint->rgba[3] <= 1.0)) {', '  if (0) {', L),
-    ('ls-paint-space', 'src', LS, '  if (paint->color_space != 0) {\n    return GSHSCENE_ERR_UNSUPPORTED;\n  }\n', '', L),
     ('ls-paint-copy', 'src', LS, '  for (int i = 0; i < 4; i++) {\n    out->rgba[i] = paint->rgba[i];', '  for (int i = 0; i < 3; i++) {\n    out->rgba[i] = paint->rgba[i];', L),
-    ('ls-group-default-opacity', 'src', LS, '  out->opacity = 1.0;\n  out->blend_space = 0;', '  out->opacity = 0.0;\n  out->blend_space = 0;', L),
     ('ls-group-null', 'src', LS, '  if (!group) {\n    return GSHSCENE_OK;\n  }\n  if (!gshscene_finite(group->opacity)', '  if (!gshscene_finite(group->opacity)', L),
     ('ls-group-low', 'src', LS, '!(group->opacity >= 0.0 && group->opacity <= 1.0)) {', '!(group->opacity > 0.0 && group->opacity <= 1.0)) {', L),
     ('ls-group-high', 'src', LS, '!(group->opacity >= 0.0 && group->opacity <= 1.0)) {', '!(group->opacity >= 0.0 && group->opacity < 1.0)) {', L),
-    ('ls-group-ordering-range', 'src', LS, '  if (group->ordering >= (uint32_t)GSHSCENE_ORDERING_COUNT) {', '  if (group->ordering > (uint32_t)GSHSCENE_ORDERING_COUNT) {', L),
-    ('ls-group-ordering-unchecked', 'src', LS, '  if (group->ordering >= (uint32_t)GSHSCENE_ORDERING_COUNT) {\n    return GSHSCENE_ERR_INVALID;\n  }\n', '', L),
-    ('ls-group-blend', 'src', LS, '  if (group->blend_space != 0 || group->ordering != GSHSCENE_ORDER_FLAT) {', '  if (group->ordering != GSHSCENE_ORDER_FLAT) {', L),
-    ('ls-group-ordering', 'src', LS, '  if (group->blend_space != 0 || group->ordering != GSHSCENE_ORDER_FLAT) {', '  if (group->blend_space != 0) {', L),
-    ('ls-group-opacity-copy', 'src', LS, '  out->opacity = group->opacity;\n  return GSHSCENE_OK;', '  return GSHSCENE_OK;', L),
     ('ls-stack-depth-inclusive', 'src', LS, '  if (list->depth >= list->limits.max_depth) {', '  if (list->depth > list->limits.max_depth) {', L),
     ('ls-stack-depth-ignored', 'src', LS, '  if (list->depth >= list->limits.max_depth) {\n    return GSHSCENE_ERR_LIMIT;\n  }\n  if (list->depth < list->stack_capacity) {', '  if (list->depth < list->stack_capacity) {', L),
     ('ls-stack-capacity-check', 'src', LS, '  if (list->depth < list->stack_capacity) {\n    return GSHSCENE_OK;\n  }', '', L),
     ('ls-stack-alloc-error', 'src', LS, '  GSHSCENE_Result result = arena_alloc(list, capacity, &memory);\n  if (result != GSHSCENE_OK) {\n    return result;\n  }', '  GSHSCENE_Result result = arena_alloc(list, capacity, &memory);\n  (void)result;', L),
     ('ls-stack-copy', 'src', LS, '  if (list->depth) {\n    memcpy(memory, list->stack, list->depth);\n  }', '', L),
     ('ls-stack-installed', 'src', LS, '  list->stack = (uint8_t *)memory;\n  list->stack_capacity = capacity;', '  list->stack_capacity = capacity;', L),
-    ('ls-fill-null-list', 'src', LS, '    const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, const GSHSCENE_Paint * paint, int32_t layer) {\n  if (!list || list->closed) {', '    const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, const GSHSCENE_Paint * paint, int32_t layer) {\n  if (list->closed) {', L),
-    ('ls-fill-closed', 'src', LS, '    const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, const GSHSCENE_Paint * paint, int32_t layer) {\n  if (!list || list->closed) {', '    const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, const GSHSCENE_Paint * paint, int32_t layer) {\n  if (!list) {', L),
     ('ls-fill-resource-check', 'src', LS, '  GSHSCENE_Result result = check_resource(list, resource, TAKES_PATH | TAKES_RUN);\n  if (result == GSHSCENE_OK) {\n    result = canonical_map(map, &item.map);\n  }\n  if (result == GSHSCENE_OK) {\n    result = check_rule(rule);\n  }\n  if (result == GSHSCENE_OK) {\n    result = canonical_paint(paint, &item.paint);', '  GSHSCENE_Result result = GSHSCENE_OK;\n  if (result == GSHSCENE_OK) {\n    result = canonical_map(map, &item.map);\n  }\n  if (result == GSHSCENE_OK) {\n    result = check_rule(rule);\n  }\n  if (result == GSHSCENE_OK) {\n    result = canonical_paint(paint, &item.paint);', L),
     ('ls-fill-map-check', 'src', LS, '  if (result == GSHSCENE_OK) {\n    result = canonical_map(map, &item.map);\n  }\n  if (result == GSHSCENE_OK) {\n    result = check_rule(rule);\n  }\n  if (result == GSHSCENE_OK) {\n    result = canonical_paint', '  if (result == GSHSCENE_OK) {\n    canonical_map(map, &item.map);\n  }\n  if (result == GSHSCENE_OK) {\n    result = check_rule(rule);\n  }\n  if (result == GSHSCENE_OK) {\n    result = canonical_paint', L),
     ('ls-fill-rule-check', 'src', LS, '  if (result == GSHSCENE_OK) {\n    result = check_rule(rule);\n  }\n  if (result == GSHSCENE_OK) {\n    result = canonical_paint', '  if (result == GSHSCENE_OK) {\n    check_rule(rule);\n  }\n  if (result == GSHSCENE_OK) {\n    result = canonical_paint', L),
@@ -622,13 +623,7 @@ PLANTS = [
     ('ls-fill-resource', 'src', LS, '  item.resource = resource;\n  item.fill_rule = rule;\n  item.layer = layer;\n  return list_append(list, &item);\n}\n\nGSHSCENE_Result gshscene_list_clip_push', '  item.fill_rule = rule;\n  item.layer = layer;\n  return list_append(list, &item);\n}\n\nGSHSCENE_Result gshscene_list_clip_push', L),
     ('ls-fill-rule', 'src', LS, '  item.resource = resource;\n  item.fill_rule = rule;\n  item.layer = layer;\n  return list_append(list, &item);\n}\n\nGSHSCENE_Result gshscene_list_clip_push', '  item.resource = resource;\n  item.layer = layer;\n  return list_append(list, &item);\n}\n\nGSHSCENE_Result gshscene_list_clip_push', L),
     ('ls-fill-layer', 'src', LS, '  item.resource = resource;\n  item.fill_rule = rule;\n  item.layer = layer;\n  return list_append(list, &item);\n}\n\nGSHSCENE_Result gshscene_list_clip_push', '  item.resource = resource;\n  item.fill_rule = rule;\n  (void)layer;\n  return list_append(list, &item);\n}\n\nGSHSCENE_Result gshscene_list_clip_push', L),
-    ('ls-clip-null-list', 'src', LS, '    const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule) {\n  if (!list || list->closed) {', '    const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule) {\n  if (list->closed) {', L),
-    ('ls-clip-closed', 'src', LS, '    const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule) {\n  if (!list || list->closed) {', '    const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule) {\n  if (!list) {', L),
     ('ls-clip-resource-check', 'src', LS, '  item_init(&item, GSHSCENE_ITEM_CLIP_PUSH);\n  GSHSCENE_Result result = check_resource(list, resource, TAKES_PATH | TAKES_RUN);', '  item_init(&item, GSHSCENE_ITEM_CLIP_PUSH);\n  GSHSCENE_Result result = GSHSCENE_OK;', L),
-    ('ls-clip-stack', 'src', LS, '  if (result == GSHSCENE_OK) {\n    result = stack_reserve(list);\n  }\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  item.resource = resource;\n  item.fill_rule = rule;\n  result = list_append(list, &item);\n  if (result == GSHSCENE_OK) {\n    list->stack[list->depth++] = PUSH_CLIP;', '  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  item.resource = resource;\n  item.fill_rule = rule;\n  result = list_append(list, &item);\n  if (result == GSHSCENE_OK) {\n    list->stack[list->depth++] = PUSH_CLIP;', L),
-    ('ls-clip-rule-check', 'src', LS, '  if (result == GSHSCENE_OK) {\n    result = check_rule(rule);\n  }\n  if (result == GSHSCENE_OK) {\n    result = stack_reserve(list);', '  if (result == GSHSCENE_OK) {\n    check_rule(rule);\n  }\n  if (result == GSHSCENE_OK) {\n    result = stack_reserve(list);', L),
-    ('ls-clip-resource', 'src', LS, '  item.resource = resource;\n  item.fill_rule = rule;\n  result = list_append(list, &item);', '  item.fill_rule = rule;\n  result = list_append(list, &item);', L),
-    ('ls-clip-rule', 'src', LS, '  item.resource = resource;\n  item.fill_rule = rule;\n  result = list_append(list, &item);', '  item.resource = resource;\n  result = list_append(list, &item);', L),
     ('ls-clip-push-kind', 'src', LS, '    list->stack[list->depth++] = PUSH_CLIP;', '    list->stack[list->depth++] = PUSH_GROUP;', L),
     ('ls-clip-push-uncounted', 'src', LS, '    list->stack[list->depth++] = PUSH_CLIP;', '    list->stack[list->depth] = PUSH_CLIP;', L),
     ('ls-pop-null', 'src', LS, '  if (!list || list->closed || list->depth == 0 || list->stack[list->depth - 1] != push) {', '  if (list->closed || list->depth == 0 || list->stack[list->depth - 1] != push) {', L),
@@ -637,22 +632,13 @@ PLANTS = [
     ('ls-pop-depth', 'src', LS, '  if (result == GSHSCENE_OK) {\n    list->depth--;\n  }', '', L),
     ('ls-pop-item-kind', 'src', LS, '  return pop(list, PUSH_CLIP, GSHSCENE_ITEM_CLIP_POP);', '  return pop(list, PUSH_CLIP, GSHSCENE_ITEM_GROUP_POP);', L),
     ('ls-group-pop-item-kind', 'src', LS, '  return pop(list, PUSH_GROUP, GSHSCENE_ITEM_GROUP_POP);', '  return pop(list, PUSH_GROUP, GSHSCENE_ITEM_CLIP_POP);', L),
-    ('ls-group-push-null-list', 'src', LS, 'GSHSCENE_Result gshscene_list_group_push(GSHSCENE_List * list, const GSHSCENE_Group * group, int32_t layer) {\n  if (!list || list->closed) {', 'GSHSCENE_Result gshscene_list_group_push(GSHSCENE_List * list, const GSHSCENE_Group * group, int32_t layer) {\n  if (list->closed) {', L),
-    ('ls-group-push-closed', 'src', LS, 'GSHSCENE_Result gshscene_list_group_push(GSHSCENE_List * list, const GSHSCENE_Group * group, int32_t layer) {\n  if (!list || list->closed) {', 'GSHSCENE_Result gshscene_list_group_push(GSHSCENE_List * list, const GSHSCENE_Group * group, int32_t layer) {\n  if (!list) {', L),
-    ('ls-group-push-check', 'src', LS, '  GSHSCENE_Result result = canonical_group(group, &item.group);\n  if (result == GSHSCENE_OK) {\n    result = stack_reserve(list);\n  }', '  GSHSCENE_Result result = GSHSCENE_OK;\n  canonical_group(group, &item.group);\n  if (result == GSHSCENE_OK) {\n    result = stack_reserve(list);\n  }', L),
-    ('ls-group-push-reserve', 'src', LS, '  GSHSCENE_Result result = canonical_group(group, &item.group);\n  if (result == GSHSCENE_OK) {\n    result = stack_reserve(list);\n  }', '  GSHSCENE_Result result = canonical_group(group, &item.group);', L),
+    ('ls-group-push-null-list', 'src', LS, 'GSHSCENE_Result gshscene_list_group_push(GSHSCENE_List * list, const GSHSCENE_Group * group, int32_t layer, double depth) {\n  if (!list || list->closed) {', 'GSHSCENE_Result gshscene_list_group_push(GSHSCENE_List * list, const GSHSCENE_Group * group, int32_t layer, double depth) {\n  if (list->closed) {', L),
+    ('ls-group-push-closed', 'src', LS, 'GSHSCENE_Result gshscene_list_group_push(GSHSCENE_List * list, const GSHSCENE_Group * group, int32_t layer, double depth) {\n  if (!list || list->closed) {', 'GSHSCENE_Result gshscene_list_group_push(GSHSCENE_List * list, const GSHSCENE_Group * group, int32_t layer, double depth) {\n  if (!list) {', L),
     ('ls-group-push-layer', 'src', LS, '  item.layer = layer;\n  result = list_append(list, &item);\n  if (result == GSHSCENE_OK) {\n    list->stack[list->depth++] = PUSH_GROUP;', '  (void)layer;\n  result = list_append(list, &item);\n  if (result == GSHSCENE_OK) {\n    list->stack[list->depth++] = PUSH_GROUP;', L),
     ('ls-group-push-kind', 'src', LS, '    list->stack[list->depth++] = PUSH_GROUP;', '    list->stack[list->depth++] = PUSH_CLIP;', L),
-    ('ls-instance-null-list', 'src', LS, '    GSHSCENE_List * list, const GSHSCENE_Resource * picture, const GSHGEOM_Map * map, int32_t layer) {\n  if (!list || list->closed) {', '    GSHSCENE_List * list, const GSHSCENE_Resource * picture, const GSHGEOM_Map * map, int32_t layer) {\n  if (list->closed) {', L),
-    ('ls-instance-closed', 'src', LS, '    GSHSCENE_List * list, const GSHSCENE_Resource * picture, const GSHGEOM_Map * map, int32_t layer) {\n  if (!list || list->closed) {', '    GSHSCENE_List * list, const GSHSCENE_Resource * picture, const GSHGEOM_Map * map, int32_t layer) {\n  if (!list) {', L),
     ('ls-instance-resource-check', 'src', LS, '  GSHSCENE_Result result = check_resource(list, picture, TAKES_PICTURE);', '  GSHSCENE_Result result = GSHSCENE_OK;', L),
-    ('ls-instance-map-check', 'src', LS, '  if (result == GSHSCENE_OK) {\n    result = canonical_map(map, &item.map);\n  }\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  item.resource = picture;', '  if (result == GSHSCENE_OK) {\n    canonical_map(map, &item.map);\n  }\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  item.resource = picture;', L),
     ('ls-instance-resource', 'src', LS, '  item.resource = picture;\n  item.layer = layer;', '  item.layer = layer;', L),
     ('ls-instance-layer', 'src', LS, '  item.resource = picture;\n  item.layer = layer;', '  item.resource = picture;\n  (void)layer;', L),
-    ('ls-close-null', 'src', LS, '  if (!list || list->closed || list->depth != 0) {', '  if (list->closed || list->depth != 0) {', L),
-    ('ls-close-twice', 'src', LS, '  if (!list || list->closed || list->depth != 0) {', '  if (!list || list->depth != 0) {', L),
-    ('ls-close-open-push', 'src', LS, '  if (!list || list->closed || list->depth != 0) {', '  if (!list || list->closed) {', L),
-    ('ls-close-seals', 'src', LS, '  list->closed = 1;\n  return GSHSCENE_OK;\n}\n\n/* --- reading', '  return GSHSCENE_OK;\n}\n\n/* --- reading', L),
     ('ls-is-closed-null', 'src', LS, '  return list ? list->closed : 0;', '  return list->closed;', L),
     ('ls-count-null', 'src', LS, '  return list ? list->count : 0;', '  return list->count;', L),
     ('ls-item-null', 'src', LS, '  if (!list || !out || index >= list->count) {', '  if (!out || index >= list->count) {', L),
@@ -662,7 +648,6 @@ PLANTS = [
     ('ls-bytes-null', 'src', LS, '  return list ? list->bytes : 0;', '  return list->bytes;', L),
     ('ls-copy-limits', 'src', LS, 'gshscene_list_create_effective(alloc, &source->limits, source->store, &copy);', 'gshscene_list_create_effective(alloc, &(GSHSCENE_Limits){0}, source->store, &copy);', R),
     ('ls-copy-last-item', 'src', LS, '  for (size_t i = 0; result == GSHSCENE_OK && i < source->count; i++) {\n    result = list_append(copy, item_at(source, i));', '  for (size_t i = 0; result == GSHSCENE_OK && i + 1 < source->count; i++) {\n    result = list_append(copy, item_at(source, i));', R),
-    ('ls-copy-failure-leaks', 'src', LS, '  if (result != GSHSCENE_OK) {\n    gshscene_list_destroy(copy);\n    return result;\n  }\n  copy->closed = 1;', '  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  copy->closed = 1;', R),
     ('ls-copy-closed', 'src', LS, '  copy->closed = 1;\n  *out = copy;', '  *out = copy;', R),
     ('ls-eq-map-dim', 'src', LS, '  if (a->dim != b->dim || a->kind != b->kind) {', '  if (a->kind != b->kind) {', L),
     ('ls-eq-map-kind', 'src', LS, '  if (a->dim != b->dim || a->kind != b->kind) {', '  if (a->dim != b->dim) {', L),
@@ -673,16 +658,10 @@ PLANTS = [
     ('ls-eq-map-translation-numeric', 'src', LS, '    if (gshgeom_f64_bits(a->t[i]) != gshgeom_f64_bits(b->t[i])) {', '    if (a->t[i] != b->t[i]) {', L),
     ('ls-eq-resource', 'src', LS, 'a->resource != b->resource || !map_equal', '!map_equal', L),
     ('ls-eq-map', 'src', LS, 'a->resource != b->resource || !map_equal(&a->map, &b->map) ||\n      a->fill_rule', 'a->resource != b->resource ||\n      a->fill_rule', L),
-    ('ls-eq-rule', 'src', LS, '      a->fill_rule != b->fill_rule || a->layer != b->layer) {', '      a->layer != b->layer) {', L),
-    ('ls-eq-layer', 'src', LS, '      a->fill_rule != b->fill_rule || a->layer != b->layer) {', '      a->fill_rule != b->fill_rule) {', L),
     ('ls-eq-rgba', 'src', LS, '    if (gshgeom_f64_bits(a->paint.rgba[i]) != gshgeom_f64_bits(b->paint.rgba[i])) {\n      return 0;\n    }\n', '', L),
     ('ls-eq-rgba-numeric', 'src', LS, '    if (gshgeom_f64_bits(a->paint.rgba[i]) != gshgeom_f64_bits(b->paint.rgba[i])) {', '    if (a->paint.rgba[i] != b->paint.rgba[i]) {', L),
     ('ls-eq-rgba-loop', 'src', LS, '  for (int i = 0; i < 4; i++) {\n    if (gshgeom_f64_bits(a->paint.rgba[i])', '  for (int i = 0; i < 3; i++) {\n    if (gshgeom_f64_bits(a->paint.rgba[i])', L),
-    ('ls-eq-opacity', 'src', LS, '  return gshgeom_f64_bits(a->group.opacity) == gshgeom_f64_bits(b->group.opacity) &&\n         a->group.blend_space', '  return 1 &&\n         a->group.blend_space', L),
     ('ls-eq-opacity-numeric', 'src', LS, '  return gshgeom_f64_bits(a->group.opacity) == gshgeom_f64_bits(b->group.opacity) &&', '  return a->group.opacity == b->group.opacity &&', L),
-    ('ls-eq-null-a', 'src', LS, '  if (!a || !b || a->count != b->count) {', '  if (!b || a->count != b->count) {', L),
-    ('ls-eq-null-b', 'src', LS, '  if (!a || !b || a->count != b->count) {', '  if (!a || a->count != b->count) {', L),
-    ('ls-eq-count', 'src', LS, '  if (!a || !b || a->count != b->count) {', '  if (!a || !b) {', L),
     ('ls-eq-items-ignored', 'src', LS, '    if (!item_equal(item_at(a, i), item_at(b, i))) {\n      return 0;\n    }\n', '', L),
     ('ls-hash-null', 'src', LS, '  if (!list) {\n    return gshgeom_hash_value(&h);\n  }\n  gshgeom_hash_u32(&h, LIST_FORMAT_VERSION);', '  gshgeom_hash_u32(&h, LIST_FORMAT_VERSION);', L),
     ('ls-hash-version-width', 'src', LS, '  gshgeom_hash_u32(&h, LIST_FORMAT_VERSION);', '  gshgeom_hash_u16(&h, LIST_FORMAT_VERSION);', D),
@@ -695,34 +674,23 @@ PLANTS = [
     ('ls-hash-fill-rule-width', 'src', LS, '        hash_resource_and_map(&h, item);\n        gshgeom_hash_u8(&h, (uint8_t)item->fill_rule);\n        gshgeom_hash_u8(&h, (uint8_t)item->paint.kind);', '        hash_resource_and_map(&h, item);\n        gshgeom_hash_u32(&h, (uint32_t)item->fill_rule);\n        gshgeom_hash_u8(&h, (uint8_t)item->paint.kind);', D),
     ('ls-hash-paint-kind-width', 'src', LS, '        gshgeom_hash_u8(&h, (uint8_t)item->paint.kind);', '        gshgeom_hash_u32(&h, (uint32_t)item->paint.kind);', D),
     ('ls-hash-rgba-loop', 'src', LS, '        for (int k = 0; k < 4; k++) {\n          gshgeom_hash_f64(&h, item->paint.rgba[k]);', '        for (int k = 0; k < 3; k++) {\n          gshgeom_hash_f64(&h, item->paint.rgba[k]);', D),
-    ('ls-hash-space-width', 'src', LS, '        gshgeom_hash_u32(&h, item->paint.color_space);', '        gshgeom_hash_u8(&h, (uint8_t)item->paint.color_space);', D),
-    ('ls-hash-fill-layer-width', 'src', LS, '        gshgeom_hash_u32(&h, item->paint.color_space);\n        gshgeom_hash_i32(&h, item->layer);', '        gshgeom_hash_u32(&h, item->paint.color_space);\n        gshgeom_hash_i64(&h, item->layer);', D),
     ('ls-hash-clip-rule-width', 'src', LS, '      case GSHSCENE_ITEM_CLIP_PUSH:\n        hash_resource_and_map(&h, item);\n        gshgeom_hash_u8(&h, (uint8_t)item->fill_rule);', '      case GSHSCENE_ITEM_CLIP_PUSH:\n        hash_resource_and_map(&h, item);\n        gshgeom_hash_u32(&h, (uint32_t)item->fill_rule);', D),
     ('ls-hash-opacity', 'src', LS, '        gshgeom_hash_f64(&h, item->group.opacity);', '        gshgeom_hash_f64(&h, item->group.opacity + 1.0);', D),
-    ('ls-hash-blend-width', 'src', LS, '        gshgeom_hash_u32(&h, item->group.blend_space);', '        gshgeom_hash_u8(&h, (uint8_t)item->group.blend_space);', D),
     ('ls-hash-ordering-width', 'src', LS, '        gshgeom_hash_u32(&h, item->group.ordering);', '        gshgeom_hash_u8(&h, (uint8_t)item->group.ordering);', D),
     ('ls-hash-group-layer-width', 'src', LS, '        gshgeom_hash_u32(&h, item->group.ordering);\n        gshgeom_hash_i32(&h, item->layer);', '        gshgeom_hash_u32(&h, item->group.ordering);\n        gshgeom_hash_i64(&h, item->layer);', D),
     ('ls-hash-instance-layer-width', 'src', LS, '      case GSHSCENE_ITEM_INSTANCE:\n        hash_resource_and_map(&h, item);\n        gshgeom_hash_i32(&h, item->layer);', '      case GSHSCENE_ITEM_INSTANCE:\n        hash_resource_and_map(&h, item);\n        gshgeom_hash_i64(&h, item->layer);', D),
     ('ls-hash-instance-resource', 'src', LS, '      case GSHSCENE_ITEM_INSTANCE:\n        hash_resource_and_map(&h, item);', '      case GSHSCENE_ITEM_INSTANCE:\n        gshgeom_hash_u64(&h, gshgeom_map_hash(&item->map));', D),
     ('ls-hash-pop-fields', 'src', LS, '      default:\n        break;\n    }\n  }\n  return gshgeom_hash_value(&h);', '      default:\n        gshgeom_hash_u8(&h, 0);\n        break;\n    }\n  }\n  return gshgeom_hash_value(&h);', D),
-    ('ls-dump-null-list', 'src', LS, '  if (!list || !out) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  /* The count is printed', '  if (!out) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  /* The count is printed', D),
-    ('ls-dump-null-out', 'src', LS, '  if (!list || !out) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  /* The count is printed', '  if (!list) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  /* The count is printed', D),
-    ('ls-dump-header', 'src', LS, '"gshscene.list %u items=%llu hash=%016llx\\n"', '"gshscene.list %u count=%llu hash=%016llx\\n"', D),
-    ('ls-dump-header-hash-width', 'src', LS, 'items=%llu hash=%016llx\\n"', 'items=%llu hash=%llx\\n"', D),
     ('ls-dump-resource-width', 'src', LS, '" res=%s:%016llx map=%016llx"', '" res=%s:%llx map=%016llx"', D),
     ('ls-dump-map-width', 'src', LS, '" res=%s:%016llx map=%016llx"', '" res=%s:%016llx map=%llx"', D),
     ('ls-dump-fill-tag', 'src', LS, "        written = fputc('F', out) == EOF ? -1 : dump_resource_and_map(out, item);", "        written = fputc('f', out) == EOF ? -1 : dump_resource_and_map(out, item);", D),
-    ('ls-dump-fill-line', 'src', LS, '" rule=%u paint=%u %016llx %016llx %016llx %016llx space=%u layer=%lld"', '" rule=%u kind=%u %016llx %016llx %016llx %016llx space=%u layer=%lld"', D),
     ('ls-dump-fill-red-width', 'src', LS, '" rule=%u paint=%u %016llx %016llx', '" rule=%u paint=%u %llx %016llx', D),
-    ('ls-dump-fill-alpha-width', 'src', LS, '%016llx %016llx space=%u', '%016llx %llx space=%u', D),
     ('ls-dump-fill-components', 'src', LS, 'HEX(gshgeom_f64_bits(item->paint.rgba[1])), HEX(gshgeom_f64_bits(item->paint.rgba[2])),', 'HEX(gshgeom_f64_bits(item->paint.rgba[2])), HEX(gshgeom_f64_bits(item->paint.rgba[1])),', D),
     ('ls-dump-clip-tag', 'src', LS, "        written = fputc('C', out) == EOF ? -1 : dump_resource_and_map(out, item);", "        written = fputc('K', out) == EOF ? -1 : dump_resource_and_map(out, item);", D),
     ('ls-dump-clip-rule', 'src', LS, '          written = fprintf(out, " rule=%u", (unsigned)item->fill_rule);', '          written = fprintf(out, " rule=%u", 0u);', D),
     ('ls-dump-clip-pop-tag', 'src', LS, "        written = fputc('c', out) == EOF ? -1 : 0;", "        written = fputc('p', out) == EOF ? -1 : 0;", D),
-    ('ls-dump-group-line', 'src', LS, '"G opacity=%016llx blend=%u order=%u layer=%lld"', '"G opacity=%llx blend=%u order=%u layer=%lld"', D),
     ('ls-dump-group-pop-tag', 'src', LS, "        written = fputc('g', out) == EOF ? -1 : 0;", "        written = fputc('p', out) == EOF ? -1 : 0;", D),
     ('ls-dump-instance-tag', 'src', LS, "        written = fputc('I', out) == EOF ? -1 : dump_resource_and_map(out, item);", "        written = fputc('i', out) == EOF ? -1 : dump_resource_and_map(out, item);", D),
-    ('ls-dump-instance-layer', 'src', LS, '          written = fprintf(out, " layer=%lld", (long long)item->layer);', '          written = fprintf(out, " layer=%lld", 0LL);', D),
     ('ls-dump-final-error-flag', 'src', LS, '  return (fflush(out) == 0 && !ferror(out)) ? GSHSCENE_OK : GSHSCENE_ERR_IO;', '  return fflush(out) == 0 ? GSHSCENE_OK : GSHSCENE_ERR_IO;', D),
     ('ls-dump-final-flush', 'src', LS, '  return (fflush(out) == 0 && !ferror(out)) ? GSHSCENE_OK : GSHSCENE_ERR_IO;', '  return !ferror(out) ? GSHSCENE_OK : GSHSCENE_ERR_IO;', D),
     ('hdr-kind-path', 'hdr', HR, '  GSHSCENE_RESOURCE_PATH = 1,      ///< A model path.', '  GSHSCENE_RESOURCE_PATH = 8,      ///< A model path.', R + D),
@@ -737,9 +705,7 @@ PLANTS = [
     ('hdr-item-group-push', 'hdr', HL, '  GSHSCENE_ITEM_GROUP_PUSH = 4, ///< Begin an opacity group.', '  GSHSCENE_ITEM_GROUP_PUSH = 10, ///< Begin an opacity group.', L + D),
     ('hdr-item-group-pop', 'hdr', HL, '  GSHSCENE_ITEM_GROUP_POP = 5,  ///< End the innermost group and composite it.', '  GSHSCENE_ITEM_GROUP_POP = 11,  ///< End the innermost group and composite it.', L + D),
     ('hdr-item-instance', 'hdr', HL, '  GSHSCENE_ITEM_INSTANCE = 6,   ///< Draw a picture under a map.', '  GSHSCENE_ITEM_INSTANCE = 12,   ///< Draw a picture under a map.', L + D),
-    ('hdr-ordering-flat', 'hdr', HL, '  GSHSCENE_ORDER_FLAT = 0,    ///< Declared order.', '  GSHSCENE_ORDER_FLAT = 3,    ///< Declared order.', L),
-    ('hdr-paint-solid', 'hdr', HP, '  GSHSCENE_PAINT_SOLID = 0,    ///< One color.', '  GSHSCENE_PAINT_SOLID = 3,    ///< One color.', L + D),
-    ('hdr-paint-foreground', 'hdr', HP, '  GSHSCENE_PAINT_FOREGROUND = 2,', '  GSHSCENE_PAINT_FOREGROUND = 6,', L),
+    ('hdr-paint-foreground', 'hdr', HP, '  GSHSCENE_PAINT_FOREGROUND = 2,', '  GSHSCENE_PAINT_FOREGROUND = 6,', L + ["testColor"]),
     ('hdr-paint-palette', 'hdr', HP, '  GSHSCENE_PAINT_PALETTE = 3,', '  GSHSCENE_PAINT_PALETTE = 7,', L),
     ('hdr-paint-gradient', 'hdr', HP, '  GSHSCENE_PAINT_GRADIENT = 1, ///< Reserved:', '  GSHSCENE_PAINT_GRADIENT = 4, ///< Reserved:', L),
 ]
@@ -763,7 +729,7 @@ PLANTS += [
     ('s-reason-overlap', 'hdr', HSC, 'GSHSCENE_PROBLEM_OVERLAP = 1,', 'GSHSCENE_PROBLEM_OVERLAP = 50,', ["testScene"]),
     ('s-reason-key', 'hdr', HSC, 'GSHSCENE_PROBLEM_KEY_CONFLICT = 2,', 'GSHSCENE_PROBLEM_KEY_CONFLICT = 51,', ["testScene"]),
     ('s-reason-dangling', 'hdr', HSC, 'GSHSCENE_PROBLEM_DANGLING_TARGET = 3,', 'GSHSCENE_PROBLEM_DANGLING_TARGET = 52,', ["testScene"]),
-    ('s-reason-cycle', 'hdr', HSC, 'GSHSCENE_PROBLEM_CYCLE = 4,', 'GSHSCENE_PROBLEM_CYCLE = 5,', ["testScene"]),
+    ('s-reason-cycle', 'hdr', HSC, 'GSHSCENE_PROBLEM_CYCLE = 4,', 'GSHSCENE_PROBLEM_CYCLE = 15,', ["testScene"]),
     ('d-kind-added', 'hdr', HDF, 'GSHSCENE_DIFF_ADDED = 1,', 'GSHSCENE_DIFF_ADDED = 14,', ["testDiff", "testScene"]),
     ('d-kind-removed', 'hdr', HDF, 'GSHSCENE_DIFF_REMOVED = 2,', 'GSHSCENE_DIFF_REMOVED = 15,', ["testDiff", "testScene"]),
     ('d-kind-changed', 'hdr', HDF, 'GSHSCENE_DIFF_CHANGED = 3,', 'GSHSCENE_DIFF_CHANGED = 16,', ["testDiff", "testScene"]),
@@ -785,12 +751,357 @@ PLANTS += [
     ('rs-bytes-picture-no-base', 'src', RS, 'gshscene_sat_add(GSHSCENE_BYTES_BASE, gshscene_sat_mul(gshscene_list_count(list)', 'gshscene_sat_add(0, gshscene_sat_mul(gshscene_list_count(list)', ["testBytes"]),
 ]
 PLANTS += [
-    ('vs-format-version', 'src', IH, '#define VERSION_FORMAT_VERSION 1u', '#define VERSION_FORMAT_VERSION 2u', ["testScene_dump"]),
     ('vs-hash-kind', 'src', IH, '#define VERSION_HASH_KIND UINT32_C(0x4e454353)', '#define VERSION_HASH_KIND UINT32_C(0x4e454354)', ["testScene_dump"]),
     ('df-range-limit-high', 'src', DF, '#define RANGE_LIMIT 4.0e18', '#define RANGE_LIMIT 4.0e30', ["testDiff"]),
     ('df-range-limit-low', 'src', DF, '#define RANGE_LIMIT 4.0e18', '#define RANGE_LIMIT 4.0e3', ["testDiff"]),
 ]
 
+
+# --- story 12: paint, color and composition ------------------------------------------------------------------------
+# What changed in the list's sources (the paint rules, the group rules, the record calls, close and the order, the hash
+# and the dump) is planted here by hand; the retained scene's new lines are generated (tools/gen-scene-plants.py).
+CS = "src/paint/color_space.c"
+CL = ["testColor"]
+O = ["testOrder"]
+CP = ["testComposite"]
+PS = ["testPaint_scene"]
+LD = ["testList", "testDump"]
+LC = ["testList", "testColor"]
+
+PLANTS += [
+    # the format and the pinned values
+    ('ls-format-version', 'src', LS, '#define LIST_FORMAT_VERSION 2u', '#define LIST_FORMAT_VERSION 3u', D),
+    ('hdr-ordering-flat', 'hdr', HL, '  GSHSCENE_ORDER_FLAT = 0,', '  GSHSCENE_ORDER_FLAT = 3,', L + O),
+    ('hdr-ordering-depth', 'hdr', HL, '  GSHSCENE_ORDER_DEPTH = 1,', '  GSHSCENE_ORDER_DEPTH = 4,', O),
+    ('hdr-ordering-overlay', 'hdr', HL, '  GSHSCENE_ORDER_OVERLAY = 2,', '  GSHSCENE_ORDER_OVERLAY = 5,', O),
+    ('hdr-paint-solid', 'hdr', HP, '  GSHSCENE_PAINT_SOLID = 0,', '  GSHSCENE_PAINT_SOLID = 3,', L + D),
+    ('hdr-tie-layer', 'hdr', HL, '  GSHSCENE_TIE_LAYER = 1,', '  GSHSCENE_TIE_LAYER = 21,', O),
+    ('hdr-tie-path', 'hdr', HL, '  GSHSCENE_TIE_PATH = 2,', '  GSHSCENE_TIE_PATH = 22,', O),
+    ('hdr-tie-declared', 'hdr', HL, '  GSHSCENE_TIE_DECLARED = 3,', '  GSHSCENE_TIE_DECLARED = 23,', O),
+    ('hdr-problem-parameter', 'hdr', "include/ghoti.io/shape-scene/scene.h", '  GSHSCENE_PROBLEM_PARAMETER = 5,', '  GSHSCENE_PROBLEM_PARAMETER = 25,', PS),
+    ('vs-format-version', 'src', IH, '#define VERSION_FORMAT_VERSION 2u', '#define VERSION_FORMAT_VERSION 3u', ["testScene_dump"]),
+    ('cs-gamma-min', 'src', CS, '#define GAMMA_MIN 0.1', '#define GAMMA_MIN 0.2', CL),
+    ('cs-gamma-max', 'src', CS, '#define GAMMA_MAX 10.0', '#define GAMMA_MAX 9.0', CL),
+]
+for _op, _name in enumerate(["SRC_OVER", "CLEAR", "SRC", "DEST", "DEST_OVER", "SRC_IN", "DEST_IN", "SRC_OUT", "DEST_OUT",
+                             "SRC_ATOP", "DEST_ATOP", "XOR", "PLUS"]):
+    PLANTS.append(('hdr-composite-%s' % _name.lower().replace("_", "-"), 'hdr', HL,
+                   '  GSHSCENE_COMPOSITE_%s = %d,' % (_name, _op), '  GSHSCENE_COMPOSITE_%s = %d,' % (_name, 20 + _op), CP + CL))
+
+PLANTS += [
+    # create, clear and destroy
+    ('ls-create-store', 'src', LS, '  list->store = store;\n', '', L),
+    ('ls-create-no-store-ref', 'src', LS, '  gshscene_store_ref(store);\n  *out = list;', '  *out = list;', L),
+    ('ls-create-foreground-default', 'src', LS, '  list->store = store;\n  gshscene_color_init(&list->foreground);', '  list->store = store;', CL),
+    ('ls-clear-picture-depth', 'src', LS, '  list->picture_depth = 0;\n  list->nonflat = 0;', '  list->nonflat = 0;', L),
+    ('ls-clear-foreground', 'src', LS, '  gshscene_color_init(&list->foreground);\n  gshscene_free(&list->alloc, list->ties);', '  gshscene_free(&list->alloc, list->ties);', CL + O),
+    ('ls-clear-ties', 'src', LS, '  list->ties = NULL;\n  list->tie_count = 0;\n  list->tie_capacity = 0;\n  list->closed = 0;', '  list->tie_capacity = 0;\n  list->closed = 0;', O),
+    ('ls-clear-closed', 'src', LS, '  list->tie_capacity = 0;\n  list->closed = 0;', '  list->tie_capacity = 0;', L),
+    ('ls-destroy-standard-chunks', 'src', LS, '  chunks_free(list, list->head, NULL);\n  chunks_free(list, list->big, NULL);\n  gshscene_free(&list->alloc, list->ties);', '  chunks_free(list, list->big, NULL);\n  gshscene_free(&list->alloc, list->ties);', L),
+    ('ls-destroy-big-chunks', 'src', LS, '  chunks_free(list, list->head, NULL);\n  chunks_free(list, list->big, NULL);\n  gshscene_free(&list->alloc, list->ties);', '  chunks_free(list, list->head, NULL);\n  gshscene_free(&list->alloc, list->ties);', L),
+    ('ls-destroy-ties', 'src', LS, '  gshscene_free(&list->alloc, list->ties);\n  GSHSCENE_Store * store = list->store;', '  GSHSCENE_Store * store = list->store;', O),
+    ('ls-append-no-retain', 'src', LS, '  gshscene_resource_retain(item->resource);\n  note_item(list, item);', '  note_item(list, item);', L),
+    ('ls-append-no-note', 'src', LS, '  note_item(list, item);\n  list->count++;', '  list->count++;', O),
+    # the paint
+    ('ls-paint-gradient', 'src', LS, 'paint->kind == GSHSCENE_PAINT_GRADIENT || paint->kind == GSHSCENE_PAINT_PALETTE) {', 'paint->kind == GSHSCENE_PAINT_PALETTE) {', L),
+    ('ls-paint-palette', 'src', LS, 'paint->kind == GSHSCENE_PAINT_GRADIENT || paint->kind == GSHSCENE_PAINT_PALETTE) {', 'paint->kind == GSHSCENE_PAINT_GRADIENT) {', L),
+    ('ls-paint-solid-only', 'src', LS, '  if ((paint->kind != GSHSCENE_PAINT_SOLID && paint->kind != GSHSCENE_PAINT_FOREGROUND) || paint->gradient) {', '  if (paint->kind != GSHSCENE_PAINT_SOLID || paint->gradient) {', CL),
+    ('ls-paint-kind', 'src', LS, '  if ((paint->kind != GSHSCENE_PAINT_SOLID && paint->kind != GSHSCENE_PAINT_FOREGROUND) || paint->gradient) {', '  if (paint->gradient) {', L),
+    ('ls-paint-gradient-pointer', 'src', LS, '  if ((paint->kind != GSHSCENE_PAINT_SOLID && paint->kind != GSHSCENE_PAINT_FOREGROUND) || paint->gradient) {', '  if (paint->kind != GSHSCENE_PAINT_SOLID && paint->kind != GSHSCENE_PAINT_FOREGROUND) {', L + CL),
+    ('ls-paint-foreground-red', 'src', LS, 'if (gshgeom_f64_bits(paint->rgba[0]) != 0 || gshgeom_f64_bits(paint->rgba[1]) != 0 ||', 'if (gshgeom_f64_bits(paint->rgba[1]) != 0 ||', CL),
+    ('ls-paint-foreground-green', 'src', LS, 'if (gshgeom_f64_bits(paint->rgba[0]) != 0 || gshgeom_f64_bits(paint->rgba[1]) != 0 ||', 'if (gshgeom_f64_bits(paint->rgba[0]) != 0 ||', CL),
+    ('ls-paint-foreground-blue', 'src', LS, '        gshgeom_f64_bits(paint->rgba[2]) != 0 || !gshscene_color_space_is_target(&paint->space)) {', '        !gshscene_color_space_is_target(&paint->space)) {', CL),
+    ('ls-paint-foreground-space', 'src', LS, '        gshgeom_f64_bits(paint->rgba[2]) != 0 || !gshscene_color_space_is_target(&paint->space)) {', '        gshgeom_f64_bits(paint->rgba[2]) != 0) {', CL),
+    ('ls-paint-foreground-kind', 'src', LS, '    out->kind = GSHSCENE_PAINT_FOREGROUND;\n', '', CL + L),
+    ('ls-paint-foreground-alpha', 'src', LS, '    out->rgba[3] = paint->rgba[3];\n    return GSHSCENE_OK;', '    return GSHSCENE_OK;', CL),
+    ('ls-paint-space-check', 'src', LS, '  GSHSCENE_Result result = gshscene_color_space_check(&paint->space);\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  for (int i = 0; i < 4; i++) {\n    out->rgba[i] = paint->rgba[i];', '  for (int i = 0; i < 4; i++) {\n    out->rgba[i] = paint->rgba[i];', L),
+    ('ls-paint-space-copy', 'src', LS, '  out->space = paint->space;\n  return GSHSCENE_OK;', '  return GSHSCENE_OK;', CL),
+    ('ls-depth-finite', 'src', LS, '  if (!gshscene_finite(depth)) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  *out = depth == 0.0 ? 0.0 : depth;', '  *out = depth == 0.0 ? 0.0 : depth;', L + PS),
+    ('ls-depth-negative-zero', 'src', LS, '  *out = depth == 0.0 ? 0.0 : depth;', '  *out = depth;', O),
+    # the group
+    ('ls-group-default-opacity', 'src', LS, '  out->opacity = 1.0;\n  out->ordering = GSHSCENE_ORDER_FLAT;', '  out->opacity = 0.0;\n  out->ordering = GSHSCENE_ORDER_FLAT;', L),
+    ('ls-group-ordering-range', 'src', LS, 'group->ordering >= (uint32_t)GSHSCENE_ORDERING_COUNT || group->composite', 'group->ordering > (uint32_t)GSHSCENE_ORDERING_COUNT || group->composite', L),
+    ('ls-group-composite-range', 'src', LS, '|| group->composite >= (uint32_t)GSHSCENE_COMPOSITE_COUNT) {', '|| group->composite > (uint32_t)GSHSCENE_COMPOSITE_COUNT) {', L),
+    ('ls-group-ordering-unchecked', 'src', LS, '  if (group->ordering >= (uint32_t)GSHSCENE_ORDERING_COUNT || group->composite >= (uint32_t)GSHSCENE_COMPOSITE_COUNT) {', '  if (group->composite >= (uint32_t)GSHSCENE_COMPOSITE_COUNT) {', L),
+    ('ls-group-composite-unchecked', 'src', LS, '  if (group->ordering >= (uint32_t)GSHSCENE_ORDERING_COUNT || group->composite >= (uint32_t)GSHSCENE_COMPOSITE_COUNT) {', '  if (group->ordering >= (uint32_t)GSHSCENE_ORDERING_COUNT) {', L),
+    ('ls-group-blend-check', 'src', LS, '  GSHSCENE_Result result = gshscene_color_space_check(&group->blend_space);\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  out->opacity = group->opacity;', '  out->opacity = group->opacity;', L),
+    ('ls-group-opacity-copy', 'src', LS, '  out->opacity = group->opacity;\n  out->blend_space = group->blend_space;', '  out->blend_space = group->blend_space;', L + CP),
+    ('ls-group-blend-copy', 'src', LS, '  out->blend_space = group->blend_space;\n  out->ordering = group->ordering;', '  out->ordering = group->ordering;', LD),
+    ('ls-group-ordering-copy', 'src', LS, '  out->ordering = group->ordering;\n  out->composite = group->composite;\n  return GSHSCENE_OK;', '  out->composite = group->composite;\n  return GSHSCENE_OK;', O),
+    ('ls-group-composite-copy', 'src', LS, '  out->composite = group->composite;\n  return GSHSCENE_OK;\n}', '  return GSHSCENE_OK;\n}', CP + LD),
+    # the record calls
+    ('ls-fill-null-list', 'src', LS, 'const GSHSCENE_Paint * paint, int32_t layer, double depth) {\n  if (!list || list->closed) {', 'const GSHSCENE_Paint * paint, int32_t layer, double depth) {\n  if (list->closed) {', L),
+    ('ls-fill-closed', 'src', LS, 'const GSHSCENE_Paint * paint, int32_t layer, double depth) {\n  if (!list || list->closed) {', 'const GSHSCENE_Paint * paint, int32_t layer, double depth) {\n  if (!list) {', L),
+    ('ls-fill-depth-check', 'src', LS, '  if (result == GSHSCENE_OK) {\n    result = gshscene_list_canonical_depth(depth, &item.depth);\n  }\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  item.resource = resource;\n  item.fill_rule = rule;\n  item.layer = layer;\n  return list_append', '(void)depth;\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  item.resource = resource;\n  item.fill_rule = rule;\n  item.layer = layer;\n  return list_append', L),
+    ('ls-clip-null-list', 'src', LS, 'const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, int32_t layer, double depth) {\n  if (!list || list->closed) {', 'const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, int32_t layer, double depth) {\n  if (list->closed) {', L),
+    ('ls-clip-closed', 'src', LS, 'const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, int32_t layer, double depth) {\n  if (!list || list->closed) {', 'const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, int32_t layer, double depth) {\n  if (!list) {', L),
+    ('ls-clip-rule-check', 'src', LS, '  if (result == GSHSCENE_OK) {\n    result = check_rule(rule);\n  }\n  if (result == GSHSCENE_OK) {\n    result = gshscene_list_canonical_depth(depth, &item.depth);\n  }\n  if (result == GSHSCENE_OK) {\n    result = stack_reserve(list);', '  if (result == GSHSCENE_OK) {\n    check_rule(rule);\n  }\n  if (result == GSHSCENE_OK) {\n    result = gshscene_list_canonical_depth(depth, &item.depth);\n  }\n  if (result == GSHSCENE_OK) {\n    result = stack_reserve(list);', L),
+    ('ls-clip-depth-check', 'src', LS, '  if (result == GSHSCENE_OK) {\n    result = gshscene_list_canonical_depth(depth, &item.depth);\n  }\n  if (result == GSHSCENE_OK) {\n    result = stack_reserve(list);\n  }\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  item.resource = resource;', '(void)depth;\n  if (result == GSHSCENE_OK) {\n    result = stack_reserve(list);\n  }\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  item.resource = resource;', L),
+    ('ls-clip-stack', 'src', LS, '  if (result == GSHSCENE_OK) {\n    result = stack_reserve(list);\n  }\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  item.resource = resource;\n  item.fill_rule = rule;\n  item.layer = layer;\n  result = list_append(list, &item);', '  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  item.resource = resource;\n  item.fill_rule = rule;\n  item.layer = layer;\n  result = list_append(list, &item);', L),
+    ('ls-clip-resource', 'src', LS, '  item.resource = resource;\n  item.fill_rule = rule;\n  item.layer = layer;\n  result = list_append(list, &item);', '  item.fill_rule = rule;\n  item.layer = layer;\n  result = list_append(list, &item);', L),
+    ('ls-clip-rule', 'src', LS, '  item.resource = resource;\n  item.fill_rule = rule;\n  item.layer = layer;\n  result = list_append(list, &item);', '  item.resource = resource;\n  item.layer = layer;\n  result = list_append(list, &item);', L),
+    ('ls-clip-layer', 'src', LS, '  item.resource = resource;\n  item.fill_rule = rule;\n  item.layer = layer;\n  result = list_append(list, &item);', '(void)layer;\n  item.resource = resource;\n  item.fill_rule = rule;\n  result = list_append(list, &item);', LD),
+    ('ls-group-push-check', 'src', LS, '  GSHSCENE_Result result = canonical_group(group, &item.group);\n  if (result == GSHSCENE_OK) {\n    result = gshscene_list_canonical_depth(depth, &item.depth);\n  }', '  GSHSCENE_Result result = GSHSCENE_OK;\n  canonical_group(group, &item.group);\n  if (result == GSHSCENE_OK) {\n    result = gshscene_list_canonical_depth(depth, &item.depth);\n  }', L),
+    ('ls-group-push-depth-check', 'src', LS, '  if (result == GSHSCENE_OK) {\n    result = gshscene_list_canonical_depth(depth, &item.depth);\n  }\n  if (result == GSHSCENE_OK) {\n    result = stack_reserve(list);\n  }\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  item.layer = layer;', '(void)depth;\n  if (result == GSHSCENE_OK) {\n    result = stack_reserve(list);\n  }\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  item.layer = layer;', L),
+    ('ls-group-push-reserve', 'src', LS, '  if (result == GSHSCENE_OK) {\n    result = stack_reserve(list);\n  }\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  item.layer = layer;', '  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  item.layer = layer;', L),
+    ('ls-instance-null-list', 'src', LS, 'GSHSCENE_List * list, const GSHSCENE_Resource * picture, const GSHGEOM_Map * map, int32_t layer, double depth) {\n  if (!list || list->closed) {', 'GSHSCENE_List * list, const GSHSCENE_Resource * picture, const GSHGEOM_Map * map, int32_t layer, double depth) {\n  if (list->closed) {', L),
+    ('ls-instance-closed', 'src', LS, 'GSHSCENE_List * list, const GSHSCENE_Resource * picture, const GSHGEOM_Map * map, int32_t layer, double depth) {\n  if (!list || list->closed) {', 'GSHSCENE_List * list, const GSHSCENE_Resource * picture, const GSHGEOM_Map * map, int32_t layer, double depth) {\n  if (!list) {', L),
+    ('ls-instance-map-check', 'src', LS, '  if (result == GSHSCENE_OK) {\n    result = canonical_map(map, &item.map);\n  }\n  if (result == GSHSCENE_OK) {\n    result = gshscene_list_canonical_depth(depth, &item.depth);\n  }\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  item.resource = picture;', '  if (result == GSHSCENE_OK) {\n    canonical_map(map, &item.map);\n  }\n  if (result == GSHSCENE_OK) {\n    result = gshscene_list_canonical_depth(depth, &item.depth);\n  }\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  item.resource = picture;', L),
+    ('ls-instance-depth-check', 'src', LS, '  if (result == GSHSCENE_OK) {\n    result = gshscene_list_canonical_depth(depth, &item.depth);\n  }\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  item.resource = picture;', '(void)depth;\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  item.resource = picture;', L),
+    # the foreground
+    ('ls-foreground-set-closed', 'src', LS, 'GSHSCENE_Result gshscene_list_set_foreground(GSHSCENE_List * list, const GSHSCENE_Color * color) {\n  if (!list || list->closed) {', 'GSHSCENE_Result gshscene_list_set_foreground(GSHSCENE_List * list, const GSHSCENE_Color * color) {\n  if (!list) {', CL),
+    ('ls-foreground-set-null-list', 'src', LS, 'GSHSCENE_Result gshscene_list_set_foreground(GSHSCENE_List * list, const GSHSCENE_Color * color) {\n  if (!list || list->closed) {', 'GSHSCENE_Result gshscene_list_set_foreground(GSHSCENE_List * list, const GSHSCENE_Color * color) {\n  if (list->closed) {', CL),
+    ('ls-foreground-set-check', 'src', LS, '    GSHSCENE_Result result = gshscene_color_check(color);\n    if (result != GSHSCENE_OK) {\n      return result;\n    }\n    value = *color;', '    value = *color;', CL),
+    ('ls-foreground-set-null-default', 'src', LS, '  GSHSCENE_Color value;\n  gshscene_color_init(&value);\n  if (color) {', '  GSHSCENE_Color value;\n  memset(&value, 0, sizeof value);\n  if (color) {', CL),
+    ('ls-foreground-set-store', 'src', LS, '  list->foreground = value;\n  return GSHSCENE_OK;', '  return GSHSCENE_OK;', CL),
+    ('ls-foreground-get-null', 'src', LS, 'GSHSCENE_Result gshscene_list_foreground(const GSHSCENE_List * list, GSHSCENE_Color * out) {\n  if (!list || !out) {', 'GSHSCENE_Result gshscene_list_foreground(const GSHSCENE_List * list, GSHSCENE_Color * out) {\n  if (!out) {', CL),
+    ('ls-foreground-get-value', 'src', LS, '  *out = list->foreground;\n  return GSHSCENE_OK;', '  return GSHSCENE_OK;', CL),
+    # composite operators
+    ('ls-composite-unbounded-clear', 'src', LS, '    case GSHSCENE_COMPOSITE_CLEAR:\n    case GSHSCENE_COMPOSITE_SRC:\n    case GSHSCENE_COMPOSITE_SRC_IN:', '    case GSHSCENE_COMPOSITE_SRC:\n    case GSHSCENE_COMPOSITE_SRC_IN:', CP),
+    ('ls-composite-unbounded-src', 'src', LS, '    case GSHSCENE_COMPOSITE_CLEAR:\n    case GSHSCENE_COMPOSITE_SRC:\n    case GSHSCENE_COMPOSITE_SRC_IN:', '    case GSHSCENE_COMPOSITE_CLEAR:\n    case GSHSCENE_COMPOSITE_SRC_IN:', CP),
+    ('ls-composite-unbounded-src-in', 'src', LS, '    case GSHSCENE_COMPOSITE_SRC:\n    case GSHSCENE_COMPOSITE_SRC_IN:\n    case GSHSCENE_COMPOSITE_DEST_IN:', '    case GSHSCENE_COMPOSITE_SRC:\n    case GSHSCENE_COMPOSITE_DEST_IN:', CP),
+    ('ls-composite-unbounded-dest-in', 'src', LS, '    case GSHSCENE_COMPOSITE_SRC_IN:\n    case GSHSCENE_COMPOSITE_DEST_IN:\n    case GSHSCENE_COMPOSITE_SRC_OUT:', '    case GSHSCENE_COMPOSITE_SRC_IN:\n    case GSHSCENE_COMPOSITE_SRC_OUT:', CP),
+    ('ls-composite-unbounded-src-out', 'src', LS, '    case GSHSCENE_COMPOSITE_DEST_IN:\n    case GSHSCENE_COMPOSITE_SRC_OUT:\n    case GSHSCENE_COMPOSITE_DEST_ATOP:', '    case GSHSCENE_COMPOSITE_DEST_IN:\n    case GSHSCENE_COMPOSITE_DEST_ATOP:', CP),
+    ('ls-composite-unbounded-dest-atop', 'src', LS, '    case GSHSCENE_COMPOSITE_SRC_OUT:\n    case GSHSCENE_COMPOSITE_DEST_ATOP:\n      return 1;', '    case GSHSCENE_COMPOSITE_SRC_OUT:\n      return 1;', CP),
+    ('ls-composite-unbounded-all', 'src', LS, '    case GSHSCENE_COMPOSITE_DEST_ATOP:\n      return 1;\n    default:\n      return 0;', '    case GSHSCENE_COMPOSITE_DEST_ATOP:\n      return 1;\n    default:\n      return 1;', CP),
+    ('ls-composite-string-unknown', 'src', LS, '  return "unknown composite";', '  return "";', CP),
+    # the order
+    ('ls-order-depth-far-first', 'src', LS, '    if (depth_a > depth_b) {\n      return -1; /* the farther unit is painted first */\n    }', '    if (depth_a < depth_b) {\n      return -1; /* the farther unit is painted first */\n    }', O),
+    ('ls-order-depth-near-last', 'src', LS, '    if (depth_a < depth_b) {\n      return 1;\n    }\n    *tied = 1;', '    if (depth_a > depth_b) {\n      return 1;\n    }\n    *tied = 1;', O),
+    ('ls-order-layer-ascending', 'src', LS, '    return layer_a < layer_b ? -1 : 1;', '    return layer_a < layer_b ? 1 : -1;', O),
+    ('ls-order-stable', 'src', LS, 'if (unit_before(list, context, &units[j], &units[i], &tied) < 0) {', 'if (unit_before(list, context, &units[j], &units[i], &tied) <= 0) {', O),
+    ('ls-order-depth-tie-reason', 'src', LS, 'tie->reason = before->layer != item->layer ? GSHSCENE_TIE_LAYER : GSHSCENE_TIE_DECLARED;', 'tie->reason = before->layer != item->layer ? GSHSCENE_TIE_DECLARED : GSHSCENE_TIE_LAYER;', O),
+    ('ls-order-tie-first', 'src', LS, '        tie->first = f->prev_pos;', '        tie->first = pos;', O),
+    ('ls-order-tie-second', 'src', LS, '        tie->second = pos;', '        tie->second = f->prev_pos;', O),
+    ('ls-order-tie-depth', 'src', LS, '        tie->depth = item->depth;', '        tie->depth = 0.0;', O),
+    ('ls-order-prev-pos', 'src', LS, '    f->prev_pos = pos;\n    s->out[out_n++] = u.start;', '    s->out[out_n++] = u.start;', O),
+    ('ls-order-inner-context', 'src', LS, '      uint32_t inner = item->kind == GSHSCENE_ITEM_GROUP_PUSH ? item->group.ordering : f->context;', '      uint32_t inner = f->context;', O),
+    ('ls-order-clip-inherits', 'src', LS, '      uint32_t inner = item->kind == GSHSCENE_ITEM_GROUP_PUSH ? item->group.ordering : f->context;', '      uint32_t inner = item->kind == GSHSCENE_ITEM_GROUP_PUSH ? item->group.ordering : GSHSCENE_ORDER_FLAT;', O),
+    ('ls-order-pop-emitted', 'src', LS, '      if (f->closing != SIZE_MAX) {\n        s->out[out_n++] = f->closing;\n      }', '', O),
+    ('ls-order-root-flat', 'src', LS, '  frame_open(list, s, &frame_count, &unit_top, 0, n, GSHSCENE_ORDER_FLAT, SIZE_MAX);', '  frame_open(list, s, &frame_count, &unit_top, 0, n, GSHSCENE_ORDER_DEPTH, SIZE_MAX);', O),
+    ('ls-order-permute-hold', 'src', LS, '    *item_at(list, j) = hold;\n    out[j] = j;\n  }', '    (void)hold;\n    out[j] = j;\n  }', O),
+    ('ls-order-matching-pop', 'src', LS, '      s->match[s->open[--open_n]] = i;', '      s->match[s->open[--open_n]] = i - 1;', O),
+    ('ls-order-ties-installed', 'src', LS, '  list->ties = ties;\n  list->tie_count = tie_n;\n  list->tie_capacity = tie_n;', '  list->ties = NULL;\n  list->tie_count = 0;\n  list->tie_capacity = 0;', O),
+    ('ls-close-null', 'src', LS, 'GSHSCENE_Result gshscene_list_close(GSHSCENE_List * list) {\n  if (!list || list->closed || list->depth != 0) {', 'GSHSCENE_Result gshscene_list_close(GSHSCENE_List * list) {\n  if (list->closed || list->depth != 0) {', L),
+    ('ls-close-twice', 'src', LS, 'GSHSCENE_Result gshscene_list_close(GSHSCENE_List * list) {\n  if (!list || list->closed || list->depth != 0) {', 'GSHSCENE_Result gshscene_list_close(GSHSCENE_List * list) {\n  if (!list || list->depth != 0) {', L),
+    ('ls-close-open-push', 'src', LS, 'GSHSCENE_Result gshscene_list_close(GSHSCENE_List * list) {\n  if (!list || list->closed || list->depth != 0) {', 'GSHSCENE_Result gshscene_list_close(GSHSCENE_List * list) {\n  if (!list || list->closed) {', L),
+    ('ls-close-seals', 'src', LS, '  list->closed = 1;\n  return GSHSCENE_OK;\n}\n\nstatic int tie_compare', '  return GSHSCENE_OK;\n}\n\nstatic int tie_compare', L),
+    ('ls-close-resolve', 'src', LS, '  GSHSCENE_Result result = list_resolve(list);\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  list->closed = 1;\n  return GSHSCENE_OK;\n}\n\nstatic int tie_compare', '  list->closed = 1;\n  return GSHSCENE_OK;\n}\n\nstatic int tie_compare', O),
+    ('ls-close-resolve-error', 'src', LS, '  GSHSCENE_Result result = list_resolve(list);\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  list->closed = 1;\n  return GSHSCENE_OK;\n}\n\nstatic int tie_compare', '  GSHSCENE_Result result = list_resolve(list);\n  (void)result;\n  list->closed = 1;\n  return GSHSCENE_OK;\n}\n\nstatic int tie_compare', O),
+    ('ls-close-ordered-sort', 'src', LS, '  if (list->tie_count > 1) {\n    qsort(list->ties, list->tie_count, sizeof *list->ties, tie_compare);\n  }', '', O),
+    ('ls-close-ordered-seals', 'src', LS, '    qsort(list->ties, list->tie_count, sizeof *list->ties, tie_compare);\n  }\n  list->closed = 1;', '    qsort(list->ties, list->tie_count, sizeof *list->ties, tie_compare);\n  }', ["testEmit", "testVersion"]),
+    ('ls-tie-compare-direction', 'src', LS, '  return a->second < b->second ? -1 : (a->second > b->second ? 1 : 0);', '  return a->second < b->second ? 1 : (a->second > b->second ? -1 : 0);', O),
+    ('ls-tie-add-first', 'src', LS, '  tie->first = first;\n  tie->second = second;\n  tie->depth = depth;', '(void)first;\n  tie->first = second;\n  tie->second = second;\n  tie->depth = depth;', O),
+    ('ls-tie-add-depth', 'src', LS, '  tie->second = second;\n  tie->depth = depth;\n  tie->reason = reason;', '(void)depth;\n  tie->second = second;\n  tie->reason = reason;', O),
+    ('ls-tie-add-reason', 'src', LS, '  tie->depth = depth;\n  tie->reason = reason;\n  return GSHSCENE_OK;', '(void)reason;\n  tie->depth = depth;\n  return GSHSCENE_OK;', O),
+    ('ls-tie-add-grow-copy', 'src', LS, '    if (list->tie_count) {\n      memcpy(grown, list->ties, list->tie_count * sizeof *grown);\n    }', '', O),
+    ('ls-tie-read-range', 'src', LS, '  if (!list || !out || !list->closed || index >= list->tie_count) {', '  if (!list || !out || !list->closed || index > list->tie_count) {', O),
+    ('ls-copy-failure-leaks', 'src', LS, '  if (result != GSHSCENE_OK) {\n    gshscene_list_destroy(copy);\n    return result;\n  }\n  copy->closed = 1;', '  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  copy->closed = 1;', ["testResource"]),
+    ('ls-copy-ties', 'src', LS, '  for (size_t i = 0; result == GSHSCENE_OK && i < source->tie_count; i++) {\n    const GSHSCENE_Tie * t = &source->ties[i];\n    result = gshscene_list_add_tie(copy, t->first, t->second, t->depth, t->reason);\n  }\n', '', O),
+    ('ls-picture-foreground', 'src', RS, '  if (!gshscene_color_is_default(&list->foreground)) {\n    return GSHSCENE_ERR_INVALID;\n  }\n', '', CL),
+    # equality
+    ('ls-eq-rule', 'src', LS, '      a->fill_rule != b->fill_rule || a->layer != b->layer ||', '      a->layer != b->layer ||', L),
+    ('ls-eq-layer', 'src', LS, '      a->fill_rule != b->fill_rule || a->layer != b->layer ||', '      a->fill_rule != b->fill_rule ||', L),
+    ('ls-eq-depth', 'src', LS, '      gshgeom_f64_bits(a->depth) != gshgeom_f64_bits(b->depth)) {', '      0) {', O + L),
+    ('ls-eq-opacity', 'src', LS, '  return gshgeom_f64_bits(a->group.opacity) == gshgeom_f64_bits(b->group.opacity) &&', '  return 1 &&', L),
+    ('ls-eq-blend', 'src', LS, '         gshscene_space_equal(&a->group.blend_space, &b->group.blend_space) &&', '         1 &&', CL),
+    ('ls-eq-composite', 'src', LS, '         a->group.composite == b->group.composite && a->group.ordering == b->group.ordering;', '         a->group.ordering == b->group.ordering;', L + O + CP),
+    ('ls-eq-ordering', 'src', LS, '         a->group.composite == b->group.composite && a->group.ordering == b->group.ordering;', '         a->group.composite == b->group.composite;', L + O),
+    ('ls-eq-paint-kind', 'src', LS, '  if (a->paint.kind != b->paint.kind || !gshscene_space_equal(&a->paint.space, &b->paint.space) ||', '  if (!gshscene_space_equal(&a->paint.space, &b->paint.space) ||', CL + O),
+    ('ls-eq-paint-space', 'src', LS, '  if (a->paint.kind != b->paint.kind || !gshscene_space_equal(&a->paint.space, &b->paint.space) ||', '  if (a->paint.kind != b->paint.kind ||', CL),
+    ('ls-eq-null-a', 'src', LS, '  if (!a || !b || a->count != b->count || !color_equal(&a->foreground, &b->foreground)) {', '  if (!b || a->count != b->count || !color_equal(&a->foreground, &b->foreground)) {', L),
+    ('ls-eq-null-b', 'src', LS, '  if (!a || !b || a->count != b->count || !color_equal(&a->foreground, &b->foreground)) {', '  if (!a || a->count != b->count || !color_equal(&a->foreground, &b->foreground)) {', L),
+    ('ls-eq-count', 'src', LS, '  if (!a || !b || a->count != b->count || !color_equal(&a->foreground, &b->foreground)) {', '  if (!a || !b || !color_equal(&a->foreground, &b->foreground)) {', L),
+    ('ls-eq-foreground', 'src', LS, '  if (!a || !b || a->count != b->count || !color_equal(&a->foreground, &b->foreground)) {', '  if (!a || !b || a->count != b->count) {', CL),
+    ('ls-eq-color-rgba', 'src', LS, '    if (gshgeom_f64_bits(a->rgba[i]) != gshgeom_f64_bits(b->rgba[i])) {\n      return 0;\n    }\n  }\n  return gshscene_space_equal(&a->space, &b->space);', '  }\n  return gshscene_space_equal(&a->space, &b->space);', CL),
+    ('ls-eq-color-space', 'src', LS, '  return gshscene_space_equal(&a->space, &b->space);\n}\n\nstatic int item_equal', '  return 1;\n}\n\nstatic int item_equal', CL),
+    ('ls-eq-space-primaries', 'src', LS, '  return a->primaries == b->primaries && a->transfer == b->transfer &&', '  return a->transfer == b->transfer &&', CL),
+    ('ls-eq-space-transfer', 'src', LS, '  return a->primaries == b->primaries && a->transfer == b->transfer &&', '  return a->primaries == b->primaries &&', CL),
+    ('ls-eq-space-gamma', 'src', LS, '         gshgeom_f64_bits(a->gamma) == gshgeom_f64_bits(b->gamma);', '         1;', CL),
+    # hash
+    ('ls-hash-foreground', 'src', LS, '  gshscene_color_hash(&h, &list->foreground);\n  gshgeom_hash_u64(&h, (uint64_t)list->count);', '  gshgeom_hash_u64(&h, (uint64_t)list->count);', D + CL),
+    ('ls-hash-fill-space', 'src', LS, '        gshscene_space_hash(&h, &item->paint.space);\n        gshgeom_hash_i32(&h, item->layer);', '        gshgeom_hash_i32(&h, item->layer);', D),
+    ('ls-hash-fill-layer-width', 'src', LS, '        gshscene_space_hash(&h, &item->paint.space);\n        gshgeom_hash_i32(&h, item->layer);', '        gshscene_space_hash(&h, &item->paint.space);\n        gshgeom_hash_i64(&h, item->layer);', D),
+    ('ls-hash-fill-depth', 'src', LS, '        gshgeom_hash_i32(&h, item->layer);\n        gshgeom_hash_f64(&h, item->depth);\n        break;\n      case GSHSCENE_ITEM_CLIP_PUSH:', '        gshgeom_hash_i32(&h, item->layer);\n        break;\n      case GSHSCENE_ITEM_CLIP_PUSH:', D),
+    ('ls-hash-clip-layer', 'src', LS, '        gshgeom_hash_u8(&h, (uint8_t)item->fill_rule);\n        gshgeom_hash_i32(&h, item->layer);\n        gshgeom_hash_f64(&h, item->depth);\n        break;\n      case GSHSCENE_ITEM_GROUP_PUSH:', '        gshgeom_hash_u8(&h, (uint8_t)item->fill_rule);\n        gshgeom_hash_f64(&h, item->depth);\n        break;\n      case GSHSCENE_ITEM_GROUP_PUSH:', D),
+    ('ls-hash-clip-depth', 'src', LS, '        gshgeom_hash_u8(&h, (uint8_t)item->fill_rule);\n        gshgeom_hash_i32(&h, item->layer);\n        gshgeom_hash_f64(&h, item->depth);\n        break;\n      case GSHSCENE_ITEM_GROUP_PUSH:', '        gshgeom_hash_u8(&h, (uint8_t)item->fill_rule);\n        gshgeom_hash_i32(&h, item->layer);\n        break;\n      case GSHSCENE_ITEM_GROUP_PUSH:', D),
+    ('ls-hash-group-blend', 'src', LS, '        gshscene_space_hash(&h, &item->group.blend_space);\n        gshgeom_hash_u8(&h, (uint8_t)item->group.composite);', '        gshgeom_hash_u8(&h, (uint8_t)item->group.composite);', D),
+    ('ls-hash-group-composite-width', 'src', LS, '        gshgeom_hash_u8(&h, (uint8_t)item->group.composite);\n        gshgeom_hash_u32(&h, item->group.ordering);', '        gshgeom_hash_u32(&h, (uint32_t)item->group.composite);\n        gshgeom_hash_u32(&h, item->group.ordering);', D),
+    ('ls-hash-group-composite', 'src', LS, '        gshgeom_hash_u8(&h, (uint8_t)item->group.composite);\n        gshgeom_hash_u32(&h, item->group.ordering);', '        gshgeom_hash_u32(&h, item->group.ordering);', D),
+    ('ls-hash-group-ordering-width', 'src', LS, '        gshgeom_hash_u32(&h, item->group.ordering);\n        gshgeom_hash_i32(&h, item->layer);', '        gshgeom_hash_u8(&h, (uint8_t)item->group.ordering);\n        gshgeom_hash_i32(&h, item->layer);', D),
+    ('ls-hash-group-depth', 'src', LS, '        gshgeom_hash_i32(&h, item->layer);\n        gshgeom_hash_f64(&h, item->depth);\n        break;\n      case GSHSCENE_ITEM_INSTANCE:', '        gshgeom_hash_i32(&h, item->layer);\n        break;\n      case GSHSCENE_ITEM_INSTANCE:', D),
+    ('ls-hash-instance-layer', 'src', LS, '        gshgeom_hash_i32(&h, item->layer);\n        gshgeom_hash_f64(&h, item->depth);\n        break;\n      default:', '        gshgeom_hash_f64(&h, item->depth);\n        break;\n      default:', D),
+    ('ls-hash-instance-depth', 'src', LS, '        gshgeom_hash_i32(&h, item->layer);\n        gshgeom_hash_f64(&h, item->depth);\n        break;\n      default:', '        gshgeom_hash_i32(&h, item->layer);\n        break;\n      default:', D),
+    ('ls-space-hash-primaries-width', 'src', LS, '  gshgeom_hash_u8(h, (uint8_t)space->primaries);', '  gshgeom_hash_u32(h, (uint32_t)space->primaries);', D),
+    ('ls-space-hash-transfer-width', 'src', LS, '  gshgeom_hash_u8(h, (uint8_t)space->transfer);', '  gshgeom_hash_u32(h, (uint32_t)space->transfer);', D),
+    ('ls-space-hash-order', 'src', LS, '  gshgeom_hash_u8(h, (uint8_t)space->primaries);\n  gshgeom_hash_u8(h, (uint8_t)space->transfer);', '  gshgeom_hash_u8(h, (uint8_t)space->transfer);\n  gshgeom_hash_u8(h, (uint8_t)space->primaries);', D),
+    ('ls-space-hash-gamma', 'src', LS, '  gshgeom_hash_f64(h, space->gamma);', '', D),
+    ('ls-color-hash-components', 'src', LS, '  for (int k = 0; k < 4; k++) {\n    gshgeom_hash_f64(h, color->rgba[k]);\n  }\n  gshscene_space_hash(h, &color->space);', '  for (int k = 0; k < 3; k++) {\n    gshgeom_hash_f64(h, color->rgba[k]);\n  }\n  gshscene_space_hash(h, &color->space);', D),
+    ('ls-color-hash-space', 'src', LS, '  gshscene_space_hash(h, &color->space);', '', D),
+    # dump
+    ('ls-dump-null-list', 'src', LS, '  if (!list || !out) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  /* The counts are printed', '  if (!out) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  /* The counts are printed', D),
+    ('ls-dump-null-out', 'src', LS, '  if (!list || !out) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  /* The counts are printed', '  if (!list) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  /* The counts are printed', D),
+    ('ls-dump-header', 'src', LS, '"gshscene.list %u items=%llu ties=%llu fg=', '"gshscene.list %u count=%llu ties=%llu fg=', D),
+    ('ls-dump-header-ties', 'src', LS, '"gshscene.list %u items=%llu ties=%llu fg=', '"gshscene.list %u items=%llu tie=%llu fg=', D),
+    ('ls-dump-header-ties-value', 'src', LS, 'HEX(list->count), HEX(list->closed ? list->tie_count : 0),', 'HEX(list->count), HEX(0),', D),
+    ('ls-dump-header-hash-width', 'src', LS, '" hash=%016llx\\n"', '" hash=%llx\\n"', D),
+    ('ls-dump-header-foreground', 'src', LS, '      gshscene_space_dump(out, &fg->space) < 0 ||\n', '', D),
+    ('ls-dump-space-width', 'src', LS, '"%u:%u:%016llx"', '"%u:%u:%llx"', D),
+    ('ls-dump-space-order', 'src', LS, '(unsigned)space->primaries, (unsigned)space->transfer,', '(unsigned)space->transfer, (unsigned)space->primaries,', D),
+    ('ls-dump-fill-line', 'src', LS, '" rule=%u paint=%u %016llx %016llx %016llx %016llx space="', '" rule=%u kind=%u %016llx %016llx %016llx %016llx space="', D),
+    ('ls-dump-fill-alpha-width', 'src', LS, '%016llx %016llx %016llx %016llx space="', '%016llx %016llx %016llx %llx space="', D),
+    ('ls-dump-fill-space', 'src', LS, '          written = gshscene_space_dump(out, &item->paint.space);\n', '          written = 0;\n', D),
+    ('ls-dump-group-line', 'src', LS, '"G opacity=%016llx blend="', '"G opacity=%llx blend="', D),
+    ('ls-dump-group-blend', 'src', LS, '          written = gshscene_space_dump(out, &item->group.blend_space);\n', '          written = 0;\n', D),
+    ('ls-dump-group-order', 'src', LS, '" composite=%u order=%u", (unsigned)item->group.composite, (unsigned)item->group.ordering);', '" composite=%u order=%u", (unsigned)item->group.ordering, (unsigned)item->group.composite);', D),
+    ('ls-dump-layer-depth', 'src', LS, '" layer=%lld depth=%016llx", (long long)item->layer, HEX(gshgeom_f64_bits(item->depth)));', '" layer=%lld depth=%llx", (long long)item->layer, HEX(gshgeom_f64_bits(item->depth)));', D),
+    ('ls-dump-layer', 'src', LS, '" layer=%lld depth=%016llx", (long long)item->layer,', '" layer=%lld depth=%016llx", 0LL,', D),
+    ('ls-dump-tie-line', 'src', LS, '"T first=%llu second=%llu depth=%016llx reason=%u\\n"', '"U first=%llu second=%llu depth=%016llx reason=%u\\n"', D),
+    ('ls-dump-tie-width', 'src', LS, '"T first=%llu second=%llu depth=%016llx reason=%u\\n"', '"T first=%llu second=%llu depth=%llx reason=%u\\n"', D),
+    ('ls-dump-tie-order', 'src', LS, 'HEX(tie->first), HEX(tie->second),', 'HEX(tie->second), HEX(tie->first),', D),
+    ('ls-dump-ties-guard', 'src', LS, '  if (list->closed) {\n    for (size_t i = 0; i < list->tie_count; i++) {', '  if (!list->closed) {\n    for (size_t i = 0; i < list->tie_count; i++) {', D),
+    # the color space and color functions
+    ('cs-target-gamma', 'src', CS, '         gshgeom_f64_bits(space->gamma) == 0;', '         1;', CL),
+    ('cs-check-null', 'src', CS, '  if (!space) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  if ((unsigned)space->primaries', '  if ((unsigned)space->primaries', CL),
+    ('cs-check-gamma-only-gamma', 'src', CS, '  } else if (gshgeom_f64_bits(space->gamma) != 0) {', '  } else if (0) {', CL),
+    ('cs-check-partial', 'src', CS, '  if (space->primaries == GCOL_PRIMARIES_UNKNOWN || space->transfer == GCOL_TRANSFER_UNKNOWN) {', '  if (space->primaries == GCOL_PRIMARIES_UNKNOWN && space->transfer == GCOL_TRANSFER_UNKNOWN) {', CL),
+    ('cs-from-info-icc-bytes', 'src', CS, '  if (info->icc_bytes != NULL || info->icc_size != 0 || info->icc_linked_path != NULL) {', '  if (info->icc_size != 0 || info->icc_linked_path != NULL) {', CL),
+    ('cs-from-info-icc-size', 'src', CS, '  if (info->icc_bytes != NULL || info->icc_size != 0 || info->icc_linked_path != NULL) {', '  if (info->icc_bytes != NULL || info->icc_linked_path != NULL) {', CL),
+    ('cs-from-info-icc-path', 'src', CS, '  if (info->icc_bytes != NULL || info->icc_size != 0 || info->icc_linked_path != NULL) {', '  if (info->icc_bytes != NULL || info->icc_size != 0) {', CL),
+    ('cs-from-info-gamma', 'src', CS, '  space.gamma = info->transfer == GCOL_TRANSFER_GAMMA ? info->gamma_value : 0.0;', '  space.gamma = info->gamma_value;', CL),
+    ('cs-from-info-tolerance', 'src', CS, 'gcol_gamut_identify(&info->gamut, GCOL_GAMUT_TOLERANCE_DEFAULT)', 'gcol_gamut_identify(&info->gamut, 1.0e-9)', CL),
+    ('cs-color-default-alpha', 'src', CS, '  color->rgba[3] = 1.0;', '  color->rgba[3] = 0.0;', CL),
+    ('cs-color-alpha-range', 'src', CS, '  if (!(color->rgba[3] >= 0.0 && color->rgba[3] <= 1.0)) {', '  if (!(color->rgba[3] >= 0.0 && color->rgba[3] < 1.0)) {', CL),
+    ('cs-color-default-check', 'src', CS, '  return gshscene_color_space_is_target(&color->space);\n}', '  return 1;\n}', CL),
+]
+
+
+# The reference and the evaluator (story 12): the oracle (kind orc: its selftest or the vectors it writes must fail) and the
+# test-only evaluator (kind tst: the tests are recompiled with the planted header).
+PLANTS += [
+    ('orc-clear', 'orc', 'tools/composite-oracle.py', '    if op == "clear":\n        return ZERO, ZERO', '    if op == "clear":\n        return ONE, ZERO', ['selftest', 'vectors']),
+    ('orc-src', 'orc', 'tools/composite-oracle.py', '    if op == "src":\n        return ONE, ZERO', '    if op == "src":\n        return ONE, ONE', ['selftest', 'vectors']),
+    ('orc-dest', 'orc', 'tools/composite-oracle.py', '    if op == "dest":\n        return ZERO, ONE', '    if op == "dest":\n        return ONE, ONE', ['selftest', 'vectors']),
+    ('orc-src-over', 'orc', 'tools/composite-oracle.py', 'return ONE, ONE - sa\n    if op == "dest-over":', 'return ONE, ONE - da\n    if op == "dest-over":', ['selftest', 'vectors']),
+    ('orc-dest-over', 'orc', 'tools/composite-oracle.py', 'return ONE - da, ONE\n    if op == "src-in":', 'return ONE - sa, ONE\n    if op == "src-in":', ['selftest', 'vectors']),
+    ('orc-src-in', 'orc', 'tools/composite-oracle.py', 'return da, ZERO\n    if op == "dest-in":', 'return sa, ZERO\n    if op == "dest-in":', ['selftest', 'vectors']),
+    ('orc-dest-in', 'orc', 'tools/composite-oracle.py', 'return ZERO, sa\n    if op == "src-out":', 'return ZERO, da\n    if op == "src-out":', ['selftest', 'vectors']),
+    ('orc-src-out', 'orc', 'tools/composite-oracle.py', 'return ONE - da, ZERO\n    if op == "dest-out":', 'return ONE - sa, ZERO\n    if op == "dest-out":', ['selftest', 'vectors']),
+    ('orc-dest-out', 'orc', 'tools/composite-oracle.py', 'return ZERO, ONE - sa\n    if op == "src-atop":', 'return ZERO, ONE - da\n    if op == "src-atop":', ['selftest', 'vectors']),
+    ('orc-src-atop', 'orc', 'tools/composite-oracle.py', 'return da, ONE - sa\n    if op == "dest-atop":', 'return sa, ONE - sa\n    if op == "dest-atop":', ['selftest', 'vectors']),
+    ('orc-dest-atop', 'orc', 'tools/composite-oracle.py', 'return ONE - da, sa\n    if op == "xor":', 'return ONE - da, da\n    if op == "xor":', ['selftest', 'vectors']),
+    ('orc-xor', 'orc', 'tools/composite-oracle.py', 'return ONE - da, ONE - sa\n    raise ValueError(op)', 'return ONE - sa, ONE - sa\n    raise ValueError(op)', ['selftest', 'vectors']),
+    ('orc-plus-clamp', 'orc', 'tools/composite-oracle.py', 'return [min(ONE, s[i] + d[i]) for i in range(4)]', 'return [s[i] + d[i] for i in range(4)]', ['selftest', 'vectors']),
+    ('orc-apply-coverage-source', 'orc', 'tools/composite-oracle.py', 'return [(ONE - m) * d[i] + m * o[i] for i in range(4)]', 'return [(ONE - m) * d[i] + o[i] for i in range(4)]', ['selftest', 'vectors']),
+    ('orc-apply-coverage-backdrop', 'orc', 'tools/composite-oracle.py', 'return [(ONE - m) * d[i] + m * o[i] for i in range(4)]', 'return [d[i] + m * o[i] for i in range(4)]', ['selftest', 'vectors']),
+    ('orc-premultiply', 'orc', 'tools/composite-oracle.py', 'return [rgb[0] * a, rgb[1] * a, rgb[2] * a, a]', 'return [rgb[0] * a, rgb[1] * a, rgb[2], a]', ['selftest', 'vectors']),
+    ('orc-fill-clips', 'orc', 'tools/composite-oracle.py', 'm = cov[i] * product(top.clips)', 'm = cov[i]', ['selftest', 'vectors']),
+    ('orc-fill-convert', 'orc', 'tools/composite-oracle.py', 'source = premultiply(convert(rgb, space, top.space, ex), alpha)', 'source = premultiply(rgb, alpha)', ['selftest', 'vectors']),
+    ('orc-fill-foreground-alpha', 'orc', 'tools/composite-oracle.py', 'alpha = F(fg[0][3]) * F(it["rgba"][3])', 'alpha = F(fg[0][3])', ['selftest', 'vectors']),
+    ('orc-fill-foreground-color', 'orc', 'tools/composite-oracle.py', 'rgb = [F(v) for v in fg[0][:3]]', 'rgb = [F(v) for v in it["rgba"][:3]]', ['selftest', 'vectors']),
+    ('orc-fill-foreground-space', 'orc', 'tools/composite-oracle.py', 'space = target if is_target(fg[1]) else fg[1]', 'space = target', ['selftest', 'vectors']),
+    ('orc-fill-paint-space', 'orc', 'tools/composite-oracle.py', 'space = target if is_target(it["space"]) else it["space"]', 'space = it["space"] if not is_target(it["space"]) else top.space', ['selftest', 'vectors']),
+    ('orc-clip-push', 'orc', 'tools/composite-oracle.py', 'top.clips.append(cov[i])', 'top.clips.append(ONE)', ['selftest', 'vectors']),
+    ('orc-group-outer-clip', 'orc', 'tools/composite-oracle.py', 'outer=product(top.clips)))', 'outer=ONE))', ['selftest', 'vectors']),
+    ('orc-group-blend-inherit', 'orc', 'tools/composite-oracle.py', 'space = top.space if is_target(it["blend"]) else it["blend"]\n            stack.append', 'space = target if is_target(it["blend"]) else it["blend"]\n            stack.append', ['selftest', 'vectors']),
+    ('orc-group-layer-start', 'orc', 'tools/composite-oracle.py', 'stack.append(Frame([ZERO] * 4, space,', 'stack.append(Frame(list(top.layer), space,', ['selftest', 'vectors']),
+    ('orc-group-convert', 'orc', 'tools/composite-oracle.py', 'moved = convert_premultiplied(done.layer, done.space, parent.space, ex)', 'moved = list(done.layer)', ['selftest', 'vectors']),
+    ('orc-group-opacity', 'orc', 'tools/composite-oracle.py', 'source = [opacity * v for v in moved]', 'source = list(moved)', ['selftest', 'vectors']),
+    ('orc-group-operator', 'orc', 'tools/composite-oracle.py', 'op = OPS[done.group["composite"]]', 'op = "src-over"', ['selftest', 'vectors']),
+    ('orc-group-coverage', 'orc', 'tools/composite-oracle.py', 'parent.layer = apply(parent.layer, source, done.outer, op)', 'parent.layer = apply(parent.layer, source, ONE, op)', ['selftest', 'vectors']),
+    ('orc-convert-identity', 'orc', 'tools/composite-oracle.py', '    if a == b:\n        return list(rgb)\n    lin =', '    lin =', ['selftest', 'vectors']),
+    ('orc-convert-decode', 'orc', 'tools/composite-oracle.py', 'lin = [decode(a, v, ex) for v in rgb]', 'lin = list(rgb)', ['selftest', 'vectors']),
+    ('orc-convert-encode', 'orc', 'tools/composite-oracle.py', 'return [encode(b, v, ex) for v in lin]', 'return lin', ['selftest', 'vectors']),
+    ('orc-convert-matrix-skip', 'orc', 'tools/composite-oracle.py', '    if a[0] != b[0]:\n        lin = matvec', '    if False:\n        lin = matvec', ['selftest', 'vectors']),
+    ('orc-convert-matrix-order', 'orc', 'tools/composite-oracle.py', 'lin = matvec(MATRIX_INVERSE[b[0]], matvec(MATRIX[a[0]], lin))', 'lin = matvec(MATRIX_INVERSE[a[0]], matvec(MATRIX[b[0]], lin))', ['selftest', 'vectors']),
+    ('orc-premultiplied-conversion-zero', 'orc', 'tools/composite-oracle.py', 'if alpha == 0:\n        return [ZERO, ZERO, ZERO, ZERO]', 'if alpha == 0:\n        return [ZERO, ZERO, ZERO, ONE]', ['selftest', 'vectors']),
+    ('orc-premultiplied-unpremultiply', 'orc', 'tools/composite-oracle.py', 'straight = [px[i] / alpha for i in range(3)]', 'straight = [px[i] for i in range(3)]', ['selftest', 'vectors']),
+    ('orc-srgb-threshold', 'orc', 'tools/composite-oracle.py', 'if x <= F("0.04045"):', 'if x <= F("0.04046"):', ['selftest', 'vectors']),
+    ('orc-srgb-slope', 'orc', 'tools/composite-oracle.py', 'return x / F("12.92")', 'return x / F("12.9")', ['selftest', 'vectors']),
+    ('orc-srgb-offset', 'orc', 'tools/composite-oracle.py', '(x + F("0.055")) / F("1.055"), F("2.4"), ex)', '(x + F("0.056")) / F("1.055"), F("2.4"), ex)', ['selftest', 'vectors']),
+    ('orc-srgb-scale', 'orc', 'tools/composite-oracle.py', '(x + F("0.055")) / F("1.055"), F("2.4"), ex)', '(x + F("0.055")) / F("1.06"), F("2.4"), ex)', ['selftest', 'vectors']),
+    ('orc-srgb-exponent', 'orc', 'tools/composite-oracle.py', '(x + F("0.055")) / F("1.055"), F("2.4"), ex)', '(x + F("0.055")) / F("1.055"), F("2.3"), ex)', ['selftest', 'vectors']),
+    ('orc-srgb-encode-threshold', 'orc', 'tools/composite-oracle.py', 'if y <= F("0.0031308"):', 'if y <= F("0.0031309"):', ['selftest', 'vectors']),
+    ('orc-srgb-encode-slope', 'orc', 'tools/composite-oracle.py', 'return y * F("12.92")', 'return y * F("12.9")', ['selftest', 'vectors']),
+    ('orc-srgb-encode-scale', 'orc', 'tools/composite-oracle.py', 'return F("1.055") * power(y, ONE / F("2.4"), ex) - F("0.055")', 'return F("1.05") * power(y, ONE / F("2.4"), ex) - F("0.055")', ['selftest', 'vectors']),
+    ('orc-srgb-encode-offset', 'orc', 'tools/composite-oracle.py', 'return F("1.055") * power(y, ONE / F("2.4"), ex) - F("0.055")', 'return F("1.055") * power(y, ONE / F("2.4"), ex) - F("0.05")', ['selftest', 'vectors']),
+    ('orc-srgb-encode-exponent', 'orc', 'tools/composite-oracle.py', 'power(y, ONE / F("2.4"), ex)', 'power(y, ONE / F("2.2"), ex)', ['selftest', 'vectors']),
+    ('orc-gamma-sign', 'orc', 'tools/composite-oracle.py', 'return sign(x) * power(abs(x), g, ex)', 'return power(abs(x), g, ex)', ['selftest', 'vectors']),
+    ('orc-gamma-encode-sign', 'orc', 'tools/composite-oracle.py', 'return sign(y) * F(to_dec(abs(y)) ** (Decimal(1) / to_dec(g))) if not (g == 1) else y', 'return F(to_dec(abs(y)) ** (Decimal(1) / to_dec(g))) if not (g == 1) else y', ['selftest', 'vectors']),
+    ('orc-gamut-srgb-green', 'orc', 'tools/composite-oracle.py', '1: ((F("0.64"), F("0.33")), (F("0.30"), F("0.60")), (F("0.15"), F("0.06"))),', '1: ((F("0.64"), F("0.33")), (F("0.31"), F("0.60")), (F("0.15"), F("0.06"))),', ['selftest', 'vectors']),
+    ('orc-gamut-adobe-green', 'orc', 'tools/composite-oracle.py', '(F("0.21"), F("0.71"))', '(F("0.20"), F("0.71"))', ['selftest', 'vectors']),
+    ('orc-gamut-p3-red', 'orc', 'tools/composite-oracle.py', '3: ((F("0.680"), F("0.320"))', '3: ((F("0.681"), F("0.320"))', ['selftest', 'vectors']),
+    ('orc-gamut-bt2020-blue', 'orc', 'tools/composite-oracle.py', '(F("0.131"), F("0.046"))', '(F("0.131"), F("0.047"))', ['selftest', 'vectors']),
+    ('orc-white-point', 'orc', 'tools/composite-oracle.py', 'WHITE_D65 = (F("0.3127"), F("0.3290"))', 'WHITE_D65 = (F("0.3127"), F("0.3291"))', ['selftest', 'vectors']),
+    ('orc-matrix-scale', 'orc', 'tools/composite-oracle.py', 'return [[s[c] * cols[c][r] for c in range(3)] for r in range(3)]', 'return [[cols[c][r] for c in range(3)] for r in range(3)]', ['selftest', 'vectors']),
+    ('orc-matrix-sign', 'orc', 'tools/composite-oracle.py', 'cof[i][j] = (-1) ** (i + j) * minor', 'cof[i][j] = minor', ['selftest', 'vectors']),
+    ('orc-matrix-white-y', 'orc', 'tools/composite-oracle.py', 'cols.append((x / y, ONE, (ONE - x - y) / y))', 'cols.append((x / y, ONE, (ONE - x) / y))', ['selftest', 'vectors']),
+    ('orc-order-depth-direction', 'orc', 'tools/composite-oracle.py', 'indexed.sort(key=lambda e: (-items[e[1][0]]["depth"], items[e[1][0]]["layer"], e[0]))', 'indexed.sort(key=lambda e: (items[e[1][0]]["depth"], items[e[1][0]]["layer"], e[0]))', ['selftest', 'vectors']),
+    ('orc-order-depth-layer', 'orc', 'tools/composite-oracle.py', 'indexed.sort(key=lambda e: (-items[e[1][0]]["depth"], items[e[1][0]]["layer"], e[0]))', 'indexed.sort(key=lambda e: (-items[e[1][0]]["depth"], -items[e[1][0]]["layer"], e[0]))', ['selftest', 'vectors']),
+    ('orc-order-depth-stable', 'orc', 'tools/composite-oracle.py', 'indexed.sort(key=lambda e: (-items[e[1][0]]["depth"], items[e[1][0]]["layer"], e[0]))', 'indexed.sort(key=lambda e: (-items[e[1][0]]["depth"], items[e[1][0]]["layer"], -e[0]))', ['selftest', 'vectors']),
+    ('orc-order-overlay-layer', 'orc', 'tools/composite-oracle.py', 'indexed.sort(key=lambda e: (items[e[1][0]]["layer"], e[0]))', 'indexed.sort(key=lambda e: (-items[e[1][0]]["layer"], e[0]))', ['selftest', 'vectors']),
+    ('orc-order-overlay-stable', 'orc', 'tools/composite-oracle.py', 'indexed.sort(key=lambda e: (items[e[1][0]]["layer"], e[0]))', 'indexed.sort(key=lambda e: (items[e[1][0]]["layer"], -e[0]))', ['selftest', 'vectors']),
+    ('orc-order-tie-reason', 'orc', 'tools/composite-oracle.py', 'reason = 1 if before["layer"] != after["layer"] else 3', 'reason = 3 if before["layer"] != after["layer"] else 1', ['selftest', 'vectors']),
+    ('orc-order-inner-context', 'orc', 'tools/composite-oracle.py', 'inner = items[start]["order"] if items[start]["k"] == GROUP_PUSH else context', 'inner = ORDER_FLAT', ['selftest', 'vectors']),
+    ('orc-order-tie-depth', 'orc', 'tools/composite-oracle.py', 'if before["depth"] == after["depth"]:', 'if before["depth"] >= after["depth"]:', ['selftest', 'vectors']),
+    ('orc-unbounded-probe', 'orc', 'tools/composite-oracle.py', 'return operator(op, zero, probe) != probe', 'return operator(op, probe, zero) != probe', ['selftest', 'vectors']),
+    ('tst-clear', 'tst', 'tests/ref_composite.h', 'case GSHSCENE_COMPOSITE_CLEAR: fa = 0; fb = 0; break;', 'case GSHSCENE_COMPOSITE_CLEAR: fa = 1; fb = 0; break;', ['testComposite']),
+    ('tst-src', 'tst', 'tests/ref_composite.h', 'case GSHSCENE_COMPOSITE_SRC: fa = 1; fb = 0; break;', 'case GSHSCENE_COMPOSITE_SRC: fa = 1; fb = 1; break;', ['testComposite']),
+    ('tst-dest', 'tst', 'tests/ref_composite.h', 'case GSHSCENE_COMPOSITE_DEST: fa = 0; fb = 1; break;', 'case GSHSCENE_COMPOSITE_DEST: fa = 1; fb = 1; break;', ['testComposite']),
+    ('tst-src-over', 'tst', 'tests/ref_composite.h', 'case GSHSCENE_COMPOSITE_SRC_OVER: fa = 1; fb = 1 - sa; break;', 'case GSHSCENE_COMPOSITE_SRC_OVER: fa = 1; fb = 1 - da; break;', ['testComposite']),
+    ('tst-dest-over', 'tst', 'tests/ref_composite.h', 'case GSHSCENE_COMPOSITE_DEST_OVER: fa = 1 - da; fb = 1; break;', 'case GSHSCENE_COMPOSITE_DEST_OVER: fa = 1 - sa; fb = 1; break;', ['testComposite']),
+    ('tst-src-in', 'tst', 'tests/ref_composite.h', 'case GSHSCENE_COMPOSITE_SRC_IN: fa = da; fb = 0; break;', 'case GSHSCENE_COMPOSITE_SRC_IN: fa = sa; fb = 0; break;', ['testComposite']),
+    ('tst-dest-in', 'tst', 'tests/ref_composite.h', 'case GSHSCENE_COMPOSITE_DEST_IN: fa = 0; fb = sa; break;', 'case GSHSCENE_COMPOSITE_DEST_IN: fa = 0; fb = da; break;', ['testComposite']),
+    ('tst-src-out', 'tst', 'tests/ref_composite.h', 'case GSHSCENE_COMPOSITE_SRC_OUT: fa = 1 - da; fb = 0; break;', 'case GSHSCENE_COMPOSITE_SRC_OUT: fa = 1 - sa; fb = 0; break;', ['testComposite']),
+    ('tst-dest-out', 'tst', 'tests/ref_composite.h', 'case GSHSCENE_COMPOSITE_DEST_OUT: fa = 0; fb = 1 - sa; break;', 'case GSHSCENE_COMPOSITE_DEST_OUT: fa = 0; fb = 1 - da; break;', ['testComposite']),
+    ('tst-src-atop', 'tst', 'tests/ref_composite.h', 'case GSHSCENE_COMPOSITE_SRC_ATOP: fa = da; fb = 1 - sa; break;', 'case GSHSCENE_COMPOSITE_SRC_ATOP: fa = sa; fb = 1 - sa; break;', ['testComposite']),
+    ('tst-dest-atop', 'tst', 'tests/ref_composite.h', 'case GSHSCENE_COMPOSITE_DEST_ATOP: fa = 1 - da; fb = sa; break;', 'case GSHSCENE_COMPOSITE_DEST_ATOP: fa = 1 - da; fb = da; break;', ['testComposite']),
+    ('tst-xor', 'tst', 'tests/ref_composite.h', 'case GSHSCENE_COMPOSITE_XOR: fa = 1 - da; fb = 1 - sa; break;', 'case GSHSCENE_COMPOSITE_XOR: fa = 1 - sa; fb = 1 - sa; break;', ['testComposite']),
+    ('tst-plus-clamp', 'tst', 'tests/ref_composite.h', 'composite == GSHSCENE_COMPOSITE_PLUS ? std::min(1.0, s.v[i] + d.v[i]) : fa * s.v[i] + fb * d.v[i]', 'composite == GSHSCENE_COMPOSITE_PLUS ? s.v[i] + d.v[i] : fa * s.v[i] + fb * d.v[i]', ['testComposite']),
+    ('tst-apply-source', 'tst', 'tests/ref_composite.h', 'out.v[i] = (1 - m) * d.v[i] + m * o.v[i];', 'out.v[i] = (1 - m) * d.v[i] + o.v[i];', ['testComposite']),
+    ('tst-apply-backdrop', 'tst', 'tests/ref_composite.h', 'out.v[i] = (1 - m) * d.v[i] + m * o.v[i];', 'out.v[i] = d.v[i] + m * o.v[i];', ['testComposite']),
+    ('tst-fill-clips', 'tst', 'tests/ref_composite.h', 'top.layer = apply(top.layer, s, coverage[i] * product(top.clips), GSHSCENE_COMPOSITE_SRC_OVER);', 'top.layer = apply(top.layer, s, coverage[i], GSHSCENE_COMPOSITE_SRC_OVER);', ['testComposite']),
+    ('tst-fill-operator', 'tst', 'tests/ref_composite.h', 'top.layer = apply(top.layer, s, coverage[i] * product(top.clips), GSHSCENE_COMPOSITE_SRC_OVER);', 'top.layer = apply(top.layer, s, coverage[i] * product(top.clips), GSHSCENE_COMPOSITE_SRC);', ['testComposite']),
+    ('tst-foreground-alpha', 'tst', 'tests/ref_composite.h', 'alpha = fgc.rgba[3] * item->paint.rgba[3];', 'alpha = fgc.rgba[3];', ['testComposite']),
+    ('tst-foreground-color', 'tst', 'tests/ref_composite.h', 'rgb[k] = fgc.rgba[k];', 'rgb[k] = item->paint.rgba[k];', ['testComposite']),
+    ('tst-foreground-space', 'tst', 'tests/ref_composite.h', 'space = from(fgc.space);', 'space = target;', ['testComposite']),
+    ('tst-paint-target-space', 'tst', 'tests/ref_composite.h', '        if (is_target(space)) {\n          space = target;\n        }\n', '', ['testComposite']),
+    ('tst-fill-convert', 'tst', 'tests/ref_composite.h', '        convert(rgb, space, top.space, c);', '        c[0] = rgb[0]; c[1] = rgb[1]; c[2] = rgb[2];', ['testComposite']),
+    ('tst-clip-push', 'tst', 'tests/ref_composite.h', 'top.clips.push_back(coverage[i]);', 'top.clips.push_back(1.0);', ['testComposite']),
+    ('tst-group-blend-inherit', 'tst', 'tests/ref_composite.h', 'f.space = is_target(blend) ? top.space : blend;', 'f.space = is_target(blend) ? target : blend;', ['testComposite']),
+    ('tst-group-outer', 'tst', 'tests/ref_composite.h', 'f.outer = product(top.clips);', 'f.outer = 1.0;', ['testComposite']),
+    ('tst-group-layer', 'tst', 'tests/ref_composite.h', 'f.layer = Px{{0, 0, 0, 0}};', 'f.layer = top.layer;', ['testComposite']),
+    ('tst-group-convert', 'tst', 'tests/ref_composite.h', 'Px moved = convert_premultiplied(done.layer, done.space, parent.space);', 'Px moved = done.layer;', ['testComposite']),
+    ('tst-group-opacity', 'tst', 'tests/ref_composite.h', 'done.group.opacity * moved.v[3]}};', 'moved.v[3]}};', ['testComposite']),
+    ('tst-group-opacity-color', 'tst', 'tests/ref_composite.h', '        Px s = {{done.group.opacity * moved.v[0],', '        Px s = {{moved.v[0],', ['testComposite']),
+    ('tst-group-operator', 'tst', 'tests/ref_composite.h', 'parent.layer = apply(parent.layer, s, done.outer, (int)done.group.composite);', 'parent.layer = apply(parent.layer, s, done.outer, GSHSCENE_COMPOSITE_SRC_OVER);', ['testComposite']),
+    ('tst-group-coverage', 'tst', 'tests/ref_composite.h', 'parent.layer = apply(parent.layer, s, done.outer, (int)done.group.composite);', 'parent.layer = apply(parent.layer, s, 1.0, (int)done.group.composite);', ['testComposite']),
+    ('tst-convert-same', 'tst', 'tests/ref_composite.h', '  if (same(a, b)) {\n    for (int i = 0; i < 3; i++) {\n      out[i] = in[i];', '  if (false) {\n    for (int i = 0; i < 3; i++) {\n      out[i] = in[i];', ['testComposite']),
+    ('tst-convert-decode', 'tst', 'tests/ref_composite.h', 'double lin[3] = {decode(a, in[0]), decode(a, in[1]), decode(a, in[2])};', 'double lin[3] = {in[0], in[1], in[2]};', ['testComposite']),
+    ('tst-convert-encode', 'tst', 'tests/ref_composite.h', '    out[i] = encode(b, lin[i]);', '    out[i] = lin[i];', ['testComposite']),
+    ('tst-convert-matrix-skip', 'tst', 'tests/ref_composite.h', '  if (a.primaries != b.primaries) {\n    Mat ma, mb, mbi;', '  if (false) {\n    Mat ma, mb, mbi;', ['testComposite']),
+    ('tst-convert-matrix-order', 'tst', 'tests/ref_composite.h', '    rgb_to_xyz(a.primaries, ma);\n    rgb_to_xyz(b.primaries, mb);', '    rgb_to_xyz(b.primaries, ma);\n    rgb_to_xyz(a.primaries, mb);', ['testComposite']),
+    ('tst-premultiplied-zero', 'tst', 'tests/ref_composite.h', '  if (p.v[3] == 0.0) {\n    return Px{{0, 0, 0, 0}};\n  }', '', ['testComposite']),
+    ('tst-srgb-threshold', 'tst', 'tests/ref_composite.h', 'return x <= 0.04045 ? x / 12.92', 'return x <= 0.04046 ? x / 12.92', ['testComposite']),
+    ('tst-srgb-slope', 'tst', 'tests/ref_composite.h', 'x / 12.92 : gmath_pow', 'x / 12.9 : gmath_pow', ['testComposite']),
+    ('tst-srgb-offset', 'tst', 'tests/ref_composite.h', 'gmath_pow((x + 0.055) / 1.055, 2.4)', 'gmath_pow((x + 0.056) / 1.055, 2.4)', ['testComposite']),
+    ('tst-srgb-exponent', 'tst', 'tests/ref_composite.h', 'gmath_pow((x + 0.055) / 1.055, 2.4)', 'gmath_pow((x + 0.055) / 1.055, 2.3)', ['testComposite']),
+    ('tst-srgb-encode-threshold', 'tst', 'tests/ref_composite.h', 'return y <= 0.0031308 ? y * 12.92', 'return y <= 0.0031309 ? y * 12.92', ['testComposite']),
+    ('tst-srgb-encode-slope', 'tst', 'tests/ref_composite.h', 'y * 12.92 : 1.055', 'y * 12.9 : 1.055', ['testComposite']),
+    ('tst-srgb-encode-scale', 'tst', 'tests/ref_composite.h', '1.055 * gmath_pow(y, 1.0 / 2.4) - 0.055', '1.05 * gmath_pow(y, 1.0 / 2.4) - 0.055', ['testComposite']),
+    ('tst-srgb-encode-offset', 'tst', 'tests/ref_composite.h', '1.055 * gmath_pow(y, 1.0 / 2.4) - 0.055', '1.055 * gmath_pow(y, 1.0 / 2.4) - 0.05', ['testComposite']),
+    ('tst-gamma-sign', 'tst', 'tests/ref_composite.h', 'return x == 0.0 ? 0.0 : sign_of(x) * gmath_pow(x < 0 ? -x : x, s.gamma);', 'return x == 0.0 ? 0.0 : gmath_pow(x < 0 ? -x : x, s.gamma);', ['testComposite']),
+    ('tst-gamma-encode', 'tst', 'tests/ref_composite.h', 'sign_of(y) * gmath_pow(y < 0 ? -y : y, 1.0 / s.gamma);', 'sign_of(y) * gmath_pow(y < 0 ? -y : y, s.gamma);', ['testComposite']),
+    ('tst-gamut-srgb', 'tst', 'tests/ref_composite.h', 'out[0] = {0.64, 0.33}; out[1] = {0.30, 0.60}; out[2] = {0.15, 0.06};', 'out[0] = {0.64, 0.33}; out[1] = {0.31, 0.60}; out[2] = {0.15, 0.06};', ['testComposite']),
+    ('tst-gamut-adobe', 'tst', 'tests/ref_composite.h', 'out[0] = {0.64, 0.33}; out[1] = {0.21, 0.71}; out[2] = {0.15, 0.06};', 'out[0] = {0.64, 0.33}; out[1] = {0.20, 0.71}; out[2] = {0.15, 0.06};', ['testComposite']),
+    ('tst-gamut-p3', 'tst', 'tests/ref_composite.h', 'out[0] = {0.680, 0.320}; out[1] = {0.265, 0.690}; out[2] = {0.150, 0.060};', 'out[0] = {0.681, 0.320}; out[1] = {0.265, 0.690}; out[2] = {0.150, 0.060};', ['testComposite']),
+    ('tst-gamut-bt2020', 'tst', 'tests/ref_composite.h', 'out[0] = {0.708, 0.292}; out[1] = {0.170, 0.797}; out[2] = {0.131, 0.046};', 'out[0] = {0.708, 0.292}; out[1] = {0.170, 0.797}; out[2] = {0.131, 0.047};', ['testComposite']),
+    ('tst-white', 'tst', 'tests/ref_composite.h', 'const double wx = 0.3127, wy = 0.3290;\n  const double white[3]', 'const double wx = 0.3127, wy = 0.3291;\n  const double white[3]', ['testComposite']),
+    ('tst-matrix-scale', 'tst', 'tests/ref_composite.h', '      out[r][k] = s[k] * p[r][k];', '      out[r][k] = p[r][k];', ['testComposite']),
+    ('tst-matrix-z', 'tst', 'tests/ref_composite.h', 'p[2][i] = (1.0 - c[i].x - c[i].y) / c[i].y;', 'p[2][i] = (1.0 - c[i].x) / c[i].y;', ['testComposite']),
+    ('tst-inverse-cofactor', 'tst', 'tests/ref_composite.h', 'out[i][j] = (m[r0][c0] * m[r1][c1] - m[r0][c1] * m[r1][c0]) / d;', 'out[i][j] = (m[r0][c0] * m[r1][c1] + m[r0][c1] * m[r1][c0]) / d;', ['testComposite']),
+
+]
 
 # The generated plants (tools/gen-scene-plants.py): the mutations of src/scene
 # the sweep was seen to catch.  PLANT_EXTRA_JSON names another file to run
@@ -929,6 +1240,49 @@ def do_plant(plant, control_objs):
                 raise RuntimeError("plant %s does not compile:\n%s" % (pid, r.stderr))
             objs = [str(obj) if o.endswith(fname.replace("/", "_") + ".o") else o for o in control_objs]
             assert str(obj) in objs, pid
+    elif kind == "tst":
+        # A change to a test-only header (the evaluator): the tests that include it are recompiled with the planted copy
+        # ahead on the include path, and linked against the unplanted library.
+        tinc = d / "tinc"
+        tinc.mkdir()
+        (tinc / Path(fname).name).write_text(apply((ROOT / fname).read_text(), old, new, pid))
+        caught_by = []
+        for test in tests:
+            snake = re.sub(r"(?<!^)(?=[A-Z])", "_", test[len("test"):]).lower()
+            obj = d / (test + ".o")
+            r = run(shlex.split(CXX) + ["-I", str(tinc)] + shlex.split(CXX_INCLUDE) +
+                    ["-c", str(ROOT / "tests" / "unit" / ("test_%s.cpp" % snake)), "-o", str(obj)])
+            if r.returncode != 0:
+                raise RuntimeError("plant %s does not compile:\n%s" % (pid, r.stderr))
+            exe = d / test
+            cmd = "%s -o %s %s %s %s" % (CXX, exe, obj, " ".join(control_objs), LDFLAGS)
+            r = run(cmd, shell=True)
+            if r.returncode != 0:
+                raise RuntimeError("cannot link %s:\n%s" % (test, r.stderr))
+            rc, failing = run_test(exe)
+            if rc != 0:
+                caught_by.append((test, failing[:1]))
+                break
+        return pid, caught_by
+    elif kind == "orc":
+        # A change to the oracle: its own selftest, or the vectors it writes, must disagree with the committed ones.
+        tools = d / "tools"
+        tools.mkdir()
+        for name in ("composite-oracle.py", "gen-composite-vectors.py", "gen-scene-vectors.py"):
+            shutil.copy(ROOT / "tools" / name, tools / name)
+        (d / "tests").mkdir()
+        shutil.copy(ROOT / "tests" / "composite_vectors.h", d / "tests" / "composite_vectors.h")
+        planted = tools / Path(fname).name
+        planted.write_text(apply(planted.read_text(), old, new, pid))
+        caught_by = []
+        for test in tests:
+            args = ["--selftest"] if test == "selftest" else ["--check"]
+            script = "composite-oracle.py" if test == "selftest" else "gen-composite-vectors.py"
+            r = run([sys.executable, str(tools / script)] + args)
+            if r.returncode != 0:
+                caught_by.append((test, [(r.stdout + r.stderr).strip().splitlines()[-1][:80] if (r.stdout + r.stderr).strip() else "crash"]))
+                break
+        return pid, caught_by
     else:
         text = apply((ROOT / fname).read_text(), old, new, pid)
         hdr = d / "include" / Path(fname).relative_to("include")

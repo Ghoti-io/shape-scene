@@ -13,8 +13,8 @@ static const std::uint64_t kFontRunHash = UINT64_C(0x0187bb6b4cba610a);
 static const std::uint64_t kOutlineRunHash = UINT64_C(0x99e3cf48a1beb8e0);
 static const std::uint64_t kPictureListHash = UINT64_C(0x36d687e81c47d762);
 static const std::uint64_t kPictureHash = UINT64_C(0x8810bf3f3a795dee);
-static const std::uint64_t kListHash = UINT64_C(0x5697a1eaa27e626f);
-static const std::uint64_t kOrderListHash = UINT64_C(0xccfadf322e6de3cd);
+static const std::uint64_t kListHash = UINT64_C(0x3b3186b79bbc2d7f);
+static const std::uint64_t kOrderListHash = UINT64_C(0xa5a28a69710898c6);
 static const std::uint64_t kMapIdentityHash = UINT64_C(0x1f5787abb2e02a06);
 static const std::uint64_t kMapTranslateHash = UINT64_C(0xd242bc481e41cf7c);
 static const std::uint64_t kMapDesignHash = UINT64_C(0xff01deda28fd860d);
@@ -70,8 +70,8 @@ F res=path:0a107c56241f4b98 map=d242bc481e41cf7c rule=1 paint=0 3ff0000000000000
 g
 )DUMP";
 static const char * const kListDump =
-R"DUMP(gshscene.list 2 items=9 ties=0 fg=3fb999999999999a 3fc999999999999a 3fd3333333333333 3fe0000000000000 1:1:0000000000000000 hash=5697a1eaa27e626f
-F res=path:b0a83b16e6cec382 map=ff01deda28fd860d rule=0 paint=0 3fd0000000000000 3fe0000000000000 3fe8000000000000 3ff0000000000000 space=3:3:400199999999999a layer=-3 depth=3fe0000000000000
+R"DUMP(gshscene.list 2 items=9 ties=0 fg=3fb999999999999a 3fc999999999999a 3fd3333333333333 3fe0000000000000 1:1:0000000000000000 hash=3b3186b79bbc2d7f
+F res=path:b0a83b16e6cec382 map=ff01deda28fd860d rule=0 paint=0 3fd0000000000000 3fe0000000000000 3fe8000000000000 3ff0000000000000 space=2:3:4001980000000000 layer=-3 depth=3fe0000000000000
 F res=glyph-run:0187bb6b4cba610a map=1f5787abb2e02a06 rule=1 paint=0 0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 space=0:0:0000000000000000 layer=0 depth=0000000000000000
 C res=path:0a107c56241f4b98 map=d242bc481e41cf7c rule=1 layer=4 depth=c000000000000000
 G opacity=3fe0000000000000 blend=1:1:0000000000000000 composite=5 order=0 layer=7 depth=3ff8000000000000
@@ -82,7 +82,7 @@ g
 c
 )DUMP";
 static const char * const kOrderListDump =
-R"DUMP(gshscene.list 2 items=22 ties=4 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 hash=ccfadf322e6de3cd
+R"DUMP(gshscene.list 2 items=26 ties=5 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 hash=a5a28a69710898c6
 F res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=0 3fb0000000000000 0000000000000000 0000000000000000 3ff0000000000000 space=0:0:0000000000000000 layer=0 depth=0000000000000000
 G opacity=3ff0000000000000 blend=0:0:0000000000000000 composite=0 order=1 layer=0 depth=0000000000000000
 F res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=0 3fd8000000000000 0000000000000000 0000000000000000 3ff0000000000000 space=0:0:0000000000000000 layer=0 depth=4008000000000000
@@ -105,10 +105,15 @@ F res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=0 3fe4000000000000
 g
 g
 F res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=0 3fec000000000000 0000000000000000 0000000000000000 3ff0000000000000 space=0:0:0000000000000000 layer=0 depth=0000000000000000
+G opacity=3ff0000000000000 blend=0:0:0000000000000000 composite=0 order=1 layer=0 depth=0000000000000000
+F res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=0 3fee000000000000 0000000000000000 0000000000000000 3ff0000000000000 space=0:0:0000000000000000 layer=0 depth=0000000000000000
+F res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=0 3ff0000000000000 0000000000000000 0000000000000000 3ff0000000000000 space=0:0:0000000000000000 layer=0 depth=0000000000000000
+g
 T first=3 second=4 depth=4000000000000000 reason=3
 T first=4 second=5 depth=4000000000000000 reason=3
 T first=5 second=8 depth=4000000000000000 reason=1
 T first=8 second=9 depth=4000000000000000 reason=1
+T first=23 second=24 depth=0000000000000000 reason=3
 )DUMP";
 static const char * const kSceneDump =
 R"DUMP(gshscene.version 2 nodes=7 root=1 fg=3ff0000000000000 3fe0000000000000 3fd0000000000000 3fe8000000000000 3:3:400199999999999a hash=be823c7fd8ad66e2

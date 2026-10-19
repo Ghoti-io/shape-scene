@@ -32,6 +32,7 @@ ROOT = Path(__file__).resolve().parent.parent
 EXCL = {}
 
 FILES = {
+    "src/paint/color_space.c": "cs",
     "src/scene/node.c": "nd",
     "src/scene/edit.c": "ed",
     "src/scene/scene.c": "sc",
@@ -44,7 +45,9 @@ FILES = {
 LINE_FILTER = {
     "src/store/store.c": r"bytes|fits\(",
     "src/resource/resource.c": r"BYTES|bytes|sat_",
-    "src/list/list.c": r"max_bytes|max_nodes|max_node_depth|NODE_DEPTH_CEILING|gshscene_list_canonical|gshscene_list_check_rule|return canonical_|return check_rule",
+    "src/list/list.c": r"max_bytes|max_nodes|max_node_depth|NODE_DEPTH_CEILING|gshscene_list_canonical|gshscene_list_check_rule|return canonical_|return check_rule"
+    # story 12: the order, the ties, the foreground, the composite helpers and the new equality
+    r"|unit|frame|scratch|\btie|ties|nonflat|composite|foreground|context|space_equal|color_equal|open_n|out_n|prev_pos|closing|match\[",
     "src/core/core.c": r"max_bytes|max_nodes|max_node_depth|REFUSED|refused",
 }
 EXTRA = {
@@ -53,16 +56,18 @@ EXTRA = {
     "src/list/list.c": "bl",
     "src/core/core.c": "bc",
 }
-TESTS_EXTRA = ["testBytes", "testCore", "testStore", "testScene_limits"]
+TESTS_EXTRA = ["testBytes", "testCore", "testStore", "testScene_limits", "testOrder", "testList", "testColor", "testDump",
+               "testComposite", "testPaint_scene", "testEmit"]
 TESTS_BY_FILE = {
-    "src/scene/node.c": ["testNode", "testEdit", "testScene", "testScene_dump", "testVersion"],
-    "src/scene/edit.c": ["testEdit", "testScene", "testNode", "fuzz-replay"],
-    "src/scene/scene.c": ["testScene", "testEdit", "testScene_limits", "testDiff", "testEmit", "fuzz-replay"],
-    "src/scene/version.c": ["testVersion", "testScene_dump", "testScene", "testEmit", "testDiff"],
-    "src/scene/walk.c": ["testVersion", "testEmit", "testDiff", "testScene_limits"],
-    "src/scene/validate.c": ["testScene", "testScene_limits", "testEdit", "fuzz-replay"],
-    "src/scene/emit.c": ["testEmit", "testScene_limits", "testVersion", "testDiff"],
-    "src/scene/diff.c": ["testDiff", "testScene", "testVersion"],
+    "src/paint/color_space.c": ["testColor", "testList", "testNode", "testPaint_scene", "testScene_dump"],
+    "src/scene/node.c": ["testNode", "testEdit", "testScene", "testScene_dump", "testVersion", "testPaint_scene", "testOrder", "testEmit"],
+    "src/scene/edit.c": ["testEdit", "testScene", "testNode", "testPaint_scene", "fuzz-replay"],
+    "src/scene/scene.c": ["testScene", "testEdit", "testScene_limits", "testDiff", "testEmit", "testPaint_scene", "fuzz-replay"],
+    "src/scene/version.c": ["testVersion", "testScene_dump", "testScene", "testEmit", "testDiff", "testPaint_scene", "testOrder"],
+    "src/scene/walk.c": ["testVersion", "testEmit", "testDiff", "testScene_limits", "testOrder"],
+    "src/scene/validate.c": ["testScene", "testScene_limits", "testEdit", "testPaint_scene", "fuzz-replay"],
+    "src/scene/emit.c": ["testEmit", "testScene_limits", "testVersion", "testDiff", "testOrder", "testPaint_scene"],
+    "src/scene/diff.c": ["testDiff", "testScene", "testVersion", "testPaint_scene"],
 }
 
 REL = [("==", "!="), ("!=", "=="), ("<=", "<"), (">=", ">"), ("<", "<="), (">", ">=")]
@@ -210,7 +215,7 @@ def candidates(path):
     return out
 
 
-STRING_FILES = {"src/scene/version.c", "src/scene/validate.c", "src/scene/node.c"}
+STRING_FILES = {"src/scene/version.c", "src/scene/validate.c", "src/scene/node.c", "src/list/list.c"}
 
 
 def main():

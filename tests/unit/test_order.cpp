@@ -712,6 +712,72 @@ TEST(OrderScene, TheTiesOfNestedDepthGroupsComeInAscendingOrderOfTheirSecondItem
   }
 }
 
+TEST(OrderScene, ManyTiesGrowTheListsArrayAndAPictureKeepsThemAll) {
+  Scn c;
+  EditHolder e(c.s);
+  GSHSCENE_Node def = group_node();
+  def.ordering = GSHSCENE_ORDER_DEPTH;
+  def.flags = GSHSCENE_NODE_HIDDEN;
+  uint64_t did = add(e.edit, GSHSCENE_ROOT_ID, def);
+  for (int i = 0; i < 20; i++) {
+    add(e.edit, did, shape_at(c, i + 1, 0, 1.0));
+  }
+  add(e.edit, GSHSCENE_ROOT_ID, instance_node(did));
+  VersionRef v;
+  publish(c.s, e, &v);
+  const GSHSCENE_Resource * picture = nullptr;
+  ASSERT_EQ(gshscene_version_picture(v.get(), did, &picture), GSHSCENE_OK);
+  std::vector<TieRow> ties = ties_of(gshscene_resource_picture(picture));
+  ASSERT_EQ(ties.size(), 19u);
+  for (size_t i = 0; i < ties.size(); i++) {
+    EXPECT_EQ(ties[i].first, i + 1) << i;
+    EXPECT_EQ(ties[i].second, i + 2) << i;
+    EXPECT_EQ(ties[i].reason, (int)GSHSCENE_TIE_PATH) << i;
+  }
+  // The same drawn in the version's own list (not through an instance).
+  EditHolder f(c.s);
+  GSHSCENE_Node plain = group_node();
+  plain.ordering = GSHSCENE_ORDER_DEPTH;
+  uint64_t gid = add(f.edit, GSHSCENE_ROOT_ID, plain);
+  for (int i = 0; i < 20; i++) {
+    add(f.edit, gid, shape_at(c, i + 1, 0, 1.0));
+  }
+  VersionRef w;
+  publish(c.s, f, &w);
+  const GSHSCENE_List * list = nullptr;
+  ASSERT_EQ(gshscene_version_list(w.get(), &list), GSHSCENE_OK);
+  std::vector<TieRow> own = ties_of(list);
+  ASSERT_EQ(own.size(), 19u);
+  for (size_t i = 0; i < own.size(); i++) {
+    EXPECT_EQ(own[i].first, i + 2);
+    EXPECT_EQ(own[i].second, i + 3);
+  }
+}
+
+TEST(Order, ListsThatDifferOnlyInADepthALayerAnOrderingOrAnOperatorAreDifferent) {
+  Fix f;
+  auto build = [&](ListHolder & l, double depth, uint32_t ordering, uint32_t composite, bool foreground) {
+    GSHSCENE_Group g = make_group(1.0, ordering, composite);
+    ASSERT_EQ(gshscene_list_group_push(l.list, &g, 0, 0.0), GSHSCENE_OK);
+    GSHSCENE_Paint p = solid(0, 0, 0, 1);
+    if (foreground) {
+      p.kind = GSHSCENE_PAINT_FOREGROUND;
+    }
+    ASSERT_EQ(gshscene_list_fill(l.list, f.sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, depth), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_group_pop(l.list), GSHSCENE_OK);
+  };
+  ListHolder base(f.s.store), depth(f.s.store), ordering(f.s.store), composite(f.s.store), kind(f.s.store);
+  build(base, 1.0, GSHSCENE_ORDER_OVERLAY, GSHSCENE_COMPOSITE_SRC_OVER, false);
+  build(depth, 2.0, GSHSCENE_ORDER_OVERLAY, GSHSCENE_COMPOSITE_SRC_OVER, false);
+  build(ordering, 1.0, GSHSCENE_ORDER_FLAT, GSHSCENE_COMPOSITE_SRC_OVER, false);
+  build(composite, 1.0, GSHSCENE_ORDER_OVERLAY, GSHSCENE_COMPOSITE_XOR, false);
+  build(kind, 1.0, GSHSCENE_ORDER_OVERLAY, GSHSCENE_COMPOSITE_SRC_OVER, true);
+  for (ListHolder * other : {&depth, &ordering, &composite, &kind}) {
+    EXPECT_FALSE(gshscene_list_equal(base.list, other->list));
+    EXPECT_NE(gshscene_list_hash(base.list), gshscene_list_hash(other->list));
+  }
+}
+
 TEST(OrderScene, AContainerInAnOrderedGroupKeepsItsChildrenTogether) {
   Scn c;
   EditHolder e(c.s);

@@ -142,7 +142,16 @@ case("the same two fills blended in the target's space", [group(1.0, "src-over")
 case("a group in P3 holding a paint in sRGB", [group(0.5, "src-over", LINP3), fill((0.25, 0.5, 0.75, 1.0)), pop()])
 case("a group that inherits the enclosing group's space", [group(1.0, "src-over", LIN), group(1.0, "src-over"),
                                                            fill((0.5, 0.5, 0.5, 1.0)), pop(), pop()], backdrop=(0.0, 0.0, 0.0, 0.0))
+case("a negative component in a gamma space", [fill((-0.25, 0.5, 0.75, 1.0), 1.0, P3G)], backdrop=(0.0, 0.0, 0.0, 0.0))
 case("a negative component through a linear group", [group(1.0, "src-over", LIN), fill((-0.25, 0.5, 2.0, 1.0)), pop()],
+     backdrop=(0.0, 0.0, 0.0, 0.0))
+case("an inherited blend space blends in the enclosing group's space",
+     [group(1.0, "src-over", LIN), group(1.0, "src-over"), fill((1.0, 1.0, 1.0, 0.5)), fill((0.0, 0.0, 0.0, 0.5)), pop(), pop()],
+     backdrop=(0.0, 0.0, 0.0, 0.0))
+case("an empty group in another space composites nothing", [group(1.0, "src-over", LIN), pop()])
+case("a paint just above the sRGB decode threshold", [fill((0.040455, 0.04046, 0.5, 1.0), 1.0, SRGB)], target=LIN,
+     backdrop=(0.0, 0.0, 0.0, 0.0))
+case("a paint just above the sRGB encode threshold", [fill((0.00313085, 0.00313095, 0.5, 1.0), 1.0, LIN)], target=SRGB,
      backdrop=(0.0, 0.0, 0.0, 0.0))
 case("foreground in another space", [currentcolor(1.0)], fg=((0.5, 0.25, 0.75, 1.0), LIN))
 case("foreground in another space inside a linear group", [group(1.0, "src-over", LIN), currentcolor(0.5), pop()],

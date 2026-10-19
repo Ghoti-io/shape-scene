@@ -348,7 +348,7 @@ PICTURE_RES = fnv(u32(1) + u32(KIND_PICTURE) + u64(PICTURE_LIST_HASH))
 
 LIST_FG = ((0.1, 0.2, 0.3, 0.5), SRGB_LINEAR)
 LIST_ITEMS = [
-    fill(KIND_PATH, SQ_RES, DESIGN, 0, (0.25, 0.5, 0.75, 1.0), space=P3_GAMMA, layer=-3, depth=0.5),
+    fill(KIND_PATH, SQ_RES, DESIGN, 0, (0.25, 0.5, 0.75, 1.0), space=ADOBE_GAMMA, layer=-3, depth=0.5),
     fill(KIND_RUN, FONT_RUN_HASH, IDENTITY, 1, BLACK),
     clip_push(KIND_PATH, P2_RES, TRANSLATE, 1, layer=4, depth=-2.0),
     group_push(0.5, blend=SRGB_LINEAR, composite=COMPOSITE["src-in"], layer=7, depth=1.5),
@@ -387,6 +387,9 @@ ORDER_ITEMS_DECLARED = [
     GROUP_POP_ITEM,
     GROUP_POP_ITEM,
     orderfill(14),
+    group_push(1.0, order=ORDER_DEPTH),                     # a second depth group whose tie is at depth 0
+    orderfill(15), orderfill(16),
+    GROUP_POP_ITEM,
 ]
 ORDER_ITEMS, ORDER_TIES = resolve(ORDER_ITEMS_DECLARED)
 ORDER_LIST_HASH = list_hash(ORDER_ITEMS)

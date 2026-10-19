@@ -90,7 +90,7 @@ struct Fixture {
     GSHGEOM_Map design;
     gshgeom_map_design_to_model(2.5, 10, 20, &design);
     GSHSCENE_Paint blue = solid(0.25, 0.5, 0.75, 1.0);
-    blue.space = space_of(GCOL_PRIMARIES_DISPLAY_P3, GCOL_TRANSFER_GAMMA, 2.2);
+    blue.space = space_of(GCOL_PRIMARIES_ADOBE_RGB, GCOL_TRANSFER_GAMMA, 2.19921875);
     GSHSCENE_Paint wide = solid(2.0, -0.5, 0.0, 0.5);
     GSHSCENE_Paint currentcolor = solid(0.0, 0.0, 0.0, 0.75);
     currentcolor.kind = GSHSCENE_PAINT_FOREGROUND;
@@ -140,6 +140,10 @@ struct Fixture {
     gshscene_list_group_pop(order_list);
     gshscene_list_group_pop(order_list);
     orderfill(14);
+    gshscene_list_group_push(order_list, &depth_group, 0, 0.0);
+    orderfill(15);
+    orderfill(16);
+    gshscene_list_group_pop(order_list);
     gshscene_list_close(order_list);
   }
   ~Fixture() {
@@ -199,10 +203,10 @@ TEST(KnownAnswers, TheListHashesAsTheIndependentGeneratorSays) {
   Fixture f(s.store);
   ASSERT_EQ(gshscene_list_count(f.list), 9u);
   EXPECT_EQ(gshscene_list_hash(f.list), known::kListHash);
-  ASSERT_EQ(gshscene_list_count(f.order_list), 22u);
+  ASSERT_EQ(gshscene_list_count(f.order_list), 26u);
   EXPECT_EQ(gshscene_list_hash(f.order_list), known::kOrderListHash)
       << "the closed list is the independent generator's paint order";
-  EXPECT_EQ(gshscene_list_tie_count(f.order_list), 4u);
+  EXPECT_EQ(gshscene_list_tie_count(f.order_list), 5u);
 }
 
 TEST(KnownAnswers, EveryDumpIsTheIndependentGeneratorsText) {

@@ -359,9 +359,9 @@ TEST(ListRecord, EveryInvalidArgumentIsRefusedAndTheListIsAsItWas) {
   const GSHSCENE_Paint ok_paint = solid(0.1, 0.2, 0.3, 0.4);
   const GSHGEOM_Fill_Rule bad_rule = (GSHGEOM_Fill_Rule)2;
 
-  auto fill = [&](const GSHSCENE_Resource * r, const GSHGEOM_Map * m, GSHGEOM_Fill_Rule rule, const GSHSCENE_Paint * p) {
+  auto fill = [&](const GSHSCENE_Resource * r, const GSHGEOM_Map * m, GSHGEOM_Fill_Rule rule, const GSHSCENE_Paint * p, double depth = 0.0) {
     Snapshot before(l.list, sq.get());
-    GSHSCENE_Result rc = gshscene_list_fill(l.list, r, m, rule, p, 0, 0);
+    GSHSCENE_Result rc = gshscene_list_fill(l.list, r, m, rule, p, 0, depth);
     Snapshot after(l.list, sq.get());
     EXPECT_EQ(before.count, after.count);
     EXPECT_EQ(before.expansion, after.expansion);
@@ -426,6 +426,11 @@ TEST(ListRecord, EveryInvalidArgumentIsRefusedAndTheListIsAsItWas) {
   EXPECT_EQ(gshscene_list_clip_push(nullptr, sq.get(), &good, GSHGEOM_FILL_NONZERO, 0, 0), INV);
   EXPECT_EQ(gshscene_list_instance(nullptr, picture.get(), &good, 0, 0), INV);
   EXPECT_EQ(gshscene_list_group_push(nullptr, nullptr, 0, 0), INV);
+  for (double bad : {kNaN, kInf, -kInf}) {
+    EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &ok_paint, bad), INV) << "a depth that is not finite: fill";
+    EXPECT_EQ(gshscene_list_clip_push(l.list, sq.get(), &good, GSHGEOM_FILL_NONZERO, 0, bad), INV) << "clip push";
+    EXPECT_EQ(gshscene_list_instance(l.list, picture.get(), &good, 0, bad), INV) << "instance";
+  }
   EXPECT_EQ(gshscene_list_clip_pop(nullptr), INV);
   EXPECT_EQ(gshscene_list_group_pop(nullptr), INV);
   // Groups.
