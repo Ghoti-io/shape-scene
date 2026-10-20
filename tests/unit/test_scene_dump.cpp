@@ -44,7 +44,7 @@ namespace {
 /** The fixture of tools/gen-scene-vectors.py, built through the API in the order of its IDs. */
 struct Fixture {
   SceneHolder s;
-  Ref sq, p2, font_run, outline_run;
+  Ref sq, p2, face, font_run, outline_run;
   VersionRef v;
   Fixture() {
     sq.resource = intern_square(s.store());
@@ -53,11 +53,11 @@ struct Fixture {
     std::memset(&run, 0, sizeof run);
     GSHSCENE_Glyph fglyphs[3] = {{36, 0.0, 0.0, nullptr}, {37, 7.5, 0.25, nullptr}, {4294967295u, -1.0, 2.0, nullptr}};
     run.source = GSHSCENE_GLYPHS_FROM_FONT;
-    run.font_key = UINT64_C(0x1122334455667788);
-    run.face_index = 2;
+    face.resource = intern_face(s.store());
+    run.face = face.get();
     run.size = 12.5;
-    run.hint_mode = 3;
-    run.variation_key = UINT64_C(0xAABBCCDD00112233);
+    run.hint_mode = GSHSCENE_HINT_NONE;
+    run.hint_version = 40;
     run.glyph_count = 3;
     run.glyphs = fglyphs;
     gshscene_store_intern_glyph_run(s.store(), &run, &font_run.resource);

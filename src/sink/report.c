@@ -83,6 +83,22 @@ const char * gshscene_reason_string(GSHSCENE_Reason reason) {
       return "tie-path";
     case GSHSCENE_REASON_TIE_DECLARED:
       return "tie-declared";
+    case GSHSCENE_REASON_HINT_ROUTE:
+      return "hint-route";
+    case GSHSCENE_REASON_HINT_SIZE:
+      return "hint-size";
+    case GSHSCENE_REASON_HINT_NO_PROGRAM:
+      return "hint-no-program";
+    case GSHSCENE_REASON_HINT_PROGRAM_FAILED:
+      return "hint-program-failed";
+    case GSHSCENE_REASON_HINT_WITH_ERRORS:
+      return "hint-with-errors";
+    case GSHSCENE_REASON_HINT_STRICT_ROUTE:
+      return "hint-strict-route";
+    case GSHSCENE_REASON_GLYPH_UNAVAILABLE:
+      return "glyph-unavailable";
+    case GSHSCENE_REASON_FACE_UNBOUND:
+      return "face-unbound";
     case GSHSCENE_REASON_COUNT:
       break;
   }

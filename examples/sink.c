@@ -85,10 +85,15 @@ int main(void) {
   failed |= check(gshscene_store_create(NULL, NULL, &store), "store");
   const GSHSCENE_Resource * a = square(store, 4, 4, 24);
   const GSHSCENE_Resource * b = square(store, 8, 8, 40);
+  /* A face bound to no glyph path provider: a sink that draws runs from a font refuses this one (face-unbound). */
+  GSHSCENE_Face_Desc face_desc = {0x1234, 0, 0, NULL, NULL, NULL};
+  const GSHSCENE_Resource * face = NULL;
+  failed |= check(gshscene_store_intern_face(store, &face_desc, &face), "face");
   GSHSCENE_Glyph glyphs[2] = {{36, 10, 50, NULL}, {37, 18, 50, NULL}};
-  GSHSCENE_Glyph_Run run = {GSHSCENE_GLYPHS_FROM_FONT, 0x1234, 0, 8.0, 0, 0, 2, glyphs};
+  GSHSCENE_Glyph_Run run = {GSHSCENE_GLYPHS_FROM_FONT, face, 8.0, 0, 0, 2, glyphs};
   const GSHSCENE_Resource * text = NULL;
   failed |= check(gshscene_store_intern_glyph_run(store, &run, &text), "glyph run");
+  gshscene_resource_release(face);
 
   GSHSCENE_Paint red = {GSHSCENE_PAINT_SOLID, {1, 0, 0, 1}, {0, 0, 0.0}, NULL};
   GSHSCENE_Group half = {0.5, {0, 0, 0.0}, GSHSCENE_ORDER_FLAT, GSHSCENE_COMPOSITE_SRC_OVER};

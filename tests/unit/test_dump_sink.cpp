@@ -279,6 +279,119 @@ TEST(DumpSink, TheNarrowSinksReportIsTheGenerators) {
   EXPECT_EQ(raster->snapshot(), sink_known::kRasterPixelsHash) << "approximations change nothing a marker shows";
 }
 
+/* --- the glyph fixture of tools/gen-sink-vectors.py (story 14a) -------------------------------------------- */
+
+namespace {
+
+/** Two fills of one run from the test provider's 2048-unit face with a program: the identity and a quarter turn. */
+const GSHSCENE_List * glyph_list(Scene & s) {
+  const GSHSCENE_Resource * face = gshscene_tp_face(s.store, &s.provider, 1, 0x51, 0);
+  s.held.push_back(face);
+  std::vector<GSHSCENE_Glyph> g = {{1, 2.0, 30.0, nullptr}, {2, 13.25, 30.5, nullptr}, {4, 24.0, 30.0, nullptr},
+      {3, 30.0, 30.0, nullptr}};
+  GSHSCENE_Glyph_Run run{};
+  run.source = GSHSCENE_GLYPHS_FROM_FONT;
+  run.face = face;
+  run.size = 16.0;
+  run.hint_mode = GSHSCENE_HINT_FONT;
+  run.glyph_count = g.size();
+  run.glyphs = g.data();
+  const GSHSCENE_Resource * r = nullptr;
+  EXPECT_EQ(gshscene_store_intern_glyph_run(s.store, &run, &r), GSHSCENE_OK);
+  s.held.push_back(r);
+  GSHGEOM_Map quarter;
+  GSHGEOM_Map move;
+  gshgeom_map_rotate(GSHGEOM_ANGLE_DEGREES, 90.0, &quarter);
+  gshgeom_map_translate(2, 60.0, 0.0, 0.0, &move);
+  gshgeom_map_compose(&move, &quarter, &quarter);
+  GSHSCENE_Paint red = solid(1, 0, 0);
+  GSHSCENE_List * l = s.open();
+  gshscene_list_fill(l, r, nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0);
+  gshscene_list_fill(l, r, &quarter, GSHGEOM_FILL_NONZERO, &red, 0, 0.0);
+  EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  return l;
+}
+
+}  // namespace
+
+TEST(DumpSink, TheGlyphRecordsOnARasterAreTheGenerators) {
+  Scene s;
+  const GSHSCENE_List * list = glyph_list(s);
+  EXPECT_EQ(gshscene_list_hash(list), sink_known::kGlyphListHash);
+  const GSHSCENE_Item * item = nullptr;
+  ASSERT_EQ(gshscene_list_item(list, 0, &item), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_resource_hash(item->resource), sink_known::kGlyphRunHash);
+  Log log;
+  GSHSCENE_Dump_Sink_Config c = config_default();
+  c.log = &log.writer;
+  SinkRef sink(make_with(c, nullptr, nullptr));
+  auto raster = make_raster();
+  ReportRef report;
+  gshscene_tp_reset(&s.provider);
+  Rendered r = render_job(sink.sink, request_for(list, *raster, report.report));
+  ASSERT_EQ(r.result, GSHSCENE_OK);
+  EXPECT_EQ(log.text, sink_known::kGlyphRasterDump);
+  EXPECT_EQ(r.output, sink_known::kGlyphRasterOutputHash);
+  EXPECT_EQ(raster->snapshot(), sink_known::kGlyphRasterPixelsHash);
+  EXPECT_EQ(gshscene_report_hash(report.report), sink_known::kGlyphRasterReportHash);
+  EXPECT_EQ(report_dump(report.report), with_bytes(sink_known::kGlyphRasterReportDump, report.report));
+  EXPECT_EQ(gcu_atomic_size_load(&s.provider.fast_calls), 4u) << "the first item's glyphs, by the fast tier";
+  EXPECT_EQ(gcu_atomic_size_load(&s.provider.outline_calls), 4u) << "the second's, by the general route";
+}
+
+TEST(DumpSink, TheGlyphRecordsOnAStreamAreTheGenerators) {
+  Scene s;
+  const GSHSCENE_List * list = glyph_list(s);
+  SinkRef sink(make_full(nullptr, nullptr));
+  auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+  gshgeom_map_scale(2, 0.5, 0.5, 1.0, &stream->target.map);
+  ReportRef report;
+  Rendered r = render_job(sink.sink, request_for(list, *stream, report.report));
+  ASSERT_EQ(r.result, GSHSCENE_OK);
+  EXPECT_EQ(stream->bytes, sink_known::kGlyphStreamDump);
+  EXPECT_EQ(r.output, sink_known::kGlyphStreamOutputHash);
+  EXPECT_EQ(gshscene_report_hash(report.report), sink_known::kGlyphStreamReportHash);
+}
+
+TEST(DumpSink, AGlyphPastTheScratchIsRefusedAsTheSinksOwnLimit) {
+  // Glyph 8's 3000 lines do not fit the 64 KiB of a glyph's scratch, on either route: refused, the rest drawn.
+  for (uint32_t kind : {(uint32_t)GSHSCENE_TARGET_RASTER, (uint32_t)GSHSCENE_TARGET_STREAM}) {
+    Scene s;
+    const GSHSCENE_List * list = one_run(s, s.glyphs(s.face(), {8, 1}, 8.0, GSHSCENE_HINT_NONE));
+    SinkRef sink(make_full(nullptr, nullptr));
+    auto surface = make_surface(kind);
+    ReportRef report;
+    ASSERT_EQ(render_job(sink.sink, request_for(list, *surface, report.report)).result, GSHSCENE_OK);
+    auto refused = of_class(report.report, GSHSCENE_ENTRY_REFUSED);
+    ASSERT_EQ(refused.size(), 1u) << kind;
+    EXPECT_EQ(refused[0].reason, GSHSCENE_REASON_RESOURCE_LIMIT);
+    EXPECT_EQ(refused[0].second, 0u);
+  }
+}
+
+TEST(DumpSink, UnderCallerMemoryTheGlyphScratchIsTheWorkspaces) {
+  // Under caller memory the glyph scratch is the workspace's: the run's paths fit, and the render allocates nothing.
+  Scene s;
+  const GSHSCENE_List * list = glyph_list(s);
+  tracker::Tracker t;
+  GSHSCENE_Allocator a = tracker::allocator_for(&t);
+  SinkRef sink(make_full(&a, nullptr));
+  auto raster = make_raster();
+  ReportRef report;
+  GSHSCENE_Render_Request req = request_for(list, *raster, report.report);
+  req.flags = GSHSCENE_RENDER_CALLER_MEMORY;
+  size_t need = 0;
+  ASSERT_EQ(gshscene_sink_workspace_bytes(sink.sink, &req, &need), GSHSCENE_OK);
+  EXPECT_GE(need, (size_t)65536) << "the glyph scratch is part of the workspace";
+  std::vector<unsigned char> workspace(need);
+  req.workspace = workspace.data();
+  req.workspace_bytes = need;
+  long calls = t.calls;
+  ASSERT_EQ(render_job(sink.sink, req).result, GSHSCENE_OK);
+  EXPECT_EQ(t.calls, calls) << "caller memory: nothing allocated for the glyphs";
+  EXPECT_EQ(gshscene_report_hash(report.report), sink_known::kGlyphRasterReportHash);
+}
+
 TEST(DumpSink, AStrictRefusalWhileDrawingKeepsThePrefixAndNamesTheUnit) {
   Scene s;
   const GSHSCENE_List * list = answer_list(s);
@@ -809,7 +922,7 @@ TEST(DumpSink, AStrictRefusalInAPictureNamesItsChain) {
   EXPECT_EQ(sum.failure.chain[0], 2u);
   EXPECT_EQ(sum.failure.chain[1], 1u);
   EXPECT_EQ(sum.units_processed, 4u);
-  EXPECT_STREQ(sum.failure.reason, "strict: refused while drawing (the sink's resource limit)");
+  EXPECT_STREQ(sum.failure.reason, "strict: refused while drawing (the sink's resource limit, or a glyph)");
 }
 
 // The frame bytes are the scratch a render used, with a workspace or without; the sink's own failures say why.

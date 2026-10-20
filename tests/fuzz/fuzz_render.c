@@ -32,7 +32,7 @@
  * set, the sink's extent limit and the report's cap, the write of the stream and
  * the allocation that fail, and how many units a deferred step goes through.  The
  * rest builds up to three pictures and a list (fills of paths, of glyph runs from
- * a font and from outlines, foreground fills, clips, groups with every operator,
+ * a face and from outlines, foreground fills, clips, groups with every operator,
  * blend space and ordering, instances), always balanced and closed.  After the
  * render the contract's invariants are checked, and a violation is an `abort`:
  *
@@ -55,6 +55,8 @@
  */
 
 #include <ghoti.io/shape-scene/shape-scene.h>
+
+#include "../glyph_test_provider.h"
 
 #include <ghoti.io/image/raster.h>
 #include <ghoti.io/shape-geometry/shape-geometry.h>
@@ -257,6 +259,42 @@ static const GSHSCENE_Resource * square(Scene * s, double x, double y, double si
   return keep(s, r);
 }
 
+/**
+ * The faces a run from a font names (story 14a): unbound, or bound to one of two test providers (a 2048-unit face
+ * with a program, a 1000-unit one without), with the fast tier or without it, at one of three instances.  The
+ * providers live for the process; their counters are not read.
+ */
+static GSHSCENE_Test_Provider provider_program = {2048u, GSHSCENE_FACE_HINTING, 0, 0, {0}, {0}, {0}, {0}, {0}, {0}};
+static GSHSCENE_Test_Provider provider_plain = {1000u, 0, 0, 0, {0}, {0}, {0}, {0}, {0}, {0}};
+
+static const GSHSCENE_Resource * face_from(Scene * s, uint8_t a) {
+  int16_t coord = (int16_t)((a % 3) * 4096);
+  GSHSCENE_Face_Desc desc;
+  memset(&desc, 0, sizeof desc);
+  desc.font_key = 0x77u + (a & 3u);
+  desc.coord_count = 1;
+  desc.coords = &coord;
+  switch (a & 3u) {
+    case 0:
+      break; /* unbound */
+    case 1:
+      desc.provider = gshscene_tp_ops(1);
+      desc.ctx = &provider_program;
+      break;
+    case 2:
+      desc.provider = gshscene_tp_ops(0);
+      desc.ctx = &provider_program;
+      break;
+    default:
+      desc.provider = gshscene_tp_ops(1);
+      desc.ctx = &provider_plain;
+      break;
+  }
+  const GSHSCENE_Resource * face = NULL;
+  gshscene_store_intern_face(s->store, &desc, &face);
+  return keep(s, face);
+}
+
 static const GSHSCENE_Resource * run_from(Scene * s, int font, uint8_t a) {
   GSHSCENE_Glyph glyphs[2];
   memset(glyphs, 0, sizeof glyphs);
@@ -270,10 +308,14 @@ static const GSHSCENE_Resource * run_from(Scene * s, int font, uint8_t a) {
   run.glyphs = glyphs;
   if (font) {
     run.source = GSHSCENE_GLYPHS_FROM_FONT;
-    run.font_key = 0x77 + a;
+    run.face = face_from(s, a);
+    if (!run.face) {
+      return NULL;
+    }
     run.size = 1.0 + (a % 7);
-    glyphs[0].id = 3;
-    glyphs[1].id = 4;
+    run.hint_mode = (uint32_t)((a / 4u) % 3u);
+    glyphs[0].id = (uint32_t)(a % 9u);
+    glyphs[1].id = (uint32_t)((a / 9u) % 9u);
   } else {
     run.source = GSHSCENE_GLYPHS_FROM_OUTLINES;
     glyphs[0].outline = square(s, 0, 0, 2 + a % 5);

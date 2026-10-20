@@ -22,7 +22,7 @@ test_dump.cpp builds with the API).
     python3 tools/gen-scene-vectors.py --check      # fails if the file differs
 
 The fixtures: a square path, shape-geometry's own fixture path (every verb), a
-glyph run from a font and one from outlines, a picture, and a list holding every
+face, a glyph run from that face and one from outlines, a picture, and a list holding every
 kind of item, each also in its dump text; and a scene (version.h) holding every kind
 of node, with a clip, a key, a hidden node and an instance, built by the test in the
 order of the IDs below (the root 1, then 2 to 7), with its hash and its dump, and the
@@ -133,27 +133,50 @@ TRANSLATE = map_hash(2, [1, 0, 0, 1], [1.5, -2.25], 1)
 DESIGN = map_hash(2, [2.5, 0, 0, -2.5], [10, 20], 1 | 2 | 8)
 
 # --- resources (resource.h) ----------------------------------------------------
-KIND_PATH, KIND_RUN, KIND_PICTURE = 1, 2, 3
-KIND_NAME = {KIND_PATH: "path", KIND_RUN: "glyph-run", KIND_PICTURE: "picture"}
+KIND_PATH, KIND_RUN, KIND_PICTURE, KIND_FACE = 1, 2, 3, 6
+KIND_NAME = {KIND_PATH: "path", KIND_RUN: "glyph-run", KIND_PICTURE: "picture", KIND_FACE: "face"}
+# The format is per kind (resource.h): a glyph run's is 2 since story 14a, the rest 1.
+RUN_FORMAT = 2
 
 
 def path_resource_hash(path):
     return fnv(u32(1) + u32(KIND_PATH) + u64(path_hash(path)))
 
 
-def run_hash(source, key, face, size, hint, var, glyphs):
-    out = u32(1) + u32(KIND_RUN) + u32(source) + u64(key) + u32(face) + f64(size) + u32(hint) + u64(var)
+def face_hash(key, index, coords):
+    # Trailing zero coordinates are dropped before the face is interned.
+    coords = list(coords)
+    while coords and coords[-1] == 0:
+        coords.pop()
+    out = u32(1) + u32(KIND_FACE) + u64(key) + u32(index) + u32(len(coords))
+    for c in coords:
+        out += u32(c & 0xFFFFFFFF)
+    return fnv(out)
+
+
+def face_dump(key, index, coords):
+    h = face_hash(key, index, coords)
+    coords = list(coords)
+    while coords and coords[-1] == 0:
+        coords.pop()
+    return ("gshscene.resource 1 kind=face hash=%016x\n" % h +
+            "face font=%016x index=%d coords=%d" % (key, index, len(coords)) + "".join(" %d" % c for c in coords) +
+            "\nbound=0 upem=0 flags=0\n")
+
+
+def run_hash(source, face, size, hint, version, glyphs):
+    out = u32(RUN_FORMAT) + u32(KIND_RUN) + u32(source) + u64(face) + f64(size) + u32(hint) + u32(version)
     out += u64(len(glyphs))
     for gid, x, y, outline in glyphs:
         out += u32(gid) + f64(x) + f64(y) + u64(outline)
     return fnv(out)
 
 
-def run_dump(source, key, face, size, hint, var, glyphs):
-    h = run_hash(source, key, face, size, hint, var, glyphs)
-    lines = ["gshscene.resource 1 kind=glyph-run hash=%016x" % h,
-             "run source=%d font=%016x face=%d size=%016x hint=%d var=%016x glyphs=%d" % (
-                 source, key, face, bits(size), hint, var, len(glyphs))]
+def run_dump(source, face, size, hint, version, glyphs):
+    h = run_hash(source, face, size, hint, version, glyphs)
+    lines = ["gshscene.resource %d kind=glyph-run hash=%016x" % (RUN_FORMAT, h),
+             "run source=%d face=%016x size=%016x hint=%d version=%d glyphs=%d" % (
+                 source, face, bits(size), hint, version, len(glyphs))]
     for gid, x, y, outline in glyphs:
         lines.append("g id=%d x=%016x y=%016x outline=%016x" % (gid, bits(x), bits(y), outline))
     return "\n".join(lines) + "\n"
@@ -164,9 +187,12 @@ P2 = fixture2()
 SQ_RES = path_resource_hash(SQ)
 P2_RES = path_resource_hash(P2)
 
-FONT_RUN = (0, 0x1122334455667788, 2, 12.5, 3, 0xAABBCCDD00112233,
+# The face (story 14a): key, face index 2, coordinates 8192 and -4096, unbound.
+FACE = (0x1122334455667788, 2, [8192, -4096])
+FACE_HASH = face_hash(*FACE)
+FONT_RUN = (0, FACE_HASH, 12.5, 1, 40,
             [(36, 0.0, 0.0, 0), (37, 7.5, 0.25, 0), (4294967295, -1.0, 2.0, 0)])
-OUTLINE_RUN = (1, 0, 0, 0.0, 0, 0, [(1, 0.0, 0.0, SQ_RES), (2, 5.0, -3.0, P2_RES)])
+OUTLINE_RUN = (1, 0, 0.0, 0, 0, [(1, 0.0, 0.0, SQ_RES), (2, 5.0, -3.0, P2_RES)])
 FONT_RUN_HASH = run_hash(*FONT_RUN)
 OUTLINE_RUN_HASH = run_hash(*OUTLINE_RUN)
 
@@ -543,7 +569,7 @@ def render():
     o.append("#ifndef GHOTI_IO_GSHSCENE_TEST_KNOWN_ANSWERS_H\n#define GHOTI_IO_GSHSCENE_TEST_KNOWN_ANSWERS_H\n\n#include <cstdint>\n\n")
     o.append("namespace known {\n\n")
     for name, v in (("kSquareResourceHash", SQ_RES), ("kFixturePathResourceHash", P2_RES),
-                    ("kFontRunHash", FONT_RUN_HASH), ("kOutlineRunHash", OUTLINE_RUN_HASH),
+                    ("kFaceHash", FACE_HASH), ("kFontRunHash", FONT_RUN_HASH), ("kOutlineRunHash", OUTLINE_RUN_HASH),
                     ("kPictureListHash", PICTURE_LIST_HASH), ("kPictureHash", PICTURE_RES),
                     ("kListHash", LIST_HASH), ("kOrderListHash", ORDER_LIST_HASH), ("kMapIdentityHash", IDENTITY),
                     ("kMapTranslateHash", TRANSLATE), ("kMapDesignHash", DESIGN),
@@ -556,6 +582,7 @@ def render():
     o.append("\n")
     o.append(cxx_string("kSquareResourceDump", "gshscene.resource 1 kind=path hash=%016x\n" % SQ_RES + path_dump(SQ)))
     o.append(cxx_string("kFixturePathResourceDump", "gshscene.resource 1 kind=path hash=%016x\n" % P2_RES + path_dump(P2)))
+    o.append(cxx_string("kFaceDump", face_dump(*FACE)))
     o.append(cxx_string("kFontRunDump", run_dump(*FONT_RUN)))
     o.append(cxx_string("kOutlineRunDump", run_dump(*OUTLINE_RUN)))
     o.append(cxx_string("kPictureDump", "gshscene.resource 1 kind=picture hash=%016x\n" % PICTURE_RES + list_dump(PICTURE_ITEMS)))

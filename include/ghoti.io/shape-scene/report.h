@@ -51,7 +51,10 @@
  * | `REFUSED` | the item, and its block if it is a push or an instance, was skipped |
  * | `APPROXIMATED` | the item was drawn, differently from the definition (a clip without antialiasing, a group blended in another space) |
  * | `RESOLVED_AMBIGUITY` | a depth tie of the list (N11): `second` is the first item of the unit painted after, in the same list, `depth` the depth they share |
- * | `HINT_STATUS` | a glyph run's hinting (story 14) |
+ * | `HINT_STATUS` | a run from a font not hinted as it asked (glyph.h, D7): one entry per run for a run-level cause, `second` 0; one per glyph for a glyph-level cause, `second` the glyph's index in the run |
+ *
+ * A `REFUSED` entry of one glyph of a run (glyph.h) likewise has the glyph's
+ * index in `second`; the rest of the run was drawn.
  *
  * **Order** (normative): entries are sorted by chain (element by element, a
  * prefix before its extensions, so render-level entries come first), then
@@ -118,7 +121,7 @@ typedef enum GSHSCENE_Entry_Class {
   GSHSCENE_ENTRY_REFUSED = 1,            ///< Skipped: not drawn.
   GSHSCENE_ENTRY_APPROXIMATED = 2,       ///< Drawn, not as the definition says.
   GSHSCENE_ENTRY_RESOLVED_AMBIGUITY = 3, ///< A depth tie the list resolved (N11).
-  GSHSCENE_ENTRY_HINT_STATUS = 4,        ///< A glyph run's hinting (story 14).
+  GSHSCENE_ENTRY_HINT_STATUS = 4,        ///< A run from a font not hinted as it asked (glyph.h).
   GSHSCENE_ENTRY_CLASS_COUNT             ///< Closes the enum.
 } GSHSCENE_Entry_Class;
 
@@ -135,6 +138,14 @@ typedef enum GSHSCENE_Reason {
   GSHSCENE_REASON_TIE_LAYER = 9,      ///< Ambiguity: the tie was broken by layer.
   GSHSCENE_REASON_TIE_PATH = 10,      ///< Ambiguity: the tie was broken by instance path.
   GSHSCENE_REASON_TIE_DECLARED = 11,  ///< Ambiguity: the tie was broken by declared order.
+  GSHSCENE_REASON_HINT_ROUTE = 12,    ///< Hint status, per run: the map sends the run to the general route, unhinted.
+  GSHSCENE_REASON_HINT_SIZE = 13,     ///< Hint status, per run: the device ppem is not an integer the fast tier takes.
+  GSHSCENE_REASON_HINT_NO_PROGRAM = 14, ///< Hint status: the face (per run) or the glyph at this size (per glyph) has no program.
+  GSHSCENE_REASON_HINT_PROGRAM_FAILED = 15, ///< Per glyph: the program failed (hint status), or failed under strict (refused).
+  GSHSCENE_REASON_HINT_WITH_ERRORS = 16, ///< Hint status, per glyph: a tolerant program erred.
+  GSHSCENE_REASON_HINT_STRICT_ROUTE = 17, ///< Refused, per run: a strict-hinted run whose map or size sends it to the general route (D6).
+  GSHSCENE_REASON_GLYPH_UNAVAILABLE = 18, ///< Refused, per glyph: the provider cannot give the glyph.
+  GSHSCENE_REASON_FACE_UNBOUND = 19,  ///< Refused, per run: the run's face has no glyph path provider.
   GSHSCENE_REASON_COUNT               ///< Closes the enum.
 } GSHSCENE_Reason;
 
@@ -150,7 +161,7 @@ typedef struct GSHSCENE_Report_Entry {
   GSHSCENE_Reason reason;           ///< The reason.
   const size_t * chain;             ///< The key (see the file comment); valid until the report is reset or destroyed.  NULL when empty.
   size_t chain_count;               ///< Its length; 0 for a render-level entry.
-  size_t second;                    ///< Ambiguity: the first item of the unit painted after, in the list of the chain's last index.  Else 0.
+  size_t second;                    ///< Ambiguity: the first item of the unit painted after, in the list of the chain's last index.  A glyph's entry: its index in the run.  Else 0.
   double depth;                     ///< Ambiguity: the depth the two units share.  Else 0.
 } GSHSCENE_Report_Entry;
 

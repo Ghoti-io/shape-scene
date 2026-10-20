@@ -44,6 +44,13 @@ The renders: the full test sink on a 64 by 64 RGBA8 raster filled with 0x5a
 millimetres with the map `scale(0.5)`, the narrow sink (no antialiased clips, no
 blend spaces) on the raster, and the full sink with `max_extent` 7 under strict
 on the raster (the first fill is refused while drawing).
+
+Since story 14a, a second fixture: two fills of one run from a face of the test provider (glyph_test_provider.h,
+restated below: 2048 units, a program, mode FONT, size 16, glyphs 1, 2, 4 (corrupt) and 3), the first under the
+identity and the second under a quarter turn moved by (60, 0), rendered on the raster (the first takes the fast tier
+at 16 ppem, the second the general route with a run-level entry) and on the stream (both general).  The generator
+restates glyph.h's route, the snapped scale, gshgeom_scale_26_6, the test provider's toy hinter, the device path's and
+the model path's hashes and the composition of the general route's map.
 """
 import importlib.util
 import os
@@ -318,7 +325,169 @@ NARROW_HASH, NARROW_DUMP = report(OK, (15, 15, 15), [
 STRICT_HASH, STRICT_DUMP = report(ERR_REFUSED, (15, 0, 0), [
     (REFUSED, R_LIMIT, (0,), 0, 0.0),
     TIE,
-], work=1, failure_chain=(0,), reason="strict: refused while drawing (the sink's resource limit)")
+], work=1, failure_chain=(0,), reason="strict: refused while drawing (the sink's resource limit, or a glyph)")
+
+
+# --- runs from a font (story 14a): glyph.h's route and the test sink's glyph records ---------------------------
+#
+# The test provider (tests/glyph_test_provider.h), restated: its glyphs in 26.6 design units, y up.
+def U(v):
+    return v * 64
+
+
+TP_RECT = [("M", [(U(3), U(3))]), ("L", [(U(1021), U(3))]), ("L", [(U(1021), U(1501))]), ("L", [(U(3), U(1501))]),
+           ("Z", []), ("M", [(U(301), U(301))]), ("L", [(U(301), U(1203))]), ("L", [(U(723), U(1203))]),
+           ("L", [(U(723), U(301))]), ("Z", [])]
+TP_RING = [("M", [(U(1023), U(0))]), ("Q", [(U(1771), U(1)), (U(1771), U(751))]),
+           ("Q", [(U(1771), U(1501)), (U(1023), U(1501))]), ("Q", [(U(275) + 33, U(1501)), (U(275), U(751) - 7)]),
+           ("Q", [(U(275), U(1)), (U(1023), U(0))]), ("Z", []), ("M", [(U(1023), U(301))]),
+           ("Q", [(U(577), U(301)), (U(577), U(751))]), ("Q", [(U(577), U(1201)), (U(1023), U(1201))]),
+           ("Q", [(U(1469), U(1201)), (U(1469), U(751))]), ("Q", [(U(1469), U(301)), (U(1023), U(301))]), ("Z", [])]
+TP_CURL = [("M", [(U(-101) + 5, U(-203) + 17)]),
+           ("C", [(U(400) + 1, U(-480)), (U(1301), U(97) + 63), (U(1001), U(905))]),
+           ("C", [(U(803), U(1499) + 31), (U(-37), U(1201)), (U(13) - 9, U(611) + 3)]),
+           ("L", [(U(511), U(609))]), ("Z", [])]
+TP_GLYPHS = {1: TP_RECT, 2: TP_RING, 3: TP_CURL, 5: TP_RECT, 6: TP_RECT, 7: TP_RECT, 0: []}
+TP_FAILS = {4}  # corrupt: every op fails
+
+
+def scale_26_6(p, S, flip):
+    v = -p * S if flip else p * S
+    return (v + 32768) // 65536  # Python's // is a floor
+
+
+def glyph_scale(ppem, upem):
+    return (ppem * 131072 + upem) // (2 * upem)
+
+
+def round_26_6(x):
+    import math
+    return int(math.floor(x * 64 + 0.5))
+
+
+DEVICE_VERB = {"M": 0, "L": 1, "Q": 2, "C": 3, "Z": 4}
+
+
+def device_path_hash(els):
+    out = u32(1) + u32(0x50564544) + u64(len(els))
+    for verb, pts in els:
+        out += u8(DEVICE_VERB[verb])
+        for x, y in pts:
+            out += struct.pack("<i", x) + struct.pack("<i", y)
+    return fnv(out)
+
+
+def fast_tier(gid, S, origin, hint):
+    """The provider's device path of glyph gid with the whole pixel added (glyph_provider.h, the test provider)."""
+    ox, oy = origin
+    px, py = ox // 64, oy // 64
+    fx, fy = ox - 64 * px, oy - 64 * py
+    els = []
+    for verb, pts in TP_GLYPHS[gid]:
+        out = []
+        for x, y in pts:
+            ax = fx + scale_26_6(x, S, 0)
+            ay = fy + scale_26_6(y, S, 1)
+            if hint:
+                ax = (ax + 32) - (ax + 32) % 64
+                ay = (ay + 32) - (ay + 32) % 64
+            out.append((ax + 64 * px, ay + 64 * py))
+        els.append((verb, out))
+    return device_path_hash(els)
+
+
+def outline_hash(gid):
+    els = [(verb, [(x / 64.0, y / 64.0) for x, y in pts], None) for verb, pts in TP_GLYPHS[gid]]
+    return sv.path_hash((2, els))
+
+
+def glyph_box(gid):
+    pts = [p for _, ps in TP_GLYPHS[gid] for p in ps]
+    if not pts:
+        return None
+    return (min(p[0] for p in pts), min(p[1] for p in pts), max(p[0] for p in pts), max(p[1] for p in pts))
+
+
+FLIPS_Y, QUARTER_TURNS = 8, 32
+
+
+def design(s):
+    flip = ([1.0, 0.0, 0.0, -1.0], [0.0, 0.0], FLIPS_Y)
+    return compose(compose(ident(), scale(s)), flip)
+
+
+GLYPH_UPEM, GLYPH_SIZE, GLYPH_MODE = 2048, 16.0, 0  # mode FONT; the face has a program
+FACE_KEY = 0x51
+FACE_HASH = sv.face_hash(FACE_KEY, 0, [])
+GLYPHS = [(1, 2.0, 30.0), (2, 13.25, 30.5), (4, 24.0, 30.0), (3, 30.0, 30.0)]
+RUN_HASH = sv.run_hash(0, FACE_HASH, GLYPH_SIZE, GLYPH_MODE, 0, [(g, x, y, 0) for g, x, y in GLYPHS])
+QUARTER = compose(translate(60, 0), ([0.0, -1.0, 1.0, 0.0], [0.0, 0.0], QUARTER_TURNS))
+GLYPH_ITEMS = [
+    sv.fill(sv.KIND_RUN, RUN_HASH, ID, 0, RED),
+    sv.fill(sv.KIND_RUN, RUN_HASH, mhash(QUARTER), 0, RED),
+]
+GLYPH_LIST_HASH = sv.list_hash(GLYPH_ITEMS)
+R_HINT_ROUTE, R_UNAVAILABLE = 12, 18
+
+
+def glyph_render(kind, unit, target_map, area=None):
+    """The test sink's dump of the glyph fixture: each item's route, box and glyph records."""
+    lines = ["gshscene.dump-sink 1 kind=%d unit=%d units=2 list=%016x" % (kind, unit, GLYPH_LIST_HASH)]
+    stamps = []
+    entries = []
+    for index, item_map in enumerate((ident(), QUARTER)):
+        c = (index,)
+        composed = chain([item_map], target_map)
+        a, t, _ = composed
+        # The route (glyph.h): pixels, the predicate (no rotation, a uniform positive scale, no flip), an integer ppem.
+        fast = (area is not None and a[1] == 0.0 and a[2] == 0.0 and a[0] == a[3] and a[0] > 0
+                and GLYPH_SIZE * a[0] == int(GLYPH_SIZE * a[0]))
+        if area is not None and not fast:
+            entries.append((HINT, R_HINT_ROUTE, c, 0, 0.0))
+        # The box: each glyph's design box placed by its position at size / upem, through the composed map.
+        sc = GLYPH_SIZE / GLYPH_UPEM / 64.0
+        boxes = []
+        for gid, x, y in GLYPHS:
+            b = glyph_box(gid) if gid not in TP_FAILS else None
+            if b:
+                boxes.append((x + sc * b[0], y - sc * b[3], x + sc * b[2], y - sc * b[1]))
+        mb = (min(b[0] for b in boxes), min(b[1] for b in boxes), max(b[2] for b in boxes), max(b[3] for b in boxes))
+        corners = [apply(composed, px, py) for px in (mb[0], mb[2]) for py in (mb[1], mb[3])]
+        box = (min(p[0] for p in corners), min(p[1] for p in corners), max(p[0] for p in corners),
+               max(p[1] for p in corners))
+        lines.append("U %s F res=glyph-run:%016x map=%016x rule=0 box=%s" % (
+            chain_text(c), RUN_HASH, mhash(composed), " ".join("%016x" % bits(v) for v in box)))
+        S = glyph_scale(int(GLYPH_SIZE * a[0]), GLYPH_UPEM) if fast else 0
+        for i, (gid, x, y) in enumerate(GLYPHS):
+            if gid in TP_FAILS:
+                lines.append("Y %d x reason=%d" % (i, R_UNAVAILABLE))
+                entries.append((REFUSED, R_UNAVAILABLE, c, i, 0.0))
+                continue
+            if fast:
+                ox, oy = apply(composed, x, y)
+                h = fast_tier(gid, S, (round_26_6(ox), round_26_6(oy)), hint=True)
+                lines.append("Y %d f %016x status=0" % (i, h))
+            else:
+                gmap = compose(compose(composed, translate(x, y)), design(GLYPH_SIZE / GLYPH_UPEM))
+                h = fnv(u64(outline_hash(gid)) + u64(mhash(gmap)))
+                lines.append("Y %d g %016x status=0" % (i, h))
+        if area is not None:
+            r = meet((floor(box[0]), floor(box[1]), ceil(box[2]), ceil(box[3])), area)
+            if not empty(r):
+                stamps.append((r, mark(c)))
+                lines.append("S %d %d %d %d %08x" % (r[0], r[1], r[2], r[3], mark(c)))
+    lines.append("E result=0 processed=2 done=2")
+    text = "\n".join(lines) + "\n"
+    entries.sort(key=lambda e: (list(e[2]), e[0], e[1], e[3]))
+    return text, fnv(text.encode()), stamps, entries
+
+
+GLYPH_RASTER_TEXT, GLYPH_RASTER_HASH, GLYPH_RASTER_STAMPS, GLYPH_RASTER_ENTRIES = glyph_render(
+    KIND_RASTER, UNIT_DEFAULT, ident(), (0, 0, 64, 64))
+GLYPH_STREAM_TEXT, GLYPH_STREAM_HASH, _, GLYPH_STREAM_ENTRIES = glyph_render(KIND_STREAM, UNIT_MM, scale(0.5))
+GLYPH_RASTER_PIXELS = pixels_hash(GLYPH_RASTER_STAMPS)
+GLYPH_RASTER_REPORT_HASH, GLYPH_RASTER_REPORT_DUMP = report(OK, (2, 2, 2), GLYPH_RASTER_ENTRIES)
+GLYPH_STREAM_REPORT_HASH, _ = report(OK, (2, 2, 2), GLYPH_STREAM_ENTRIES)
 
 
 def cxx_string(name, text):
@@ -333,13 +502,20 @@ def render_header():
     o.append("#include <cstdint>\n\nnamespace sink_known {\n\n")
     for name, v in (("kListHash", LIST_HASH), ("kPictureHash", PICTURE_HASH), ("kRasterOutputHash", RASTER_HASH),
                     ("kRasterPixelsHash", RASTER_PIXELS), ("kStreamOutputHash", STREAM_HASH),
-                    ("kNarrowReportHash", NARROW_HASH), ("kStrictReportHash", STRICT_HASH)):
+                    ("kNarrowReportHash", NARROW_HASH), ("kStrictReportHash", STRICT_HASH),
+                    ("kGlyphListHash", GLYPH_LIST_HASH), ("kGlyphRunHash", RUN_HASH),
+                    ("kGlyphRasterOutputHash", GLYPH_RASTER_HASH), ("kGlyphRasterPixelsHash", GLYPH_RASTER_PIXELS),
+                    ("kGlyphStreamOutputHash", GLYPH_STREAM_HASH), ("kGlyphRasterReportHash", GLYPH_RASTER_REPORT_HASH),
+                    ("kGlyphStreamReportHash", GLYPH_STREAM_REPORT_HASH)):
         o.append("static const std::uint64_t %s = UINT64_C(0x%016x);\n" % (name, v))
     o.append("\n")
     o.append(cxx_string("kRasterDump", RASTER_TEXT))
     o.append(cxx_string("kStreamDump", STREAM_TEXT))
     o.append(cxx_string("kNarrowReportDump", NARROW_DUMP))
     o.append(cxx_string("kStrictReportDump", STRICT_DUMP))
+    o.append(cxx_string("kGlyphRasterDump", GLYPH_RASTER_TEXT))
+    o.append(cxx_string("kGlyphStreamDump", GLYPH_STREAM_TEXT))
+    o.append(cxx_string("kGlyphRasterReportDump", GLYPH_RASTER_REPORT_DUMP))
     o.append("\n}  // namespace sink_known\n\n#endif\n")
     return "".join(o)
 

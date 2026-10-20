@@ -594,12 +594,13 @@ TEST(Damage, GlyphRunsFromOutlinesAreBoundedAndFromAFontAreNot) {
   }
   Result r = diff_of(v1.get(), v2.get());
   expect_rect(r.damage, 99, 99, 125, 110, "squares at 100..104 and 120..124 by 100..104 and 105..109");
-  // A run from a font has no bounds the scene can know.
+  // A run whose face is unbound has no bounds the scene can know (a bound face's are test_glyph.cpp's).
   GSHSCENE_Glyph fg[1] = {{9, 0, 0, nullptr}};
   GSHSCENE_Glyph_Run frun;
   std::memset(&frun, 0, sizeof frun);
+  Ref unbound(intern_face(d.s.store(), 0x77));
   frun.source = GSHSCENE_GLYPHS_FROM_FONT;
-  frun.font_key = 0x77;
+  frun.face = unbound.get();
   frun.size = 12;
   frun.glyph_count = 1;
   frun.glyphs = fg;

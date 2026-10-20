@@ -92,6 +92,14 @@ struct GSHSCENE_Resource {
       GSHSCENE_List * list;
       size_t depth;
     } picture;
+    struct {
+      GSHSCENE_Face face;           /* coords points at the copy below */
+      int16_t * coords;
+      GSHSCENE_Glyph_Provider ops;  /* the binding's ops, copied; meaningful when bound */
+      void * ctx;
+      GSHSCENE_Face_Info info;      /* as face_info gave it when the face was built */
+      int bound;
+    } face;
   } u;
 };
 

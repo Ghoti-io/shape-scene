@@ -9,16 +9,17 @@ namespace known {
 
 static const std::uint64_t kSquareResourceHash = UINT64_C(0xb0a83b16e6cec382);
 static const std::uint64_t kFixturePathResourceHash = UINT64_C(0x0a107c56241f4b98);
-static const std::uint64_t kFontRunHash = UINT64_C(0x0187bb6b4cba610a);
-static const std::uint64_t kOutlineRunHash = UINT64_C(0x99e3cf48a1beb8e0);
+static const std::uint64_t kFaceHash = UINT64_C(0x6c1ececace087998);
+static const std::uint64_t kFontRunHash = UINT64_C(0xff3d88fae83f9c32);
+static const std::uint64_t kOutlineRunHash = UINT64_C(0xef78b4b2ed8203d7);
 static const std::uint64_t kPictureListHash = UINT64_C(0x36d687e81c47d762);
 static const std::uint64_t kPictureHash = UINT64_C(0x8810bf3f3a795dee);
-static const std::uint64_t kListHash = UINT64_C(0x3b3186b79bbc2d7f);
+static const std::uint64_t kListHash = UINT64_C(0x28c52e8c24e38fd9);
 static const std::uint64_t kOrderListHash = UINT64_C(0xa5a28a69710898c6);
 static const std::uint64_t kMapIdentityHash = UINT64_C(0x1f5787abb2e02a06);
 static const std::uint64_t kMapTranslateHash = UINT64_C(0xd242bc481e41cf7c);
 static const std::uint64_t kMapDesignHash = UINT64_C(0xff01deda28fd860d);
-static const std::uint64_t kSceneHash = UINT64_C(0xbe823c7fd8ad66e2);
+static const std::uint64_t kSceneHash = UINT64_C(0x20be48b38128eb04);
 static const std::uint64_t kEmptySceneHash = UINT64_C(0x686c3f795130bed5);
 static const std::uint64_t kSceneBHash = UINT64_C(0x0494e9bfbe8f046a);
 static const std::uint64_t kPathKeyEmpty = UINT64_C(0xa8c7f832281a39c5);
@@ -48,16 +49,21 @@ RQ 3ff0000000000000 3fe0000000000000 4000000000000000 402e000000000000 403000000
 RC 3ff0000000000000 4000000000000000 3fe0000000000000 4010000000000000 4033000000000000 4034000000000000 4035000000000000 4036000000000000 4037000000000000 403819999999999a
 Z
 )DUMP";
+static const char * const kFaceDump =
+R"DUMP(gshscene.resource 1 kind=face hash=6c1ececace087998
+face font=1122334455667788 index=2 coords=2 8192 -4096
+bound=0 upem=0 flags=0
+)DUMP";
 static const char * const kFontRunDump =
-R"DUMP(gshscene.resource 1 kind=glyph-run hash=0187bb6b4cba610a
-run source=0 font=1122334455667788 face=2 size=4029000000000000 hint=3 var=aabbccdd00112233 glyphs=3
+R"DUMP(gshscene.resource 2 kind=glyph-run hash=ff3d88fae83f9c32
+run source=0 face=6c1ececace087998 size=4029000000000000 hint=1 version=40 glyphs=3
 g id=36 x=0000000000000000 y=0000000000000000 outline=0000000000000000
 g id=37 x=401e000000000000 y=3fd0000000000000 outline=0000000000000000
 g id=4294967295 x=bff0000000000000 y=4000000000000000 outline=0000000000000000
 )DUMP";
 static const char * const kOutlineRunDump =
-R"DUMP(gshscene.resource 1 kind=glyph-run hash=99e3cf48a1beb8e0
-run source=1 font=0000000000000000 face=0 size=0000000000000000 hint=0 var=0000000000000000 glyphs=2
+R"DUMP(gshscene.resource 2 kind=glyph-run hash=ef78b4b2ed8203d7
+run source=1 face=0000000000000000 size=0000000000000000 hint=0 version=0 glyphs=2
 g id=1 x=0000000000000000 y=0000000000000000 outline=b0a83b16e6cec382
 g id=2 x=4014000000000000 y=c008000000000000 outline=0a107c56241f4b98
 )DUMP";
@@ -70,13 +76,13 @@ F res=path:0a107c56241f4b98 map=d242bc481e41cf7c rule=1 paint=0 3ff0000000000000
 g
 )DUMP";
 static const char * const kListDump =
-R"DUMP(gshscene.list 2 items=9 ties=0 fg=3fb999999999999a 3fc999999999999a 3fd3333333333333 3fe0000000000000 1:1:0000000000000000 hash=3b3186b79bbc2d7f
+R"DUMP(gshscene.list 2 items=9 ties=0 fg=3fb999999999999a 3fc999999999999a 3fd3333333333333 3fe0000000000000 1:1:0000000000000000 hash=28c52e8c24e38fd9
 F res=path:b0a83b16e6cec382 map=ff01deda28fd860d rule=0 paint=0 3fd0000000000000 3fe0000000000000 3fe8000000000000 3ff0000000000000 space=2:3:4001980000000000 layer=-3 depth=3fe0000000000000
-F res=glyph-run:0187bb6b4cba610a map=1f5787abb2e02a06 rule=1 paint=0 0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 space=0:0:0000000000000000 layer=0 depth=0000000000000000
+F res=glyph-run:ff3d88fae83f9c32 map=1f5787abb2e02a06 rule=1 paint=0 0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 space=0:0:0000000000000000 layer=0 depth=0000000000000000
 C res=path:0a107c56241f4b98 map=d242bc481e41cf7c rule=1 layer=4 depth=c000000000000000
 G opacity=3fe0000000000000 blend=1:1:0000000000000000 composite=5 order=0 layer=7 depth=3ff8000000000000
 I res=picture:8810bf3f3a795dee map=d242bc481e41cf7c layer=1 depth=400a000000000000
-F res=glyph-run:99e3cf48a1beb8e0 map=1f5787abb2e02a06 rule=0 paint=0 4000000000000000 bfe0000000000000 0000000000000000 3fe0000000000000 space=0:0:0000000000000000 layer=5 depth=0000000000000000
+F res=glyph-run:ef78b4b2ed8203d7 map=1f5787abb2e02a06 rule=0 paint=0 4000000000000000 bfe0000000000000 0000000000000000 3fe0000000000000 space=0:0:0000000000000000 layer=5 depth=0000000000000000
 F res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=2 0000000000000000 0000000000000000 0000000000000000 3fe8000000000000 space=0:0:0000000000000000 layer=6 depth=0000000000000000
 g
 c
@@ -116,13 +122,13 @@ T first=8 second=9 depth=4000000000000000 reason=1
 T first=23 second=24 depth=0000000000000000 reason=3
 )DUMP";
 static const char * const kSceneDump =
-R"DUMP(gshscene.version 2 nodes=7 root=1 fg=3ff0000000000000 3fe0000000000000 3fd0000000000000 3fe8000000000000 3:3:400199999999999a hash=be823c7fd8ad66e2
+R"DUMP(gshscene.version 2 nodes=7 root=1 fg=3ff0000000000000 3fe0000000000000 3fd0000000000000 3fe8000000000000 3:3:400199999999999a hash=20be48b38128eb04
 G id=1 parent=0 flags=0 key=- map=1f5787abb2e02a06 opacity=3ff0000000000000 blend=0:0:0000000000000000 composite=0 order=0 layer=0 depth=0000000000000000 clip=- children=2,4,7
 G id=2 parent=1 flags=0 key=5356470000000001:000000000000002a map=d242bc481e41cf7c opacity=3fe0000000000000 blend=1:1:0000000000000000 composite=11 order=1 layer=3 depth=bff4000000000000 clip=path:0a107c56241f4b98:ff01deda28fd860d:1 children=3
 S id=3 parent=2 flags=0 key=- res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=0 3fd0000000000000 3fe0000000000000 3fe8000000000000 3ff0000000000000 space=2:3:4001980000000000 layer=-1 depth=4004000000000000
 G id=4 parent=1 flags=1 key=- map=1f5787abb2e02a06 opacity=3ff0000000000000 blend=0:0:0000000000000000 composite=0 order=0 layer=0 depth=0000000000000000 clip=- children=5,6
-S id=5 parent=4 flags=0 key=0000000000000001:0000000000000002 res=glyph-run:99e3cf48a1beb8e0 map=d242bc481e41cf7c rule=1 paint=0 4000000000000000 bfe0000000000000 0000000000000000 3fe0000000000000 space=0:0:0000000000000000 layer=5 depth=0000000000000000
-S id=6 parent=4 flags=0 key=- res=glyph-run:0187bb6b4cba610a map=1f5787abb2e02a06 rule=0 paint=2 0000000000000000 0000000000000000 0000000000000000 3fd0000000000000 space=0:0:0000000000000000 layer=0 depth=0000000000000000
+S id=5 parent=4 flags=0 key=0000000000000001:0000000000000002 res=glyph-run:ef78b4b2ed8203d7 map=d242bc481e41cf7c rule=1 paint=0 4000000000000000 bfe0000000000000 0000000000000000 3fe0000000000000 space=0:0:0000000000000000 layer=5 depth=0000000000000000
+S id=6 parent=4 flags=0 key=- res=glyph-run:ff3d88fae83f9c32 map=1f5787abb2e02a06 rule=0 paint=2 0000000000000000 0000000000000000 0000000000000000 3fd0000000000000 space=0:0:0000000000000000 layer=0 depth=0000000000000000
 I id=7 parent=1 flags=0 key=- target=4 map=ff01deda28fd860d layer=9 depth=c012000000000000
 )DUMP";
 static const char * const kEmptySceneDump =

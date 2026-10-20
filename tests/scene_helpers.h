@@ -171,6 +171,36 @@ inline const GSHSCENE_Resource * intern_fixture(GSHSCENE_Store * store) {
   return r;
 }
 
+/** The face of tools/gen-scene-vectors.py: the key, face index 2 and the coordinates 8192 and -4096, unbound. */
+inline const GSHSCENE_Resource * intern_face(GSHSCENE_Store * store, uint64_t key = UINT64_C(0x1122334455667788),
+    uint32_t index = 2, int16_t c0 = 8192, int16_t c1 = -4096) {
+  int16_t coords[2] = {c0, c1};
+  GSHSCENE_Face_Desc desc;
+  std::memset(&desc, 0, sizeof desc);
+  desc.font_key = key;
+  desc.face_index = index;
+  desc.coord_count = 2;
+  desc.coords = coords;
+  const GSHSCENE_Resource * r = nullptr;
+  return gshscene_store_intern_face(store, &desc, &r) == GSHSCENE_OK ? r : nullptr;
+}
+
+/** A glyph run from the face @p face (retained by the caller), the given glyphs, size and mode. */
+inline const GSHSCENE_Resource * intern_font_run(GSHSCENE_Store * store, const GSHSCENE_Resource * face, double size,
+    const std::vector<GSHSCENE_Glyph> & glyphs, uint32_t hint_mode = 0, uint32_t hint_version = 0) {
+  GSHSCENE_Glyph_Run run;
+  std::memset(&run, 0, sizeof run);
+  run.source = GSHSCENE_GLYPHS_FROM_FONT;
+  run.face = face;
+  run.size = size;
+  run.hint_mode = hint_mode;
+  run.hint_version = hint_version;
+  run.glyph_count = glyphs.size();
+  run.glyphs = glyphs.empty() ? nullptr : glyphs.data();
+  const GSHSCENE_Resource * r = nullptr;
+  return gshscene_store_intern_glyph_run(store, &run, &r) == GSHSCENE_OK ? r : nullptr;
+}
+
 inline GSHGEOM_Map translate(double tx, double ty) {
   GSHGEOM_Map m;
   gshgeom_map_translate(2, tx, ty, 0.0, &m);

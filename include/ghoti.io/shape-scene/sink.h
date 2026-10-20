@@ -80,7 +80,9 @@
  * layer walks the closed list and its pictures against the caps and writes every
  * refusal and approximation that is a property of the list and the caps
  * (::gshscene_caps_disposition is the one predicate, and a sink decides each item
- * with it too), and every depth tie of the list as `RESOLVED_AMBIGUITY`.  A
+ * with it too), the entry of each run from a font's route (::gshscene_glyph_route:
+ * a run-level `HINT_STATUS`, or a refusal, D6), and every depth tie of the list as
+ * `RESOLVED_AMBIGUITY`.  A
  * refused push or instance skips its whole block.  Best effort returns
  * ::GSHSCENE_OK.  With ::GSHSCENE_RENDER_STRICT a planned refusal is
  * ::GSHSCENE_ERR_REFUSED before the sink is called, so the target is untouched; a
@@ -150,15 +152,19 @@
  * Nothing here composes, flattens or rounds; each sink composes its maps
  * (`gshgeom_map_compose_chain`) and flattens with its own rule, or not at all (a
  * writer emits curves, a GPU sink may rasterize them).  A resource's id is the key
- * a writer dedupes by and a cache is keyed by.
+ * a writer dedupes by and a cache is keyed by.  The planning pass composes maps to
+ * decide (a run from a font's route, glyph.h), and never hands composed geometry
+ * to a sink.
  *
  * ### For sink implementations
  *
  * A sink library fills a ::GSHSCENE_Sink_Ops and calls ::gshscene_sink_create
  * from its own constructor.  Its `begin` reads the job's request
  * (::gshscene_job_request; the target there is the job's copy), walks the list
- * (::GSHSCENE_Expansion), decides each item with ::gshscene_caps_disposition, adds
- * the entries only it can find (::gshscene_job_report), reports progress and
+ * (::GSHSCENE_Expansion), decides each item with ::gshscene_caps_disposition (and a
+ * run from a font with ::gshscene_glyph_route, skipping a run it refuses: the plan
+ * reported it), adds the entries only it can find (::gshscene_job_report, and
+ * ::gshscene_job_report_glyph for one glyph of a run), reports progress and
  * checks cancel at its declared points (::gshscene_job_unit,
  * ::gshscene_job_checkpoint), and ends the job with ::gshscene_job_complete,
  * inside `begin` or later.
@@ -171,6 +177,7 @@
 #include <ghoti.io/shape-scene/cancel.h>
 #include <ghoti.io/shape-scene/core.h>
 #include <ghoti.io/shape-scene/diff.h>
+#include <ghoti.io/shape-scene/glyph.h>
 #include <ghoti.io/shape-scene/list.h>
 #include <ghoti.io/shape-scene/macros.h>
 #include <ghoti.io/shape-scene/paint.h>
@@ -269,7 +276,7 @@ typedef struct GSHSCENE_Target {
 #define GSHSCENE_CAP_THREAD_AFFINE (UINT32_C(1) << 1)    ///< Calls only from the creating thread (S14).
 #define GSHSCENE_CAP_READBACK (UINT32_C(1) << 2)         ///< ::gshscene_sink_readback works (S15).
 #define GSHSCENE_CAP_CALLER_MEMORY (UINT32_C(1) << 3)    ///< ::GSHSCENE_RENDER_CALLER_MEMORY is honored (S9).
-#define GSHSCENE_CAP_GLYPHS_FROM_FONT (UINT32_C(1) << 4) ///< Glyph runs named by a font are drawn (a glyph path provider).
+#define GSHSCENE_CAP_GLYPHS_FROM_FONT (UINT32_C(1) << 4) ///< Glyph runs from a font are drawn through their face's provider (glyph.h).
 #define GSHSCENE_CAP_CLIP_AA (UINT32_C(1) << 5)          ///< Clips are antialiased (else each is approximated, AD-12).
 #define GSHSCENE_CAP_BLEND_SPACES (UINT32_C(1) << 6)     ///< Groups blend in their stated space (else approximated, AD-23).
 #define GSHSCENE_CAP_PREPARE (UINT32_C(1) << 7)          ///< `prepare` holds resources across frames (S9).
@@ -569,6 +576,13 @@ GSHSCENE_API GSHSCENE_Result gshscene_job_report(GSHSCENE_Job * job, GSHSCENE_En
     GSHSCENE_Reason reason, const size_t * chain, size_t chain_count);
 
 /**
+ * @brief Add an entry about one glyph of a run (glyph.h): as ::gshscene_job_report, with the glyph's index in the
+ *   run as the entry's `second`.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_job_report_glyph(GSHSCENE_Job * job, GSHSCENE_Entry_Class entry_class,
+    GSHSCENE_Reason reason, const size_t * chain, size_t chain_count, size_t glyph);
+
+/**
  * @brief Complete the job (S3): seal the report (sort it, write the summary and @p result, the failure's @p chain and
  *   static @p reason), release the surface, call `on_complete`, mark the job done.  Called once per begun job.
  *
@@ -587,7 +601,7 @@ typedef struct GSHSCENE_Disposition {
  * @brief The one predicate of the planning pass (S6): what @p caps make of @p item on a target whose resolved blend
  *   space is @p target_space.
  *
- * In this order: a kind the caps do not draw is refused (`ITEM_KIND`); a fill or clip of a glyph run named by a font
+ * In this order: a kind the caps do not draw is refused (`ITEM_KIND`); a fill or clip of a glyph run from a font
  * without `GLYPHS_FROM_FONT` is refused (`GLYPH_SOURCE`); a group whose operator the caps do not composite is refused
  * (`COMPOSITE`); a clip push without `CLIP_AA` is approximated (`CLIP_ALIASED`); a group whose own blend space is
  * stated and differs from @p target_space, without `BLEND_SPACES`, is approximated (`BLEND_SPACE`).  A pop is drawn

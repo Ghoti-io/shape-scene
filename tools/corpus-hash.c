@@ -33,6 +33,10 @@
  * scale and on a 32 by 32 raster, by a sink that draws everything and by a narrow one under strict, and the results,
  * the output hashes (the dump's bytes: every box a double through a composed map), the report hashes and the
  * stamped pixels are folded in.
+ * Since story 14a the glyph runs from a font name faces bound to the test provider (tests/glyph_test_provider.h),
+ * so the renders go through both routes, and a glyph section folds in each route's decision, the fast tier's device
+ * paths and the general route's under the snapped map (which must be the same paths: AD-5's gate, checked here on
+ * every target) and test-sink renders at integer, fractional and rotated sizes.
  * It is built by `make check-corpus-hash` on the host and by
  * suite/tools/xarch/shape.sh and suite/tools/xwin/shape.sh for the others.
  *
@@ -51,6 +55,8 @@
 #include <ghoti.io/shape-geometry/shape-geometry.h>
 
 #include <ghoti.io/image/raster.h>
+
+#include "../tests/glyph_test_provider.h"
 
 #include <inttypes.h>
 #include <stdint.h>
@@ -489,6 +495,8 @@ static void feed_render(const GSHSCENE_List * list) {
   check(gshscene_sink_destroy(sinks[1]), "destroy");
 }
 
+static const GSHSCENE_Resource * test_face(GSHSCENE_Store * store, unsigned which, int16_t coord);
+
 static void scene_section(void) {
   Tree t;
   memset(&t, 0, sizeof t);
@@ -503,18 +511,20 @@ static void scene_section(void) {
     GSHSCENE_Glyph_Run run;
     GSHSCENE_Glyph glyphs[4];
     memset(&run, 0, sizeof run);
+    const GSHSCENE_Resource * face = test_face(store, 0, 0);
     run.source = GSHSCENE_GLYPHS_FROM_FONT;
-    run.font_key = next() | 1u;
+    run.face = face;
     run.size = 14.0;
     run.glyph_count = 4;
     for (size_t g = 0; g < 4; g++) {
-      glyphs[g].id = (uint32_t)(next() & 0xffffu);
+      glyphs[g].id = (uint32_t)between(0, 3);
       glyphs[g].x = coord();
       glyphs[g].y = coord();
       glyphs[g].outline = NULL;
     }
     run.glyphs = glyphs;
     check(gshscene_store_intern_glyph_run(store, &run, &t.runs[0]), "scene font run");
+    gshscene_resource_release(face);
     memset(&run, 0, sizeof run);
     run.source = GSHSCENE_GLYPHS_FROM_OUTLINES;
     run.glyph_count = 3;
@@ -649,6 +659,129 @@ static void scene_section(void) {
   gshscene_scene_destroy(t.scene);
 }
 
+/* --- glyphs (story 14a) -------------------------------------------------------------------------------- */
+
+static GSHSCENE_Test_Provider provider_program = {2048u, GSHSCENE_FACE_HINTING, 0, 0, {0}, {0}, {0}, {0}, {0}, {0}};
+static GSHSCENE_Test_Provider provider_plain = {1000u, 0, 0, 0, {0}, {0}, {0}, {0}, {0}, {0}};
+
+/** A face of the test provider: @p which 0 (2048 units, a program, fast), 1 (1000, plain, fast), 2 (2048, no fast). */
+static const GSHSCENE_Resource * test_face(GSHSCENE_Store * store, unsigned which, int16_t coord) {
+  GSHSCENE_Test_Provider * tp = which == 1 ? &provider_plain : &provider_program;
+  const GSHSCENE_Resource * face = gshscene_tp_face(store, tp, which != 2, 0x51u + which, coord);
+  if (!face) {
+    fail("test face");
+  }
+  return face;
+}
+
+/** Every glyph of @p run under @p map: its route, and on the fast tier its path and the general route's under the snapped map. */
+static void feed_routes(const GSHSCENE_Resource * run, const GSHGEOM_Map * map) {
+  GSHSCENE_Glyph_Route route;
+  check(gshscene_glyph_route(run, map, GSHSCENE_TARGET_RASTER, &route), "route");
+  feed(route.route);
+  feed(route.entry_class);
+  feed(route.reason);
+  feed(route.ppem);
+  feed((uint64_t)(uint32_t)route.scale);
+  GSHSCENE_Glyph_Run r;
+  check(gshscene_resource_glyph_run(run, &r), "run");
+  for (size_t i = 0; i < r.glyph_count; i++) {
+    GSHSCENE_Glyph_Note note;
+    if (route.route == GSHSCENE_GLYPH_FAST) {
+      GSHSCENE_Glyph_Origin origin;
+      GSHGEOM_Device_Path * fast = NULL;
+      check(gshscene_glyph_origin(run, map, i, &origin), "origin");
+      check(gshscene_glyph_device_path(run, &route, i, &origin, NULL, NULL, &fast, &note), "fast tier");
+      feed(note.entry_class);
+      feed(note.reason);
+      feed(note.status);
+      feed(gshgeom_device_path_hash(fast));
+      GSHGEOM_Path * outline = NULL;
+      GSHSCENE_Glyph_Note general_note;
+      check(gshscene_glyph_outline(run, i, NULL, NULL, &outline, &general_note), "outline");
+      if (fast && outline && r.hint_mode == GSHSCENE_HINT_NONE) {
+        GSHGEOM_Map snap;
+        GSHGEOM_Device_Path * general = NULL;
+        check(gshscene_glyph_snap_map(&route, &origin, &snap), "snap");
+        if (gshgeom_device_path_from_model(outline, &snap, NULL, NULL, &general) != GSHGEOM_OK ||
+            gshgeom_device_path_hash(general) != gshgeom_device_path_hash(fast)) {
+          fail("AD-5: the fast tier with hinting off is not the general route under the snapped map");
+        }
+        gshgeom_device_path_destroy(general);
+      }
+      gshgeom_path_destroy(outline);
+      gshgeom_device_path_destroy(fast);
+    } else {
+      GSHGEOM_Map glyph_map;
+      GSHGEOM_Path * outline = NULL;
+      check(gshscene_glyph_map(run, map, i, &glyph_map), "glyph map");
+      check(gshscene_glyph_outline(run, i, NULL, NULL, &outline, &note), "outline");
+      feed(note.entry_class);
+      feed(note.reason);
+      feed(gshgeom_map_hash(&glyph_map));
+      feed(gshgeom_path_hash(outline));
+      gshgeom_path_destroy(outline);
+    }
+  }
+}
+
+static void glyph_section(void) {
+  GSHSCENE_Store * store = NULL;
+  check(gshscene_store_create(NULL, NULL, &store), "glyph store");
+  static const double sizes[5] = {16.0, 8.0, 13.0, 12.5, 40.0 / 3.0};
+  static const int16_t coords[3] = {0, 8192, -16384};
+  for (unsigned f = 0; f < 3; f++) {
+    for (unsigned c = 0; c < 3; c++) {
+      const GSHSCENE_Resource * face = test_face(store, f, coords[c]);
+      feed(gshscene_resource_hash(face));
+      for (unsigned mode = 0; mode < GSHSCENE_HINT_MODE_COUNT; mode++) {
+        GSHSCENE_Glyph glyphs[8];
+        for (uint32_t g = 0; g < 8; g++) {
+          glyphs[g].id = g;
+          glyphs[g].x = (double)(g * 11u) + (double)between(0, 63) / 64.0 - 3.0; /* 26.6 positions, either sign */
+          glyphs[g].y = 20.0 + (double)between(0, 127) / 128.0;
+          glyphs[g].outline = NULL;
+        }
+        GSHSCENE_Glyph_Run run;
+        memset(&run, 0, sizeof run);
+        run.source = GSHSCENE_GLYPHS_FROM_FONT;
+        run.face = face;
+        run.size = sizes[(f + c + mode) % 5];
+        run.hint_mode = mode;
+        run.glyph_count = 8;
+        run.glyphs = glyphs;
+        const GSHSCENE_Resource * r = NULL;
+        check(gshscene_store_intern_glyph_run(store, &run, &r), "glyph run");
+        feed(gshscene_resource_hash(r));
+        /* Grid-aligned (a scale and a translation), rotated, and through a general map. */
+        GSHGEOM_Map maps[3];
+        GSHGEOM_Map t;
+        gshgeom_map_scale(2, 1.0 + (double)(mode % 2), 1.0 + (double)(mode % 2), 1.0, &maps[0]);
+        gshgeom_map_translate(2, 0.3125, -1.75, 0.0, &t);
+        gshgeom_map_compose(&t, &maps[0], &maps[0]);
+        gshgeom_map_rotate(GSHGEOM_ANGLE_DEGREES, 30.0, &maps[1]);
+        maps[2] = random_map();
+        for (unsigned m = 0; m < 3; m++) {
+          feed_routes(r, &maps[m]);
+        }
+        /* And rendered through the test sink, in a list under the grid-aligned map and the rotation. */
+        GSHSCENE_List * list = NULL;
+        check(gshscene_list_create(NULL, NULL, store, &list), "glyph list");
+        GSHSCENE_Paint black = random_paint();
+        check(gshscene_list_fill(list, r, &maps[0], GSHGEOM_FILL_NONZERO, &black, 0, 0.0), "glyph fill");
+        check(gshscene_list_fill(list, r, &maps[1], GSHGEOM_FILL_NONZERO, &black, 0, 0.0), "glyph fill");
+        check(gshscene_list_close(list), "glyph close");
+        feed(gshscene_list_hash(list));
+        feed_render(list);
+        gshscene_list_destroy(list);
+        gshscene_resource_release(r);
+      }
+      gshscene_resource_release(face);
+    }
+  }
+  gshscene_store_destroy(store);
+}
+
 int main(void) {
   gshgeom_hash_init(&total);
   GSHSCENE_Store * store = NULL;
@@ -679,16 +812,17 @@ int main(void) {
     GSHSCENE_Glyph glyphs[20];
     GSHSCENE_Glyph_Run run;
     memset(&run, 0, sizeof run);
+    const GSHSCENE_Resource * face = NULL;
     if (i % 2 == 0) {
+      face = test_face(store, between(0, 2), (i % 4 == 0) ? 0 : (int16_t)((int)between(0, 32768) - 16384));
       run.source = GSHSCENE_GLYPHS_FROM_FONT;
-      run.font_key = next() | 1u;
-      run.face_index = between(0, 3);
+      run.face = face;
       run.size = sizes[between(0, 4)];
-      run.hint_mode = between(0, 3);
-      run.variation_key = (i % 4 == 0) ? 0 : next();
+      run.hint_mode = between(0, 2);
+      run.hint_version = between(0, 2);
       run.glyph_count = between(0, 20);
       for (size_t g = 0; g < run.glyph_count; g++) {
-        glyphs[g].id = (uint32_t)(next() & 0xffffffffu);
+        glyphs[g].id = (uint32_t)between(0, 9);
         glyphs[g].x = coord();
         glyphs[g].y = coord();
         glyphs[g].outline = NULL;
@@ -706,6 +840,7 @@ int main(void) {
     run.glyphs = glyphs;
     const GSHSCENE_Resource * r = NULL;
     check(gshscene_store_intern_glyph_run(store, &run, &r), "intern run");
+    gshscene_resource_release(face); /* the run holds its own */
     feed(gshscene_resource_hash(r));
     feed((uint64_t)run.glyph_count);
     runs[run_count++] = r;
@@ -811,6 +946,7 @@ int main(void) {
   gshscene_store_destroy(store);
 
   scene_section();
+  glyph_section();
 
   printf("shape-scene.hash %016" PRIx64 "\n", gshgeom_hash_value(&total));
   printf("shape-scene.count %lu\n", count);

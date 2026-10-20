@@ -711,9 +711,19 @@ static void op(S * s, unsigned code) {
       memset(glyphs, 0, sizeof glyphs);
       run.glyph_count = pick(s, 4);
       run.glyphs = glyphs;
+      const GSHSCENE_Resource * face = NULL;
       if (code % OP_COUNT == OP_INTERN_RUN) {
+        /* A face, unbound, with the key and a coordinate the input gives (story 14a). */
+        int16_t coord = (int16_t)((int)arg(s) * 128 - 16384);
+        GSHSCENE_Face_Desc desc;
+        memset(&desc, 0, sizeof desc);
+        desc.font_key = 1 + arg(s);
+        desc.coord_count = 1;
+        desc.coords = &coord;
+        r = gshscene_store_intern_face(store, &desc, &face);
+        CHECK(r == GSHSCENE_OK || r == GSHSCENE_ERR_LIMIT || r == GSHSCENE_ERR_OOM);
         run.source = GSHSCENE_GLYPHS_FROM_FONT;
-        run.font_key = 1 + arg(s);
+        run.face = face;
         run.size = 10;
       } else {
         run.source = GSHSCENE_GLYPHS_FROM_OUTLINES;
@@ -725,6 +735,7 @@ static void op(S * s, unsigned code) {
       }
       const GSHSCENE_Resource * x = NULL;
       r = gshscene_store_intern_glyph_run(store, &run, &x);
+      gshscene_resource_release(face); /* the run holds its own */
       CHECK(r == GSHSCENE_OK || r == GSHSCENE_ERR_LIMIT || r == GSHSCENE_ERR_INVALID);
       if (r == GSHSCENE_OK) {
         unsigned slot = pick(s, POOL);

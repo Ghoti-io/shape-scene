@@ -33,6 +33,7 @@
 #include "../internal.h"
 #include "sink_internal.h"
 
+#include <ghoti.io/shape-geometry/device.h>
 #include <ghoti.io/shape-geometry/path.h>
 
 #include <inttypes.h>
@@ -47,6 +48,12 @@
 
 /** What the workspace is carved in. */
 #define CARVE_ALIGN 16u
+
+/**
+ * The scratch one glyph's provider paths take (dump_sink.h): carved from the run's memory, so a render allocates
+ * nothing for its glyphs, and a glyph whose paths do not fit is refused (`RESOURCE_LIMIT`, the sink's own limit).
+ */
+#define GLYPH_BYTES ((size_t)65536)
 
 /**
  * The range a box edge is clamped to before it is made a whole pixel: an `int32_t`'s.  A double becomes an
@@ -74,6 +81,15 @@ typedef struct Block {
 
 typedef struct Dump_Sink Dump_Sink;
 
+/** A bump allocator over the glyph scratch, reset for each glyph: a block is a 16-byte header (its size) and its payload. */
+typedef struct Glyph_Arena {
+  unsigned char * base;
+  size_t capacity;
+  size_t used;
+  void * last;          /* the last block handed out: a realloc of it grows in place */
+  GSHGEOM_Allocator self;
+} Glyph_Arena;
+
 /** One render of the test sink: what it has to remember between units. */
 typedef struct Run {
   Dump_Sink * sink;
@@ -97,6 +113,7 @@ typedef struct Run {
   size_t * stop;          /* the chain of the unit a refusal stopped at */
   size_t stop_count;
   char * line;
+  Glyph_Arena glyphs;     /* the scratch of one glyph's provider paths */
 } Run;
 
 struct Dump_Sink {
@@ -214,7 +231,84 @@ static size_t run_bytes(const GSHSCENE_List * list, size_t * levels, size_t * bl
   n = gshscene_sat_add(n, align_up(gshscene_sat_mul(*blocks, sizeof(Block))));
   n = gshscene_sat_add(n, align_up(gshscene_sat_mul(*levels, sizeof(size_t))));
   n = gshscene_sat_add(n, align_up(LINE_BYTES));
+  n = gshscene_sat_add(n, GLYPH_BYTES);
   return n;
+}
+
+/* --- the glyph scratch --------------------------------------------------------------- */
+
+static void * arena_take(Glyph_Arena * a, size_t size) {
+  size_t payload = align_up(size ? size : 1);
+  if (payload == SIZE_MAX || payload > a->capacity || a->capacity - payload < a->used + CARVE_ALIGN) {
+    return NULL;
+  }
+  unsigned char * block = a->base + a->used;
+  memcpy(block, &size, sizeof size);
+  a->used += CARVE_ALIGN + payload;
+  a->last = block + CARVE_ALIGN;
+  return a->last;
+}
+
+static void * arena_malloc(void * ctx, size_t size) {
+  return arena_take(ctx, size);
+}
+
+static void * arena_calloc(void * ctx, size_t count, size_t size) {
+  if (size != 0 && count > SIZE_MAX / size) {
+    return NULL;
+  }
+  void * p = arena_take(ctx, count * size);
+  if (p) {
+    memset(p, 0, count * size);
+  }
+  return p;
+}
+
+static void * arena_realloc(void * ctx, void * pointer, size_t size) {
+  Glyph_Arena * a = ctx;
+  if (!pointer) {
+    return arena_take(a, size);
+  }
+  size_t old;
+  memcpy(&old, (unsigned char *)pointer - CARVE_ALIGN, sizeof old);
+  if (pointer == a->last) {
+    /* The last block: grown or shrunk in place. */
+    size_t start = (size_t)((unsigned char *)pointer - a->base);
+    size_t payload = align_up(size ? size : 1);
+    if (payload == SIZE_MAX || payload > a->capacity - start) {
+      return NULL;
+    }
+    a->used = start + payload;
+    memcpy((unsigned char *)pointer - CARVE_ALIGN, &size, sizeof size);
+    return pointer;
+  }
+  void * p = arena_take(a, size);
+  if (p) {
+    memcpy(p, pointer, old < size ? old : size);
+  }
+  return p;
+}
+
+static void arena_free(void * ctx, void * pointer) {
+  (void)ctx;
+  (void)pointer; /* kept until the arena is reset */
+}
+
+static void arena_init(Glyph_Arena * a, unsigned char * memory, size_t bytes) {
+  a->base = memory;
+  a->capacity = bytes;
+  a->used = 0;
+  a->last = NULL;
+  a->self.ctx = a;
+  a->self.malloc_fn = arena_malloc;
+  a->self.calloc_fn = arena_calloc;
+  a->self.realloc_fn = arena_realloc;
+  a->self.free_fn = arena_free;
+}
+
+static void arena_reset(Glyph_Arena * a) {
+  a->used = 0;
+  a->last = NULL;
 }
 
 static GSHSCENE_Result op_workspace_bytes(void * impl, const GSHSCENE_Render_Request * request, size_t * out) {
@@ -292,6 +386,29 @@ static void box_add(Box * box, double x0, double y0, double x1, double y1) {
   box->y1 = y1 > box->y1 ? y1 : box->y1;
 }
 
+/**
+ * The model-space box of a run from a font: each glyph's design box (the provider's) through the glyph's
+ * placement, `x + (size / upem) u` and `y - (size / upem) v`.  A glyph whose box the provider cannot give adds
+ * nothing (it is refused when it is drawn).
+ */
+static int font_box(const GSHSCENE_Resource * resource, const GSHSCENE_Glyph_Run * run, Box * box) {
+  GSHSCENE_Face_Info info;
+  if (gshscene_face_info(run->face, &info) != GSHSCENE_OK) {
+    return 1;
+  }
+  double s = run->size / (double)(int32_t)info.upem / 64.0; /* model units per 26.6 design unit */
+  for (size_t i = 0; i < run->glyph_count; i++) {
+    GSHSCENE_Glyph_Box b;
+    if (gshscene_glyph_box(resource, i, &b) != GSHSCENE_OK || b.empty) {
+      continue;
+    }
+    const GSHSCENE_Glyph * g = &run->glyphs[i];
+    box_add(box, g->x + s * (double)b.x_min, g->y - s * (double)b.y_max, g->x + s * (double)b.x_max,
+        g->y - s * (double)b.y_min);
+  }
+  return 0;
+}
+
 /** The model-space box of a path or glyph run (see dump_sink.h); 0, or nonzero when it cannot be formed. */
 static int resource_box(const GSHSCENE_Resource * resource, Box * box) {
   box->empty = 1;
@@ -311,12 +428,11 @@ static int resource_box(const GSHSCENE_Resource * resource, Box * box) {
   if (gshscene_resource_glyph_run(resource, &run) != GSHSCENE_OK) {
     return 1;
   }
+  if (run.source == GSHSCENE_GLYPHS_FROM_FONT) {
+    return font_box(resource, &run, box);
+  }
   for (size_t i = 0; i < run.glyph_count; i++) {
     const GSHSCENE_Glyph * g = &run.glyphs[i];
-    if (run.source == GSHSCENE_GLYPHS_FROM_FONT) {
-      box_add(box, g->x - run.size, g->y - run.size, g->x + run.size, g->y + run.size);
-      continue;
-    }
     const GSHGEOM_Path * outline = gshscene_resource_path(g->outline);
     GSHGEOM_Bounds b;
     if (!outline || gshgeom_path_bounds(outline, &b) != GSHGEOM_OK) {
@@ -471,6 +587,86 @@ static void hex(Run * run, const char * prefix, uint64_t value, GSHSCENE_Result 
   emit_text(run, run->line, failed);
 }
 
+/** A refusal while drawing (S6): the entry is the caller's; under strict the render stops at this unit. */
+static GSHSCENE_Result stop_here(Run * run, const size_t * chain, size_t count, GSHSCENE_Result failed) {
+  memcpy(run->stop, chain, count * sizeof *chain);
+  run->stop_count = count;
+  return failed != GSHSCENE_OK ? failed : GSHSCENE_ERR_REFUSED;
+}
+
+/**
+ * The glyph records of a run from a font (dump_sink.h): for each glyph, its route's answer and the entry the
+ * provider's answer makes (glyph.h).  @return 0 to go on; ::GSHSCENE_ERR_REFUSED to stop (a glyph refused under
+ * strict); an error from the report or the stream.
+ */
+static GSHSCENE_Result glyph_records(Run * run, const GSHSCENE_Item * item, const GSHGEOM_Map * map,
+    const GSHSCENE_Glyph_Route * route, const size_t * chain, size_t count, GSHSCENE_Result * failed) {
+  GSHSCENE_Glyph_Run glyphs;
+  if (gshscene_resource_glyph_run(item->resource, &glyphs) != GSHSCENE_OK) {
+    return GSHSCENE_ERR_INTERNAL;
+  }
+  for (size_t i = 0; i < glyphs.glyph_count; i++) {
+    arena_reset(&run->glyphs);
+    GSHSCENE_Glyph_Note note;
+    memset(&note, 0, sizeof note);
+    uint64_t hash = 0;
+    char tier = route->route == GSHSCENE_GLYPH_FAST ? 'f' : 'g';
+    GSHSCENE_Result r;
+    if (tier == 'f') {
+      GSHSCENE_Glyph_Origin origin;
+      GSHGEOM_Device_Path * path = NULL;
+      r = gshscene_glyph_origin(item->resource, map, i, &origin);
+      if (r == GSHSCENE_OK) {
+        r = gshscene_glyph_device_path(item->resource, route, i, &origin, &run->glyphs.self, NULL, &path, &note);
+      }
+      if (r == GSHSCENE_OK && path) {
+        hash = gshgeom_device_path_hash(path);
+      }
+      gshgeom_device_path_destroy(path);
+    } else {
+      GSHGEOM_Map glyph_map;
+      GSHGEOM_Path * path = NULL;
+      r = gshscene_glyph_map(item->resource, map, i, &glyph_map);
+      if (r == GSHSCENE_OK) {
+        r = gshscene_glyph_outline(item->resource, i, &run->glyphs.self, NULL, &path, &note);
+      }
+      if (r == GSHSCENE_OK && path) {
+        GSHGEOM_Hash h;
+        gshgeom_hash_init(&h);
+        gshgeom_hash_u64(&h, gshgeom_path_hash(path));
+        gshgeom_hash_u64(&h, gshgeom_map_hash(&glyph_map));
+        hash = gshgeom_hash_value(&h);
+      }
+      gshgeom_path_destroy(path);
+    }
+    if (r == GSHSCENE_ERR_LIMIT || r == GSHSCENE_ERR_OOM) {
+      /* An origin past 26.6, a map past its bounds, or paths past the glyph scratch: the sink's own limit. */
+      note.entry_class = GSHSCENE_ENTRY_REFUSED;
+      note.reason = GSHSCENE_REASON_RESOURCE_LIMIT;
+    } else if (r != GSHSCENE_OK) {
+      return r;
+    }
+    if (note.entry_class == GSHSCENE_ENTRY_REFUSED) {
+      snprintf(run->line, LINE_BYTES, "Y %" PRIu64 " x reason=%u\n", (uint64_t)i, (unsigned)note.reason);
+    } else {
+      snprintf(run->line, LINE_BYTES, "Y %" PRIu64 " %c %016" PRIx64 " status=%u\n", (uint64_t)i, tier, hash,
+          (unsigned)note.status);
+    }
+    emit_text(run, run->line, failed);
+    if (note.entry_class) {
+      r = gshscene_job_report_glyph(run->job, (GSHSCENE_Entry_Class)note.entry_class, (GSHSCENE_Reason)note.reason,
+          chain, count, i);
+      if (r != GSHSCENE_OK) {
+        return r;
+      }
+      if (note.entry_class == GSHSCENE_ENTRY_REFUSED && (run->job->request.flags & GSHSCENE_RENDER_STRICT)) {
+        return stop_here(run, chain, count, *failed);
+      }
+    }
+  }
+  return GSHSCENE_OK;
+}
+
 /**
  * Go through one unit.  @return 0 to go on; a result to stop with (::GSHSCENE_ERR_REFUSED for a strict refusal while
  * drawing, an I/O error from the stream).
@@ -500,7 +696,22 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
       GSHGEOM_Map map;
       Box model;
       Box box;
-      int bad = unit_map(run, item, count, &map) || resource_box(item->resource, &model) || box_map(&map, &model, &box);
+      int mapped = !unit_map(run, item, count, &map);
+      /* A run from a font: its route, decided as the plan decided it; a refused run was reported by the plan. */
+      GSHSCENE_Glyph_Run glyphs;
+      GSHSCENE_Glyph_Route route;
+      int font = gshscene_resource_glyph_run(item->resource, &glyphs) == GSHSCENE_OK &&
+          glyphs.source == GSHSCENE_GLYPHS_FROM_FONT;
+      memset(&route, 0, sizeof route);
+      int routed = font && mapped && gshscene_glyph_route(item->resource, &map, run->job->target.kind, &route) == GSHSCENE_OK;
+      if (routed && route.entry_class == GSHSCENE_ENTRY_REFUSED) {
+        snprintf(run->line, LINE_BYTES, " X class=%d reason=%d\n", (int)route.entry_class, (int)route.reason);
+        emit_text(run, run->line, &failed);
+        gshscene_skip_begin(&run->skip, item, count);
+        run->skip_reason = (GSHSCENE_Reason)route.reason;
+        return failed;
+      }
+      int bad = !mapped || (font && !routed) || resource_box(item->resource, &model) || box_map(&map, &model, &box);
       double limit = run->sink->config.max_extent;
       if (bad || (limit > 0.0 && !box.empty && (box.x1 - box.x0 > limit || box.y1 - box.y0 > limit))) {
         /* The sink's own resource limit, found while drawing (S6). */
@@ -512,9 +723,7 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
           return r;
         }
         if (request->flags & GSHSCENE_RENDER_STRICT) {
-          memcpy(run->stop, chain, count * sizeof *chain);
-          run->stop_count = count;
-          return failed != GSHSCENE_OK ? failed : GSHSCENE_ERR_REFUSED;
+          return stop_here(run, chain, count, failed);
         }
         gshscene_skip_begin(&run->skip, item, count);
         run->skip_reason = GSHSCENE_REASON_RESOURCE_LIMIT;
@@ -530,6 +739,12 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
         snprintf(run->line, LINE_BYTES, "%016" PRIx64 " %016" PRIx64 " %016" PRIx64 " %016" PRIx64 "\n",
             gshgeom_f64_bits(box.x0), gshgeom_f64_bits(box.y0), gshgeom_f64_bits(box.x1), gshgeom_f64_bits(box.y1));
         emit_text(run, run->line, &failed);
+      }
+      if (routed) {
+        GSHSCENE_Result r = glyph_records(run, item, &map, &route, chain, count, &failed);
+        if (r != GSHSCENE_OK) {
+          return r;
+        }
       }
       GSHSCENE_Rect r = box.empty ? (GSHSCENE_Rect){0, 0, 0, 0} : box_pixels(&box);
       if (item->kind == GSHSCENE_ITEM_FILL) {
@@ -620,7 +835,7 @@ static void finish(Run * run, GSHSCENE_Result result) {
   gshscene_job_set_impl_state(job, NULL);
   const char * reason = result == GSHSCENE_OK ? NULL
       : result == GSHSCENE_ERR_CANCELLED ? "cancelled between units"
-      : result == GSHSCENE_ERR_REFUSED ? "strict: refused while drawing (the sink's resource limit)"
+      : result == GSHSCENE_ERR_REFUSED ? "strict: refused while drawing (the sink's resource limit, or a glyph)"
       : result == GSHSCENE_ERR_IO ? "the stream refused a write"
       : "the test sink failed";
   unsigned char * memory = run->memory;
@@ -695,6 +910,7 @@ static GSHSCENE_Result op_begin(void * impl, GSHSCENE_Job * job) {
   run->blocks = carve(&cursor, blocks * sizeof(Block));
   run->stop = carve(&cursor, levels * sizeof(size_t));
   run->line = carve(&cursor, LINE_BYTES);
+  arena_init(&run->glyphs, carve(&cursor, GLYPH_BYTES), GLYPH_BYTES);
   run->sink = ds;
   run->job = job;
   run->memory = memory;

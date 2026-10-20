@@ -508,6 +508,16 @@ GSHSCENE_Result gshscene_job_report(GSHSCENE_Job * job, GSHSCENE_Entry_Class ent
   return gshscene_report_add(job->request.report, entry_class, reason, chain, chain_count, 0, 0.0);
 }
 
+GSHSCENE_Result gshscene_job_report_glyph(GSHSCENE_Job * job, GSHSCENE_Entry_Class entry_class, GSHSCENE_Reason reason,
+    const size_t * chain, size_t chain_count, size_t glyph) {
+  if (!job || !job->request.report || entry_class < GSHSCENE_ENTRY_REFUSED ||
+      entry_class >= GSHSCENE_ENTRY_CLASS_COUNT || reason < GSHSCENE_REASON_ITEM_KIND ||
+      reason >= GSHSCENE_REASON_COUNT || (!chain && chain_count)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  return gshscene_report_add(job->request.report, entry_class, reason, chain, chain_count, glyph, 0.0);
+}
+
 void gshscene_job_complete(GSHSCENE_Job * job, GSHSCENE_Result result, const size_t * chain, size_t chain_count,
     const char * reason) {
   if (!job || gcu_atomic_int_load(&job->state) != GSHSCENE_JOB_RUNNING) {
@@ -570,20 +580,45 @@ static GSHSCENE_Result plan_ties(GSHSCENE_Report * report, const GSHSCENE_List *
 }
 
 /**
- * Walk the list against the caps: every refusal and approximation the caps decide, every tie.  @p refused is set to
- * the refusals found.
+ * The route of a fill or clip push of a run from a font (glyph.h), when its map composes: the item's map goes in at
+ * @p maps[count - 1], after the enclosing instances' (AD-24, as a sink composes them).  @return 1 and @p route, or 0
+ * for anything else (an item that is not such a run, or a map past shape-geometry's bounds, which the sink meets as
+ * its own limit).
+ */
+static int plan_route(const GSHSCENE_Job * job, const GSHSCENE_Item * item, GSHGEOM_Map * maps, size_t count,
+    GSHSCENE_Glyph_Route * route) {
+  GSHSCENE_Glyph_Run run;
+  if ((item->kind != GSHSCENE_ITEM_FILL && item->kind != GSHSCENE_ITEM_CLIP_PUSH) ||
+      gshscene_resource_glyph_run(item->resource, &run) != GSHSCENE_OK || run.source != GSHSCENE_GLYPHS_FROM_FONT) {
+    return 0;
+  }
+  maps[count - 1] = item->map;
+  GSHGEOM_Map composed;
+  if (gshgeom_map_compose_chain(maps, count, &job->target.map, &composed) != GSHGEOM_OK) {
+    return 0;
+  }
+  return gshscene_glyph_route(item->resource, &composed, job->target.kind, route) == GSHSCENE_OK;
+}
+
+/**
+ * Walk the list against the caps: every refusal and approximation the caps decide, the entry of each run from a
+ * font's route, every tie.  @p refused is set to the refusals found.
  */
 static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
   GSHSCENE_Report * report = job->request.report;
   const GSHSCENE_List * list = job->request.list;
   size_t walk_bytes = gshscene_expansion_bytes(list);
   size_t levels = walk_levels(list);
-  /* The walk's memory, then room for a chain to key the ties by. */
-  unsigned char * memory = gshscene_report_scratch(report, gshscene_sat_add(walk_bytes, gshscene_sat_mul(levels, sizeof(size_t))));
+  /* The walk's memory, then room for a chain to key the ties by, then a map per level (the routes'). */
+  size_t key_bytes = gshscene_sat_mul(levels, sizeof(size_t));
+  /* The maps start on a 16-byte boundary of the scratch (which the allocator aligns), whatever a pointer's size. */
+  size_t at_maps = gshscene_sat_add(gshscene_sat_add(walk_bytes, key_bytes), 15u) & ~(size_t)15u;
+  unsigned char * memory = gshscene_report_scratch(report, gshscene_sat_add(at_maps, gshscene_sat_mul(levels, sizeof(GSHGEOM_Map))));
   if (!memory) {
     return GSHSCENE_ERR_OOM;
   }
   size_t * key = (size_t *)(void *)(memory + walk_bytes);
+  GSHGEOM_Map * maps = (GSHGEOM_Map *)(void *)(memory + at_maps);
   GSHSCENE_Expansion walk;
   GSHSCENE_Result result = gshscene_expansion_init(&walk, list, memory, walk_bytes);
   if (result != GSHSCENE_OK) {
@@ -614,7 +649,22 @@ static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
       gshscene_skip_begin(&skip, item, count);
       continue;
     }
+    GSHSCENE_Glyph_Route route;
+    if (plan_route(job, item, maps, count, &route) && route.entry_class) {
+      /* A run-level entry (D6, D7): the item's chain, second 0. */
+      result = gshscene_report_add(report, (GSHSCENE_Entry_Class)route.entry_class, (GSHSCENE_Reason)route.reason,
+          chain, count, 0, 0.0);
+      if (result != GSHSCENE_OK) {
+        return result;
+      }
+      if (route.entry_class == GSHSCENE_ENTRY_REFUSED) {
+        (*refused)++;
+        gshscene_skip_begin(&skip, item, count);
+        continue;
+      }
+    }
     if (item->kind == GSHSCENE_ITEM_INSTANCE) {
+      maps[count - 1] = item->map;
       const GSHSCENE_List * picture = gshscene_resource_picture(item->resource);
       memcpy(key, chain, count * sizeof *chain); /* key[count] is written by plan_ties */
       result = plan_ties(report, picture, key, count + 1);

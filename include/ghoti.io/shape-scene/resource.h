@@ -26,8 +26,10 @@
  *
  * ### The model
  *
- * A **resource** is a path, a glyph run or a picture (a closed list, frozen);
- * two further kinds, a gradient and an image, are named and reserved.  A
+ * A **resource** is a path, a glyph run, a picture (a closed list, frozen) or
+ * a face (glyph_provider.h: a font's face and variation instance, which a run
+ * from a font names); two further kinds, a gradient and an image, are named
+ * and reserved.  A
  * **store** interns resources: asking it for content it already holds, while a
  * handle to that content is held, returns that handle, so equality of content
  * is equality of pointers within one store.  The store decides by the index
@@ -50,32 +52,41 @@
  * reference; the memory lives until the last resource of the store has been
  * released.
  *
- * ### The hash of a resource (version 1)
+ * ### The hash of a resource
  *
  * The **content hash**, in the spelling of shape-geometry's hash.h.  Neither
- * the id, nor the pointer, nor the allocator, nor the limits are part of it.
- * Each stream starts with `u32` 1 (this format) and `u32` the resource's kind
- * (::GSHSCENE_Resource_Kind, pinned), and goes on:
+ * the id, nor the pointer, nor the allocator, nor the limits, nor a face's
+ * binding are part of it.  Each stream starts with `u32` the format of its
+ * kind and `u32` the resource's kind (::GSHSCENE_Resource_Kind, pinned).  The
+ * format is per kind: a path's, a picture's and a face's are 1; a glyph run's
+ * is 2 (story 14a: the run names a face where format 1 named a key).  It goes
+ * on:
  *
- * - **path**: `u64` the path's own hash (`gshgeom_path_hash`).
- * - **glyph run**: `u32` the source, `u64` font key, `u32` face index, `f64`
- *   size, `u32` hint mode, `u64` variation key, `u64` glyph count; then for
- *   each glyph `u32` id, `f64` x, `f64` y and `u64` the content hash of the
- *   outline resource (0 for a glyph with none).
- * - **picture**: `u64` the hash of its list (list.h).
+ * - **path** (1): `u64` the path's own hash (`gshgeom_path_hash`).
+ * - **glyph run** (2): `u32` the source, `u64` the content hash of the face
+ *   (0 for a run from outlines), `f64` size, `u32` hint mode, `u32` hint
+ *   version, `u64` glyph count; then for each glyph `u32` id, `f64` x, `f64` y
+ *   and `u64` the content hash of the outline resource (0 for a glyph with
+ *   none).
+ * - **picture** (1): `u64` the hash of its list (list.h).
+ * - **face** (1): `u64` font key, `u32` face index, `u32` coordinate count and
+ *   `u32` each coordinate (its `int16_t` value sign-extended to 32 bits).
  *
- * The hash is of the content, not of the reference to it: a glyph run of
- * outlines hashes its outlines' content hashes, so two stores that were given
+ * The hash is of the content, not of the reference to it: a glyph run hashes
+ * its face's and its outlines' content hashes, so two stores that were given
  * the same content print the same hash.
  *
  * ### The dump
  *
- * `gshscene.resource 1 kind=<name> hash=<16 hex digits>` and then the payload
- * as text, every `double` as the 16 hexadecimal digits of its bit pattern and
- * every hash as 16 digits: a path is `gshgeom_path_dump`'s own text; a glyph
- * run is a line `run source=S font=<hex> face=N size=<hex> hint=N var=<hex>
- * glyphs=N` and a line `g id=N x=<hex> y=<hex> outline=<hex>` per glyph; a
- * picture is `gshscene_list_dump`'s text.
+ * `gshscene.resource F kind=<name> hash=<16 hex digits>`, F the kind's format,
+ * and then the payload as text, every `double` as the 16 hexadecimal digits of
+ * its bit pattern and every hash as 16 digits: a path is `gshgeom_path_dump`'s
+ * own text; a glyph run is a line `run source=S face=<hex> size=<hex> hint=N
+ * version=N glyphs=N` and a line `g id=N x=<hex> y=<hex> outline=<hex>` per
+ * glyph; a picture is `gshscene_list_dump`'s text; a face is a line `face
+ * font=<hex> index=N coords=N` followed, on the same line, by ` C` for each
+ * coordinate in signed decimal, and a line `bound=B upem=N flags=N` (B 0 for an
+ * unbound face, whose upem and flags are 0).
  */
 
 #ifndef GHOTI_IO_GSHSCENE_RESOURCE_H
@@ -83,6 +94,7 @@
 
 #include <ghoti.io/shape-scene/allocator.h>
 #include <ghoti.io/shape-scene/core.h>
+#include <ghoti.io/shape-scene/glyph_provider.h>
 #include <ghoti.io/shape-scene/macros.h>
 #include <ghoti.io/shape-scene/types.h>
 
@@ -103,6 +115,7 @@ typedef enum GSHSCENE_Resource_Kind {
   GSHSCENE_RESOURCE_PICTURE = 3,   ///< A closed list, frozen: what an instance draws.
   GSHSCENE_RESOURCE_GRADIENT = 4,  ///< Reserved for story 12: no constructor yet.
   GSHSCENE_RESOURCE_IMAGE = 5,     ///< Reserved for the raster stories: no constructor yet.
+  GSHSCENE_RESOURCE_FACE = 6,      ///< A font's face and variation instance, bound to a glyph path provider (glyph_provider.h).
   GSHSCENE_RESOURCE_KIND_COUNT     ///< Closes the enum.
 } GSHSCENE_Resource_Kind;
 
@@ -111,13 +124,13 @@ typedef enum GSHSCENE_Resource_Kind {
  *
  * @param kind The kind, including a value outside the enum.
  * @return A static string, never NULL: "path", "glyph-run", "picture",
- *   "gradient", "image", or "unknown resource kind".
+ *   "gradient", "image", "face", or "unknown resource kind".
  */
 GSHSCENE_API const char * gshscene_resource_kind_string(GSHSCENE_Resource_Kind kind);
 
 /** @brief Where a glyph run's glyphs come from.  The values are pinned (they are hashed). */
 typedef enum GSHSCENE_Glyph_Source {
-  /** The glyph is named by font key, face, variation and id; the glyph path provider (story 14) turns it into an outline. */
+  /** The glyph is named by a face resource and an id; the face's glyph path provider gives its outline (glyph.h). */
   GSHSCENE_GLYPHS_FROM_FONT = 0,
   /** The glyph is a path resource, in run space, drawn translated by the glyph's position. */
   GSHSCENE_GLYPHS_FROM_OUTLINES = 1,
@@ -142,14 +155,14 @@ typedef struct GSHSCENE_Glyph {
  */
 typedef struct GSHSCENE_Glyph_Run {
   GSHSCENE_Glyph_Source source; ///< Where the glyphs come from.
-  /** From font: the nonzero identity of the face (for `font`, a hash of the font data).  From outlines: 0. */
-  uint64_t font_key;
-  uint32_t face_index;          ///< From font: the face in a collection.  From outlines: 0.
+  /** From font: a face resource of the same store (glyph_provider.h), retained by the run.  From outlines: NULL. */
+  const GSHSCENE_Resource * face;
   /** From font: the em size in model units, finite, greater than zero, at most `GSHGEOM_COORD_LIMIT`.  From outlines: 0. */
   double size;
-  /** From font: the hint mode passed to the glyph path provider unread; 0 is the font's default.  From outlines: 0. */
+  /** From font: a ::GSHSCENE_Hint_Mode; 0 (`FONT`) is the font's own request.  From outlines: 0. */
   uint32_t hint_mode;
-  uint64_t variation_key;       ///< From font: a hash of the variation axis values, 0 for none.  From outlines: 0.
+  /** From font: the hint version, passed to the provider unread; 0 is its default.  From outlines: 0. */
+  uint32_t hint_version;
   size_t glyph_count;           ///< How many glyphs; 0 is an empty run.
   const GSHSCENE_Glyph * glyphs; ///< The glyphs; may be NULL only when @p glyph_count is 0.
 } GSHSCENE_Glyph_Run;
@@ -163,8 +176,9 @@ typedef struct GSHSCENE_Glyph_Run {
  * every allocator: a resource's base, plus, for a path, the per-element figure
  * for each element (the most a path element, a rational cubic in 3D, can take),
  * for a glyph run the per-glyph figure for each glyph, and for a picture the
- * per-item figure for each item of its list.  What a resource holds by handle
- * (a glyph's outline, an instanced picture) is a resource of its own and is
+ * per-item figure for each item of its list, and for a face the per-axis
+ * figure for each coordinate.  What a resource holds by handle (a run's face,
+ * a glyph's outline, an instanced picture) is a resource of its own and is
  * counted there.  An intern that would pass the limit is
  * ::GSHSCENE_ERR_LIMIT and builds and keeps nothing; a hit costs nothing; the
  * last release gives the bytes back.
@@ -174,6 +188,7 @@ typedef struct GSHSCENE_Glyph_Run {
 #define GSHSCENE_BYTES_PER_PATH_ELEMENT ((size_t)160) ///< Added for each element of a path.
 #define GSHSCENE_BYTES_PER_GLYPH ((size_t)32)    ///< Added for each glyph of a run.
 #define GSHSCENE_BYTES_PER_ITEM ((size_t)256)    ///< Added for each item of a picture's list.
+#define GSHSCENE_BYTES_PER_AXIS ((size_t)8)      ///< Added for each variation coordinate of a face.
 /** @} */
 
 /** @brief Counters of a store, for tests and diagnostics. */
@@ -291,9 +306,9 @@ GSHSCENE_API GSHSCENE_Result gshscene_store_intern_path(GSHSCENE_Store * store,
 /**
  * @brief Intern a glyph run.
  *
- * The glyph array is copied; a glyph's outline is retained.  ::GSHSCENE_ERR_INVALID for any
- * field the rules in ::GSHSCENE_Glyph_Run forbid (a font field on an outline run, an outline that is
- * not a path resource of this store, a non-finite number).
+ * The glyph array is copied; the face and a glyph's outline are retained.  ::GSHSCENE_ERR_INVALID for any
+ * field the rules in ::GSHSCENE_Glyph_Run forbid (a font field on an outline run, a face or an outline that is
+ * not a resource of the right kind of this store, a hint mode outside its enum, a non-finite number).
  */
 GSHSCENE_API GSHSCENE_Result gshscene_store_intern_glyph_run(GSHSCENE_Store * store,
     const GSHSCENE_Glyph_Run * run, const GSHSCENE_Resource ** out);

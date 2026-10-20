@@ -45,6 +45,7 @@ struct Fixture {
   GSHSCENE_Store * store;
   const GSHSCENE_Resource * sq = nullptr;
   const GSHSCENE_Resource * p2 = nullptr;
+  const GSHSCENE_Resource * face = nullptr;
   const GSHSCENE_Resource * font_run = nullptr;
   const GSHSCENE_Resource * outline_run = nullptr;
   const GSHSCENE_Resource * picture = nullptr;
@@ -58,11 +59,11 @@ struct Fixture {
     std::memset(&run, 0, sizeof run);
     GSHSCENE_Glyph fglyphs[3] = {{36, 0.0, 0.0, nullptr}, {37, 7.5, 0.25, nullptr}, {4294967295u, -1.0, 2.0, nullptr}};
     run.source = GSHSCENE_GLYPHS_FROM_FONT;
-    run.font_key = UINT64_C(0x1122334455667788);
-    run.face_index = 2;
+    face = intern_face(store);
+    run.face = face;
     run.size = 12.5;
-    run.hint_mode = 3;
-    run.variation_key = UINT64_C(0xAABBCCDD00112233);
+    run.hint_mode = GSHSCENE_HINT_NONE;
+    run.hint_version = 40;
     run.glyph_count = 3;
     run.glyphs = fglyphs;
     gshscene_store_intern_glyph_run(store, &run, &font_run);
@@ -152,6 +153,7 @@ struct Fixture {
     gshscene_resource_release(picture);
     gshscene_resource_release(outline_run);
     gshscene_resource_release(font_run);
+    gshscene_resource_release(face);
     gshscene_resource_release(p2);
     gshscene_resource_release(sq);
   }
@@ -192,6 +194,7 @@ TEST(KnownAnswers, EveryResourceHashesAsTheIndependentGeneratorSays) {
   ASSERT_NE(f.picture, nullptr);
   EXPECT_EQ(gshscene_resource_hash(f.sq), known::kSquareResourceHash);
   EXPECT_EQ(gshscene_resource_hash(f.p2), known::kFixturePathResourceHash);
+  EXPECT_EQ(gshscene_resource_hash(f.face), known::kFaceHash);
   EXPECT_EQ(gshscene_resource_hash(f.font_run), known::kFontRunHash);
   EXPECT_EQ(gshscene_resource_hash(f.outline_run), known::kOutlineRunHash);
   EXPECT_EQ(gshscene_resource_hash(f.picture), known::kPictureHash);
@@ -214,6 +217,7 @@ TEST(KnownAnswers, EveryDumpIsTheIndependentGeneratorsText) {
   Fixture f(s.store);
   EXPECT_EQ(dump_resource(f.sq), known::kSquareResourceDump);
   EXPECT_EQ(dump_resource(f.p2), known::kFixturePathResourceDump);
+  EXPECT_EQ(dump_resource(f.face), known::kFaceDump);
   EXPECT_EQ(dump_resource(f.font_run), known::kFontRunDump);
   EXPECT_EQ(dump_resource(f.outline_run), known::kOutlineRunDump);
   EXPECT_EQ(dump_resource(f.picture), known::kPictureDump);
@@ -444,24 +448,25 @@ TEST(Dump, EveryHashAndDoubleIsSixteenDigitsEvenWhenItStartsWithZeros) {
   std::string text = dump_list(l.list);
   expect_sixteen_digits(text, "a list");
   EXPECT_NE(text.find("opacity=0000000000000000"), std::string::npos) << text;
-  // And a picture of it, and a run with a zero key, size and variation.
+  // And a picture of it, and a run from a face whose key is 1.
   Ref picture;
   ASSERT_EQ(gshscene_store_intern_picture(s.store, l.list, &picture.resource), GSHSCENE_OK);
   expect_sixteen_digits(dump_resource(picture.get()), "a picture");
   GSHSCENE_Glyph_Run run;
   std::memset(&run, 0, sizeof run);
+  Ref face(intern_face(s.store, 1, 0, 0, 1));
   run.source = GSHSCENE_GLYPHS_FROM_FONT;
-  run.font_key = 1;
+  run.face = face.get();
   run.size = 1.0;
-  run.variation_key = 1;
+  run.hint_version = 1;
   GSHSCENE_Glyph g = {1, 0.0, 0.0, nullptr};
   run.glyph_count = 1;
   run.glyphs = &g;
   Ref run_ref;
   ASSERT_EQ(gshscene_store_intern_glyph_run(s.store, &run, &run_ref.resource), GSHSCENE_OK);
   expect_sixteen_digits(dump_resource(run_ref.get()), "a font run");
-  EXPECT_NE(dump_resource(run_ref.get()).find("font=0000000000000001"), std::string::npos);
-  EXPECT_NE(dump_resource(run_ref.get()).find("var=0000000000000001"), std::string::npos);
+  EXPECT_NE(dump_resource(face.get()).find("font=0000000000000001 index=0 coords=2 0 1"), std::string::npos);
+  EXPECT_NE(dump_resource(run_ref.get()).find("version=1 "), std::string::npos);
 }
 
 TEST(Dump, DoesNotDependOnTheLocale) {

@@ -26,6 +26,7 @@
 #include <ghoti.io/shape-scene/shape-scene.h>
 
 #include "alloc_tracker.h"
+#include "glyph_test_provider.h"
 
 #include <cstdint>
 #include <cstring>
@@ -149,12 +150,18 @@ inline GSHSCENE_Paint solid(double r, double g, double b, double a = 1.0) {
   return paint;
 }
 
-/** A store, the resources it holds for the test, and lists over them; everything released at the end. */
+/**
+ * A store, the resources it holds for the test, and lists over them; everything released at the end.  Its faces are
+ * the test provider's (glyph_test_provider.h): 2048 units with a hinting program.
+ */
 struct Scene {
+  GSHSCENE_Test_Provider provider{};
   GSHSCENE_Store * store = nullptr;
   std::vector<const GSHSCENE_Resource *> held;
   std::vector<GSHSCENE_List *> lists;
   explicit Scene(const GSHSCENE_Allocator * alloc = nullptr) {
+    provider.upem = 2048;
+    provider.flags = GSHSCENE_FACE_HINTING;
     gshscene_store_create(alloc, nullptr, &store);
   }
   Scene(const Scene &) = delete;
@@ -182,19 +189,41 @@ struct Scene {
     lists.push_back(l);
     return l;
   }
-  /** A glyph run named by a font: what a sink without a glyph path provider refuses. */
-  const GSHSCENE_Resource * font_run() {
-    GSHSCENE_Glyph glyphs[2] = {{36, 2.0, 40.0, nullptr}, {37, 9.0, 40.0, nullptr}};
+  /** A face: of the test provider with its fast tier or without it, or (@p bound 0) bound to nothing. */
+  const GSHSCENE_Resource * face(int fast = 1, int bound = 1) {
+    const GSHSCENE_Resource * r = nullptr;
+    if (bound) {
+      r = gshscene_tp_face(store, &provider, fast, 0x1122334455667788ull + (uint64_t)fast, 0);
+    } else {
+      GSHSCENE_Face_Desc desc{};
+      desc.font_key = 0x99;
+      gshscene_store_intern_face(store, &desc, &r);
+    }
+    held.push_back(r);
+    return r;
+  }
+  /** A run from @p f of the given glyphs, 11 units apart from (x, y), at @p size, in @p mode. */
+  const GSHSCENE_Resource * glyphs(const GSHSCENE_Resource * f, std::vector<uint32_t> ids, double size, uint32_t mode,
+      double x = 2.0, double y = 40.0) {
+    std::vector<GSHSCENE_Glyph> g;
+    for (size_t i = 0; i < ids.size(); i++) {
+      g.push_back(GSHSCENE_Glyph{ids[i], x + 11.0 * (double)i, y, nullptr});
+    }
     GSHSCENE_Glyph_Run run{};
     run.source = GSHSCENE_GLYPHS_FROM_FONT;
-    run.font_key = 0x1122334455667788ull;
-    run.size = 6.0;
-    run.glyph_count = 2;
-    run.glyphs = glyphs;
+    run.face = f;
+    run.size = size;
+    run.hint_mode = mode;
+    run.glyph_count = g.size();
+    run.glyphs = g.data();
     const GSHSCENE_Resource * r = nullptr;
     gshscene_store_intern_glyph_run(store, &run, &r);
     held.push_back(r);
     return r;
+  }
+  /** A glyph run from a font: what a sink without `GLYPHS_FROM_FONT` refuses. */
+  const GSHSCENE_Resource * font_run() {
+    return glyphs(face(), {1, 2}, 6.0, GSHSCENE_HINT_FONT);
   }
 };
 
@@ -1351,6 +1380,300 @@ TEST_P(SinkConformance, EveryWriteToAStreamCanFail) {
   }
   if (!any) {
     GTEST_SKIP() << "no stream target";
+  }
+}
+
+/* --- runs from a font (story 14a, glyph.h) --------------------------------------------------------------- */
+
+namespace sinkconf {
+
+/** A list of one fill of @p run under @p map (NULL: the identity), between two fills of squares. */
+inline const GSHSCENE_List * one_run(Scene & s, const GSHSCENE_Resource * run, const GSHGEOM_Map * map = nullptr) {
+  GSHSCENE_Paint red = solid(1, 0, 0);
+  GSHSCENE_List * l = s.open();
+  gshscene_list_fill(l, s.sq(1, 1, 3), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0);
+  gshscene_list_fill(l, run, map, GSHGEOM_FILL_NONZERO, &red, 0, 0.0);
+  gshscene_list_fill(l, s.sq(50, 50, 3), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0);
+  gshscene_list_close(l);
+  return l;
+}
+
+/** Whether @p sink draws runs from a font on @p surface's target. */
+inline bool draws_glyphs(GSHSCENE_Sink * sink, const Surface & surface) {
+  return (caps_of(sink, surface).flags & GSHSCENE_CAP_GLYPHS_FROM_FONT) != 0;
+}
+
+/** The entries of class @p c. */
+inline std::vector<GSHSCENE_Report_Entry> of_class(const GSHSCENE_Report * report, GSHSCENE_Entry_Class c) {
+  std::vector<GSHSCENE_Report_Entry> out;
+  for (const auto & e : entries(report)) {
+    if (e.entry_class == c) {
+      out.push_back(e);
+    }
+  }
+  return out;
+}
+
+inline GSHGEOM_Map rotated(double degrees, double tx, double ty) {
+  GSHGEOM_Map r;
+  GSHGEOM_Map t;
+  gshgeom_map_rotate(GSHGEOM_ANGLE_DEGREES, degrees, &r);
+  gshgeom_map_translate(2, tx, ty, 0.0, &t);
+  gshgeom_map_compose(&t, &r, &r);
+  return r;
+}
+
+}  // namespace sinkconf
+
+// AD-5, AD-13: a sink calls the provider's fast tier exactly where the route says FAST (a pixel target, a map the
+// predicate accepts, an integer ppem), and the general route's outline everywhere else; mode NONE reports nothing.
+TEST_P(SinkConformance, Glyphs_EachGlyphGoesToTheProviderByItsRoute) {
+  bool any = false;
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto surface = make_surface(kind);
+    if (!draws_glyphs(sink.sink, *surface)) {
+      continue;
+    }
+    any = true;
+    GSHGEOM_Map place;
+    gshgeom_map_translate(2, 0.40625, -2.5, 0.0, &place);
+    const GSHSCENE_List * list = one_run(s, s.glyphs(s.face(), {1, 2, 3, 0}, 8.0, GSHSCENE_HINT_NONE), &place);
+    gshscene_tp_reset(&s.provider);
+    ReportRef report;
+    EXPECT_EQ(run(f(), sink.sink, request_for(list, *surface, report.report)).result, GSHSCENE_OK);
+    bool pixels = gshscene_target_kind_has_pixels((GSHSCENE_Target_Kind)kind) != 0;
+    EXPECT_EQ(gcu_atomic_size_load(&s.provider.fast_calls), pixels ? 4u : 0u) << "the fast tier, taken";
+    EXPECT_EQ(gcu_atomic_size_load(&s.provider.outline_calls), pixels ? 0u : 4u) << "the general route";
+    EXPECT_EQ(gshscene_report_count(report.report), 0u) << "mode NONE reports nothing";
+  }
+  if (!any) {
+    GTEST_SKIP() << "no target draws runs from a font";
+  }
+}
+
+// D3, D7: a rotated run, or a size that is not an integer ppem, takes the general route, with one entry per run under
+// FONT and none under NONE; a stream never has one.
+TEST_P(SinkConformance, Glyphs_TheGeneralRouteOfAHintedRunIsOneEntryPerRun) {
+  bool any = false;
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    auto probe = make_surface(kind);
+    if (!draws_glyphs(sink.sink, *probe)) {
+      continue;
+    }
+    any = true;
+    bool pixels = gshscene_target_kind_has_pixels((GSHSCENE_Target_Kind)kind) != 0;
+    struct Case {
+      double degrees;
+      double size;
+      GSHSCENE_Reason reason;
+    } cases[] = {{30.0, 8.0, GSHSCENE_REASON_HINT_ROUTE}, {0.0, 40.0 / 3.0, GSHSCENE_REASON_HINT_SIZE}};
+    for (const Case & c : cases) {
+      for (uint32_t mode : {(uint32_t)GSHSCENE_HINT_FONT, (uint32_t)GSHSCENE_HINT_NONE}) {
+        Scene s;
+        GSHGEOM_Map map = rotated(c.degrees, 8.0, 0.0);
+        const GSHSCENE_List * list = one_run(s, s.glyphs(s.face(), {1, 2}, c.size, mode), &map);
+        gshscene_tp_reset(&s.provider);
+        auto surface = make_surface(kind);
+        ReportRef report;
+        EXPECT_EQ(run(f(), sink.sink, request_for(list, *surface, report.report)).result, GSHSCENE_OK);
+        EXPECT_EQ(gcu_atomic_size_load(&s.provider.fast_calls), 0u);
+        EXPECT_EQ(gcu_atomic_size_load(&s.provider.outline_calls), 2u);
+        auto hints = of_class(report.report, GSHSCENE_ENTRY_HINT_STATUS);
+        if (pixels && mode == GSHSCENE_HINT_FONT) {
+          ASSERT_EQ(hints.size(), 1u) << c.reason;
+          EXPECT_EQ(hints[0].reason, c.reason);
+          ASSERT_EQ(hints[0].chain_count, 1u);
+          EXPECT_EQ(hints[0].chain[0], 1u);
+          EXPECT_EQ(hints[0].second, 0u) << "a run-level entry";
+        } else {
+          EXPECT_EQ(hints.size(), 0u) << "mode NONE, or a target without pixels";
+        }
+      }
+    }
+  }
+  if (!any) {
+    GTEST_SKIP() << "no target draws runs from a font";
+  }
+}
+
+// D6: strict hinting on the general route is refused by the plan, so strict leaves the target untouched; on a stream
+// hinting does not apply.
+TEST_P(SinkConformance, Glyphs_StrictHintingOnTheGeneralRouteIsRefusedBeforeDrawing) {
+  bool any = false;
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto surface = make_surface(kind);
+    if (!draws_glyphs(sink.sink, *surface)) {
+      continue;
+    }
+    any = true;
+    bool pixels = gshscene_target_kind_has_pixels((GSHSCENE_Target_Kind)kind) != 0;
+    GSHGEOM_Map map = rotated(30.0, 8.0, 0.0);
+    const GSHSCENE_List * list = one_run(s, s.glyphs(s.face(), {1, 2}, 8.0, GSHSCENE_HINT_FONT_STRICT), &map);
+    gshscene_tp_reset(&s.provider);
+    uint64_t before = surface->snapshot();
+    ReportRef report;
+    GSHSCENE_Render_Request req = request_for(list, *surface, report.report);
+    req.flags = GSHSCENE_RENDER_STRICT;
+    Outcome o = run(f(), sink.sink, req);
+    if (pixels) {
+      EXPECT_EQ(o.result, GSHSCENE_ERR_REFUSED);
+      EXPECT_EQ(surface->snapshot(), before) << "a planned refusal touched the target";
+      auto refused = of_class(report.report, GSHSCENE_ENTRY_REFUSED);
+      ASSERT_EQ(refused.size(), 1u);
+      EXPECT_EQ(refused[0].reason, GSHSCENE_REASON_HINT_STRICT_ROUTE);
+      EXPECT_EQ(gcu_atomic_size_load(&s.provider.fast_calls) + gcu_atomic_size_load(&s.provider.outline_calls), 0u);
+      // Best effort skips the run and draws the rest.
+      ReportRef best;
+      EXPECT_EQ(run(f(), sink.sink, request_for(list, *surface, best.report)).result, GSHSCENE_OK);
+      EXPECT_EQ(of_class(best.report, GSHSCENE_ENTRY_REFUSED).size(), 1u);
+      EXPECT_EQ(summary(best.report).units_done, 3u);
+    } else {
+      EXPECT_EQ(o.result, GSHSCENE_OK) << "a document has no pixels to hint to";
+      EXPECT_EQ(gshscene_report_count(report.report), 0u);
+    }
+  }
+  if (!any) {
+    GTEST_SKIP() << "no target draws runs from a font";
+  }
+}
+
+// S16, AD-24: the route is decided on the composed map, the instances' maps and the target's included, as the plan
+// composes it: a run in a picture instanced under a rotation, or drawn on a target whose map rotates, is general.
+TEST_P(SinkConformance, Glyphs_TheRouteComposesTheInstancesAndTheTargetMap) {
+  bool any = false;
+  for (uint32_t kind : f()->kinds) {
+    if (!gshscene_target_kind_has_pixels((GSHSCENE_Target_Kind)kind)) {
+      continue;
+    }
+    SinkRef sink(make());
+    Scene s;
+    auto surface = make_surface(kind);
+    if (!draws_glyphs(sink.sink, *surface)) {
+      continue;
+    }
+    any = true;
+    GSHSCENE_Paint red = solid(1, 0, 0);
+    GSHSCENE_List * pl = s.open();
+    gshscene_list_fill(pl, s.glyphs(s.face(), {1}, 8.0, GSHSCENE_HINT_FONT, 0.0, 10.0), nullptr, GSHGEOM_FILL_NONZERO,
+        &red, 0, 0.0);
+    gshscene_list_close(pl);
+    const GSHSCENE_Resource * picture = nullptr;
+    ASSERT_EQ(gshscene_store_intern_picture(s.store, pl, &picture), GSHSCENE_OK);
+    s.held.push_back(picture);
+    GSHGEOM_Map turned = rotated(30.0, 30.0, 20.0);
+    GSHGEOM_Map moved;
+    gshgeom_map_translate(2, 3.0, 4.0, 0.0, &moved);
+    GSHSCENE_List * l = s.open();
+    gshscene_list_instance(l, picture, &moved, 0, 0.0);
+    gshscene_list_instance(l, picture, &turned, 0, 0.0);
+    gshscene_list_close(l);
+    gshscene_tp_reset(&s.provider);
+    ReportRef report;
+    EXPECT_EQ(run(f(), sink.sink, request_for(l, *surface, report.report)).result, GSHSCENE_OK);
+    auto hints = of_class(report.report, GSHSCENE_ENTRY_HINT_STATUS);
+    ASSERT_EQ(hints.size(), 1u) << "the turned instance only";
+    EXPECT_EQ(hints[0].reason, GSHSCENE_REASON_HINT_ROUTE);
+    ASSERT_EQ(hints[0].chain_count, 2u);
+    EXPECT_EQ(hints[0].chain[0], 1u);
+    EXPECT_EQ(hints[0].chain[1], 0u);
+    EXPECT_EQ(gcu_atomic_size_load(&s.provider.fast_calls), 1u);
+    EXPECT_EQ(gcu_atomic_size_load(&s.provider.outline_calls), 1u);
+    // The target's map: a scale of 2 makes the size 16 ppem, a turn makes every run general.
+    auto scaled = make_surface(kind);
+    gshgeom_map_scale(2, 2.0, 2.0, 1.0, &scaled->target.map);
+    gshscene_tp_reset(&s.provider);
+    ReportRef scaled_report;
+    EXPECT_EQ(run(f(), sink.sink, request_for(pl, *scaled, scaled_report.report)).result, GSHSCENE_OK);
+    EXPECT_EQ(gshscene_report_count(scaled_report.report), 0u);
+    EXPECT_EQ(gcu_atomic_size_load(&s.provider.fast_calls), 1u);
+    auto turned_target = make_surface(kind);
+    turned_target->target.map = rotated(30.0, 20.0, 0.0);
+    ReportRef turned_report;
+    EXPECT_EQ(run(f(), sink.sink, request_for(pl, *turned_target, turned_report.report)).result, GSHSCENE_OK);
+    EXPECT_EQ(of_class(turned_report.report, GSHSCENE_ENTRY_HINT_STATUS).size(), 1u);
+  }
+  if (!any) {
+    GTEST_SKIP() << "no pixel target draws runs from a font";
+  }
+}
+
+// The face: an unbound face's run is refused by the plan, on every target.
+TEST_P(SinkConformance, Glyphs_ARunOfAnUnboundFaceIsRefused) {
+  bool any = false;
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto surface = make_surface(kind);
+    if (!draws_glyphs(sink.sink, *surface)) {
+      continue;
+    }
+    any = true;
+    const GSHSCENE_List * list = one_run(s, s.glyphs(s.face(1, 0), {1}, 8.0, GSHSCENE_HINT_NONE));
+    ReportRef report;
+    EXPECT_EQ(run(f(), sink.sink, request_for(list, *surface, report.report)).result, GSHSCENE_OK);
+    auto refused = of_class(report.report, GSHSCENE_ENTRY_REFUSED);
+    ASSERT_EQ(refused.size(), 1u);
+    EXPECT_EQ(refused[0].reason, GSHSCENE_REASON_FACE_UNBOUND);
+    ReportRef strict;
+    GSHSCENE_Render_Request req = request_for(list, *surface, strict.report);
+    req.flags = GSHSCENE_RENDER_STRICT;
+    EXPECT_EQ(run(f(), sink.sink, req).result, GSHSCENE_ERR_REFUSED);
+  }
+  if (!any) {
+    GTEST_SKIP() << "no target draws runs from a font";
+  }
+}
+
+// D7, S6: each glyph's own status is its own entry, with its index in `second`; a glyph the provider cannot give is
+// refused and the rest drawn; under strict a refused glyph stops the render at its item.
+TEST_P(SinkConformance, Glyphs_EachGlyphsStatusIsItsOwnEntry) {
+  bool any = false;
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto surface = make_surface(kind);
+    if (!draws_glyphs(sink.sink, *surface)) {
+      continue;
+    }
+    any = true;
+    bool pixels = gshscene_target_kind_has_pixels((GSHSCENE_Target_Kind)kind) != 0;
+    // 4 corrupt, 5 a failing program, 6 hinted with errors, 7 no instructions, 1 hinted.
+    const GSHSCENE_List * list = one_run(s, s.glyphs(s.face(), {4, 5, 6, 7, 1}, 8.0, GSHSCENE_HINT_FONT, 1.0, 20.0));
+    ReportRef report;
+    EXPECT_EQ(run(f(), sink.sink, request_for(list, *surface, report.report)).result, GSHSCENE_OK);
+    auto refused = of_class(report.report, GSHSCENE_ENTRY_REFUSED);
+    ASSERT_EQ(refused.size(), 1u);
+    EXPECT_EQ(refused[0].reason, GSHSCENE_REASON_GLYPH_UNAVAILABLE);
+    EXPECT_EQ(refused[0].second, 0u);
+    auto hints = of_class(report.report, GSHSCENE_ENTRY_HINT_STATUS);
+    if (pixels) {
+      ASSERT_EQ(hints.size(), 3u);
+      EXPECT_EQ(hints[0].reason, GSHSCENE_REASON_HINT_NO_PROGRAM);
+      EXPECT_EQ(hints[0].second, 3u);
+      EXPECT_EQ(hints[1].reason, GSHSCENE_REASON_HINT_PROGRAM_FAILED);
+      EXPECT_EQ(hints[1].second, 1u);
+      EXPECT_EQ(hints[2].reason, GSHSCENE_REASON_HINT_WITH_ERRORS);
+      EXPECT_EQ(hints[2].second, 2u);
+    } else {
+      EXPECT_EQ(hints.size(), 0u);
+    }
+    EXPECT_EQ(summary(report.report).units_done, 3u) << "the rest of the run, and of the list, is drawn";
+    ReportRef strict;
+    GSHSCENE_Render_Request req = request_for(list, *surface, strict.report);
+    req.flags = GSHSCENE_RENDER_STRICT;
+    EXPECT_EQ(run(f(), sink.sink, req).result, GSHSCENE_ERR_REFUSED);
+    GSHSCENE_Report_Summary sum = summary(strict.report);
+    EXPECT_EQ(sum.units_done, 1u) << "the prefix: the fill before the run";
+    ASSERT_EQ(sum.failure.chain_count, 1u);
+    EXPECT_EQ(sum.failure.chain[0], 1u);
+  }
+  if (!any) {
+    GTEST_SKIP() << "no target draws runs from a font";
   }
 }
 

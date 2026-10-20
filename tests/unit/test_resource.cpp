@@ -42,22 +42,31 @@ namespace {
 const double kNaN = std::numeric_limits<double>::quiet_NaN();
 const double kInf = std::numeric_limits<double>::infinity();
 
-/** The font run of tools/gen-scene-vectors.py. */
+/** The font run of tools/gen-scene-vectors.py, from its face in @p store (held). */
 struct FontRun {
   GSHSCENE_Glyph_Run run;
   std::vector<GSHSCENE_Glyph> glyphs;
-  FontRun() {
+  const GSHSCENE_Resource * face = nullptr;
+  explicit FontRun(GSHSCENE_Store * store) {
     std::memset(&run, 0, sizeof run);
     glyphs = {{36, 0.0, 0.0, nullptr}, {37, 7.5, 0.25, nullptr}, {4294967295u, -1.0, 2.0, nullptr}};
+    face = intern_face(store);
     run.source = GSHSCENE_GLYPHS_FROM_FONT;
-    run.font_key = UINT64_C(0x1122334455667788);
-    run.face_index = 2;
+    run.face = face;
     run.size = 12.5;
-    run.hint_mode = 3;
-    run.variation_key = UINT64_C(0xAABBCCDD00112233);
+    run.hint_mode = GSHSCENE_HINT_NONE;
+    run.hint_version = 40;
     sync();
   }
-  FontRun(const FontRun & o) : run(o.run), glyphs(o.glyphs) { sync(); }
+  FontRun(const FontRun & o) : run(o.run), glyphs(o.glyphs), face(gshscene_resource_retain(o.face)) { sync(); }
+  FontRun & operator=(const FontRun &) = delete;
+  ~FontRun() { gshscene_resource_release(face); }
+  /** Name another face (whose reference this takes). */
+  void use_face(const GSHSCENE_Resource * f) {
+    gshscene_resource_release(face);
+    face = f;
+    run.face = f;
+  }
   void sync() {
     run.glyph_count = glyphs.size();
     run.glyphs = glyphs.empty() ? nullptr : glyphs.data();
@@ -128,7 +137,9 @@ TEST(ResourceKind, EveryKindHasItsPinnedValueAndName) {
   EXPECT_EQ((int)GSHSCENE_RESOURCE_PICTURE, 3);
   EXPECT_EQ((int)GSHSCENE_RESOURCE_GRADIENT, 4);
   EXPECT_EQ((int)GSHSCENE_RESOURCE_IMAGE, 5);
-  EXPECT_EQ((int)GSHSCENE_RESOURCE_KIND_COUNT, 6);
+  EXPECT_EQ((int)GSHSCENE_RESOURCE_FACE, 6);
+  EXPECT_EQ((int)GSHSCENE_RESOURCE_KIND_COUNT, 7);
+  EXPECT_STREQ(gshscene_resource_kind_string(GSHSCENE_RESOURCE_FACE), "face");
   EXPECT_STREQ(gshscene_resource_kind_string(GSHSCENE_RESOURCE_PATH), "path");
   EXPECT_STREQ(gshscene_resource_kind_string(GSHSCENE_RESOURCE_GLYPH_RUN), "glyph-run");
   EXPECT_STREQ(gshscene_resource_kind_string(GSHSCENE_RESOURCE_PICTURE), "picture");
@@ -141,7 +152,7 @@ TEST(ResourceKind, EveryKindHasItsPinnedValueAndName) {
 TEST(ResourceKind, AccessorsOfTheWrongKindAnswerNothing) {
   StoreHolder s(nullptr, nullptr, all_zero);
   Ref path(intern_square(s.store));
-  FontRun fr;
+  FontRun fr(s.store);
   Ref run(intern_run(s.store, fr.run));
   ASSERT_NE(path.get(), nullptr);
   ASSERT_NE(run.get(), nullptr);
@@ -469,7 +480,7 @@ TEST(PathResource, APathThatIsAPrefixOfAnotherIsNotMergedWithItWhicheverIsFirst)
 
 TEST(GlyphRun, AFontRunReadsBackAndCopiesItsGlyphs) {
   StoreHolder s(nullptr, nullptr, all_zero);
-  FontRun fr;
+  FontRun fr(s.store);
   Ref r(intern_run(s.store, fr.run));
   ASSERT_NE(r.get(), nullptr);
   EXPECT_EQ(gshscene_resource_kind(r.get()), GSHSCENE_RESOURCE_GLYPH_RUN);
@@ -477,11 +488,10 @@ TEST(GlyphRun, AFontRunReadsBackAndCopiesItsGlyphs) {
   std::memset(&out, 0xAB, sizeof out);
   ASSERT_EQ(gshscene_resource_glyph_run(r.get(), &out), GSHSCENE_OK);
   EXPECT_EQ(out.source, GSHSCENE_GLYPHS_FROM_FONT);
-  EXPECT_EQ(out.font_key, fr.run.font_key);
-  EXPECT_EQ(out.face_index, 2u);
+  EXPECT_EQ(out.face, fr.face);
   EXPECT_EQ(out.size, 12.5);
-  EXPECT_EQ(out.hint_mode, 3u);
-  EXPECT_EQ(out.variation_key, fr.run.variation_key);
+  EXPECT_EQ(out.hint_mode, 1u);
+  EXPECT_EQ(out.hint_version, 40u);
   ASSERT_EQ(out.glyph_count, 3u);
   EXPECT_NE(out.glyphs, fr.run.glyphs) << "the glyph array is the store's own";
   EXPECT_EQ(out.glyphs[0].id, 36u);
@@ -523,17 +533,17 @@ TEST(GlyphRun, AnOutlineRunRetainsItsOutlinesAndReleasesThemWithTheRun) {
 TEST(GlyphRun, EqualRunsShareAHandleAndOneDifferenceSeparatesThem) {
   StoreHolder s(nullptr, nullptr, all_zero);
   Ref sq(intern_square(s.store)), sq2(intern_square(s.store, 1.0));
-  FontRun base;
+  FontRun base(s.store);
   Ref baseline(intern_run(s.store, base.run));
   ASSERT_NE(baseline.get(), nullptr);
   {
-    FontRun same;
+    FontRun same(s.store);
     Ref again(intern_run(s.store, same.run));
     EXPECT_EQ(again.get(), baseline.get());
   }
   std::vector<Ref *> others;
   auto differs = [&](const char * what, auto mutate) {
-    FontRun fr;
+    FontRun fr(s.store);
     mutate(fr);
     fr.sync();
     Ref * r = new Ref(intern_run(s.store, fr.run));
@@ -541,11 +551,12 @@ TEST(GlyphRun, EqualRunsShareAHandleAndOneDifferenceSeparatesThem) {
     ASSERT_NE(r->get(), nullptr) << what;
     EXPECT_NE(r->get(), baseline.get()) << what;
   };
-  differs("font key", [](FontRun & f) { f.run.font_key += 1; });
-  differs("face index", [](FontRun & f) { f.run.face_index += 1; });
+  differs("font key", [&](FontRun & f) { f.use_face(intern_face(s.store, UINT64_C(0x1122334455667789))); });
+  differs("face index", [&](FontRun & f) { f.use_face(intern_face(s.store, UINT64_C(0x1122334455667788), 3)); });
+  differs("a coordinate", [&](FontRun & f) { f.use_face(intern_face(s.store, UINT64_C(0x1122334455667788), 2, 8192, -4095)); });
   differs("size", [](FontRun & f) { f.run.size = std::nextafter(f.run.size, 100.0); });
   differs("hint mode", [](FontRun & f) { f.run.hint_mode += 1; });
-  differs("variation key", [](FontRun & f) { f.run.variation_key += 1; });
+  differs("hint version", [](FontRun & f) { f.run.hint_version += 1; });
   differs("glyph count", [](FontRun & f) { f.glyphs.pop_back(); });
   differs("a glyph id", [](FontRun & f) { f.glyphs[1].id += 1; });
   differs("a glyph x", [](FontRun & f) { f.glyphs[1].x = std::nextafter(f.glyphs[1].x, 100.0); });
@@ -571,7 +582,7 @@ TEST(GlyphRun, EqualRunsShareAHandleAndOneDifferenceSeparatesThem) {
 
 TEST(GlyphRun, AnEmptyRunIsValidForBothSources) {
   StoreHolder s(nullptr, nullptr, all_zero);
-  FontRun fr;
+  FontRun fr(s.store);
   fr.glyphs.clear();
   fr.sync();
   Ref font(intern_run(s.store, fr.run));
@@ -592,7 +603,8 @@ TEST(GlyphRun, EveryForbiddenFieldIsRefusedAndNothingIsLeftBehind) {
   Ref sq(intern_square(s.store));
   StoreHolder other;
   Ref foreign(intern_square(other.store));
-  FontRun fr0;
+  Ref foreign_face(intern_face(other.store));
+  FontRun fr0(s.store);
   Ref somerun(intern_run(s.store, fr0.run));
   GSHSCENE_Store_Stats before;
   ASSERT_EQ(gshscene_store_stats(s.store, &before), GSHSCENE_OK);
@@ -605,7 +617,7 @@ TEST(GlyphRun, EveryForbiddenFieldIsRefusedAndNothingIsLeftBehind) {
     gshscene_resource_release(r);
   };
   auto font = [&](auto mutate) {
-    FontRun f;
+    FontRun f(s.store);
     mutate(f);
     f.sync();
     return f;
@@ -618,7 +630,10 @@ TEST(GlyphRun, EveryForbiddenFieldIsRefusedAndNothingIsLeftBehind) {
   };
   const GSHSCENE_Result INV = GSHSCENE_ERR_INVALID;
 
-  refused("font key 0", INV, font([](FontRun & f) { f.run.font_key = 0; }).run);
+  refused("no face", INV, font([](FontRun & f) { f.run.face = nullptr; }).run);
+  refused("a face of another store", INV, font([&](FontRun & f) { f.run.face = foreign_face.get(); }).run);
+  refused("a path as the face", INV, font([&](FontRun & f) { f.run.face = sq.get(); }).run);
+  refused("a hint mode outside the enum", INV, font([](FontRun & f) { f.run.hint_mode = GSHSCENE_HINT_MODE_COUNT; }).run);
   refused("size 0", INV, font([](FontRun & f) { f.run.size = 0.0; }).run);
   refused("size -0", INV, font([](FontRun & f) { f.run.size = -0.0; }).run);
   refused("negative size", INV, font([](FontRun & f) { f.run.size = -1.0; }).run);
@@ -639,18 +654,17 @@ TEST(GlyphRun, EveryForbiddenFieldIsRefusedAndNothingIsLeftBehind) {
   refused("NaN y", INV, font([](FontRun & f) { f.glyphs[1].y = kNaN; }).run);
   refused("NaN x", INV, font([](FontRun & f) { f.glyphs[2].x = kNaN; }).run);
   {
-    FontRun f;
+    FontRun f(s.store);
     f.run.glyphs = nullptr;  // a count with no array
     refused("glyphs NULL with a count", INV, f.run);
   }
 
   refused("outline NULL", INV, outlines([](OutlineRun & o) { o.glyphs[1].outline = nullptr; }).run);
-  refused("a font key on an outline run", INV, outlines([](OutlineRun & o) { o.run.font_key = 1; }).run);
-  refused("a face index on an outline run", INV, outlines([](OutlineRun & o) { o.run.face_index = 1; }).run);
+  refused("a face on an outline run", INV, outlines([&](OutlineRun & o) { o.run.face = fr0.face; }).run);
+  refused("a hint version on an outline run", INV, outlines([](OutlineRun & o) { o.run.hint_version = 1; }).run);
   refused("a size on an outline run", INV, outlines([](OutlineRun & o) { o.run.size = 1.0; }).run);
   refused("a size of -0 on an outline run", INV, outlines([](OutlineRun & o) { o.run.size = -0.0; }).run);
   refused("a hint mode on an outline run", INV, outlines([](OutlineRun & o) { o.run.hint_mode = 1; }).run);
-  refused("a variation on an outline run", INV, outlines([](OutlineRun & o) { o.run.variation_key = 1; }).run);
   refused("a foreign outline", INV, outlines([&](OutlineRun & o) { o.glyphs[0].outline = foreign.get(); }).run);
   refused("an outline that is a glyph run", INV, outlines([&](OutlineRun & o) { o.glyphs[0].outline = somerun.get(); }).run);
   EXPECT_EQ(gshscene_store_intern_glyph_run(s.store, nullptr, nullptr), GSHSCENE_ERR_INVALID);
@@ -667,7 +681,7 @@ TEST(GlyphRun, EveryForbiddenFieldIsRefusedAndNothingIsLeftBehind) {
 
 TEST(GlyphRun, TheLargestPositionsAndSizeAreAccepted) {
   StoreHolder s(nullptr, nullptr, all_zero);
-  FontRun fr;
+  FontRun fr(s.store);
   fr.run.size = GSHGEOM_COORD_LIMIT;
   fr.glyphs[0].x = GSHGEOM_COORD_LIMIT;
   fr.glyphs[0].y = -GSHGEOM_COORD_LIMIT;
@@ -680,7 +694,7 @@ TEST(GlyphRun, MaxResourceElementsAcceptsExactlyTheLimitInGlyphs) {
   gshscene_limits_default(&limits);
   limits.max_resource_elements = 10;
   StoreHolder s(&limits, nullptr, all_zero);
-  FontRun fr;
+  FontRun fr(s.store);
   fr.glyphs.assign(10, GSHSCENE_Glyph{1, 0.0, 0.0, nullptr});
   fr.sync();
   Ref ok(intern_run(s.store, fr.run));
@@ -694,24 +708,24 @@ TEST(GlyphRun, MaxResourceElementsAcceptsExactlyTheLimitInGlyphs) {
 
 
 TEST(GlyphRun, ARunWithAnExtraOrAMissingGlyphIsAnotherRunWhicheverWasInternedFirst) {
-  FontRun base;
-  FontRun extra;
-  extra.glyphs.push_back(GSHSCENE_Glyph{36, 0.0, 0.0, nullptr});
-  extra.sync();
-  FontRun fewer;
-  fewer.glyphs.pop_back();
-  fewer.sync();
-  {
+  for (int order = 0; order < 2; order++) {
     StoreHolder s(nullptr, nullptr, all_zero);
-    Ref a(intern_run(s.store, base.run)), b(intern_run(s.store, extra.run)), c(intern_run(s.store, fewer.run));
-    EXPECT_NE(a.get(), b.get()) << "base first, then a longer run with the same first glyphs";
-    EXPECT_NE(a.get(), c.get());
-    EXPECT_NE(b.get(), c.get());
-  }
-  {
-    StoreHolder s(nullptr, nullptr, all_zero);
-    Ref c(intern_run(s.store, fewer.run)), a(intern_run(s.store, base.run));
-    EXPECT_NE(a.get(), c.get()) << "the shorter run first, then the longer one";
+    FontRun base(s.store);
+    FontRun extra(s.store);
+    extra.glyphs.push_back(GSHSCENE_Glyph{36, 0.0, 0.0, nullptr});
+    extra.sync();
+    FontRun fewer(s.store);
+    fewer.glyphs.pop_back();
+    fewer.sync();
+    if (order == 0) {
+      Ref a(intern_run(s.store, base.run)), b(intern_run(s.store, extra.run)), c(intern_run(s.store, fewer.run));
+      EXPECT_NE(a.get(), b.get()) << "base first, then a longer run with the same first glyphs";
+      EXPECT_NE(a.get(), c.get());
+      EXPECT_NE(b.get(), c.get());
+    } else {
+      Ref c(intern_run(s.store, fewer.run)), a(intern_run(s.store, base.run));
+      EXPECT_NE(a.get(), c.get()) << "the shorter run first, then the longer one";
+    }
   }
 }
 
@@ -719,7 +733,7 @@ TEST(GlyphRun, ThePositionsRangeIsCheckedOnEverySideOfEveryAxis) {
   StoreHolder s(nullptr, nullptr, all_zero);
   const double big = std::ldexp(1.0, 101);
   for (int slot = 0; slot < 4; slot++) {
-    FontRun fr;
+    FontRun fr(s.store);
     GSHSCENE_Glyph & g = fr.glyphs[1];
     switch (slot) {
       case 0: g.x = big; break;
@@ -731,7 +745,7 @@ TEST(GlyphRun, ThePositionsRangeIsCheckedOnEverySideOfEveryAxis) {
     EXPECT_EQ(intern_run(s.store, fr.run, &rc), nullptr) << slot;
     EXPECT_EQ(rc, GSHSCENE_ERR_INVALID) << slot;
     // And the limit itself, either sign, is kept.
-    FontRun edge;
+    FontRun edge(s.store);
     GSHSCENE_Glyph & e = edge.glyphs[1];
     switch (slot) {
       case 0: e.x = GSHGEOM_COORD_LIMIT; break;
@@ -742,7 +756,7 @@ TEST(GlyphRun, ThePositionsRangeIsCheckedOnEverySideOfEveryAxis) {
     Ref ok(intern_run(s.store, edge.run, &rc));
     EXPECT_NE(ok.get(), nullptr) << slot;
   }
-  FontRun fr;
+  FontRun fr(s.store);
   fr.run.size = std::ldexp(GSHGEOM_COORD_LIMIT, 1) ;
   GSHSCENE_Result rc = GSHSCENE_OK;
   EXPECT_EQ(intern_run(s.store, fr.run, &rc), nullptr);
@@ -754,7 +768,7 @@ TEST(GlyphRun, ACountWhoseArrayWouldOverflowIsALimitAndTheArrayIsNeverRead) {
   gshscene_limits_default(&limits);
   limits.max_resource_elements = SIZE_MAX;
   StoreHolder s(&limits, nullptr, all_zero);
-  FontRun fr;
+  FontRun fr(s.store);
   GSHSCENE_Glyph_Run run = fr.run;
   run.glyph_count = SIZE_MAX / sizeof(GSHSCENE_Glyph) + 1;
   GSHSCENE_Result rc = GSHSCENE_OK;
@@ -857,7 +871,7 @@ TEST(Picture, IsACopyThatHoldsTheItemsReferences) {
 
 TEST(Picture, AListThatFillsAGlyphRunIsNotMistakenForOneThatInstancesAPicture) {
   StoreHolder s(nullptr, nullptr, all_zero);
-  FontRun fr;
+  FontRun fr(s.store);
   Ref run(intern_run(s.store, fr.run));
   GSHSCENE_List * list = nullptr;
   ASSERT_EQ(gshscene_list_create(nullptr, nullptr, s.store, &list), GSHSCENE_OK);

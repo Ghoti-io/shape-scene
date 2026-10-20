@@ -45,9 +45,20 @@
  * (`gshgeom_map_compose_chain`) and maps the four corners of the resource's
  * model-space box: its **box**, in target units.  The box of a path is its
  * bounds; of a run from outlines, the union of its outlines' bounds moved by each
- * glyph's position; of a run from a font, the glyph origins widened by the size
- * on every side.  An item whose box is wider or taller than `max_extent` (the
- * sink's one resource limit) is refused while drawing (`RESOURCE_LIMIT`).
+ * glyph's position; of a run from a font, the union of its glyphs' design boxes
+ * (the provider's `glyph_box`) placed by each glyph's position at `size / upem`
+ * (a glyph whose box cannot be had adds nothing).  An item whose box is wider or
+ * taller than `max_extent` (the sink's one resource limit) is refused while
+ * drawing (`RESOURCE_LIMIT`).
+ *
+ * **A run from a font** (story 14a) is decided with glyph.h's route, as the plan
+ * decided it: a run the route refuses is skipped (the plan reported it).  Each
+ * glyph then goes to its face's provider by its route, `glyph_device_path` on the
+ * fast tier and `glyph_outline` on the general route, and the provider's answer
+ * makes glyph.h's per-glyph entry; a refused glyph under strict stops the render
+ * at the item (S6).  A glyph's provider paths take at most 64 KiB of scratch,
+ * carved from the render's memory (so `CALLER_MEMORY` holds); past it the glyph is
+ * refused (`RESOURCE_LIMIT`).
  *
  * **Stamps** (pixel targets only).  A fill outside every group stamps its box,
  * rounded out to whole pixels and clipped by the clips in force, the extent and
@@ -67,7 +78,13 @@
  * `C res=<kind>:<hash> map=<hash> rule=N box=<x0> <y0> <x1> <y1>` (a clip push),
  * `c` (a clip pop), `G opacity=<hex> composite=N` (a group push), `g` (a group pop),
  * `I res=picture:<hash>` (an instance), or `X class=N reason=N` (a unit not
- * drawn: refused, or inside a refused block); for a pixel target, after the unit,
+ * drawn: refused, or inside a refused block); for a fill or clip of a run from a
+ * font, after its record, one line per glyph, `Y <index> f <hash> status=N` (the
+ * fast tier: `gshgeom_device_path_hash` of the device path, the whole pixel
+ * added, and the provider's hint status), `Y <index> g <hash> status=0` (the
+ * general route: FNV-1a 64 of `u64` `gshgeom_path_hash` of the outline and `u64`
+ * `gshgeom_map_hash` of the glyph's map) or `Y <index> x reason=N` (a refused
+ * glyph); for a pixel target, after the unit,
  * `S <x0> <y0> <x1> <y1> <mark>` for each stamp it makes (decimal pixel edges,
  * the mark as 8 hexadecimal digits); and last `E result=N processed=P done=D`.  A
  * chain is its indices in decimal joined by `.`; a hash is 16 hexadecimal digits

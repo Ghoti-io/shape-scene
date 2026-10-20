@@ -3,7 +3,9 @@
 **Status:** the waist (resources, lists, the immediate-mode recording path, hash and dump), the
 retained scene above it (versions, edits, identity, merge, diff and damage), and what a scene means when
 it is drawn (color, paint, composition and order, below) are implemented, and so is the sink contract
-with its report and the test sink (story 13a). The first real sink, shape-cpu's, is story 13b.
+with its report and the test sink (story 13a). The first real sink, shape-cpu's, is story 13b. Runs from a
+font reach the waist through a face resource and the glyph path provider seam (story 14a, below); `font`
+implements the provider in story 14b.
 
 The shape family waist: resources and lists, and the versioned scene above them.
 
@@ -27,6 +29,13 @@ entry from the release listener. The store lives until its last resource is rele
 Content is copied in: a path is replayed into a path of the store's allocator, a glyph run's array is
 copied, a picture is a closed copy of a list. A resource that names others (a run of outlines, a
 picture) holds a reference on each, so equality compares them by handle.
+
+A face (story 14a) is a resource too: a font's key, a face index and normalized variation coordinates as
+F2.14 (trailing zeros dropped, so equal instances are one handle), with the provider's binding as a
+non-content field: the first intern of a content builds the face, asks `face_info` once and retains the
+binding, and the face's last release releases it once. A run from a font names a face handle, which it
+holds. The formats are per kind: a glyph run's hash and dump are format 2 since the face replaced the key; a
+path's, a picture's and a face's are 1.
 
 ## Lists
 
@@ -298,7 +307,8 @@ conformance suite (`tests/sink_conformance.h`) cite the rules by number.
   raster, so a test can hash a GPU's output.
 - **S16 Geometry reaches a sink in model space.** The contract hands a sink model-space `double`
   geometry with curves intact; nothing in `sink.h` composes, flattens or rounds. A writer emits
-  curves and dedupes resources by id.
+  curves and dedupes resources by id. The planning pass composes maps to decide (a run from a font's
+  route), and never hands composed geometry to a sink.
 
 **The test sink** (`dump_sink.h`) is the second backend AD-11 asks for, independent of shape-cpu. It
 composites nothing: it writes a dump of every unit (a box per fill and clip: the resource's model
@@ -310,3 +320,65 @@ path of the contract is reachable. `tests/sink_conformance.h` runs the same test
 configurations now and against shape-cpu in 13b; `tools/gen-sink-vectors.py` restates the report's
 and the test sink's spellings, and `tests/fuzz/fuzz_render.c` drives requests through it.
 
+
+## Glyphs through the waist (normative; story 14a, AD-5)
+
+**The seam** (`glyph_provider.h`) is float-free: no floating type in it or in a suite header it includes,
+so that `font` can include it from a `GFNT_` header; `make check-float-free` preprocesses it and refuses a
+floating token in any suite header (and is seen to refuse a planted `double` in every run). A provider is an
+integer-only ops table bound to a face: `face_info` (upem, axes, flags, the largest ppem it hints, the glyph
+count, and the identity a writer needs to reference the font rather than outline it: the family and
+PostScript names, with the face's index, coordinates and key), `glyph_outline` (the unhinted outline in 26.6
+design units, y up, given to a model path through shape-geometry's fixed-point builder), `glyph_device_path`
+(the fast tier: the y-down 26.6 device path relative to the whole-pixel origin, the hint status and the
+advance), `glyph_box` (the design box), and optional `face_data` (the font's bytes). Ops may be called from
+any thread at once. A GPU sink that keeps signed-distance or MSDF atlases takes the unhinted outline, not the
+device path: a distance field is resampled at every size and hinting belongs to one size.
+
+**The route** (`glyph.h`, `gshscene_glyph_route`) is decided from the run, its item's composed map (model to
+target, AD-24) and the target's kind, in this order: an unbound face is refused (`FACE_UNBOUND`); a target
+without pixels is general with no entry; a binding without the fast tier is general (`HINT_NO_PROGRAM`
+unless the mode is `NONE`); a map `gshgeom_map_grid_aligned` rejects, or accepts with the y flip, is general
+(`HINT_ROUTE` under `FONT`, refused `HINT_STRICT_ROUTE` under `FONT_STRICT`, nothing under `NONE`); a device
+ppem (the run's size times the map's scale, the product checked exact by Dekker's error term with
+contraction off) that is not an integer in `[1, max_ppem]` is general likewise with `HINT_SIZE`; anything
+else is the fast tier at that ppem and the snapped scale `round(ppem * 65536 / upem)`, half up, with
+`HINT_NO_PROGRAM` when the face has no program. The planning pass writes the run-level entry and refuses a
+run the route refuses before the sink is called, so a strict render leaves the target untouched; a sink
+skips a refused run and never writes the run-level entry. A stream has no hinting and so no entry.
+
+**The two routes.** General: the glyph's map is `map ∘ translate(x, y) ∘ design_to_model(size / upem)`
+through the one composer, and the outline is rounded by `gshgeom_device_path_from_model` after the map.
+Fast: the glyph's origin is rounded by AD-6's rule and split into a whole pixel and a fraction in `[0, 64)`;
+the provider's path is relative to the whole pixel, which the sink adds as an exact integer. The provider's
+unhinted points are normative: each 26.6 design point `(x, y)` of the outline, in order and with its verb,
+becomes `(fx + gshgeom_scale_26_6(x, S, 0), fy + gshgeom_scale_26_6(y, S, 1))`. That is the general route
+under the **snapped map** (`x' = (S / 65536) u + ox / 64`, `y' = -(S / 65536) v + oy / 64`) bit for bit, and
+AD-5's gate is exactly that: with hinting off, `fast(map) == general(snap(map))`. `tests/unit/test_glyph.cpp`
+compares the two paths element for element over every outline glyph of the test provider, ppem 8 to 72, a
+2048-unit and a 1000-unit face, two instances and the fractions {0, 1, 16, 33, 63} on each axis (39,000
+pairs); shape-cpu's gate compares the pixels.
+
+**Per glyph** (D7): a provider's status makes a glyph-level `HINT_STATUS` entry with the glyph's index in
+`second` (`HINT_PROGRAM_FAILED`, `HINT_WITH_ERRORS`, and `HINT_NO_PROGRAM` for a glyph the font does not hint
+at this size on a face that has a program); a failing program under `FONT_STRICT`, a path past a limit, an
+origin past 26.6 or a glyph the provider cannot give refuses that glyph (`HINT_PROGRAM_FAILED`,
+`RESOURCE_LIMIT`, `GLYPH_UNAVAILABLE`), the rest of the run is drawn, and under render `STRICT` the render
+stops at the item with the finished prefix. Mode `NONE` gives no `HINT_STATUS` entry.
+
+**Caches** (D8, normative keys): an outline by `(face id, glyph)`; a device path by `(face id, glyph, ppem,
+mode, version, fraction x, fraction y)`; never by run, so a reflowed paragraph's re-interned runs still hit.
+
+**Damage** of a run from a bound face is what a pixel sink draws: the control boxes of the fast tier's
+device paths, or each glyph's design box under its map, out by the AA support; an unbound face is
+unbounded.
+
+**The test sink** routes each run as the plan did, calls the provider by the route for every glyph, and
+writes a `Y` record per glyph (the device path's hash, or the outline's and the glyph map's); a glyph's
+provider paths take at most 64 KiB of the render's memory, so `CALLER_MEMORY` holds, and a glyph past it is
+refused as the sink's own limit. `tests/glyph_test_provider.h` (installed with the conformance suite) is a
+provider with no font file whose glyphs reach every path: ties, quadratics, cubics, a corrupt glyph, a failing
+program, a program with errors, a glyph without instructions, a glyph of 3000 lines, and an axis.
+`tools/gen-sink-vectors.py` restates the route, the snapped scale, the integer rounding, the test provider's
+toy hinter and the records, and the conformance suite checks that every sink calls the provider by the route
+and reports per D6 and D7.

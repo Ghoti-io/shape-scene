@@ -35,6 +35,8 @@
 
 #include "internal.h"
 
+#include <ghoti.io/shape-geometry/device.h>
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -280,6 +282,7 @@ static GSHSCENE_Result compute_marks(const GSHSCENE_Allocator * alloc, const str
 /* --- bounds ------------------------------------------------------------------------------------------------- */
 
 typedef struct Damage_Walk {
+  const GSHSCENE_Allocator * alloc; /* a font run's provider paths (fast tier) */
   const struct GSHSCENE_Version * version;
   const unsigned char * marks;
   const GSHGEOM_Map * device;
@@ -320,6 +323,62 @@ static void add_box(Damage_Walk * d, const GSHGEOM_Map * map, double x0, double 
   }
 }
 
+/**
+ * A run from a font's bounds (glyph.h), as a pixel sink draws it: on the fast tier the control box of each glyph's
+ * device path (the provider's, so hinting is inside it); on the general route each glyph's design box under its map.
+ * An unbound face has none.  A glyph the provider refuses is not drawn and adds nothing.
+ */
+static GSHSCENE_Result add_font_run(Damage_Walk * d, const GSHSCENE_Resource * resource, size_t count,
+    const GSHGEOM_Map * composed) {
+  GSHSCENE_Glyph_Route route;
+  if (gshscene_glyph_route(resource, composed, GSHSCENE_TARGET_RASTER, &route) != GSHSCENE_OK ||
+      route.reason == GSHSCENE_REASON_FACE_UNBOUND) {
+    d->unbounded = 1;
+    return GSHSCENE_OK;
+  }
+  for (size_t i = 0; i < count && !d->unbounded; i++) {
+    if (route.route == GSHSCENE_GLYPH_FAST) {
+      GSHSCENE_Glyph_Origin origin;
+      GSHGEOM_Device_Path * path = NULL;
+      GSHSCENE_Glyph_Note note;
+      GSHSCENE_Result r = gshscene_glyph_origin(resource, composed, i, &origin);
+      if (r == GSHSCENE_OK) {
+        r = gshscene_glyph_device_path(resource, &route, i, &origin, d->alloc, NULL, &path, &note);
+      }
+      if (r == GSHSCENE_ERR_OOM) {
+        return r;
+      }
+      if (r != GSHSCENE_OK) {
+        d->unbounded = 1;
+        break;
+      }
+      size_t n = gshgeom_device_path_element_count(path);
+      for (size_t k = 0; k < n; k++) {
+        GSHGEOM_Device_Element e;
+        if (gshgeom_device_path_element(path, k, &e) == GSHGEOM_OK) {
+          for (unsigned j = 0; j < e.count && j < 3; j++) {
+            add_point(d, (double)e.p[j].x / 64.0, (double)e.p[j].y / 64.0);
+          }
+        }
+      }
+      gshgeom_device_path_destroy(path);
+      continue;
+    }
+    GSHSCENE_Glyph_Box box;
+    GSHGEOM_Map map;
+    if (gshscene_glyph_box(resource, i, &box) != GSHSCENE_OK || box.empty) {
+      continue; /* not drawn, or nothing to draw */
+    }
+    if (gshscene_glyph_map(resource, composed, i, &map) != GSHSCENE_OK) {
+      d->unbounded = 1;
+      break;
+    }
+    add_box(d, &map, (double)box.x_min / 64.0, (double)box.y_min / 64.0, (double)box.x_max / 64.0,
+        (double)box.y_max / 64.0);
+  }
+  return GSHSCENE_OK;
+}
+
 /* A shape occurrence's bounds. */
 static GSHSCENE_Result add_shape(Damage_Walk * d, const GSHSCENE_Walk * walk, const GSHSCENE_Node_Rec * shape,
     const GSHGEOM_Map * item_map) {
@@ -344,9 +403,12 @@ static GSHSCENE_Result add_shape(Damage_Walk * d, const GSHSCENE_Walk * walk, co
     return GSHSCENE_OK;
   }
   GSHSCENE_Glyph_Run run;
-  if (gshscene_resource_glyph_run(resource, &run) != GSHSCENE_OK || run.source != GSHSCENE_GLYPHS_FROM_OUTLINES) {
-    d->unbounded = 1; /* a font is an opaque key: nothing says where its glyphs fall */
+  if (gshscene_resource_glyph_run(resource, &run) != GSHSCENE_OK) {
+    d->unbounded = 1;
     return GSHSCENE_OK;
+  }
+  if (run.source == GSHSCENE_GLYPHS_FROM_FONT) {
+    return add_font_run(d, resource, run.glyph_count, &composed);
   }
   for (size_t i = 0; i < run.glyph_count && !d->unbounded; i++) {
     const GSHGEOM_Path * path = gshscene_resource_path(run.glyphs[i].outline);
@@ -459,6 +521,7 @@ static GSHSCENE_Result compute_damage(const struct GSHSCENE_Version * a, const s
   GSHSCENE_Result result = compute_marks(alloc, a, b, entries, n, &marks);
   Damage_Walk d;
   memset(&d, 0, sizeof d);
+  d.alloc = alloc;
   d.foreground = foreground;
   if (result == GSHSCENE_OK) {
     result = walk_marked(a, marks.a, device, &d);

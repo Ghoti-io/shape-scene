@@ -63,6 +63,7 @@ TEST(StoreBytes, TheAccountedBytesFollowTheFormulaForEveryKind) {
   EXPECT_EQ(GSHSCENE_BYTES_PER_PATH_ELEMENT, 160u);
   EXPECT_EQ(GSHSCENE_BYTES_PER_GLYPH, 32u);
   EXPECT_EQ(GSHSCENE_BYTES_PER_ITEM, 256u);
+  EXPECT_EQ(GSHSCENE_BYTES_PER_AXIS, 8u);
   StoreHolder s;
   Ref sq(intern_square(s.store));  // five elements
   EXPECT_EQ(gshscene_resource_bytes(sq.get()), 128u + 5 * 160u);
@@ -74,8 +75,10 @@ TEST(StoreBytes, TheAccountedBytesFollowTheFormulaForEveryKind) {
   EXPECT_EQ(gshscene_resource_bytes(none.get()), 128u) << "an empty path costs its base";
   GSHSCENE_Glyph_Run run;
   std::memset(&run, 0, sizeof run);
+  Ref face(intern_face(s.store));
+  EXPECT_EQ(gshscene_resource_bytes(face.get()), 128u + 2 * 8u) << "a face: its base and 8 for each coordinate";
   run.source = GSHSCENE_GLYPHS_FROM_FONT;
-  run.font_key = 9;
+  run.face = face.get();
   run.size = 10;
   GSHSCENE_Glyph glyphs[3] = {{1, 0, 0, nullptr}, {2, 1, 0, nullptr}, {3, 2, 0, nullptr}};
   run.glyph_count = 3;
@@ -93,7 +96,8 @@ TEST(StoreBytes, TheAccountedBytesFollowTheFormulaForEveryKind) {
   ASSERT_EQ(gshscene_store_intern_picture(s.store, l.list, &picture.resource), GSHSCENE_OK);
   EXPECT_EQ(gshscene_resource_bytes(picture.get()), 128u + 4 * 256u);
   EXPECT_EQ(gshscene_resource_bytes(nullptr), 0u);
-  EXPECT_EQ(live_bytes(s.store), (128u + 5 * 160u) + (128u + 2 * 160u) + 128u + (128u + 3 * 32u) + (128u + 4 * 256u));
+  EXPECT_EQ(live_bytes(s.store),
+      (128u + 5 * 160u) + (128u + 2 * 160u) + 128u + (128u + 2 * 8u) + (128u + 3 * 32u) + (128u + 4 * 256u));
 }
 
 TEST(StoreBytes, AReleaseGivesTheBytesBackAndAHitCostsNothing) {
@@ -196,9 +200,7 @@ TEST(StoreBytes, PicturesAndGlyphRunsAreAccountedAndRefusedAtTheLimit) {
   EXPECT_EQ(gshscene_store_intern_picture(s.store, list.list, &picture.resource), GSHSCENE_OK) << "exactly the limit";
   GSHSCENE_Glyph_Run run;
   std::memset(&run, 0, sizeof run);
-  run.source = GSHSCENE_GLYPHS_FROM_FONT;
-  run.font_key = 1;
-  run.size = 1;
+  run.source = GSHSCENE_GLYPHS_FROM_OUTLINES;
   const GSHSCENE_Resource * text = nullptr;
   EXPECT_EQ(gshscene_store_intern_glyph_run(s.store, &run, &text), GSHSCENE_ERR_LIMIT) << "an empty run still costs its base";
   EXPECT_EQ(text, nullptr);

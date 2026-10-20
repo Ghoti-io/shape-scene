@@ -14,6 +14,13 @@ static const std::uint64_t kRasterPixelsHash = UINT64_C(0x2a84270a32e6a93d);
 static const std::uint64_t kStreamOutputHash = UINT64_C(0xa8f843bac17a4e40);
 static const std::uint64_t kNarrowReportHash = UINT64_C(0xa51c8376834206a0);
 static const std::uint64_t kStrictReportHash = UINT64_C(0x5315ef57c35fbeda);
+static const std::uint64_t kGlyphListHash = UINT64_C(0x3fe1c10b1268163a);
+static const std::uint64_t kGlyphRunHash = UINT64_C(0xe1ae12c2545e8898);
+static const std::uint64_t kGlyphRasterOutputHash = UINT64_C(0x6ae536c7bea22c60);
+static const std::uint64_t kGlyphRasterPixelsHash = UINT64_C(0x8beba4fd16fe2665);
+static const std::uint64_t kGlyphStreamOutputHash = UINT64_C(0x5831b8366a3eb392);
+static const std::uint64_t kGlyphRasterReportHash = UINT64_C(0x5bf32239a1e9ba29);
+static const std::uint64_t kGlyphStreamReportHash = UINT64_C(0x71aa86ff3216db08);
 
 static const char * const kRasterDump =
 R"DUMP(gshscene.dump-sink 1 kind=1 unit=0 units=15 list=55603ca65a3d6c6f
@@ -67,9 +74,45 @@ E class=3 reason=11 chain=5 second=6 depth=3ff0000000000000
 )DUMP";
 static const char * const kStrictReportDump =
 R"DUMP(gshscene.report 1 result=9 units=15/0/0 entries=2 counted=2 overflowed=0 static=0 frame=%FRAME% workspace=%WORKSPACE% work=1 hash=5315ef57c35fbeda
-failure result=9 chain=0 reason=strict: refused while drawing (the sink's resource limit)
+failure result=9 chain=0 reason=strict: refused while drawing (the sink's resource limit, or a glyph)
 E class=1 reason=6 chain=0 second=0 depth=0000000000000000
 E class=3 reason=11 chain=5 second=6 depth=3ff0000000000000
+)DUMP";
+static const char * const kGlyphRasterDump =
+R"DUMP(gshscene.dump-sink 1 kind=1 unit=0 units=2 list=3fe1c10b1268163a
+U 0 F res=glyph-run:e1ae12c2545e8898 map=1f5787abb2e02a06 rule=0 box=4000300000000000 4032460000000000 4044150000000000 4040e00000000000
+Y 0 f 1cab3d781e5b63d5 status=0
+Y 1 f 0dafd9f995c42cdd status=0
+Y 2 x reason=18
+Y 3 f 3089c95b5f54e217 status=0
+S 2 18 41 34 4dea4c24
+U 1 F res=glyph-run:e1ae12c2545e8898 map=2d58970d98c00e79 rule=0 box=403a400000000000 4000300000000000 4044dd0000000000 4044150000000000
+Y 0 g 0f8b407a3b7cfcb9 status=0
+Y 1 g b34cee4abd30bcb6 status=0
+Y 2 x reason=18
+Y 3 g 88994dd64c747a36 status=0
+S 26 2 42 41 58d99645
+E result=0 processed=2 done=2
+)DUMP";
+static const char * const kGlyphStreamDump =
+R"DUMP(gshscene.dump-sink 1 kind=2 unit=2 units=2 list=3fe1c10b1268163a
+U 0 F res=glyph-run:e1ae12c2545e8898 map=c530824dc0bebfa4 rule=0 box=3ff0300000000000 4022460000000000 4034150000000000 4030e00000000000
+Y 0 g e6249bb1a11b6528 status=0
+Y 1 g ac9398c46ee3b4cb status=0
+Y 2 x reason=18
+Y 3 g 58cc832b9e8f8d69 status=0
+U 1 F res=glyph-run:e1ae12c2545e8898 map=be64f07c84967aab rule=0 box=402a400000000000 3ff0300000000000 4034dd0000000000 4034150000000000
+Y 0 g 2f5ab3a7b17f4f7a status=0
+Y 1 g 1df2bba4aea6e37f status=0
+Y 2 x reason=18
+Y 3 g 632cd62539e598b0 status=0
+E result=0 processed=2 done=2
+)DUMP";
+static const char * const kGlyphRasterReportDump =
+R"DUMP(gshscene.report 1 result=0 units=2/2/2 entries=3 counted=3 overflowed=0 static=0 frame=%FRAME% workspace=%WORKSPACE% work=1 hash=5bf32239a1e9ba29
+E class=1 reason=18 chain=0 second=2 depth=0000000000000000
+E class=1 reason=18 chain=1 second=2 depth=0000000000000000
+E class=4 reason=12 chain=1 second=0 depth=0000000000000000
 )DUMP";
 
 }  // namespace sink_known

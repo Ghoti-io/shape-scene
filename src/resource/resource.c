@@ -33,8 +33,9 @@
 
 #include <string.h>
 
-/** The format of a resource's hash and dump. */
+/** The format of a resource's hash and dump, per kind (resource.h): a glyph run's is 2 since story 14a. */
 #define RESOURCE_FORMAT_VERSION 1u
+#define RUN_FORMAT_VERSION 2u
 
 const char * gshscene_resource_kind_string(GSHSCENE_Resource_Kind kind) {
   switch (kind) {
@@ -48,6 +49,8 @@ const char * gshscene_resource_kind_string(GSHSCENE_Resource_Kind kind) {
       return "gradient";
     case GSHSCENE_RESOURCE_IMAGE:
       return "image";
+    case GSHSCENE_RESOURCE_FACE:
+      return "face";
     case GSHSCENE_RESOURCE_KIND_COUNT:
       break;
   }
@@ -56,14 +59,19 @@ const char * gshscene_resource_kind_string(GSHSCENE_Resource_Kind kind) {
 
 /* --- hashes ---------------------------------------------------------------- */
 
-/* The hash of a glyph's outline: 0 for a glyph with none. */
+/* The content hash of a resource a run names (its face, a glyph's outline): 0 for none. */
 static uint64_t outline_hash(const GSHSCENE_Resource * outline) {
   return outline ? gshscene_resource_hash(outline) : 0;
 }
 
+/** The format of a kind's hash and dump. */
+static uint32_t kind_format(GSHSCENE_Resource_Kind kind) {
+  return kind == GSHSCENE_RESOURCE_GLYPH_RUN ? RUN_FORMAT_VERSION : RESOURCE_FORMAT_VERSION;
+}
+
 static void hash_begin(GSHGEOM_Hash * h, GSHSCENE_Resource_Kind kind) {
   gshgeom_hash_init(h);
-  gshgeom_hash_u32(h, RESOURCE_FORMAT_VERSION);
+  gshgeom_hash_u32(h, kind_format(kind));
   gshgeom_hash_u32(h, (uint32_t)kind);
 }
 
@@ -78,17 +86,29 @@ static uint64_t run_content_hash(const GSHSCENE_Glyph_Run * run, const GSHSCENE_
   GSHGEOM_Hash h;
   hash_begin(&h, GSHSCENE_RESOURCE_GLYPH_RUN);
   gshgeom_hash_u32(&h, (uint32_t)run->source);
-  gshgeom_hash_u64(&h, run->font_key);
-  gshgeom_hash_u32(&h, run->face_index);
+  gshgeom_hash_u64(&h, outline_hash(run->face));
   gshgeom_hash_f64(&h, run->size);
   gshgeom_hash_u32(&h, run->hint_mode);
-  gshgeom_hash_u64(&h, run->variation_key);
+  gshgeom_hash_u32(&h, run->hint_version);
   gshgeom_hash_u64(&h, (uint64_t)run->glyph_count);
   for (size_t i = 0; i < run->glyph_count; i++) {
     gshgeom_hash_u32(&h, glyphs[i].id);
     gshgeom_hash_f64(&h, glyphs[i].x);
     gshgeom_hash_f64(&h, glyphs[i].y);
     gshgeom_hash_u64(&h, outline_hash(glyphs[i].outline));
+  }
+  return gshgeom_hash_value(&h);
+}
+
+/* A face's content: its key, index and coordinates (the binding is not content). */
+static uint64_t face_content_hash(uint64_t font_key, uint32_t face_index, uint32_t count, const int16_t * coords) {
+  GSHGEOM_Hash h;
+  hash_begin(&h, GSHSCENE_RESOURCE_FACE);
+  gshgeom_hash_u64(&h, font_key);
+  gshgeom_hash_u32(&h, face_index);
+  gshgeom_hash_u32(&h, count);
+  for (uint32_t i = 0; i < count; i++) {
+    gshgeom_hash_u32(&h, (uint32_t)(int32_t)coords[i]);
   }
   return gshgeom_hash_value(&h);
 }
@@ -167,9 +187,8 @@ int gshscene_path_equal(const GSHGEOM_Path * a, const GSHGEOM_Path * b) {
 
 static int run_equal(const GSHSCENE_Glyph_Run * a, const GSHSCENE_Glyph * ga, const GSHSCENE_Glyph_Run * b,
     const GSHSCENE_Glyph * gb) {
-  if (a->source != b->source || a->font_key != b->font_key || a->face_index != b->face_index ||
-      gshgeom_f64_bits(a->size) != gshgeom_f64_bits(b->size) || a->hint_mode != b->hint_mode ||
-      a->variation_key != b->variation_key || a->glyph_count != b->glyph_count) {
+  if (a->source != b->source || a->face != b->face || gshgeom_f64_bits(a->size) != gshgeom_f64_bits(b->size) ||
+      a->hint_mode != b->hint_mode || a->hint_version != b->hint_version || a->glyph_count != b->glyph_count) {
     return 0;
   }
   for (size_t i = 0; i < a->glyph_count; i++) {
@@ -193,6 +212,20 @@ int gshscene_resource_matches(const GSHSCENE_Resource * resource, const GSHSCENE
     }
     case GSHSCENE_RESOURCE_PICTURE:
       return gshscene_list_equal(resource->u.picture.list, (const GSHSCENE_List *)probe->source);
+    case GSHSCENE_RESOURCE_FACE: {
+      const GSHSCENE_Face * want = (const GSHSCENE_Face *)probe->source;
+      const GSHSCENE_Face * have = &resource->u.face.face;
+      if (have->font_key != want->font_key || have->face_index != want->face_index ||
+          have->coord_count != want->coord_count) {
+        return 0;
+      }
+      for (uint32_t i = 0; i < want->coord_count; i++) {
+        if (have->coords[i] != want->coords[i]) {
+          return 0;
+        }
+      }
+      return 1;
+    }
     default:
       return 0;
   }
@@ -211,6 +244,14 @@ void gshscene_resource_free_content(GSHSCENE_Resource * resource) {
         gshscene_resource_release(resource->u.glyphs.glyphs[i].outline);
       }
       gshscene_free(alloc, resource->u.glyphs.glyphs);
+      gshscene_resource_release(resource->u.glyphs.run.face);
+      break;
+    case GSHSCENE_RESOURCE_FACE:
+      /* The binding was retained when the face was built: released once, here. */
+      if (resource->u.face.bound && resource->u.face.ops.release) {
+        resource->u.face.ops.release(resource->u.face.ctx);
+      }
+      gshscene_free(alloc, resource->u.face.coords);
       break;
     case GSHSCENE_RESOURCE_PICTURE:
       gshscene_list_destroy(resource->u.picture.list);
@@ -307,11 +348,12 @@ static GSHSCENE_Result check_run(const GSHSCENE_Store * store, const GSHSCENE_Gl
     return GSHSCENE_ERR_INVALID;
   }
   if (run->source == GSHSCENE_GLYPHS_FROM_FONT) {
-    if (run->font_key == 0 || !gshscene_finite(run->size) || !(run->size > 0.0) || run->size > GSHGEOM_COORD_LIMIT) {
+    if (!run->face || run->face->store != store || run->face->kind != GSHSCENE_RESOURCE_FACE ||
+        !gshscene_finite(run->size) || !(run->size > 0.0) || run->size > GSHGEOM_COORD_LIMIT ||
+        run->hint_mode >= (uint32_t)GSHSCENE_HINT_MODE_COUNT) {
       return GSHSCENE_ERR_INVALID;
     }
-  } else if (run->font_key != 0 || run->face_index != 0 || gshgeom_f64_bits(run->size) != 0 ||
-             run->hint_mode != 0 || run->variation_key != 0) {
+  } else if (run->face || gshgeom_f64_bits(run->size) != 0 || run->hint_mode != 0 || run->hint_version != 0) {
     return GSHSCENE_ERR_INVALID;
   }
   if (run->glyph_count > store->limits.max_resource_elements || run->glyph_count > SIZE_MAX / sizeof(GSHSCENE_Glyph)) {
@@ -343,6 +385,7 @@ static GSHSCENE_Result build_run(GSHSCENE_Store * store, const void * source, GS
   resource->u.glyphs.run = *run;
   resource->u.glyphs.run.glyph_count = 0; /* counts only what is retained so far */
   resource->u.glyphs.run.glyphs = NULL;
+  resource->u.glyphs.run.face = NULL;     /* likewise: retained below */
   if (run->glyph_count) {
     resource->u.glyphs.glyphs = gshscene_alloc(&store->alloc, run->glyph_count * sizeof(GSHSCENE_Glyph));
     if (!resource->u.glyphs.glyphs) {
@@ -354,6 +397,8 @@ static GSHSCENE_Result build_run(GSHSCENE_Store * store, const void * source, GS
       gshscene_resource_retain(run->glyphs[i].outline);
     }
   }
+  gshscene_resource_retain(run->face);
+  resource->u.glyphs.run.face = run->face;
   resource->u.glyphs.run.glyph_count = run->glyph_count;
   resource->u.glyphs.run.glyphs = resource->u.glyphs.glyphs;
   *out = resource;
@@ -373,6 +418,167 @@ GSHSCENE_Result gshscene_store_intern_glyph_run(
       gshscene_sat_add(GSHSCENE_BYTES_BASE, gshscene_sat_mul(run->glyph_count, GSHSCENE_BYTES_PER_GLYPH)),
       run, build_run};
   return gshscene_store_intern(store, &probe, out);
+}
+
+GSHSCENE_Result gshscene_store_intern_glyph_run_fixed(GSHSCENE_Store * store, const GSHSCENE_Resource * face,
+    int32_t size, uint32_t hint_mode, uint32_t hint_version, unsigned bits, size_t glyph_count,
+    const GSHSCENE_Glyph_Fixed * glyphs, const GSHSCENE_Resource ** out) {
+  if (!store || !out || bits > 16u || size <= 0 || (glyph_count && !glyphs)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  if (glyph_count > store->limits.max_resource_elements || glyph_count > SIZE_MAX / sizeof(GSHSCENE_Glyph)) {
+    return GSHSCENE_ERR_LIMIT;
+  }
+  /* Each number converts exactly: an int32_t into a double, then a division by a power of two. */
+  double unit = (double)((int32_t)1 << bits); /* an int32_t: i686 converts an unsigned one through x87 */
+  GSHSCENE_Glyph * converted = NULL;
+  if (glyph_count) {
+    converted = gshscene_alloc(&store->alloc, glyph_count * sizeof *converted);
+    if (!converted) {
+      return GSHSCENE_ERR_OOM;
+    }
+  }
+  for (size_t i = 0; i < glyph_count; i++) {
+    converted[i].id = glyphs[i].id;
+    converted[i].x = (double)glyphs[i].x / unit;
+    converted[i].y = (double)glyphs[i].y / unit;
+    converted[i].outline = NULL;
+  }
+  GSHSCENE_Glyph_Run run;
+  memset(&run, 0, sizeof run);
+  run.source = GSHSCENE_GLYPHS_FROM_FONT;
+  run.face = face;
+  run.size = (double)size / unit;
+  run.hint_mode = hint_mode;
+  run.hint_version = hint_version;
+  run.glyph_count = glyph_count;
+  run.glyphs = converted;
+  GSHSCENE_Result result = gshscene_store_intern_glyph_run(store, &run, out);
+  gshscene_free(&store->alloc, converted);
+  return result;
+}
+
+/* --- face ------------------------------------------------------------------- */
+
+/** What a face is built from: the canonical content and the binding. */
+typedef struct Face_Source {
+  GSHSCENE_Face face;
+  const GSHSCENE_Glyph_Provider * provider;
+  void * ctx;
+} Face_Source;
+
+/** Whether @p info is within its bounds. */
+static int face_info_ok(const GSHSCENE_Face_Info * info) {
+  for (size_t i = 0; i < sizeof info->_reserved; i++) {
+    if (info->_reserved[i] != 0) {
+      return 0;
+    }
+  }
+  return info->upem >= GSHSCENE_FACE_UPEM_MIN && info->upem <= GSHSCENE_FACE_UPEM_MAX &&
+         !(info->flags & ~GSHSCENE_FACE_FLAGS_ALL) && info->max_ppem <= GSHSCENE_GLYPH_MAX_PPEM;
+}
+
+static GSHSCENE_Result build_face(GSHSCENE_Store * store, const void * source, GSHSCENE_Resource ** out) {
+  const Face_Source * src = (const Face_Source *)source;
+  GSHSCENE_Face_Info info;
+  memset(&info, 0, sizeof info);
+  if (src->provider) {
+    /* Asked once, when the face is built (glyph_provider.h). */
+    GSHSCENE_Result asked = src->provider->face_info(src->ctx, &src->face, &info);
+    if (asked != GSHSCENE_OK) {
+      return asked;
+    }
+    if (!face_info_ok(&info)) {
+      return GSHSCENE_ERR_INVALID;
+    }
+  }
+  GSHSCENE_Resource * resource = gshscene_store_new_resource(store, GSHSCENE_RESOURCE_FACE);
+  if (!resource) {
+    return GSHSCENE_ERR_OOM;
+  }
+  if (src->face.coord_count) {
+    resource->u.face.coords = gshscene_alloc(&store->alloc, src->face.coord_count * sizeof(int16_t));
+    if (!resource->u.face.coords) {
+      gshscene_store_discard_resource(resource);
+      return GSHSCENE_ERR_OOM;
+    }
+    memcpy(resource->u.face.coords, src->face.coords, src->face.coord_count * sizeof(int16_t));
+  }
+  resource->u.face.face = src->face;
+  resource->u.face.face.coords = resource->u.face.coords;
+  resource->u.face.info = info;
+  if (src->provider) {
+    resource->u.face.ops = *src->provider;
+    resource->u.face.ctx = src->ctx;
+    if (src->provider->retain) {
+      src->provider->retain(src->ctx);
+    }
+    resource->u.face.bound = 1; /* from here on, discarding the face releases the binding */
+  }
+  *out = resource;
+  return GSHSCENE_OK;
+}
+
+GSHSCENE_Result gshscene_store_intern_face(
+    GSHSCENE_Store * store, const GSHSCENE_Face_Desc * desc, const GSHSCENE_Resource ** out) {
+  if (!store || !desc || !out || desc->font_key == 0 || (desc->coord_count && !desc->coords)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  if (desc->coord_count > GSHSCENE_FACE_MAX_AXES) {
+    return GSHSCENE_ERR_LIMIT;
+  }
+  const GSHSCENE_Glyph_Provider * provider = desc->provider;
+  if (provider && (provider->version != GSHSCENE_GLYPH_PROVIDER_VERSION || !provider->face_info ||
+                      !provider->glyph_outline || !provider->glyph_box)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  uint32_t count = desc->coord_count;
+  for (uint32_t i = 0; i < count; i++) {
+    if (desc->coords[i] < -GSHSCENE_F2DOT14_ONE || desc->coords[i] > GSHSCENE_F2DOT14_ONE) {
+      return GSHSCENE_ERR_INVALID;
+    }
+  }
+  /* Trailing zeros are the default of their axes: dropped, so equal instances are one face. */
+  while (count > 0 && desc->coords[count - 1] == 0) {
+    count--;
+  }
+  Face_Source src;
+  src.face.font_key = desc->font_key;
+  src.face.face_index = desc->face_index;
+  src.face.coord_count = count;
+  src.face.coords = count ? desc->coords : NULL;
+  src.provider = provider;
+  src.ctx = desc->ctx;
+  GSHSCENE_Probe probe = {GSHSCENE_RESOURCE_FACE, face_content_hash(desc->font_key, desc->face_index, count, desc->coords),
+      gshscene_sat_add(GSHSCENE_BYTES_BASE, gshscene_sat_mul(count, GSHSCENE_BYTES_PER_AXIS)), &src.face, build_face};
+  /* The probe's source is the face; build_face reads the binding beside it. */
+  return gshscene_store_intern(store, &probe, out);
+}
+
+GSHSCENE_Result gshscene_resource_face(const GSHSCENE_Resource * resource, GSHSCENE_Face * out) {
+  if (!resource || !out || resource->kind != GSHSCENE_RESOURCE_FACE) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  *out = resource->u.face.face;
+  return GSHSCENE_OK;
+}
+
+GSHSCENE_Result gshscene_face_info(const GSHSCENE_Resource * resource, GSHSCENE_Face_Info * out) {
+  if (!resource || !out || resource->kind != GSHSCENE_RESOURCE_FACE || !resource->u.face.bound) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  *out = resource->u.face.info;
+  return GSHSCENE_OK;
+}
+
+GSHSCENE_Result gshscene_face_binding(
+    const GSHSCENE_Resource * resource, const GSHSCENE_Glyph_Provider ** ops, void ** ctx) {
+  if (!resource || !ops || !ctx || resource->kind != GSHSCENE_RESOURCE_FACE || !resource->u.face.bound) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  *ops = &resource->u.face.ops;
+  *ctx = resource->u.face.ctx;
+  return GSHSCENE_OK;
 }
 
 /* --- picture ---------------------------------------------------------------- */
@@ -443,7 +649,7 @@ GSHSCENE_Result gshscene_resource_dump(const GSHSCENE_Resource * resource, FILE 
   if (!resource || !out) {
     return GSHSCENE_ERR_INVALID;
   }
-  if (fprintf(out, "gshscene.resource %u kind=%s hash=%016llx\n", RESOURCE_FORMAT_VERSION,
+  if (fprintf(out, "gshscene.resource %u kind=%s hash=%016llx\n", kind_format(resource->kind),
           gshscene_resource_kind_string(resource->kind), HEX(resource->hash)) < 0) {
     return GSHSCENE_ERR_IO;
   }
@@ -454,9 +660,9 @@ GSHSCENE_Result gshscene_resource_dump(const GSHSCENE_Resource * resource, FILE 
       break;
     case GSHSCENE_RESOURCE_GLYPH_RUN: {
       const GSHSCENE_Glyph_Run * run = &resource->u.glyphs.run;
-      if (fprintf(out, "run source=%u font=%016llx face=%u size=%016llx hint=%u var=%016llx glyphs=%llu\n",
-              (unsigned)run->source, HEX(run->font_key), run->face_index, HEX(gshgeom_f64_bits(run->size)),
-              run->hint_mode, HEX(run->variation_key), HEX(run->glyph_count)) < 0) {
+      if (fprintf(out, "run source=%u face=%016llx size=%016llx hint=%u version=%u glyphs=%llu\n",
+              (unsigned)run->source, HEX(outline_hash(run->face)), HEX(gshgeom_f64_bits(run->size)), run->hint_mode,
+              run->hint_version, HEX(run->glyph_count)) < 0) {
         return GSHSCENE_ERR_IO;
       }
       for (size_t i = 0; i < run->glyph_count; i++) {
@@ -471,6 +677,23 @@ GSHSCENE_Result gshscene_resource_dump(const GSHSCENE_Resource * resource, FILE 
     case GSHSCENE_RESOURCE_PICTURE:
       result = gshscene_list_dump(resource->u.picture.list, out);
       break;
+    case GSHSCENE_RESOURCE_FACE: {
+      const GSHSCENE_Face * face = &resource->u.face.face;
+      if (fprintf(out, "face font=%016llx index=%u coords=%u", HEX(face->font_key), face->face_index,
+              face->coord_count) < 0) {
+        return GSHSCENE_ERR_IO;
+      }
+      for (uint32_t i = 0; i < face->coord_count; i++) {
+        if (fprintf(out, " %d", (int)face->coords[i]) < 0) {
+          return GSHSCENE_ERR_IO;
+        }
+      }
+      if (fprintf(out, "\nbound=%d upem=%u flags=%u\n", resource->u.face.bound, resource->u.face.info.upem,
+              resource->u.face.info.flags) < 0) {
+        return GSHSCENE_ERR_IO;
+      }
+      break;
+    }
     default:
       break;
   }

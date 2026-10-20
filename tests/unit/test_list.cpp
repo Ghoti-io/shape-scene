@@ -335,7 +335,8 @@ TEST(ListRecord, EveryInvalidArgumentIsRefusedAndTheListIsAsItWas) {
   GSHSCENE_Glyph_Run run;
   std::memset(&run, 0, sizeof run);
   run.source = GSHSCENE_GLYPHS_FROM_FONT;
-  run.font_key = 1;
+  Ref run_face(intern_face(s.store, 1));
+  run.face = run_face.get();
   run.size = 10.0;
   const GSHSCENE_Resource * runres = nullptr;
   ASSERT_EQ(gshscene_store_intern_glyph_run(s.store, &run, &runres), GSHSCENE_OK);
@@ -484,7 +485,8 @@ TEST(ListRecord, AGlyphRunCanBeFilledAndUsedAsAClip) {
   GSHSCENE_Glyph_Run run;
   std::memset(&run, 0, sizeof run);
   run.source = GSHSCENE_GLYPHS_FROM_FONT;
-  run.font_key = 7;
+  Ref run_face(intern_face(s.store, 7));
+  run.face = run_face.get();
   run.size = 16.0;
   const GSHSCENE_Resource * r = nullptr;
   ASSERT_EQ(gshscene_store_intern_glyph_run(s.store, &run, &r), GSHSCENE_OK);

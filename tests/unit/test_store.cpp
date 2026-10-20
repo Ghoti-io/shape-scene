@@ -321,7 +321,8 @@ TEST(StoreIntern, ACollisionBetweenKindsIsAlsoNotAMerge) {
   GSHSCENE_Glyph_Run run;
   std::memset(&run, 0, sizeof run);
   run.source = GSHSCENE_GLYPHS_FROM_FONT;
-  run.font_key = 1;
+  Ref run_face(intern_face(store, 1));
+  run.face = run_face.get();
   run.size = 10.0;
   const GSHSCENE_Resource * glyphs = nullptr;
   ASSERT_EQ(gshscene_store_intern_glyph_run(store, &run, &glyphs), GSHSCENE_OK);

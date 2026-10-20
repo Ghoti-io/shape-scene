@@ -231,7 +231,8 @@ TEST(NodeRules, AGroupsClipIsAPathOrGlyphRunOfTheStoreWithAValidMapAndRule) {
   GSHSCENE_Glyph_Run run;
   std::memset(&run, 0, sizeof run);
   run.source = GSHSCENE_GLYPHS_FROM_FONT;
-  run.font_key = 7;
+  Ref run_face(intern_face(f.s.store(), 7));
+  run.face = run_face.get();
   run.size = 10;
   Ref font_run;
   ASSERT_EQ(gshscene_store_intern_glyph_run(f.s.store(), &run, &font_run.resource), GSHSCENE_OK);

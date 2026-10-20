@@ -39,6 +39,12 @@
 #                        entry point; fails on no input and on a corpus that never
 #                        reaches a limit or a refusal (`make test-asan` replays it too)
 #
+# The glyph seam's gate (story 14a), in TEST_GATES:
+#
+#   check-float-free     glyph_provider.h, preprocessed alone, names no floating
+#                        type in any suite header (a planted double is refused and
+#                        a control of the C library passes, in every run)
+#
 # The test-executable rules keep section 6's shape: the static archive is a
 # normal prerequisite of every test because the recipe links it, and the .so
 # is order-only because check-symbols wants it and the tests do not link it.
@@ -285,7 +291,7 @@ TESTFLAGS := `PKG_CONFIG_PATH=$(PKG_CONFIG_LOOKUP_PATH) pkg-config --libs --cfla
 # check-symbols is right to reject in a shipping library.
 PLANT_JOBS ?= 4
 
-TEST_GATES ?= check-symbols check-aliasing check-stamps check-fp-contract check-edges check-libm check-no-x87 check-gates check-vectors check-sink-vectors check-composite check-corpus-hash check-publish-types check-fuzz-corpus fuzz-replay examples
+TEST_GATES ?= check-symbols check-aliasing check-stamps check-fp-contract check-edges check-libm check-no-x87 check-gates check-float-free check-vectors check-sink-vectors check-composite check-corpus-hash check-publish-types check-fuzz-corpus fuzz-replay examples
 
 VALGRIND_FLAGS := --leak-check=full --show-leak-kinds=definite,indirect,possible --track-origins=yes --error-exitcode=1 --suppressions=tests/valgrind.supp
 
@@ -490,6 +496,14 @@ $(HASH_PROBE): tools/corpus-hash.c $(APP_DIR)/$(STATIC_TARGET) \
 
 check-corpus-hash: $(HASH_PROBE) ## Fail unless the probe prints the committed cross-target hash (CAP-13)
 	@LD_LIBRARY_PATH="$(TEST_LD_PATH)" tools/check-corpus-hash.sh $(HASH_PROBE) tests/corpus/scene.hash
+
+# The float-free seam (story 14a, AD-5): the headers `font` includes from a
+# GFNT_ header name no floating type, nor does any suite header they include.
+# The script plants a double and runs a control in every run.
+FLOAT_FREE_HEADERS := include/ghoti.io/shape-scene/glyph_provider.h
+
+check-float-free: $(LIBVER_GEN) ## Fail if the glyph provider seam (a float-free header) names a floating type
+	@python3 tools/check-float-free.py --cc '$(CC)' --flags '$(INCLUDE)' $(FLOAT_FREE_HEADERS)
 
 check-vectors: ## Fail if tests/known_answers.h is not what the independent generator writes
 	@python3 tools/gen-scene-vectors.py --check
@@ -796,12 +810,14 @@ PKGCONFIG_INSTALL_PATH ?= $(PC_INSTALL_PATH)
 
 # What a sink library's tests take from this one (story 13b): the conformance
 # suite every sink passes unchanged, the allocator it counts with, and the
-# oracle's composite vectors a compositing sink is gated against. Installed as
+# oracle's composite vectors a compositing sink is gated against, and (story
+# 14a) the test glyph provider every sink's glyph tests and probes use. Installed as
 # <ghoti.io/shape-scene/testing/...>, so a sink finds them the way it finds
 # everything else of this library, through pkg-config, and runs the very text
-# this library's own tests run. They are C++ (GoogleTest) and only a test
+# this library's own tests run. They are C++ (GoogleTest), but for the glyph
+# provider, which is C so that a probe can use it, and only a test or a probe
 # includes them.
-TESTING_HEADERS := tests/sink_conformance.h tests/alloc_tracker.h tests/composite_vectors.h
+TESTING_HEADERS := tests/sink_conformance.h tests/alloc_tracker.h tests/composite_vectors.h tests/glyph_test_provider.h
 
 install: all ## Install the library
 	@mkdir -p $(LIB_INSTALL_PATH)/$(SUITE)

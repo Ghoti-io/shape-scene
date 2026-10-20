@@ -54,12 +54,15 @@
  * - the bounds of a shape occurrence are the exact bounds of its path, the box
  *   of its four corners under the composed map and the map, outset by the AA
  *   support and rounded outward to whole pixels; of a glyph run from outlines,
- *   the union over its glyphs.  The clip of a group is not intersected in.
+ *   the union over its glyphs; of a run from a font (story 14a, glyph.h), as a
+ *   pixel sink draws it: on the fast tier the control box of each glyph's
+ *   device path from the face's provider (hinting included), on the general
+ *   route each glyph's design box under its map, and nothing for a glyph the
+ *   provider refuses.  The clip of a group is not intersected in.
  *
  * Where no bound exists the damage is **unbounded** and a sink redraws the whole
- * target: a glyph run named by a font (a font is an opaque key until the glyph
- * path provider exists), a 3D path, a map that cannot be applied, a result past
- * the range of the integers.
+ * target: a run whose face is unbound, a 3D path, a map that cannot be applied,
+ * a result past the range of the integers.
  */
 
 #ifndef GHOTI_IO_GSHSCENE_DIFF_H

@@ -67,11 +67,16 @@ int main(void) {
   gshscene_resource_release(again);
   gshgeom_path_destroy(path);
 
-  /* A run of glyphs: named by a font key and glyph ids; the glyph path provider of a later story draws them. */
+  /* A run of glyphs: a face (a font's key, its index in a collection, its variation) and glyph ids.  This face is
+   * bound to no glyph path provider (a font binds its own faces), so a sink refuses the run; glyph_provider.h. */
+  GSHSCENE_Face_Desc face_desc = {0x1122334455667788u, 0, 0, NULL, NULL, NULL};
+  const GSHSCENE_Resource * face = NULL;
+  failed |= check(gshscene_store_intern_face(store, &face_desc, &face), "intern face");
   GSHSCENE_Glyph glyphs[3] = {{36, 0.0, 0.0, NULL}, {37, 9.5, 0.0, NULL}, {38, 19.0, 0.0, NULL}};
-  GSHSCENE_Glyph_Run run = {GSHSCENE_GLYPHS_FROM_FONT, 0x1122334455667788u, 0, 16.0, 0, 0, 3, glyphs};
+  GSHSCENE_Glyph_Run run = {GSHSCENE_GLYPHS_FROM_FONT, face, 16.0, 0, 0, 3, glyphs};
   const GSHSCENE_Resource * text = NULL;
   failed |= check(gshscene_store_intern_glyph_run(store, &run, &text), "intern glyph run");
+  gshscene_resource_release(face); /* the run holds its own reference */
 
   /* A picture: a closed list that instances draw under a map (what SVG's use and symbol lower to). */
   GSHSCENE_List * badge = NULL;

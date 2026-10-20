@@ -438,7 +438,8 @@ TEST(Emit, GlyphRunsFillAndClipLikePaths) {
   GSHSCENE_Glyph_Run run;
   std::memset(&run, 0, sizeof run);
   run.source = GSHSCENE_GLYPHS_FROM_FONT;
-  run.font_key = 0x1234;
+  Ref run_face(intern_face(s.store(), 0x1234));
+  run.face = run_face.get();
   run.size = 16;
   GSHSCENE_Glyph glyphs[2] = {{5, 0, 0, nullptr}, {6, 9, 0, nullptr}};
   run.glyph_count = 2;
