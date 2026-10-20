@@ -171,11 +171,52 @@ TEST(Palette, InternsByContentAndReadsBack) {
   // An empty palette is legal: every entry of it is missing.
   Ref empty(palette_of(s.store, {}));
   EXPECT_EQ(gshscene_resource_palette_count(empty.get()), 0u);
-  // Readers of another kind answer nothing.
+  // Readers of another kind answer nothing, whatever its own fields hold (a picture's depth is where a count is).
   Ref sq(intern_square(s.store));
-  EXPECT_EQ(gshscene_resource_palette_count(sq.get()), 0u);
+  Ref face(intern_face(s.store));
+  Ref run(intern_font_run(s.store, face.get(), 12.0, {GSHSCENE_Glyph{3, 1.0, 2.0, nullptr}}));
+  ListHolder inner(s.store);
+  ASSERT_EQ(gshscene_list_fill(inner.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(inner.list), GSHSCENE_OK);
+  Ref picture;
+  ASSERT_EQ(gshscene_store_intern_picture(s.store, inner.list, &picture.resource), GSHSCENE_OK);
+  for (const GSHSCENE_Resource * other : {sq.get(), face.get(), run.get(), picture.get()}) {
+    EXPECT_EQ(gshscene_resource_palette_count(other), 0u) << gshscene_resource_kind(other);
+    EXPECT_EQ(gshscene_resource_palette_color(other, 0, &got), GSHSCENE_ERR_INVALID) << gshscene_resource_kind(other);
+  }
   EXPECT_EQ(gshscene_resource_palette_count(nullptr), 0u);
-  EXPECT_EQ(gshscene_resource_palette_color(sq.get(), 0, &got), GSHSCENE_ERR_INVALID);
+}
+
+TEST(Palette, EqualityIsOnTheEntriesWhereTheHashesCollide) {
+  // Every content in one bucket: equality alone tells a palette from its prefix, its extension and one that differs
+  // in an entry or only in its last one, in either order of interning.
+  GSHSCENE_Color a = color(1, 0, 0, 1);
+  GSHSCENE_Color b = color(0, 1, 0, 1);
+  GSHSCENE_Color c = color(0, 0, 1, 1);
+  std::vector<std::vector<GSHSCENE_Color>> contents = {{a}, {a, b}, {a, c}, {b}, {b, a}, {}};
+  const size_t n = contents.size();
+  for (int order = 0; order < 2; order++) {
+    StoreHolder s(nullptr, nullptr, all_zero);
+    std::vector<const GSHSCENE_Resource *> made(n, nullptr);
+    for (size_t k = 0; k < n; k++) {
+      size_t i = order ? n - 1 - k : k;
+      made[i] = palette_of(s.store, contents[i]);
+    }
+    for (size_t i = 0; i < n; i++) {
+      for (size_t j = i + 1; j < n; j++) {
+        EXPECT_NE(made[i], made[j]) << order << ": " << i << " and " << j;
+      }
+      const GSHSCENE_Resource * again = palette_of(s.store, contents[i]);
+      EXPECT_EQ(again, made[i]) << order << ": equal content gets its own handle back, " << i;
+      gshscene_resource_release(again);
+    }
+    GSHSCENE_Store_Stats st;
+    ASSERT_EQ(gshscene_store_stats(s.store, &st), GSHSCENE_OK);
+    EXPECT_GT(st.collisions, 0u) << "the planted collision must have happened";
+    for (const GSHSCENE_Resource * r : made) {
+      gshscene_resource_release(r);
+    }
+  }
 }
 
 TEST(Palette, TheRgba8ConstructorIsCOver255InSrgb) {
@@ -220,6 +261,12 @@ TEST(Palette, TheRgba8ConstructorIsCOver255InSrgb) {
       GSHSCENE_ERR_LIMIT)
       << "the count is checked before the bytes are read";
   EXPECT_EQ(r.get(), nullptr);
+  std::vector<uint8_t> most(4u * GSHSCENE_PALETTE_MAX_ENTRIES, 0x80);
+  Ref largest;
+  ASSERT_EQ(gshscene_store_intern_palette_rgba8(s.store, GSHSCENE_PALETTE_MAX_ENTRIES, most.data(), &largest.resource),
+      GSHSCENE_OK)
+      << "the most entries";
+  EXPECT_EQ(gshscene_resource_palette_count(largest.get()), (size_t)GSHSCENE_PALETTE_MAX_ENTRIES);
   ASSERT_EQ(gshscene_store_intern_palette_rgba8(s.store, 0, nullptr, &r.resource), GSHSCENE_OK);
   EXPECT_EQ(gshscene_resource_palette_count(r.get()), 0u);
 }
@@ -252,6 +299,7 @@ TEST(Palette, BadColorsAndCountsAreRefusedAndBuildNothing) {
   Ref big(palette_of(s.store, many));
   EXPECT_EQ(gshscene_resource_palette_count(big.get()), (size_t)GSHSCENE_PALETTE_MAX_ENTRIES);
   EXPECT_EQ(GSHSCENE_PALETTE_MAX_ENTRIES, GSHSCENE_PALETTE_ENTRY_MAX + 1u);
+  EXPECT_EQ(GSHSCENE_PALETTE_ENTRY_MAX, 0xFFFEu) << "0xFFFF is a font's foreground, never an entry";
 }
 
 TEST(Palette, ItsBytesAreAccountedAndTheLimitIsExact) {
@@ -347,6 +395,24 @@ TEST(PalettePaint, TheOneResolutionOfEachKind) {
   EXPECT_EQ(gshscene_paint_resolve(&g, &fg, p.get(), &out), GSHSCENE_ERR_INVALID);
 }
 
+TEST(PalettePaint, AListTakesEntriesUpTo0xFFFEAndNoKindPastTheLast) {
+  StoreHolder s;
+  Ref sq(intern_square(s.store));
+  ListHolder l(s.store);
+  GSHSCENE_Paint last = entry_paint(0xFFFEu);
+  EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &last, 0, 0), GSHSCENE_OK);
+  GSHSCENE_Paint foreground = entry_paint(0xFFFFu);
+  EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &foreground, 0, 0), GSHSCENE_ERR_INVALID)
+      << "0xFFFF is lowered to the foreground by the fixed paint, and refused by the double one";
+  for (uint32_t kind : {(uint32_t)GSHSCENE_PAINT_KIND_COUNT, 9u, 0xFFFFFFFFu}) {
+    GSHSCENE_Paint unknown = solid(0, 0, 0, 1);
+    unknown.kind = (GSHSCENE_Paint_Kind)kind;
+    EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &unknown, 0, 0), GSHSCENE_ERR_INVALID)
+        << kind;
+  }
+  EXPECT_EQ(gshscene_list_count(l.list), 1u);
+}
+
 TEST(PalettePaint, TheDispositionRefusesAMissingEntryAndOnlyThat) {
   StoreHolder s;
   Ref p(palette_of(s.store, {color(1, 0, 0, 1), color(0, 1, 0, 1)}));
@@ -372,6 +438,10 @@ TEST(PalettePaint, TheDispositionRefusesAMissingEntryAndOnlyThat) {
   EXPECT_EQ(gshscene_caps_disposition(&caps, &fill, nullptr, nullptr).entry_class, 0);
   fill.paint.kind = GSHSCENE_PAINT_FOREGROUND;
   EXPECT_EQ(gshscene_caps_disposition(&caps, &fill, nullptr, nullptr).entry_class, 0);
+  // ...and the palette argument is not read for them, even one that is no palette.
+  EXPECT_EQ(gshscene_caps_disposition(&caps, &fill, nullptr, sq.get()).entry_class, 0);
+  fill.paint = solid(1, 0, 0, 1);
+  EXPECT_EQ(gshscene_caps_disposition(&caps, &fill, nullptr, sq.get()).entry_class, 0);
   GSHSCENE_Item clip = fill;
   clip.kind = GSHSCENE_ITEM_CLIP_PUSH;
   clip.paint = entry_paint(9); // a clip has no paint; whatever its field says is not read
@@ -519,6 +589,8 @@ TEST(Fixed, ThePaintLowersFFFFToTheForegroundAndKeepsEveryOtherEntry) {
       {GSHSCENE_FIXED_PAINT_PALETTE, 0, 2, 0},             // alpha above 1
       {GSHSCENE_FIXED_PAINT_PALETTE, 0, -1, 0},            // alpha below 0
       {GSHSCENE_FIXED_PAINT_PALETTE, 0, 1, 31},            // too many bits
+      {GSHSCENE_FIXED_PAINT_PALETTE, 0, 0, 32},            // ...even for an alpha of zero
+      {GSHSCENE_FIXED_PAINT_PALETTE, 0, 0, 63},
       {GSHSCENE_FIXED_PAINT_FOREGROUND, 1, 1, 0},          // a foreground with an entry
       {GSHSCENE_PAINT_SOLID, 0, 1, 0},                     // not a kind it takes
       {GSHSCENE_PAINT_GRADIENT, 0, 1, 0},
@@ -572,6 +644,15 @@ TEST(Fixed, BadOpsAndResourcesAreInvalidAndRecordNothing) {
     EXPECT_EQ(rec(run, {op(GSHSCENE_FIXED_SKEW, 2, {1, 0})}), INV) << "a skew of a quarter turn is infinite";
     EXPECT_EQ(rec(run, {op(GSHSCENE_FIXED_SKEW, 2, {0, -1})}), INV);
     EXPECT_EQ(rec(run, {good, op(GSHSCENE_FIXED_AFFINE, 0, {1, 0, 0, 1, 0, 0}), op(7, 0, {})}), INV);
+    {
+      size_t before = gshscene_list_count(l.list);
+      EXPECT_EQ(rec(run, {op(GSHSCENE_FIXED_TRANSLATE, GSHSCENE_FIXED_MAX_BITS, {1, -1})}), GSHSCENE_OK)
+          << "the most fraction bits";
+      if (call) {
+        ASSERT_EQ(gshscene_list_clip_pop(l.list), GSHSCENE_OK);
+      }
+      ASSERT_EQ(gshscene_list_truncate(l.list, before), GSHSCENE_OK);
+    }
     std::vector<GSHSCENE_Fixed_Op> many(GSHSCENE_FIXED_MAX_OPS + 1u, good);
     EXPECT_EQ(rec(run, many), GSHSCENE_ERR_LIMIT);
     many.pop_back();
@@ -699,6 +780,13 @@ TEST(Fixed, TheItemMapIsTheStatedChainBitForBit) {
   ASSERT_EQ(gshgeom_map_compose_chain(chain, 5, nullptr, &want), GSHGEOM_OK);
   GSHGEOM_Map got = item_map(f.s.store, run, ops);
   EXPECT_EQ(gshgeom_map_hash(&got), gshgeom_map_hash(&want));
+  {
+    ListHolder l(f.s.store);
+    ASSERT_EQ(gshscene_list_clip_push_fixed(l.list, run, ops.data(), ops.size(), GSHGEOM_FILL_NONZERO, 0), GSHSCENE_OK);
+    const GSHSCENE_Item * clip = nullptr;
+    ASSERT_EQ(gshscene_list_item(l.list, 0, &clip), GSHSCENE_OK);
+    EXPECT_EQ(gshgeom_map_hash(&clip->map), gshgeom_map_hash(&want)) << "a clip push is placed as a fill is";
+  }
   for (int i = 0; i < 2; i++) {
     EXPECT_EQ(bits_of(got.t[i]), bits_of(want.t[i])) << i;
     for (int j = 0; j < 2; j++) {
@@ -812,6 +900,46 @@ TEST(Truncate, EveryPrefixIsTheListThatRecordedOnlyIt) {
   }
 }
 
+TEST(Truncate, TheOpenPushesAndTheDeepestPictureAreCountedAgain) {
+  StoreHolder s;
+  Ref sq(intern_square(s.store));
+  // Pictures one and two deep.
+  ListHolder inner(s.store);
+  ASSERT_EQ(gshscene_list_fill(inner.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(inner.list), GSHSCENE_OK);
+  Ref one;
+  ASSERT_EQ(gshscene_store_intern_picture(s.store, inner.list, &one.resource), GSHSCENE_OK);
+  ListHolder outer(s.store);
+  ASSERT_EQ(gshscene_list_instance(outer.list, one.get(), nullptr, 0, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(outer.list), GSHSCENE_OK);
+  Ref two;
+  ASSERT_EQ(gshscene_store_intern_picture(s.store, outer.list, &two.resource), GSHSCENE_OK);
+  // A clip, the deeper picture, a group, the shallower one; truncated, then closed and made a picture: its depth is one
+  // more than the deepest picture the kept items instance.
+  auto picture_depth_after = [&](size_t keep) -> size_t {
+    ListHolder l(s.store);
+    EXPECT_EQ(gshscene_list_clip_push(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, 0, 0), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_instance(l.list, two.get(), nullptr, 0, 0), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_group_push(l.list, nullptr, 0, 0), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_instance(l.list, one.get(), nullptr, 0, 0), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_truncate(l.list, keep), GSHSCENE_OK);
+    if (keep >= 3) {
+      EXPECT_EQ(gshscene_list_group_pop(l.list), GSHSCENE_OK);
+    }
+    // One push is open here, and only the clip.
+    EXPECT_EQ(gshscene_list_group_pop(l.list), GSHSCENE_ERR_INVALID) << keep;
+    EXPECT_EQ(gshscene_list_close(l.list), GSHSCENE_ERR_INVALID) << keep;
+    EXPECT_EQ(gshscene_list_clip_pop(l.list), GSHSCENE_OK) << keep;
+    EXPECT_EQ(gshscene_list_close(l.list), GSHSCENE_OK) << keep;
+    Ref made;
+    EXPECT_EQ(gshscene_store_intern_picture(s.store, l.list, &made.resource), GSHSCENE_OK) << keep;
+    return gshscene_resource_picture_depth(made.get());
+  };
+  EXPECT_EQ(picture_depth_after(4), 3u);
+  EXPECT_EQ(picture_depth_after(3), 3u) << "the deeper picture kept";
+  EXPECT_EQ(picture_depth_after(1), 1u) << "no picture kept";
+}
+
 TEST(Truncate, ItsArgumentsAreChecked) {
   StoreHolder s;
   Ref sq(intern_square(s.store));
@@ -923,6 +1051,55 @@ TEST(VersionPalette, AnEditSetsItAndItsVersionAndListCarryIt) {
     EXPECT_EQ(gshscene_resource_refcount(d.p.get()), refs + 1);
   }
   EXPECT_EQ(gshscene_resource_refcount(d.p.get()), refs);
+}
+
+TEST(VersionPalette, AVersionHoldsItsPaletteAndASpentEditDoesNot) {
+  Doc d;
+  const size_t refs = gshscene_resource_refcount(d.p.get());
+  EditHolder e(d.s);
+  add(e.edit, GSHSCENE_ROOT_ID, d.shape_at(0, 0, 1));
+  ASSERT_EQ(gshscene_edit_set_palette(e.edit, d.p.get()), GSHSCENE_OK);
+  VersionRef v1;
+  publish(d.s, e, &v1);
+  // The edit is spent but alive: what holds the palette now is the version (and its list).
+  {
+    EditHolder later(d.s);
+    EXPECT_EQ(gshscene_edit_palette(later.edit), d.p.get()) << "an edit that sets none sees its base's";
+    ASSERT_EQ(gshscene_edit_set_palette(later.edit, d.q.get()), GSHSCENE_OK);
+    publish(d.s, later);
+    EXPECT_EQ(gshscene_edit_palette(later.edit), d.p.get()) << "a spent edit sets nothing: it sees its base's again";
+  }
+  EXPECT_GT(gshscene_resource_refcount(d.p.get()), refs) << "the version still held is made with its own reference";
+  v1 = VersionRef();
+  EXPECT_EQ(gshscene_resource_refcount(d.p.get()), refs)
+      << "once no version holds it, neither the spent edit nor the released version does";
+}
+
+TEST(VersionPalette, AChangedEntryIsAChangedNode) {
+  Doc d;
+  VersionRef v1;
+  uint64_t id = 0;
+  {
+    EditHolder e(d.s);
+    id = add(e.edit, GSHSCENE_ROOT_ID, d.shape_at(0, 0, 0));
+    ASSERT_EQ(gshscene_edit_set_palette(e.edit, d.p.get()), GSHSCENE_OK);
+    publish(d.s, e, &v1);
+  }
+  VersionRef v2;
+  {
+    EditHolder e(d.s);
+    GSHSCENE_Node changed = d.shape_at(0, 0, 1);
+    ASSERT_EQ(gshscene_edit_set(e.edit, id, &changed), GSHSCENE_OK);
+    publish(d.s, e, &v2);
+  }
+  EXPECT_NE(v2.get(), v1.get()) << "only the entry changed: a new version";
+  EXPECT_NE(gshscene_version_hash(v2.get()), gshscene_version_hash(v1.get()));
+  int changed = -1;
+  size_t count = 0;
+  GSHSCENE_Damage r = damage_of(v1.get(), v2.get(), &changed, &count);
+  EXPECT_EQ(changed, 0);
+  EXPECT_EQ(count, 1u) << "the node differs";
+  EXPECT_EQ(r.empty, 0);
 }
 
 TEST(VersionPalette, TwoEditsThatSetItConflictAtTheRootAndAStaleOneToo) {
