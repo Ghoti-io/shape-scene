@@ -2,7 +2,8 @@
 
 **Status:** the waist (resources, lists, the immediate-mode recording path, hash and dump), the
 retained scene above it (versions, edits, identity, merge, diff and damage), and what a scene means when
-it is drawn (color, paint, composition and order, below) are implemented. The sink contract is the next step.
+it is drawn (color, paint, composition and order, below) are implemented, and so is the sink contract
+with its report and the test sink (story 13a). The first real sink, shape-cpu's, is story 13b.
 
 The shape family waist: resources and lists, and the versioned scene above them.
 
@@ -223,4 +224,89 @@ means the same on every target.
 Gaps that this design knows about and where they are recorded: the spine's Deferred table (a font as an
 opaque key, fixed picture paints, intersection-only clips, per-glyph maps, affine and 2D maps, the linear
 cost of publish and diff, the granularity of a merge, single-rectangle damage, what is met at emission).
+
+## The sink contract (normative)
+
+How a closed list and its resources are rendered by a backend the caller does not need to know
+(AD-11, story 13a). It is written for every backend the family will have: the CPU reference
+(shape-cpu), GPU sinks (Vulkan, WebGPU, WebGL), and writers whose target is a document (SVG and PDF
+export, a plotter's or a machine's program). `sink.h` has the same text; tests, plants and the
+conformance suite (`tests/sink_conformance.h`) cite the rules by number.
+
+- **S1 Request.** A render is a `GSHSCENE_Render_Request`. The all-zero request with a closed list, a
+  target and a report is a whole-frame, best-effort, uncancellable render, and `gshscene_sink_render`
+  completes it in one call on every sink that can block (S13). Unknown flag bits and nonzero reserved
+  bytes are `ERR_INVALID`.
+- **S2 Sink.** A sink is made by `gshscene_sink_create` from an ops table and an implementation
+  pointer; the caller holds a `GSHSCENE_Sink *` and does not know which sink it is. Capabilities are
+  per sink and target (`gshscene_sink_caps`): what a sink draws depends on the target's kind, format
+  and device, and the contract layer asks before every render.
+- **S3 Job.** `GSHSCENE_Job` is the caller's storage. `begin` starts a render, `poll` observes it and
+  never blocks, `wait` blocks until it completes (S13). The sink ends a job with
+  `gshscene_job_complete`, which seals the report, releases the surface and calls `on_complete`
+  exactly once, before the job reads as done. From `begin` until completion the target's surface
+  belongs to the sink: a second `begin` on it, on the same sink, is `ERR_INVALID`, and at most
+  `max_jobs` renders are in flight on one sink (`ERR_LIMIT`). A sink with no executor completes
+  inside `begin`.
+- **S4 Target.** A target describes the surface; the signature never names a raster. Its kind is a
+  raster, a stream (a document a writer emits) or a reserved GPU kind (`ERR_UNSUPPORTED`). Its map
+  takes list space to target units: pixels for a pixel kind, and for a stream the unit the target
+  states. Extent, AA filter and damage are pixel-kind fields, zero for a kind with no pixels.
+  Orientation and encoding belong to the sink: the map is always model to target with y down (AD-6),
+  a sink whose framebuffer is y-up flips internally, and no caller ever flips; `blend_space` zero
+  takes the surface's description (an undescribed raster, and a document, are sRGB), and `encoding`
+  says whether the stored values are encoded by the sink or by hardware. A sink composes maps root to
+  leaf, the target's last (AD-24). Inside a damage rectangle a render equals the whole render, and
+  outside it nothing is touched.
+- **S5 Report.** One report shape for every sink: `report.h`.
+- **S6 Refusal and the planning pass.** A sink never drops an effect silently: an item is drawn as
+  stated, drawn approximately with an `APPROXIMATED` entry, or skipped with a `REFUSED` entry. The
+  contract layer walks the list and its pictures against the caps before calling the sink, and
+  writes every refusal and approximation the caps decide and every depth tie; one predicate,
+  `gshscene_caps_disposition`, decides for the plan and for the sink. A refused push or instance
+  skips its block. Best effort returns `OK`. Strict refuses a planned refusal with `ERR_REFUSED`
+  before the sink is called, so the target is untouched; a refusal found while drawing (a sink's
+  resource limit) stops the render there, with the finished prefix in the target, and is
+  `ERR_REFUSED` too. An approximation never fails a render.
+- **S7 Cancel.** The token (`cancel.h`) is the caller's, set from any thread. The unit and the bound
+  are the sink's, declared in its caps: between units (a check before the first unit and after each
+  unit's progress call, so a token set during the progress call of unit k is seen before unit k + 1),
+  or once before submission (a GPU sink). `cancel_work_bound` is the most work, in the measure the
+  caps name, between two checks; the job counts it. A cancelled render returns `ERR_CANCELLED` with a
+  prefix of paint order in the target and no half-built group.
+- **S8 Conflation.** `GSHSCENE_TARGET_SEAMLESS` is refused with `ERR_REFUSED` before the sink is
+  called, with or without strict, with one render-level entry (AD-29).
+- **S9 Memory and static resources.** With `CALLER_MEMORY` the sink allocates nothing during the
+  render and takes its scratch from the workspace, whose exact need `gshscene_sink_workspace_bytes`
+  gives; less is `ERR_LIMIT` with the need in the summary; a sink without the capability refuses the
+  flag. `prepare` uploads or caches a list's static resources by id until `evict` or destroy; the
+  summary states the static bytes and the frame's peak scratch.
+- **S10 Lifetime with work in flight.** The caller keeps the list, its resources, the target, the
+  report, the workspace and the token alive and unmodified until the job completes. A sink keeps no
+  reference past completion except what `prepare` gave it.
+- **S11 Arithmetic.** The CPU reference's: shape-cpu (story 13b).
+- **S12 Determinism.** A sink's output depends on the list, the target and the request only.
+- **S13 Completion without blocking.** A sink whose caps lack `CAN_BLOCK` (a browser's main thread)
+  returns `ERR_UNSUPPORTED` from `wait` and from the one-call render before anything is begun; its
+  completion is seen by `poll` and `on_complete`.
+- **S14 Thread affinity.** A sink whose caps say `THREAD_AFFINE` (a GL context) takes `begin`, `poll`
+  of its jobs, `wait`, `readback`, `prepare`, `evict` and `destroy` only from its creating thread, and
+  the contract refuses a call from another with `ERR_INVALID`. The token, lists, resources and
+  versions are usable from any thread in every case. (The calling thread is told apart by the address
+  of a `_Thread_local` byte that is never written: no global state.)
+- **S15 Readback.** An optional copy of a completed render's pixels of the extent into a caller
+  raster, so a test can hash a GPU's output.
+- **S16 Geometry reaches a sink in model space.** The contract hands a sink model-space `double`
+  geometry with curves intact; nothing in `sink.h` composes, flattens or rounds. A writer emits
+  curves and dedupes resources by id.
+
+**The test sink** (`dump_sink.h`) is the second backend AD-11 asks for, independent of shape-cpu. It
+composites nothing: it writes a dump of every unit (a box per fill and clip: the resource's model
+bounds through the composed map, in target units) and stamps one marker rectangle per drawn unit
+into an RGBA8 raster (a group is gathered and stamped once at its pop, so an open group is never
+stamped). Its caps, its completion (in-line, or deferred to a step the way an event loop turns), its
+affinity, its cancel unit and its one resource limit (`max_extent`) are configuration, so that every
+path of the contract is reachable. `tests/sink_conformance.h` runs the same tests against each of its
+configurations now and against shape-cpu in 13b; `tools/gen-sink-vectors.py` restates the report's
+and the test sink's spellings, and `tests/fuzz/fuzz_render.c` drives requests through it.
 

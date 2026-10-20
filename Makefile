@@ -51,9 +51,10 @@ PROJECT := shape-scene
 # and is a hard error when it is not. cutil supplies the mutex and the atomic
 # counts the store's reference counting needs, on every target (it is the
 # suite's one cross-platform layer); color supplies the types of a color
-# description and the gamut names (story 12); image returns with the raster
-# targets; EDGES_ALLOWED below stays the end-of-milestone policy.
-DEPS := cutil color shape-geometry
+# description and the gamut names (story 12); image supplies the raster of a
+# target and of a readback, which the test sink stamps (story 13a);
+# EDGES_ALLOWED below stays the end-of-milestone policy.
+DEPS := cutil color image shape-geometry
 
 # The libraries whose headers this one may include and whose shared objects it
 # may link (check-edges), as a regular expression alternation. Itself is always
@@ -284,7 +285,7 @@ TESTFLAGS := `PKG_CONFIG_PATH=$(PKG_CONFIG_LOOKUP_PATH) pkg-config --libs --cfla
 # check-symbols is right to reject in a shipping library.
 PLANT_JOBS ?= 4
 
-TEST_GATES ?= check-symbols check-aliasing check-stamps check-fp-contract check-edges check-libm check-no-x87 check-gates check-vectors check-composite check-corpus-hash check-publish-types check-fuzz-corpus fuzz-replay examples
+TEST_GATES ?= check-symbols check-aliasing check-stamps check-fp-contract check-edges check-libm check-no-x87 check-gates check-vectors check-sink-vectors check-composite check-corpus-hash check-publish-types check-fuzz-corpus fuzz-replay examples
 
 VALGRIND_FLAGS := --leak-check=full --show-leak-kinds=definite,indirect,possible --track-origins=yes --error-exitcode=1 --suppressions=tests/valgrind.supp
 
@@ -402,7 +403,7 @@ $(APP_DIR)/examples/%$(EXE_EXTENSION): examples/%.c $(APP_DIR)/$(STATIC_TARGET) 
 
 .PHONY: clean cloc docs docs-pdf examples coverage check-symbols check-stamps check-aliasing
 .PHONY: check-fp-contract check-edges check-libm check-no-x87 check-gates libver-gen
-.PHONY: check-vectors check-composite check-corpus-hash check-planted check-publish-types check-fuzz-corpus fuzz-replay
+.PHONY: check-vectors check-sink-vectors check-composite check-corpus-hash check-planted check-publish-types check-fuzz-corpus fuzz-replay
 .PHONY: all install test test-quiet test-asan test-valgrind test-valgrind-quiet test-watch uninstall watch
 .PHONY: all-debug install-debug test-debug test-valgrind-debug test-watch-debug uninstall-debug watch-debug
 .PHONY: fuzz fuzz-clean
@@ -493,6 +494,9 @@ check-corpus-hash: $(HASH_PROBE) ## Fail unless the probe prints the committed c
 check-vectors: ## Fail if tests/known_answers.h is not what the independent generator writes
 	@python3 tools/gen-scene-vectors.py --check
 
+check-sink-vectors: ## Fail if tests/sink_answers.h is not what the independent generator writes (story 13a)
+	@python3 tools/gen-sink-vectors.py --check
+
 check-composite: ## Fail if the exact reference does not agree with itself, or tests/composite_vectors.h is not what it writes
 	@python3 tools/composite-oracle.py --selftest
 	@python3 tools/gen-composite-vectors.py --check
@@ -502,22 +506,32 @@ check-composite: ## Fail if the exact reference does not agree with itself, or t
 check-publish-types: ## Fail unless a front-end's headers offer no publish, and an edit cannot publish
 	@CC='$(CC)' CFLAGS='$(CFLAGS)' INCLUDE='$(INCLUDE)' tools/check-publish-types.sh
 
-check-fuzz-corpus: ## Fail if the committed fuzz corpus is not what the generator writes
+check-fuzz-corpus: ## Fail if the committed fuzz corpora are not what the generators write
 	@python3 tools/gen-fuzz-corpus.py --check
+	@python3 tools/gen-render-corpus.py --check
 
-# The recording-API fuzz target (CAP-15), replayed over its committed corpus in an ordinary build: no libFuzzer, no clang.
-# It fails on no input and on a corpus that reaches no limit and no refusal.
-FUZZ_INPUTS = $(shell find tests/fuzz/corpus -type f 2>/dev/null | sort)
+# The fuzz targets (CAP-15), each replayed over its committed corpus in an ordinary build: no libFuzzer, no clang.
+# fuzz_record drives the recording API and the retained scene; fuzz_render (story 13a) a render request through the
+# test sink.  Each replay fails on no input and on a corpus that misses one of the outcomes its target lists.
+FUZZ_INPUTS = $(shell find tests/fuzz/corpus/record -type f 2>/dev/null | sort)
+FUZZ_RENDER_INPUTS = $(shell find tests/fuzz/corpus/render -type f 2>/dev/null | sort)
 REPLAY := $(APP_DIR)/fuzz/replay_record$(EXE_EXTENSION)
+REPLAY_RENDER := $(APP_DIR)/fuzz/replay_render$(EXE_EXTENSION)
+
+$(REPLAY_RENDER): tests/fuzz/fuzz_render.c tests/fuzz/replay_main.c $(APP_DIR)/$(STATIC_TARGET) \
+		$(FLAGS_STAMP) | $(APP_DIR)/$(TARGET) $(LIBVER_GEN)
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) $(INCLUDE) -o $@ tests/fuzz/fuzz_render.c tests/fuzz/replay_main.c $(LDFLAGS) $(SELF_LIBRARY) $(DEP_LIBS)
 
 $(REPLAY): tests/fuzz/fuzz_record.c tests/fuzz/replay_main.c $(APP_DIR)/$(STATIC_TARGET) \
 		$(FLAGS_STAMP) | $(APP_DIR)/$(TARGET) $(LIBVER_GEN)
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) $(INCLUDE) -o $@ tests/fuzz/fuzz_record.c tests/fuzz/replay_main.c $(LDFLAGS) $(SELF_LIBRARY) $(DEP_LIBS)
 
-fuzz-replay: $(REPLAY) ## Feed every corpus file once through the fuzz entry point
-	@if [ -z "$(strip $(FUZZ_INPUTS))" ]; then printf 'fuzz-replay: no corpus files; this measures nothing\n' >&2; exit 1; fi
+fuzz-replay: $(REPLAY) $(REPLAY_RENDER) ## Feed every corpus file once through its fuzz entry point
+	@if [ -z "$(strip $(FUZZ_INPUTS))" ] || [ -z "$(strip $(FUZZ_RENDER_INPUTS))" ]; then printf 'fuzz-replay: a corpus is empty; this measures nothing\n' >&2; exit 1; fi
 	@LD_LIBRARY_PATH="$(TEST_LD_PATH)" $(REPLAY) $(FUZZ_INPUTS)
+	@LD_LIBRARY_PATH="$(TEST_LD_PATH)" $(REPLAY_RENDER) $(FUZZ_RENDER_INPUTS)
 
 # Each planted defect in tools/check-planted.py is built into a copy of the
 # sources and must fail a test (or the probe's hash); the unplanted copy is the
@@ -723,13 +737,18 @@ $(foreach pair,$(TEST_PAIRS),\
 
 ASAN_TEST_EXECUTABLES := $(addprefix $(ASAN_APP_DIR)/,$(addsuffix $(EXE_EXTENSION),$(TEST_NAMES)))
 ASAN_REPLAY := $(ASAN_APP_DIR)/fuzz/replay_record$(EXE_EXTENSION)
+ASAN_REPLAY_RENDER := $(ASAN_APP_DIR)/fuzz/replay_render$(EXE_EXTENSION)
+
+$(ASAN_REPLAY_RENDER): tests/fuzz/fuzz_render.c tests/fuzz/replay_main.c $(ASAN_ARCHIVE) $(ASAN_FLAGS_STAMP)
+	@mkdir -p $(@D)
+	$(CC) $(ASAN_CFLAGS) $(INCLUDE) -o $@ tests/fuzz/fuzz_render.c tests/fuzz/replay_main.c $(ASAN_LDFLAGS) $(ASAN_SELF_LIBRARY) $(DEP_LIBS)
 
 $(ASAN_REPLAY): tests/fuzz/fuzz_record.c tests/fuzz/replay_main.c $(ASAN_ARCHIVE) $(ASAN_FLAGS_STAMP)
 	@mkdir -p $(@D)
 	$(CC) $(ASAN_CFLAGS) $(INCLUDE) -o $@ tests/fuzz/fuzz_record.c tests/fuzz/replay_main.c $(ASAN_LDFLAGS) $(ASAN_SELF_LIBRARY) $(DEP_LIBS)
 ASAN_RUNTIME := $(shell $(CC) -print-file-name=libasan.so 2>/dev/null)
 
-test-asan: $(ASAN_TEST_EXECUTABLES) $(ASAN_REPLAY) ## Build with ASan+UBSan and run the tests, and the fuzz replay
+test-asan: $(ASAN_TEST_EXECUTABLES) $(ASAN_REPLAY) $(ASAN_REPLAY_RENDER) ## Build with ASan+UBSan and run the tests, and the fuzz replay
 	@for test_exe in $(ASAN_TEST_EXECUTABLES); do \
 		printf '\n### ASan+UBSan %s ###\n\n' "$$(basename $$test_exe)"; \
 		LD_PRELOAD="$(ASAN_RUNTIME)$${LD_PRELOAD:+:$$LD_PRELOAD}" \
@@ -740,6 +759,9 @@ test-asan: $(ASAN_TEST_EXECUTABLES) $(ASAN_REPLAY) ## Build with ASan+UBSan and 
 	@LD_PRELOAD="$(ASAN_RUNTIME)$${LD_PRELOAD:+:$$LD_PRELOAD}" \
 		LD_LIBRARY_PATH="$(ASAN_APP_DIR):$(LIB_INSTALL_PATH)/$(SUITE)$(if $(DEP_LIB_DIRS),:$(DEP_LIB_DIRS))" \
 			$(ASAN_REPLAY) $(FUZZ_INPUTS)
+	@LD_PRELOAD="$(ASAN_RUNTIME)$${LD_PRELOAD:+:$$LD_PRELOAD}" \
+		LD_LIBRARY_PATH="$(ASAN_APP_DIR):$(LIB_INSTALL_PATH)/$(SUITE)$(if $(DEP_LIB_DIRS),:$(DEP_LIB_DIRS))" \
+			$(ASAN_REPLAY_RENDER) $(FUZZ_RENDER_INPUTS)
 	@printf '\nASan+UBSan suite clean.\n'
 
 ####################################################################

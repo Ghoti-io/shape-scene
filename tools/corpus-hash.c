@@ -29,6 +29,10 @@
  * Since story 11 it also builds a retained scene (nodes, a key map, instances of hidden definitions, a merge of
  * sibling edits, a diff with its damage through a general map) and folds in its version hashes, IDs, emitted lists,
  * pictures, occurrences with their composed maps and the damage rectangles.
+ * Since story 13a every list is also rendered through the test sink (dump_sink.h) on a stream in millimetres under a
+ * scale and on a 32 by 32 raster, by a sink that draws everything and by a narrow one under strict, and the results,
+ * the output hashes (the dump's bytes: every box a double through a composed map), the report hashes and the
+ * stamped pixels are folded in.
  * It is built by `make check-corpus-hash` on the host and by
  * suite/tools/xarch/shape.sh and suite/tools/xwin/shape.sh for the others.
  *
@@ -45,6 +49,8 @@
 
 #include <ghoti.io/shape-scene/shape-scene.h>
 #include <ghoti.io/shape-geometry/shape-geometry.h>
+
+#include <ghoti.io/image/raster.h>
 
 #include <inttypes.h>
 #include <stdint.h>
@@ -395,6 +401,94 @@ static void feed_diff(const GSHSCENE_Version * a, const GSHSCENE_Version * b, co
   gshscene_diff_destroy(d);
 }
 
+/* --- the test sink (story 13a) ------------------------------------------------------------------- */
+
+static GSHSCENE_Result count_write(void * ctx, const void * bytes, size_t n) {
+  (void)bytes;
+  *(uint64_t *)ctx += n;
+  return GSHSCENE_OK;
+}
+
+static GSHSCENE_Result feed_job(GSHSCENE_Sink * sink, const GSHSCENE_Render_Request * request) {
+  GSHSCENE_Job job;
+  memset(&job, 0, sizeof job);
+  GSHSCENE_Result r = gshscene_sink_begin(sink, request, &job);
+  GSHSCENE_Job_Status st;
+  check(gshscene_job_poll(&job, &st), "poll");
+  if (st.state != GSHSCENE_JOB_DONE) {
+    fail("a render of the in-line test sink did not complete in begin");
+  }
+  uint64_t out = 0;
+  check(gshscene_dump_sink_output_hash(&job, &out), "output hash");
+  feed((uint64_t)r);
+  feed(out);
+  feed(gshscene_report_hash(request->report));
+  feed((uint64_t)st.units_processed);
+  feed((uint64_t)st.units_done);
+  return r;
+}
+
+static void feed_render(const GSHSCENE_List * list) {
+  GSHSCENE_Dump_Sink_Config full;
+  gshscene_dump_sink_config_default(&full);
+  GSHSCENE_Dump_Sink_Config narrow = full;
+  GSHSCENE_Sink_Caps * both[2] = {&narrow.raster_caps, &narrow.stream_caps};
+  for (int i = 0; i < 2; i++) {
+    both[i]->flags &= ~(GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_BLEND_SPACES | GSHSCENE_CAP_GLYPHS_FROM_FONT);
+    both[i]->composites &= ~((1u << GSHSCENE_COMPOSITE_XOR) | (1u << GSHSCENE_COMPOSITE_PLUS));
+  }
+  narrow.max_extent = 2000.0;
+  GSHSCENE_Sink * sinks[2] = {NULL, NULL};
+  check(gshscene_dump_sink_create(NULL, NULL, &full, &sinks[0]), "test sink");
+  check(gshscene_dump_sink_create(NULL, NULL, &narrow, &sinks[1]), "narrow test sink");
+  GSHSCENE_Report * report = NULL;
+  check(gshscene_report_create(NULL, NULL, &report), "report");
+  for (int s = 0; s < 2; s++) {
+    uint64_t written = 0;
+    GSHSCENE_Writer writer = {count_write, &written};
+    GSHSCENE_Target stream;
+    memset(&stream, 0, sizeof stream);
+    stream.kind = GSHSCENE_TARGET_STREAM;
+    stream.surface = &writer;
+    stream.unit = GSHSCENE_UNIT_MILLIMETER;
+    if (gshgeom_map_scale(2, 0.25, 0.375, 1.0, &stream.map) != GSHGEOM_OK) {
+      fail("scale");
+    }
+    GSHSCENE_Render_Request request;
+    memset(&request, 0, sizeof request);
+    request.list = list;
+    request.target = &stream;
+    request.report = report;
+    request.flags = s ? GSHSCENE_RENDER_STRICT : 0;
+    feed_job(sinks[s], &request);
+    feed(written);
+
+    GIMG_Raster * raster = NULL;
+    if (gimg_raster_create(32, 32, &GIMG_PIXEL_RGBA8, GIMG_RASTER_OWNED, NULL, 0, &raster) != GIMG_OK) {
+      fail("raster");
+    }
+    GSHSCENE_Target pixels;
+    memset(&pixels, 0, sizeof pixels);
+    pixels.kind = GSHSCENE_TARGET_RASTER;
+    pixels.surface = raster;
+    GSHSCENE_Rect damage = {3, 5, 29, 30};
+    pixels.damage = s ? &damage : NULL;
+    request.target = &pixels;
+    feed_job(sinks[s], &request);
+    GSHGEOM_Hash h;
+    gshgeom_hash_init(&h);
+    const unsigned char * px = gimg_raster_pixels_const(raster);
+    for (uint32_t y = 0; y < 32; y++) {
+      gshgeom_hash_bytes(&h, px + y * gimg_raster_stride_bytes(raster), 32u * 4u);
+    }
+    feed(gshgeom_hash_value(&h));
+    gimg_raster_destroy(raster);
+  }
+  gshscene_report_destroy(report);
+  check(gshscene_sink_destroy(sinks[0]), "destroy");
+  check(gshscene_sink_destroy(sinks[1]), "destroy");
+}
+
 static void scene_section(void) {
   Tree t;
   memset(&t, 0, sizeof t);
@@ -682,6 +776,7 @@ int main(void) {
     feed((uint64_t)gshscene_list_count(list));
     feed((uint64_t)gshscene_list_expansion(list));
     feed_ties(list);
+    feed_render(list);
     if (l % 3 == 2 && picture_count < MAX_PICTURES) {
       const GSHSCENE_Resource * picture = NULL;
       check(gshscene_store_intern_picture(store, list, &picture), "picture");

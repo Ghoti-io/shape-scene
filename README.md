@@ -43,8 +43,28 @@ The retained scene (`version.h`, `edit.h`, `scene.h`, `diff.h`):
 - Structural limits (nodes, depth, occurrences, list items, push and picture nesting) are enforced
   at publish; `make fuzz-replay` replays a committed corpus through the recording API.
 
+The sink contract (`sink.h`, `report.h`, `cancel.h`; the normative text, S1 to S16, is in
+`documentation/design.md`):
+
+- **A render** is a request (a closed list, a described target, a report, an optional cancel token,
+  workspace, progress and completion callbacks) handed to a sink through one interface: `begin`,
+  `poll` and an optional `wait`, with a one-call `gshscene_sink_render` for sinks that can block.
+  Capabilities are asked per sink and target. Targets are rasters or streams (a document a writer
+  sink emits, in units it states); GPU kinds are reserved.
+- **The report** is the caller's, reused across frames: what was refused, approximated or resolved
+  (depth ties), keyed by list entry and resolvable to node IDs and instance paths for a version's
+  list, with a summary and a failure record; a dump and a hash in the family's spelling.
+- **Strict, cancel, conflation, caller memory**: a planning pass in the contract layer finds every
+  refusal the caps decide before the target is touched; cancel is cooperative at points each sink
+  declares, within a bound it declares; the reserved seam-free flag is refused; a caller-supplied
+  workspace makes a frame allocate nothing.
+- **The test sink** (`dump_sink.h`) writes a dump of every unit and stamps marker rectangles, with
+  configurable capabilities; one conformance suite (`tests/sink_conformance.h`) runs against it now
+  and against every later sink.
+
 `examples/frame.c` records a frame in immediate mode; `examples/retained.c` is an application, a
-front-end and a driver. A sink takes only a closed list and its resources.
+front-end and a driver; `examples/sink.c` renders a list through the sink contract with the test
+sink.
 
 ## Building
 

@@ -28,14 +28,18 @@
 #define GHOTI_IO_GSHSCENE_GSHSCENE_H
 
 #include <ghoti.io/shape-scene/allocator.h>
+#include <ghoti.io/shape-scene/cancel.h>
 #include <ghoti.io/shape-scene/core.h>
 #include <ghoti.io/shape-scene/diff.h>
+#include <ghoti.io/shape-scene/dump_sink.h>
 #include <ghoti.io/shape-scene/edit.h>
 #include <ghoti.io/shape-scene/list.h>
 #include <ghoti.io/shape-scene/macros.h>
 #include <ghoti.io/shape-scene/paint.h>
+#include <ghoti.io/shape-scene/report.h>
 #include <ghoti.io/shape-scene/resource.h>
 #include <ghoti.io/shape-scene/scene.h>
+#include <ghoti.io/shape-scene/sink.h>
 #include <ghoti.io/shape-scene/types.h>
 #include <ghoti.io/shape-scene/version.h>
 
