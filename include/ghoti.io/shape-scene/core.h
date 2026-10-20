@@ -42,9 +42,10 @@ extern "C" {
  * Zero is success.  ::GSHSCENE_RESULT_COUNT closes the enum so that a test can
  * check the string table is complete.  This is the suite's fixed vocabulary
  * (CONVENTIONS section 5) plus ::GSHSCENE_ERR_REFUSED, which AD-9 and AD-11
- * add: a merge of edits that overlap is refused, naming the IDs.  The sink
- * contract's `ERR_CANCELLED` comes with the sink contract.  Most of the
- * vocabulary is never returned by this library (it reads no bytes).
+ * add (a merge of edits that overlap is refused, naming the IDs; a strict
+ * render with a refused effect, and the conflation flag, sink.h), and
+ * ::GSHSCENE_ERR_CANCELLED, which the sink contract adds (AD-11, AD-26).  Most
+ * of the vocabulary is never returned by this library (it reads no bytes).
  */
 typedef enum {
   GSHSCENE_OK = 0,          ///< The operation succeeded.
@@ -56,8 +57,13 @@ typedef enum {
   GSHSCENE_ERR_OOM,         ///< The allocator returned NULL.
   GSHSCENE_ERR_INVALID,     ///< A caller-supplied argument is wrong, or the call is out of sequence.
   GSHSCENE_ERR_INTERNAL,    ///< The library's own invariant failed.
-  /** A well-formed request that the library declines to carry out: edits that touch the same IDs (AD-9).  Nothing changed. */
+  /**
+   * A well-formed request that the library declines to carry out: edits that touch the same IDs (AD-9), nothing
+   * changed; a strict render with a refused effect or a render asking for the conflation flag (sink.h, S6, S8).
+   */
   GSHSCENE_ERR_REFUSED,
+  /** The render's cancel token was set (sink.h, S7): the target holds the finished work, a prefix of paint order. */
+  GSHSCENE_ERR_CANCELLED,
   GSHSCENE_RESULT_COUNT
 } GSHSCENE_Result;
 
@@ -107,6 +113,12 @@ GSHSCENE_API const char * gshscene_result_string(GSHSCENE_Result result);
 /** The deepest a version's tree can be whatever its limit says, so that no walk recurses further: 1024. */
 #define GSHSCENE_NODE_DEPTH_CEILING ((size_t)1024)
 
+/** Default ::GSHSCENE_Limits.max_report_entries: 64 Ki entries stored in a report (report.h). */
+#define GSHSCENE_LIMITS_DEFAULT_MAX_REPORT_ENTRIES ((size_t)1 << 16)
+
+/** Default ::GSHSCENE_Limits.max_jobs: 64 renders in flight on one sink (sink.h, S3). */
+#define GSHSCENE_LIMITS_DEFAULT_MAX_JOBS ((size_t)64)
+
 /**
  * @brief Caps for the quantities a caller can make unbounded.
  *
@@ -131,6 +143,9 @@ typedef struct GSHSCENE_Limits {
   size_t max_nodes;             ///< Most nodes one version may hold, the root included.
   /** Most levels of nodes in a version, an instance's target counting as its child (at most ::GSHSCENE_NODE_DEPTH_CEILING). */
   size_t max_node_depth;
+  /** Most entries a report stores (report.h); past it the report counts, sets `overflowed`, and the render is ::GSHSCENE_ERR_LIMIT. */
+  size_t max_report_entries;
+  size_t max_jobs;              ///< Most renders in flight on one sink at once (sink.h, S3).
   uint8_t _reserved[8];         ///< Reserved; zero.
 } GSHSCENE_Limits;
 

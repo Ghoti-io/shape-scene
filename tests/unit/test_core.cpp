@@ -50,6 +50,7 @@ TEST(Result, EveryCodeNamesItselfInWords) {
   EXPECT_STREQ(gshscene_result_string(GSHSCENE_ERR_INVALID), "invalid argument");
   EXPECT_STREQ(gshscene_result_string(GSHSCENE_ERR_INTERNAL), "internal error");
   EXPECT_STREQ(gshscene_result_string(GSHSCENE_ERR_REFUSED), "refused");
+  EXPECT_STREQ(gshscene_result_string(GSHSCENE_ERR_CANCELLED), "cancelled");
 }
 
 TEST(Result, ACodeOutsideTheEnumHasAStringAndNoneOfTheRealOnes) {
@@ -71,8 +72,9 @@ TEST(Result, TheVocabularyIsTheSuitesFixedOneInItsOrder) {
   EXPECT_EQ((int)GSHSCENE_ERR_OOM, 6);
   EXPECT_EQ((int)GSHSCENE_ERR_INVALID, 7);
   EXPECT_EQ((int)GSHSCENE_ERR_INTERNAL, 8);
-  EXPECT_EQ((int)GSHSCENE_ERR_REFUSED, 9);  // AD-9, AD-11: the one addition; story 13 appends ERR_CANCELLED
-  EXPECT_EQ((int)GSHSCENE_RESULT_COUNT, 10);
+  EXPECT_EQ((int)GSHSCENE_ERR_REFUSED, 9);    // AD-9, AD-11
+  EXPECT_EQ((int)GSHSCENE_ERR_CANCELLED, 10); // AD-11, AD-26: the sink contract (story 13a)
+  EXPECT_EQ((int)GSHSCENE_RESULT_COUNT, 11);
 }
 
 TEST(Limits, DefaultsAreTheDocumentedOnes) {
@@ -89,6 +91,8 @@ TEST(Limits, DefaultsAreTheDocumentedOnes) {
   EXPECT_EQ(limits.max_bytes, (size_t)1 << 30);
   EXPECT_EQ(limits.max_nodes, (size_t)1 << 22);
   EXPECT_EQ(limits.max_node_depth, (size_t)256);
+  EXPECT_EQ(limits.max_report_entries, (size_t)1 << 16);
+  EXPECT_EQ(limits.max_jobs, (size_t)64);
   for (unsigned char byte : limits._reserved) {
     EXPECT_EQ(byte, 0);
   }

@@ -25448,7 +25448,7 @@
 "bc-81-del",
 "srcl",
 "src/core/core.c",
-"81:limits->max_bytes = GSHSCENE_LIMITS_DEFAULT_MAX_BYTES;",
+"83:limits->max_bytes = GSHSCENE_LIMITS_DEFAULT_MAX_BYTES;",
 ";",
 [
 "testBytes",
@@ -25468,7 +25468,7 @@
 "bc-82-del",
 "srcl",
 "src/core/core.c",
-"82:limits->max_nodes = GSHSCENE_LIMITS_DEFAULT_MAX_NODES;",
+"84:limits->max_nodes = GSHSCENE_LIMITS_DEFAULT_MAX_NODES;",
 ";",
 [
 "testBytes",
@@ -25488,7 +25488,7 @@
 "bc-83-del",
 "srcl",
 "src/core/core.c",
-"83:limits->max_node_depth = GSHSCENE_LIMITS_DEFAULT_MAX_NODE_DEPTH;",
+"85:limits->max_node_depth = GSHSCENE_LIMITS_DEFAULT_MAX_NODE_DEPTH;",
 ";",
 [
 "testBytes",
