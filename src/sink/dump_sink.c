@@ -81,12 +81,15 @@ typedef struct Block {
 
 typedef struct Dump_Sink Dump_Sink;
 
-/** A bump allocator over the glyph scratch, reset for each glyph: a block is a 16-byte header (its size) and its payload. */
+/**
+ * A bump allocator over the glyph scratch, reset for each glyph: a block is a 16-byte header (its size) and its
+ * payload.  A realloc is always a new block and a copy: shape-geometry grows a path's arrays in turn, so the block
+ * it regrows is never the last one handed out, and growing that one in place would be a branch nothing takes.
+ */
 typedef struct Glyph_Arena {
   unsigned char * base;
   size_t capacity;
   size_t used;
-  void * last;          /* the last block handed out: a realloc of it grows in place */
   GSHGEOM_Allocator self;
 } Glyph_Arena;
 
@@ -245,8 +248,7 @@ static void * arena_take(Glyph_Arena * a, size_t size) {
   unsigned char * block = a->base + a->used;
   memcpy(block, &size, sizeof size);
   a->used += CARVE_ALIGN + payload;
-  a->last = block + CARVE_ALIGN;
-  return a->last;
+  return block + CARVE_ALIGN;
 }
 
 static void * arena_malloc(void * ctx, size_t size) {
@@ -271,17 +273,6 @@ static void * arena_realloc(void * ctx, void * pointer, size_t size) {
   }
   size_t old;
   memcpy(&old, (unsigned char *)pointer - CARVE_ALIGN, sizeof old);
-  if (pointer == a->last) {
-    /* The last block: grown or shrunk in place. */
-    size_t start = (size_t)((unsigned char *)pointer - a->base);
-    size_t payload = align_up(size ? size : 1);
-    if (payload == SIZE_MAX || payload > a->capacity - start) {
-      return NULL;
-    }
-    a->used = start + payload;
-    memcpy((unsigned char *)pointer - CARVE_ALIGN, &size, sizeof size);
-    return pointer;
-  }
   void * p = arena_take(a, size);
   if (p) {
     memcpy(p, pointer, old < size ? old : size);
@@ -298,7 +289,6 @@ static void arena_init(Glyph_Arena * a, unsigned char * memory, size_t bytes) {
   a->base = memory;
   a->capacity = bytes;
   a->used = 0;
-  a->last = NULL;
   a->self.ctx = a;
   a->self.malloc_fn = arena_malloc;
   a->self.calloc_fn = arena_calloc;
@@ -308,7 +298,6 @@ static void arena_init(Glyph_Arena * a, unsigned char * memory, size_t bytes) {
 
 static void arena_reset(Glyph_Arena * a) {
   a->used = 0;
-  a->last = NULL;
 }
 
 static GSHSCENE_Result op_workspace_bytes(void * impl, const GSHSCENE_Render_Request * request, size_t * out) {

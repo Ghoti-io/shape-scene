@@ -364,7 +364,7 @@ static GSHSCENE_Result add_font_run(Damage_Walk * d, const GSHSCENE_Resource * r
       gshgeom_device_path_destroy(path);
       continue;
     }
-    GSHSCENE_Glyph_Box box;
+    GSHSCENE_Glyph_Box box = {0}; /* written only on success */
     GSHGEOM_Map map;
     if (gshscene_glyph_box(resource, i, &box) != GSHSCENE_OK || box.empty) {
       continue; /* not drawn, or nothing to draw */

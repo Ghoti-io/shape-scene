@@ -713,11 +713,13 @@ static void op(S * s, unsigned code) {
       run.glyphs = glyphs;
       const GSHSCENE_Resource * face = NULL;
       if (code % OP_COUNT == OP_INTERN_RUN) {
-        /* A face, unbound, with the key and a coordinate the input gives (story 14a). */
-        int16_t coord = (int16_t)((int)arg(s) * 128 - 16384);
+        /* A face, unbound, its key and coordinate from the one byte the key always took (story 14a), so the rest
+         * of the input drives what it drove before. */
+        unsigned key = arg(s);
+        int16_t coord = (int16_t)((int)key * 128 - 16384);
         GSHSCENE_Face_Desc desc;
         memset(&desc, 0, sizeof desc);
-        desc.font_key = 1 + arg(s);
+        desc.font_key = 1 + key;
         desc.coord_count = 1;
         desc.coords = &coord;
         r = gshscene_store_intern_face(store, &desc, &face);

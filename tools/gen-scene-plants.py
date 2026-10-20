@@ -26,8 +26,8 @@ edit that moves a line means regenerating and re-running the sweep:
 
 then keep the lines the sweep reports as ok.
 
-With --sink it writes the candidates of the sink contract's sources (story 13a, src/sink) instead, for
-tools/sink-plants.json:
+With --sink it writes the candidates of the sink contract's sources (story 13a, src/sink; and story 14a's
+src/glyph) instead, for tools/sink-plants.json:
 
   python3 tools/gen-scene-plants.py --sink > /tmp/sink-candidates.json
   PLANT_EXTRA_JSON=/tmp/sink-candidates.json PLANT_ONLY='^(sk|rp|ds|cn)-' make check-planted PREFIX=..."""
@@ -73,7 +73,7 @@ TESTS_BY_FILE = {
     "src/scene/walk.c": ["testVersion", "testEmit", "testDiff", "testScene_limits", "testOrder"],
     "src/scene/validate.c": ["testScene", "testScene_limits", "testEdit", "testPaint_scene", "fuzz-replay"],
     "src/scene/emit.c": ["testEmit", "testScene_limits", "testVersion", "testDiff", "testOrder", "testPaint_scene"],
-    "src/scene/diff.c": ["testDiff", "testScene", "testVersion", "testPaint_scene"],
+    "src/scene/diff.c": ["testDiff", "testScene", "testVersion", "testPaint_scene", "testGlyph"],
 }
 
 SINK_FILES = {
@@ -81,8 +81,9 @@ SINK_FILES = {
     "src/sink/report.c": "rp",
     "src/sink/dump_sink.c": "ds",
     "src/sink/cancel.c": "cn",
+    "src/glyph/glyph.c": "gl",
 }
-SINK_TESTS = ["testDump_sink", "testSink", "testReport", "fuzz-render", "probe"]
+SINK_TESTS = ["testDump_sink", "testSink", "testReport", "testGlyph", "fuzz-render", "probe"]
 
 REL = [("==", "!="), ("!=", "=="), ("<=", "<"), (">=", ">"), ("<", "<="), (">", ">=")]
 

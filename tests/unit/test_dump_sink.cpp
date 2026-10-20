@@ -369,6 +369,78 @@ TEST(DumpSink, AGlyphPastTheScratchIsRefusedAsTheSinksOwnLimit) {
   }
 }
 
+TEST(DumpSink, TheScratchIsEachGlyphsAlone) {
+  // 300 rings: together far past 64 KiB, each well inside it, so none is refused.
+  Scene s;
+  std::vector<uint32_t> ids(300, 2u);
+  const GSHSCENE_List * list = one_run(s, s.glyphs(s.face(), ids, 8.0, GSHSCENE_HINT_NONE, 0.0, 30.0));
+  SinkRef sink(make_full(nullptr, nullptr));
+  for (uint32_t kind : {(uint32_t)GSHSCENE_TARGET_RASTER, (uint32_t)GSHSCENE_TARGET_STREAM}) {
+    auto surface = make_surface(kind);
+    ReportRef report;
+    ASSERT_EQ(render_job(sink.sink, request_for(list, *surface, report.report)).result, GSHSCENE_OK);
+    EXPECT_EQ(gshscene_report_count(report.report), 0u) << kind;
+  }
+}
+
+// A glyph whose paths grow inside the scratch: shape-geometry grows its element and point arrays in turn, so
+// each array is regrown while the other is the scratch's last block and the copy that moves it is the one that
+// carries its contents.  The record's hash is the one the glyph's paths have from the C library's allocator.
+TEST(DumpSink, AGlyphGrownInsideTheScratchIsTheSameGlyph) {
+  for (uint32_t lines : {14u, 15u, 40u, 333u, 510u}) {
+    for (bool fast : {true, false}) {
+      Scene s;
+      s.provider.zigzag = lines;
+      const GSHSCENE_Resource * run = s.glyphs(s.face(), {8u}, 8.0, GSHSCENE_HINT_NONE);
+      GSHGEOM_Map map;
+      gshgeom_map_identity(2, &map);
+      if (!fast) {
+        gshgeom_map_rotate(GSHGEOM_ANGLE_DEGREES, 30.0, &map);
+      }
+      const GSHSCENE_List * list = one_run(s, run, &map);
+      Log log;
+      GSHSCENE_Dump_Sink_Config c = config_default();
+      c.log = &log.writer;
+      SinkRef sink(make_with(c, nullptr, nullptr));
+      auto raster = make_raster();
+      ReportRef report;
+      ASSERT_EQ(render_job(sink.sink, request_for(list, *raster, report.report)).result, GSHSCENE_OK) << lines;
+      // The expected record, from the C library's allocator.
+      GSHSCENE_Glyph_Route route;
+      ASSERT_EQ(gshscene_glyph_route(run, &map, GSHSCENE_TARGET_RASTER, &route), GSHSCENE_OK);
+      ASSERT_EQ(route.route, fast ? (uint32_t)GSHSCENE_GLYPH_FAST : (uint32_t)GSHSCENE_GLYPH_GENERAL);
+      GSHSCENE_Glyph_Note note;
+      uint64_t hash = 0;
+      if (fast) {
+        GSHSCENE_Glyph_Origin o;
+        GSHGEOM_Device_Path * p = nullptr;
+        ASSERT_EQ(gshscene_glyph_origin(run, &map, 0, &o), GSHSCENE_OK);
+        ASSERT_EQ(gshscene_glyph_device_path(run, &route, 0, &o, nullptr, nullptr, &p, &note), GSHSCENE_OK);
+        ASSERT_NE(p, nullptr);
+        hash = gshgeom_device_path_hash(p);
+        gshgeom_device_path_destroy(p);
+      } else {
+        GSHGEOM_Map glyph_map;
+        GSHGEOM_Path * p = nullptr;
+        ASSERT_EQ(gshscene_glyph_map(run, &map, 0, &glyph_map), GSHSCENE_OK);
+        ASSERT_EQ(gshscene_glyph_outline(run, 0, nullptr, nullptr, &p, &note), GSHSCENE_OK);
+        ASSERT_NE(p, nullptr);
+        GSHGEOM_Hash h;
+        gshgeom_hash_init(&h);
+        gshgeom_hash_u64(&h, gshgeom_path_hash(p));
+        gshgeom_hash_u64(&h, gshgeom_map_hash(&glyph_map));
+        hash = gshgeom_hash_value(&h);
+        gshgeom_path_destroy(p);
+      }
+      char want[64];
+      std::snprintf(want, sizeof want, "\nY 0 %c %016llx status=%d\n", fast ? 'f' : 'g', (unsigned long long)hash,
+          fast ? 1 : 0); // under NONE the fast tier answers NO_PROGRAM; the general route has no status
+      EXPECT_NE(log.text.find(want), std::string::npos) << lines << (fast ? " fast" : " general") << "\n" << log.text;
+      EXPECT_EQ(gshscene_report_count(report.report), 0u) << lines;
+    }
+  }
+}
+
 TEST(DumpSink, UnderCallerMemoryTheGlyphScratchIsTheWorkspaces) {
   // Under caller memory the glyph scratch is the workspace's: the run's paths fit, and the render allocates nothing.
   Scene s;

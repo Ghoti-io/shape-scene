@@ -298,6 +298,25 @@ TEST(ScenePublish, IdsAndHashesReproduceRunToRun) {
   EXPECT_EQ(h1, h2);
 }
 
+TEST(ScenePublish, AProblemListThatGrowsLeaksNothing) {
+  // Twenty problems: the list grows past its first eight and its sixteen, and each old array is freed.
+  tracker::Tracker t;
+  GSHSCENE_Allocator a = tracker::allocator_for(&t);
+  {
+    SceneHolder s(nullptr, &a);
+    GSHSCENE_Edit * e = nullptr;
+    ASSERT_EQ(gshscene_scene_open_edit(s.scene, nullptr, &e), GSHSCENE_OK);
+    for (int i = 0; i < 20; i++) {
+      add(e, GSHSCENE_ROOT_ID, instance_node(9000 + (uint64_t)i));
+    }
+    ProblemsRef p;
+    EXPECT_EQ(gshscene_scene_publish(s.scene, e, &p.problems, nullptr), GSHSCENE_ERR_INVALID);
+    EXPECT_EQ(p.ids().size(), 20u);
+    gshscene_edit_destroy(e);
+  }
+  EXPECT_TRUE(t.live.empty());
+}
+
 TEST(ScenePublish, AFailedPublishChangesNeitherTheSceneNorTheEdit) {
   Fx f;
   Edits keep;

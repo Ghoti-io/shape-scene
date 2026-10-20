@@ -340,6 +340,29 @@ TEST(Sink, TheJobHelpers) {
   EXPECT_EQ(gshscene_job_report(&job, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_ITEM_KIND, nullptr, 2), GSHSCENE_ERR_INVALID);
   EXPECT_EQ(gshscene_job_report(&job, GSHSCENE_ENTRY_HINT_STATUS, GSHSCENE_REASON_TIE_DECLARED, chain, 2), GSHSCENE_OK);
   EXPECT_EQ(gshscene_job_report(&job, GSHSCENE_ENTRY_APPROXIMATED, GSHSCENE_REASON_ITEM_KIND, nullptr, 0), GSHSCENE_OK);
+  // The glyph's entry checks the same bounds, each at its edge, and the glyph reaches the entry's `second`.
+  EXPECT_EQ(gshscene_job_report_glyph(nullptr, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_ITEM_KIND, nullptr, 0, 1), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_job_report_glyph(&job, (GSHSCENE_Entry_Class)0, GSHSCENE_REASON_ITEM_KIND, chain, 2, 1), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_job_report_glyph(&job, GSHSCENE_ENTRY_CLASS_COUNT, GSHSCENE_REASON_ITEM_KIND, chain, 2, 1), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_job_report_glyph(&job, GSHSCENE_ENTRY_REFUSED, (GSHSCENE_Reason)0, chain, 2, 1), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_job_report_glyph(&job, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_COUNT, chain, 2, 1), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_job_report_glyph(&job, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_ITEM_KIND, nullptr, 2, 1), GSHSCENE_ERR_INVALID);
+  size_t before = gshscene_report_count(report.report);
+  EXPECT_EQ(gshscene_job_report_glyph(&job, GSHSCENE_ENTRY_HINT_STATUS, GSHSCENE_REASON_ITEM_KIND, chain, 2, 77), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_job_report_glyph(&job, GSHSCENE_ENTRY_REFUSED,
+      (GSHSCENE_Reason)(GSHSCENE_REASON_COUNT - 1), nullptr, 0, 78), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_report_count(report.report), before + 2);
+  {
+    bool saw77 = false, saw78 = false;
+    for (size_t i = 0; i < gshscene_report_count(report.report); i++) {
+      GSHSCENE_Report_Entry e;
+      ASSERT_EQ(gshscene_report_entry(report.report, i, &e), GSHSCENE_OK);
+      saw77 = saw77 || (e.second == 77u && e.entry_class == GSHSCENE_ENTRY_HINT_STATUS);
+      saw78 = saw78 || (e.second == 78u && e.reason == GSHSCENE_REASON_COUNT - 1);
+    }
+    EXPECT_TRUE(saw77);
+    EXPECT_TRUE(saw78);
+  }
   // Work: the most between two checks, and what is left at completion counts.
   gshscene_job_work(&job, 3);
   EXPECT_EQ(gshscene_job_checkpoint(&job), 0);

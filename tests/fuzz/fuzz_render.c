@@ -264,8 +264,8 @@ static const GSHSCENE_Resource * square(Scene * s, double x, double y, double si
  * with a program, a 1000-unit one without), with the fast tier or without it, at one of three instances.  The
  * providers live for the process; their counters are not read.
  */
-static GSHSCENE_Test_Provider provider_program = {2048u, GSHSCENE_FACE_HINTING, 0, 0, {0}, {0}, {0}, {0}, {0}, {0}};
-static GSHSCENE_Test_Provider provider_plain = {1000u, 0, 0, 0, {0}, {0}, {0}, {0}, {0}, {0}};
+static GSHSCENE_Test_Provider provider_program = {2048u, GSHSCENE_FACE_HINTING, 0, 0, 0, {0}, {0}, {0}, {0}, {0}, {0}, {0}};
+static GSHSCENE_Test_Provider provider_plain = {1000u, 0, 0, 0, 0, {0}, {0}, {0}, {0}, {0}, {0}, {0}};
 
 static const GSHSCENE_Resource * face_from(Scene * s, uint8_t a) {
   int16_t coord = (int16_t)((a % 3) * 4096);

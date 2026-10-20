@@ -156,9 +156,10 @@ changes no result, cannot be seen by any test:
                ``rule-S15``, each failing the conformance suite or the contract's
                own tests), its pinned values and constants, and every generated
                mutation of src/sink the sweep caught (tools/sink-plants.json, from
-               ``gen-scene-plants.py --sink``: 1295 candidates on the final tree,
-               999 caught, 194 that do not compile dropped).  The 103 survivors are
-               of these kinds, none a result a caller can see:
+               ``gen-scene-plants.py --sink``: 1444 candidates on story 14a's
+               final tree, 1108 caught, 220 that do not compile dropped).  The 116
+               survivors are of these kinds, none a result a caller can see (those
+               on story 14a's lines of src/sink are listed with story 14a below):
 
   - the locks of the sink's busy table and of the test sink's pending runs and
     cache (``GCU_MUTEX_LOCK``/``DESTROY`` deleted), and a loop bound moved one
@@ -196,6 +197,47 @@ changes no result, cannot be seen by any test:
   - ``r.target = &copy`` in the workspace query: the test sink's need does not
     depend on the target; resolving past the chain (a read of the pool's next
     index into the caller's path), which only ASan sees
+
+  gl-, gh-, the rs- face and run plants, and rule-S6-glyph-* (story 14a)
+               runs from a font: the face resource (its content, hash, dump,
+               binding and lifetime), the run's face handle and hint version, the
+               seam's pinned values and constants (gh-, in glyph_provider.h,
+               report.h and resource.h), the route rule by rule, the snapped
+               scale and map, the origin, the provider's answers made notes, the
+               test sink's glyph records and scratch, the plan's routes through
+               instances, and the damage of a run from a bound face; and every
+               generated mutation of src/glyph/glyph.c and of the story's lines of
+               src/sink and src/scene/diff.c the sweep caught.  On story 14a's
+               final tree src/glyph/glyph.c gave 228 candidates: 155 caught
+               (tools/sink-plants.json), 56 that do not compile, 17 survivors;
+               src/scene/diff.c gave 288: 215 caught (tools/scene-plants.json), 44
+               that do not compile, 29 survivors (the 26 outside the story's lines
+               are of the kinds listed for df- above).  The survivors on the
+               story's lines, by kind:
+
+  - stores the next statement makes or nothing reads: the route's ``GENERAL``
+    written over the zeroed route and again by ``general_for``; the ``memset``
+    of the grid, the request, the box and a note where every field is then set
+    or only read on success (``gshgeom_map_grid_aligned`` and the providers
+    write all of theirs); a note's class and reason cleared before
+    ``build_failure`` sets them; the test sink's box corners and note zeroed
+    over a zeroed record; the scratch's ``used = 0`` at init over a run that
+    is ``memset`` already
+  - unreachable: ``gshgeom_map_grid_aligned`` failing on a map the route has
+    checked; ``from_geometry``'s default; a device verb past the enum in
+    ``moved``; a shape that is neither a path nor a glyph run in the damage
+    walk; the scratch's ``malloc_fn`` (shape-geometry allocates only through
+    ``calloc`` and ``realloc``)
+  - loop bounds one past the end where the next read is refused or unread: a
+    device element past the count (the accessor refuses it), a point past a
+    verb's count (zero, and only the verb's points are used; ``j < 3`` already
+    holds), the glyph box past the run (``gshscene_glyph_box`` refuses it)
+  - ties: a point exactly at ``INT32_MIN`` or ``INT32_MAX`` after the whole
+    pixel in ``moved``; a scratch block that fills the scratch to the byte; the
+    copy's shorter length when the two are equal; ``calloc``'s overflow guard
+    (a product past ``SIZE_MAX``)
+  - ``r == OK && path`` for ``||``, and the destroy of a path in the glyph
+    scratch: a path is set only on success, and the scratch frees by reset
 """
 
 import concurrent.futures
@@ -406,21 +448,30 @@ PLANTS = [
     ('rs-name-unknown', 'src', RS, '  return "unknown resource kind";', '  return NULL;', R),
     ('rs-name-unknown-count', 'src', RS, '    case GSHSCENE_RESOURCE_KIND_COUNT:\n      break;\n  }\n  return "unknown resource kind";', '    case GSHSCENE_RESOURCE_KIND_COUNT:\n      return "count";\n  }\n  return "unknown resource kind";', R),
     ('rs-format-version', 'src', RS, '#define RESOURCE_FORMAT_VERSION 1u', '#define RESOURCE_FORMAT_VERSION 2u', D),
-    ('rs-hash-version-width', 'src', RS, '  gshgeom_hash_u32(h, RESOURCE_FORMAT_VERSION);', '  gshgeom_hash_u16(h, RESOURCE_FORMAT_VERSION);', D),
+    ('rs-hash-version-width', 'src', RS, '  gshgeom_hash_u32(h, kind_format(kind));', '  gshgeom_hash_u16(h, kind_format(kind));', D),
+    ('rs-hash-run-format', 'src', RS, '#define RUN_FORMAT_VERSION 2u', '#define RUN_FORMAT_VERSION 1u', D),
+    ('rs-hash-run-format-unused', 'src', RS, '  return kind == GSHSCENE_RESOURCE_GLYPH_RUN ? RUN_FORMAT_VERSION : RESOURCE_FORMAT_VERSION;', '  return (void)kind, RESOURCE_FORMAT_VERSION;', D),
     ('rs-hash-kind-width', 'src', RS, '  gshgeom_hash_u32(h, (uint32_t)kind);', '  gshgeom_hash_u8(h, (uint8_t)kind);', D),
-    ('rs-hash-kind-first', 'src', RS, '  gshgeom_hash_u32(h, RESOURCE_FORMAT_VERSION);\n  gshgeom_hash_u32(h, (uint32_t)kind);', '  gshgeom_hash_u32(h, (uint32_t)kind);\n  gshgeom_hash_u32(h, RESOURCE_FORMAT_VERSION);', D),
+    ('rs-hash-kind-first', 'src', RS, '  gshgeom_hash_u32(h, kind_format(kind));\n  gshgeom_hash_u32(h, (uint32_t)kind);', '  gshgeom_hash_u32(h, (uint32_t)kind);\n  gshgeom_hash_u32(h, kind_format(kind));', D),
     ('rs-hash-path-width', 'src', RS, '  gshgeom_hash_u64(&h, gshgeom_path_hash(path));', '  gshgeom_hash_u32(&h, (uint32_t)gshgeom_path_hash(path));', D),
     ('rs-hash-path-kind', 'src', RS, '  hash_begin(&h, GSHSCENE_RESOURCE_PATH);', '  hash_begin(&h, GSHSCENE_RESOURCE_PICTURE);', D),
     ('rs-hash-run-kind', 'src', RS, '  hash_begin(&h, GSHSCENE_RESOURCE_GLYPH_RUN);', '  hash_begin(&h, GSHSCENE_RESOURCE_PATH);', D),
     ('rs-hash-picture-kind', 'src', RS, '  hash_begin(&h, GSHSCENE_RESOURCE_PICTURE);', '  hash_begin(&h, GSHSCENE_RESOURCE_PATH);', D),
     ('rs-hash-run-source-width', 'src', RS, '  gshgeom_hash_u32(&h, (uint32_t)run->source);', '  gshgeom_hash_u8(&h, (uint8_t)run->source);', D),
-    ('rs-hash-run-key-width', 'src', RS, '  gshgeom_hash_u64(&h, run->font_key);', '  gshgeom_hash_u32(&h, (uint32_t)run->font_key);', D),
-    ('rs-hash-run-face-width', 'src', RS, '  gshgeom_hash_u32(&h, run->face_index);', '  gshgeom_hash_u16(&h, (uint16_t)run->face_index);', D),
+    ('rs-hash-run-face-hash-width', 'src', RS, '  gshgeom_hash_u64(&h, outline_hash(run->face));', '  gshgeom_hash_u32(&h, (uint32_t)outline_hash(run->face));', D),
+    ('rs-hash-run-face-dropped', 'src', RS, '  gshgeom_hash_u64(&h, outline_hash(run->face));\n', '', D),
+    ('rs-hash-run-version-width', 'src', RS, '  gshgeom_hash_u32(&h, run->hint_version);', '  gshgeom_hash_u16(&h, (uint16_t)run->hint_version);', D),
     ('rs-hash-run-size', 'src', RS, '  gshgeom_hash_f64(&h, run->size);', '  gshgeom_hash_f64(&h, run->size + 1.0);', D),
     ('rs-hash-run-hint-width', 'src', RS, '  gshgeom_hash_u32(&h, run->hint_mode);', '  gshgeom_hash_u8(&h, (uint8_t)run->hint_mode);', D),
-    ('rs-hash-run-var-width', 'src', RS, '  gshgeom_hash_u64(&h, run->variation_key);', '  gshgeom_hash_u32(&h, (uint32_t)run->variation_key);', D),
+    ('rs-hash-run-version-dropped', 'src', RS, '  gshgeom_hash_u32(&h, run->hint_version);\n', '', D),
     ('rs-hash-run-count-width', 'src', RS, '  gshgeom_hash_u64(&h, (uint64_t)run->glyph_count);', '  gshgeom_hash_u32(&h, (uint32_t)run->glyph_count);', D),
-    ('rs-hash-run-order', 'src', RS, '  gshgeom_hash_u64(&h, run->font_key);\n  gshgeom_hash_u32(&h, run->face_index);', '  gshgeom_hash_u32(&h, run->face_index);\n  gshgeom_hash_u64(&h, run->font_key);', D),
+    ('rs-hash-run-order', 'src', RS, '  gshgeom_hash_u32(&h, run->hint_mode);\n  gshgeom_hash_u32(&h, run->hint_version);', '  gshgeom_hash_u32(&h, run->hint_version);\n  gshgeom_hash_u32(&h, run->hint_mode);', D),
+    ('rs-hash-face-kind', 'src', RS, '  hash_begin(&h, GSHSCENE_RESOURCE_FACE);', '  hash_begin(&h, GSHSCENE_RESOURCE_PATH);', D),
+    ('rs-hash-face-key-width', 'src', RS, '  gshgeom_hash_u64(&h, font_key);', '  gshgeom_hash_u32(&h, (uint32_t)font_key);', D),
+    ('rs-hash-face-index-dropped', 'src', RS, '  gshgeom_hash_u32(&h, face_index);\n', '  (void)face_index;\n', D),
+    ('rs-hash-face-count-dropped', 'src', RS, '  gshgeom_hash_u32(&h, count);\n', '', D),
+    ('rs-hash-face-coord-unsigned', 'src', RS, '    gshgeom_hash_u32(&h, (uint32_t)(int32_t)coords[i]);', '    gshgeom_hash_u32(&h, (uint32_t)(uint16_t)coords[i]);', D),
+    ('rs-hash-face-last-coord', 'src', RS, '  for (uint32_t i = 0; i < count; i++) {\n    gshgeom_hash_u32(&h, (uint32_t)(int32_t)coords[i]);', '  for (uint32_t i = 0; i + 1 < count; i++) {\n    gshgeom_hash_u32(&h, (uint32_t)(int32_t)coords[i]);', D),
     ('rs-hash-glyph-id-width', 'src', RS, '    gshgeom_hash_u32(&h, glyphs[i].id);', '    gshgeom_hash_u16(&h, (uint16_t)glyphs[i].id);', D),
     ('rs-hash-glyph-x', 'src', RS, '    gshgeom_hash_f64(&h, glyphs[i].x);', '    gshgeom_hash_f64(&h, glyphs[i].y);', D),
     ('rs-hash-glyph-y', 'src', RS, '    gshgeom_hash_f64(&h, glyphs[i].y);', '    gshgeom_hash_f64(&h, glyphs[i].x);', D),
@@ -445,11 +496,15 @@ PLANTS = [
     ('rs-eq-points-ignored', 'src', RS, '      if (!point_equal(&ea.curve.p[k], &eb.curve.p[k])) {\n        return 0;\n      }\n', '', R),
     ('rs-eq-last-weight', 'src', RS, '    for (size_t k = 0; k < verb_weights(ea.verb); k++) {', '    for (size_t k = 0; k + 1 < verb_weights(ea.verb); k++) {', R),
     ('rs-eq-weights-ignored', 'src', RS, '      if (gshgeom_f64_bits(ea.curve.w[k]) != gshgeom_f64_bits(eb.curve.w[k])) {\n        return 0;\n      }\n', '', R),
-    ('rs-run-eq-key', 'src', RS, 'a->font_key != b->font_key ||', '0 ||', R),
-    ('rs-run-eq-face', 'src', RS, 'a->face_index != b->face_index ||', '0 ||', R),
-    ('rs-run-eq-size', 'src', RS, '      gshgeom_f64_bits(a->size) != gshgeom_f64_bits(b->size) || a->hint_mode != b->hint_mode ||', '      0 || a->hint_mode != b->hint_mode ||', R),
+    ('rs-run-eq-face', 'src', RS, 'a->face != b->face ||', '0 ||', R),
+    ('rs-run-eq-version', 'src', RS, 'a->hint_version != b->hint_version ||', '0 ||', R),
+    ('rs-run-eq-size', 'src', RS, 'a->face != b->face || gshgeom_f64_bits(a->size) != gshgeom_f64_bits(b->size) ||', 'a->face != b->face || 0 ||', R),
     ('rs-run-eq-hint', 'src', RS, 'a->hint_mode != b->hint_mode ||', '0 ||', R),
-    ('rs-run-eq-variation', 'src', RS, 'a->variation_key != b->variation_key ||', '0 ||', R),
+    ('rs-match-face-always', 'src', RS, '      if (have->font_key != want->font_key || have->face_index != want->face_index ||\n          have->coord_count != want->coord_count) {\n        return 0;\n      }', '', R),
+    ('rs-match-face-key', 'src', RS, 'have->font_key != want->font_key || have->face_index', '0 || have->face_index', R),
+    ('rs-match-face-index', 'src', RS, 'have->face_index != want->face_index ||', '0 ||', R),
+    ('rs-match-face-count', 'src', RS, '          have->coord_count != want->coord_count) {', '          0) {', R + ['testGlyph']),
+    ('rs-match-face-coords', 'src', RS, '        if (have->coords[i] != want->coords[i]) {', '        if (0) {', R),
     ('rs-run-eq-count', 'src', RS, 'a->glyph_count != b->glyph_count) {', '0) {', R),
     ('rs-run-eq-glyph-id', 'src', RS, '    if (ga[i].id != gb[i].id ||', '    if (0 ||', R),
     ('rs-run-eq-glyph-x', 'src', RS, 'gshgeom_f64_bits(ga[i].x) != gshgeom_f64_bits(gb[i].x) ||', '0 ||', R),
@@ -483,16 +538,23 @@ PLANTS = [
     ('rs-run-null-glyphs', 'src', RS, '  if (!run || (run->glyph_count && !run->glyphs)) {', '  if (!run) {', R),
     ('rs-run-source-range', 'src', RS, '  if ((unsigned)run->source >= (unsigned)GSHSCENE_GLYPH_SOURCE_COUNT) {', '  if ((unsigned)run->source > (unsigned)GSHSCENE_GLYPH_SOURCE_COUNT) {', R),
     ('rs-run-source-unchecked', 'src', RS, '  if ((unsigned)run->source >= (unsigned)GSHSCENE_GLYPH_SOURCE_COUNT) {\n    return GSHSCENE_ERR_INVALID;\n  }\n', '', R),
-    ('rs-run-font-key', 'src', RS, '    if (run->font_key == 0 || !gshscene_finite(run->size)', '    if (!gshscene_finite(run->size)', R),
+    ('rs-run-face-null', 'src', RS, '    if (!run->face || run->face->store != store', '    if (run->face->store != store', R),
+    ('rs-run-face-store', 'src', RS, '!run->face || run->face->store != store || run->face->kind != GSHSCENE_RESOURCE_FACE ||', '!run->face || run->face->kind != GSHSCENE_RESOURCE_FACE ||', R),
+    ('rs-run-face-kind', 'src', RS, 'run->face->store != store || run->face->kind != GSHSCENE_RESOURCE_FACE ||', 'run->face->store != store ||', R),
+    ('rs-run-hint-mode-range', 'src', RS, '        run->hint_mode >= (uint32_t)GSHSCENE_HINT_MODE_COUNT) {', '        run->hint_mode > (uint32_t)GSHSCENE_HINT_MODE_COUNT) {', R),
+    ('rs-run-hint-mode-unchecked', 'src', RS, ' ||\n        run->hint_mode >= (uint32_t)GSHSCENE_HINT_MODE_COUNT) {', ') {', R),
     ('rs-run-size-positive', 'src', RS, '|| !(run->size > 0.0) ||', '|| (run->size < 0.0) ||', R),
-    ('rs-run-size-limit', 'src', RS, '|| run->size > GSHGEOM_COORD_LIMIT) {', '|| run->size >= GSHGEOM_COORD_LIMIT) {', R),
-    ('rs-run-size-limit-unchecked', 'src', RS, ' || run->size > GSHGEOM_COORD_LIMIT) {\n      return GSHSCENE_ERR_INVALID;', ') {\n      return GSHSCENE_ERR_INVALID;', R),
-    ('rs-run-outline-key', 'src', RS, '  } else if (run->font_key != 0 || run->face_index != 0 ||', '  } else if (run->face_index != 0 ||', R),
-    ('rs-run-outline-face', 'src', RS, 'run->font_key != 0 || run->face_index != 0 || gshgeom_f64_bits(run->size) != 0 ||', 'run->font_key != 0 || gshgeom_f64_bits(run->size) != 0 ||', R),
-    ('rs-run-outline-size', 'src', RS, 'gshgeom_f64_bits(run->size) != 0 ||\n             run->hint_mode != 0', '0 ||\n             run->hint_mode != 0', R),
-    ('rs-run-outline-size-numeric', 'src', RS, 'gshgeom_f64_bits(run->size) != 0 ||\n             run->hint_mode != 0', 'run->size != 0.0 ||\n             run->hint_mode != 0', R),
-    ('rs-run-outline-hint', 'src', RS, 'run->hint_mode != 0 || run->variation_key != 0) {', 'run->variation_key != 0) {', R),
-    ('rs-run-outline-variation', 'src', RS, 'run->hint_mode != 0 || run->variation_key != 0) {', 'run->hint_mode != 0) {', R),
+    ('rs-run-size-limit', 'src', RS, '|| run->size > GSHGEOM_COORD_LIMIT ||', '|| run->size >= GSHGEOM_COORD_LIMIT ||', R),
+    ('rs-run-size-limit-unchecked', 'src', RS, ' || run->size > GSHGEOM_COORD_LIMIT ||', ' ||', R),
+    ('rs-run-outline-face', 'src', RS, '  } else if (run->face || gshgeom_f64_bits(run->size) != 0', '  } else if (gshgeom_f64_bits(run->size) != 0', R),
+    ('rs-run-outline-version', 'src', RS, 'run->hint_mode != 0 || run->hint_version != 0) {', 'run->hint_mode != 0) {', R),
+    ('rs-run-outline-size', 'src', RS, 'run->face || gshgeom_f64_bits(run->size) != 0 ||', 'run->face || 0 ||', R),
+    ('rs-run-outline-size-numeric', 'src', RS, 'run->face || gshgeom_f64_bits(run->size) != 0 ||', 'run->face || run->size != 0.0 ||', R),
+    ('rs-run-outline-hint', 'src', RS, ' || run->hint_mode != 0 || run->hint_version != 0) {', ' || run->hint_version != 0) {', R),
+    ('rs-run-face-retained', 'src', RS, '  gshscene_resource_retain(run->face);\n', '', R),
+    ('rs-run-face-released', 'src', RS, '      gshscene_resource_release(resource->u.glyphs.run.face);\n', '', R + ['testGlyph']),
+    ('rs-run-face-kept', 'src', RS, '  resource->u.glyphs.run.face = run->face;\n', '', R),
+    ('rs-name-face', 'src', RS, '      return "face";', '      return "fact";', R + D),
     ('rs-run-count-inclusive', 'src', RS, '  if (run->glyph_count > store->limits.max_resource_elements || run->glyph_count > SIZE_MAX / sizeof(GSHSCENE_Glyph)) {', '  if (run->glyph_count >= store->limits.max_resource_elements || run->glyph_count > SIZE_MAX / sizeof(GSHSCENE_Glyph)) {', R),
     ('rs-run-count-limit-unchecked', 'src', RS, '  if (run->glyph_count > store->limits.max_resource_elements || run->glyph_count > SIZE_MAX / sizeof(GSHSCENE_Glyph)) {', '  if (run->glyph_count > SIZE_MAX / sizeof(GSHSCENE_Glyph)) {', R),
     ('rs-run-count-overflow-unchecked', 'src', RS, '  if (run->glyph_count > store->limits.max_resource_elements || run->glyph_count > SIZE_MAX / sizeof(GSHSCENE_Glyph)) {', '  if (run->glyph_count > store->limits.max_resource_elements) {', R),
@@ -550,10 +612,14 @@ PLANTS = [
     ('rs-dump-null-out', 'src', RS, '  if (!resource || !out) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  if (fprintf(out, "gshscene.resource', '  if (!resource) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  if (fprintf(out, "gshscene.resource', D),
     ('rs-dump-header-name', 'src', RS, '"gshscene.resource %u kind=%s hash=%016llx\\n"', '"gshscene.res %u kind=%s hash=%016llx\\n"', D),
     ('rs-dump-header-width', 'src', RS, '"gshscene.resource %u kind=%s hash=%016llx\\n"', '"gshscene.resource %u kind=%s hash=%llx\\n"', D),
-    ('rs-dump-run-line', 'src', RS, '"run source=%u font=%016llx face=%u size=%016llx hint=%u var=%016llx glyphs=%llu\\n"', '"run source=%u font=%016llx face=%u size=%016llx hint=%u var=%016llx count=%llu\\n"', D),
-    ('rs-dump-run-key-width', 'src', RS, '"run source=%u font=%016llx face=%u', '"run source=%u font=%llx face=%u', D),
+    ('rs-dump-run-line', 'src', RS, '"run source=%u face=%016llx size=%016llx hint=%u version=%u glyphs=%llu\\n"', '"run source=%u face=%016llx size=%016llx hint=%u version=%u count=%llu\\n"', D),
+    ('rs-dump-run-format', 'src', RS, 'hash=%016llx\\n", kind_format(resource->kind),', 'hash=%016llx\\n", RESOURCE_FORMAT_VERSION,', D),
+    ('rs-dump-run-face-width', 'src', RS, '"run source=%u face=%016llx size', '"run source=%u face=%llx size', D),
     ('rs-dump-run-size-width', 'src', RS, 'size=%016llx hint=%u', 'size=%llx hint=%u', D),
-    ('rs-dump-run-var-width', 'src', RS, 'var=%016llx glyphs=%llu', 'var=%llx glyphs=%llu', D),
+    ('rs-dump-face-line', 'src', RS, '"face font=%016llx index=%u coords=%u"', '"face font=%016llx index=%u axes=%u"', D),
+    ('rs-dump-face-key-width', 'src', RS, '"face font=%016llx index', '"face font=%llx index', D),
+    ('rs-dump-face-coord-sign', 'src', RS, '        if (fprintf(out, " %d", (int)face->coords[i]) < 0) {', '        if (fprintf(out, " %u", (unsigned)(uint16_t)face->coords[i]) < 0) {', D),
+    ('rs-dump-face-binding', 'src', RS, '"\\nbound=%d upem=%u flags=%u\\n"', '"\\nbound=%d flags=%u upem=%u\\n"', D + ['testGlyph']),
     ('rs-dump-glyph-line', 'src', RS, '"g id=%u x=%016llx y=%016llx outline=%016llx\\n"', '"g id=%u x=%016llx y=%016llx outline=%llx\\n"', D),
     ('rs-dump-glyph-x-width', 'src', RS, '"g id=%u x=%016llx y=%016llx', '"g id=%u x=%llx y=%016llx', D),
     ('rs-dump-glyph-y-width', 'src', RS, 'y=%016llx outline', 'y=%llx outline', D),
@@ -1166,7 +1232,7 @@ PLANTS += [
     ('hdr-default-report-entries', 'hdr', HC, '#define GSHSCENE_LIMITS_DEFAULT_MAX_REPORT_ENTRIES ((size_t)1 << 16)', '#define GSHSCENE_LIMITS_DEFAULT_MAX_REPORT_ENTRIES ((size_t)1 << 15)', C),
     ('hdr-default-jobs', 'hdr', HC, '#define GSHSCENE_LIMITS_DEFAULT_MAX_JOBS ((size_t)64)', '#define GSHSCENE_LIMITS_DEFAULT_MAX_JOBS ((size_t)63)', C),
     ('hdr-entry-classes', 'hdr', HRP, '  GSHSCENE_ENTRY_APPROXIMATED = 2,', '  GSHSCENE_ENTRY_APPROXIMATED = 6,', ['testReport']),
-    ('hdr-reasons', 'hdr', HRP, '  GSHSCENE_REASON_SEAMLESS = 7,', '  GSHSCENE_REASON_SEAMLESS = 17,', ['testReport']),
+    ('hdr-reasons', 'hdr', HRP, '  GSHSCENE_REASON_SEAMLESS = 7,', '  GSHSCENE_REASON_SEAMLESS = 27,', ['testReport']),
     ('hdr-target-kinds', 'hdr', HS, '  GSHSCENE_TARGET_STREAM = 2,', '  GSHSCENE_TARGET_STREAM = 5,', SINKT),
     ('hdr-seamless', 'hdr', HS, '#define GSHSCENE_TARGET_SEAMLESS (UINT32_C(1) << 0)', '#define GSHSCENE_TARGET_SEAMLESS (UINT32_C(1) << 3)', SINKT),
     ('hdr-render-strict', 'hdr', HS, '#define GSHSCENE_RENDER_STRICT (UINT32_C(1) << 0)', '#define GSHSCENE_RENDER_STRICT (UINT32_C(1) << 2)', SINKT),
@@ -1210,6 +1276,78 @@ PLANTS += [
     ('rule-S14-affinity', 'src', SK, '  return !(caps->flags & GSHSCENE_CAP_THREAD_AFFINE) || gshscene_thread_token() == sink->creator;', '  return sink != NULL || caps != NULL;', SINKT),
     ('rule-S15-readback-format', 'src', SK, '      !want || !have || !format_equal(want, have)) {', '      !want || !have) {', SINKT),
     ('rule-S15-readback-cap', 'src', SK, '  if (!(job->caps.flags & GSHSCENE_CAP_READBACK) || !sink->ops.readback) {', '  if (!sink->ops.readback) {', SINKT),
+]
+
+# Story 14a: runs from a font.  The seam's constants (gh-), glyph.c's arithmetic and the rules of the route
+# (gl-), the plan's routes and the test sink's glyph records (rule-S6-glyph-, ds-glyph-).  The branches of
+# src/glyph/glyph.c are also mutated one by one by the generator (tools/sink-plants.json).
+GL = "src/glyph/glyph.c"
+HG = "include/ghoti.io/shape-scene/glyph_provider.h"
+HGL = "include/ghoti.io/shape-scene/glyph.h"
+GLT = ["testGlyph", "testDump_sink"]
+PLANTS += [
+    ('gh-mode-none', 'hdr', HG, '  GSHSCENE_HINT_NONE = 1,', '  GSHSCENE_HINT_NONE = 3,', ['testGlyph']),
+    ('gh-mode-strict', 'hdr', HG, '  GSHSCENE_HINT_FONT_STRICT = 2,', '  GSHSCENE_HINT_FONT_STRICT = 4,', ['testGlyph']),
+    ('gh-status-failed', 'hdr', HG, '  GSHSCENE_HINT_STATUS_PROGRAM_FAILED = 2,', '  GSHSCENE_HINT_STATUS_PROGRAM_FAILED = 5,', GLT),
+    ('gh-status-errors', 'hdr', HG, '  GSHSCENE_HINT_STATUS_WITH_ERRORS = 3,', '  GSHSCENE_HINT_STATUS_WITH_ERRORS = 6,', GLT),
+    ('gh-max-ppem', 'hdr', HG, '#define GSHSCENE_GLYPH_MAX_PPEM 4096u', '#define GSHSCENE_GLYPH_MAX_PPEM 4095u', ['testGlyph']),
+    ('gh-upem-min', 'hdr', HG, '#define GSHSCENE_FACE_UPEM_MIN 16u', '#define GSHSCENE_FACE_UPEM_MIN 17u', ['testGlyph']),
+    ('gh-upem-max', 'hdr', HG, '#define GSHSCENE_FACE_UPEM_MAX 16384u', '#define GSHSCENE_FACE_UPEM_MAX 16383u', ['testGlyph']),
+    ('gh-max-axes', 'hdr', HG, '#define GSHSCENE_FACE_MAX_AXES 64u', '#define GSHSCENE_FACE_MAX_AXES 63u', ['testGlyph']),
+    ('gh-f2dot14-one', 'hdr', HG, '#define GSHSCENE_F2DOT14_ONE 16384', '#define GSHSCENE_F2DOT14_ONE 16383', ['testGlyph']),
+    ('gh-provider-version', 'hdr', HG, '#define GSHSCENE_GLYPH_PROVIDER_VERSION 1u', '#define GSHSCENE_GLYPH_PROVIDER_VERSION 2u', ['testGlyph']),
+    ('gh-face-hinting', 'hdr', HG, '#define GSHSCENE_FACE_HINTING (UINT32_C(1) << 0)', '#define GSHSCENE_FACE_HINTING (UINT32_C(1) << 2)', GLT),
+    ('gh-face-flags-all', 'hdr', HG, '#define GSHSCENE_FACE_FLAGS_ALL (GSHSCENE_FACE_HINTING | GSHSCENE_FACE_COLOR)', '#define GSHSCENE_FACE_FLAGS_ALL (GSHSCENE_FACE_HINTING | GSHSCENE_FACE_COLOR | 4u)', ['testGlyph']),
+    ('gh-route-fast', 'hdr', HGL, '  GSHSCENE_GLYPH_FAST = 1,', '  GSHSCENE_GLYPH_FAST = 2,', ['testGlyph']),
+    ('gh-reason-route', 'hdr', HRP, '  GSHSCENE_REASON_HINT_ROUTE = 12,', '  GSHSCENE_REASON_HINT_ROUTE = 22,', ['testGlyph', 'testReport', 'testDump_sink']),
+    ('gh-reason-unbound', 'hdr', HRP, '  GSHSCENE_REASON_FACE_UNBOUND = 19,', '  GSHSCENE_REASON_FACE_UNBOUND = 29,', ['testGlyph', 'testReport']),
+    ('gh-kind-face', 'hdr', HR, '  GSHSCENE_RESOURCE_FACE = 6,', '  GSHSCENE_RESOURCE_FACE = 7,', ['testResource', 'testDump']),
+    ('gh-bytes-per-axis', 'hdr', HR, '#define GSHSCENE_BYTES_PER_AXIS ((size_t)8)', '#define GSHSCENE_BYTES_PER_AXIS ((size_t)9)', ['testBytes']),
+    ('gl-split-constant', 'src', GL, '  double c = 134217729.0 * a; /* 2^27 + 1 */', '  double c = 1.0 * a; /* 2^27 + 1 */', ['testGlyph']),
+    ('gl-dekker-low-term', 'src', GL, '  double err = ((ah * bh - p) + ah * bl + al * bh) + al * bl;', '  double err = ((ah * bh - p) + ah * bl + al * bh);', ['testGlyph']),
+    ('gl-exactness-unchecked', 'src', GL, ' || !product_exact(size, grid.scale, ppem)) {', ') {', ['testGlyph']),
+    ('gl-scale-shift', 'src', GL, '  uint64_t twice = ((uint64_t)ppem << 17) + upem;', '  uint64_t twice = ((uint64_t)ppem << 16) + upem;', GLT),
+    ('gl-scale-truncates', 'src', GL, '  uint64_t twice = ((uint64_t)ppem << 17) + upem;', '  uint64_t twice = ((uint64_t)ppem << 17);', ['testGlyph']),
+    ('gl-scale-denominator', 'src', GL, '  *out = (int32_t)(twice / (2u * (uint64_t)upem));', '  *out = (int32_t)(twice / (uint64_t)upem);', GLT),
+    ('gl-max-ppem-default', 'src', GL, 'info->max_ppem ? info->max_ppem : GSHSCENE_GLYPH_MAX_PPEM', 'info->max_ppem', GLT),
+    ('gl-route-flip-ignored', 'src', GL, '  if (!aligned || grid.flip_y) {', '  if (!aligned) {', ['testGlyph']),
+    ('gl-route-integer-unchecked', 'src', GL, ' || (double)(int32_t)ppem != ppem ||', ' ||', ['testGlyph']),
+    ('gl-route-no-program-entry', 'src', GL, '  if (!none && !(info->flags & GSHSCENE_FACE_HINTING)) {', '  if (0) {', ['testGlyph']),
+    ('gl-route-stream-hinted', 'src', GL, '  if (!gshscene_target_kind_has_pixels((GSHSCENE_Target_Kind)target_kind)) {', '  if (!gshscene_target_kind_has_pixels((GSHSCENE_Target_Kind)target_kind) && 0) {', GLT),
+    ('gl-route-no-fast-op', 'src', GL, '  if (!face->u.face.ops.glyph_device_path) {\n    if (!none) {', '  if (0) {\n    if (!none) {', ['testGlyph']),
+    ('gl-strict-not-refused', 'src', GL, '  if (r->hint_mode == GSHSCENE_HINT_FONT_STRICT) {\n    r->entry_class = GSHSCENE_ENTRY_REFUSED;', '  if (0) {\n    r->entry_class = GSHSCENE_ENTRY_REFUSED;', ['testGlyph']),
+    ('gl-map-design-scale', 'src', GL, 'run->u.glyphs.run.size / (double)(int32_t)face->u.face.info.upem', 'run->u.glyphs.run.size / (double)(int32_t)(face->u.face.info.upem + 1u)', GLT),
+    ('gl-map-order', 'src', GL, '    r = gshgeom_map_compose(map, &translate, &placed);\n  }\n  if (r == GSHGEOM_OK) {\n    r = gshgeom_map_compose(&placed, &design, out);', '    r = gshgeom_map_compose(map, &design, &placed);\n  }\n  if (r == GSHGEOM_OK) {\n    r = gshgeom_map_compose(&placed, &translate, out);', GLT),
+    ('gl-origin-negative-fraction', 'src', GL, '  int64_t fx = ((int64_t)d.x % 64 + 64) % 64;', '  int64_t fx = (int64_t)d.x % 64;', ['testGlyph']),
+    ('gl-origin-pixel-truncates', 'src', GL, '  out->px = (int32_t)(((int64_t)d.x - fx) / 64);', '  out->px = (int32_t)((int64_t)d.x / 64);', ['testGlyph']),
+    ('gl-origin-y-from-x', 'src', GL, '  int64_t fy = ((int64_t)d.y % 64 + 64) % 64;', '  int64_t fy = ((int64_t)d.x % 64 + 64) % 64;', GLT),
+    ('gl-snap-scale', 'src', GL, '  double s = (double)route->scale / 65536.0;', '  double s = (double)route->scale / 65535.0;', ['testGlyph']),
+    ('gl-snap-no-flip', 'src', GL, '  const double m[4] = {s, 0.0, 0.0, -s};', '  const double m[4] = {s, 0.0, 0.0, s};', ['testGlyph']),
+    ('gl-snap-origin', 'src', GL, '  const double t[2] = {(double)origin->x / 64.0, (double)origin->y / 64.0};', '  const double t[2] = {(double)origin->x / 64.0, (double)origin->x / 64.0};', ['testGlyph']),
+    ('gl-moved-whole-pixel', 'src', GL, '    g = moved(relative, (int64_t)origin->px * 64, (int64_t)origin->py * 64, absolute);', '    g = moved(relative, (int64_t)origin->px * 64, (int64_t)origin->px * 64, absolute);', GLT),
+    ('gl-moved-range', 'src', GL, '      if (x < INT32_MIN || x > INT32_MAX || y < INT32_MIN || y > INT32_MAX) {', '      if (0) {', ['testGlyph']),
+    ('gl-request-fraction', 'src', GL, '  request.frac_y = origin->fy;', '  request.frac_y = origin->fx;', GLT),
+    ('gl-request-scale', 'src', GL, '  request.scale = route->scale;', '  request.scale = route->scale + 1;', GLT),
+    ('gl-request-mode', 'src', GL, '  request.hint_mode = run->u.glyphs.run.hint_mode;', '  request.hint_mode = GSHSCENE_HINT_FONT;', GLT),
+    ('gl-note-no-program-of-a-plain-face', 'src', GL, '      if (route->face_flags & GSHSCENE_FACE_HINTING) {', '      if (1) {', ['testGlyph']),
+    ('gl-note-none-reports', 'src', GL, '  if (route->hint_mode == GSHSCENE_HINT_NONE) {\n    return;\n  }', '', GLT),
+    ('gl-note-limit-is-unavailable', 'src', GL, '  if (result == GSHSCENE_ERR_LIMIT) {\n    note_set(note, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_RESOURCE_LIMIT);', '  if (0) {\n    note_set(note, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_RESOURCE_LIMIT);', ['testGlyph']),
+    ('gl-note-oom-is-a-refusal', 'src', GL, '  if (result == GSHSCENE_ERR_OOM) {\n    return result;\n  }\n  if (result == GSHSCENE_ERR_LIMIT)', '  if (result == GSHSCENE_ERR_LIMIT)', ['testGlyph']),
+    ('rule-S6-glyph-route', 'src', SK, '    if (plan_route(job, item, maps, count, &route) && route.entry_class) {', '    if (0) {', GLT + ['testSink']),
+    ('rule-S6-glyph-instance-maps', 'src', SK, '    if (item->kind == GSHSCENE_ITEM_INSTANCE) {\n      maps[count - 1] = item->map;', '    if (item->kind == GSHSCENE_ITEM_INSTANCE) {', GLT),
+    ('rule-S6-glyph-target-map', 'src', SK, '  if (gshgeom_map_compose_chain(maps, count, &job->target.map, &composed) != GSHGEOM_OK) {', '  if (gshgeom_map_compose_chain(maps, count, NULL, &composed) != GSHGEOM_OK) {', GLT),
+    ('rule-S6-glyph-refusal-skips', 'src', SK, '      if (route.entry_class == GSHSCENE_ENTRY_REFUSED) {\n        (*refused)++;', '      if (0) {\n        (*refused)++;', GLT),
+    ('rule-S6-glyph-entry-second', 'src', SK, '  return gshscene_report_add(job->request.report, entry_class, reason, chain, chain_count, glyph, 0.0);', '  return gshscene_report_add(job->request.report, entry_class, reason, chain, chain_count, glyph * 0u, 0.0);', GLT),
+    ('ds-glyph-scratch', 'src', DS, '#define GLYPH_BYTES ((size_t)65536)', '#define GLYPH_BYTES ((size_t)4096)', ['testDump_sink']),
+    ('ds-glyph-route-refusal-drawn', 'src', DS, '      if (routed && route.entry_class == GSHSCENE_ENTRY_REFUSED) {', '      if (0) {', ['testDump_sink']),
+    ('ds-glyph-records-skipped', 'src', DS, '      if (routed) {\n        GSHSCENE_Result r = glyph_records(', '      if (0) {\n        GSHSCENE_Result r = glyph_records(', ['testDump_sink']),
+    ('ds-glyph-box-size', 'src', DS, '  double s = run->size / (double)(int32_t)info.upem / 64.0;', '  double s = run->size / (double)(int32_t)info.upem / 32.0;', ['testDump_sink']),
+    ('ds-glyph-general-map-hashed', 'src', DS, '        gshgeom_hash_u64(&h, gshgeom_map_hash(&glyph_map));\n', '', ['testDump_sink']),
+    ('ds-glyph-strict-goes-on', 'src', DS, '      if (note.entry_class == GSHSCENE_ENTRY_REFUSED && (run->job->request.flags & GSHSCENE_RENDER_STRICT)) {', '      if (0) {', ['testDump_sink']),
+    ('ds-glyph-arena-reset', 'src', DS, '    arena_reset(&run->glyphs);\n', '', ['testDump_sink']),
+    ('df-font-run-unbounded', 'src', "src/scene/diff.c", '  if (run.source == GSHSCENE_GLYPHS_FROM_FONT) {\n    return add_font_run(d, resource, run.glyph_count, &composed);\n  }', '  if (run.source == GSHSCENE_GLYPHS_FROM_FONT) {\n    d->unbounded = 1;\n    return GSHSCENE_OK;\n  }', ['testGlyph', 'testDiff']),
+    ('df-font-fast-points-scaled', 'src', "src/scene/diff.c", '            add_point(d, (double)e.p[j].x / 64.0, (double)e.p[j].y / 64.0);', '            add_point(d, (double)e.p[j].x / 32.0, (double)e.p[j].y / 64.0);', ['testGlyph']),
+    ('df-font-general-box-units', 'src', "src/scene/diff.c", '    add_box(d, &map, (double)box.x_min / 64.0, (double)box.y_min / 64.0, (double)box.x_max / 64.0,', '    add_box(d, &map, (double)box.x_min, (double)box.y_min / 64.0, (double)box.x_max / 64.0,', ['testGlyph']),
 ]
 
 # The generated plants (tools/gen-scene-plants.py): the mutations of src/scene

@@ -39,7 +39,7 @@
  * | 5 | its program fails: `PROGRAM_FAILED` under `FONT`, `ERR_REFUSED` under `FONT_STRICT` |
  * | 6 | hinted with errors |
  * | 7 | no instructions: `NO_PROGRAM` even on a face with a program |
- * | 8 | many: a zigzag of 3000 lines (paths past a small scratch, such as the test sink's) |
+ * | 8 | many: a zigzag of 3000 lines, or of `zigzag` when that is set (3000 is past a small scratch, such as the test sink's) |
  * | 9 and up | unavailable: `ERR_INVALID` |
  *
  * The axis moves every x of glyphs 1 and 2 by `c / 4` 26.6 units (`c` the
@@ -84,12 +84,14 @@ typedef struct GSHSCENE_Test_Provider {
   uint32_t flags;     /**< Face flags (`GSHSCENE_FACE_HINTING`). */
   uint32_t max_ppem;  /**< What `face_info` states (0: the default). */
   int fail_info;      /**< Nonzero: `face_info` fails with `ERR_CORRUPT`. */
+  uint32_t zigzag;    /**< The lines of glyph 8 (0: ::GSHSCENE_TP_ZIGZAG). */
   GCU_Atomic_Size info_calls;
   GCU_Atomic_Size outline_calls;  /**< The general route. */
   GCU_Atomic_Size fast_calls;     /**< The fast tier. */
   GCU_Atomic_Size box_calls;
   GCU_Atomic_Size retains;
   GCU_Atomic_Size releases;
+  GCU_Atomic_Size last_hint_version; /**< The `hint_version` of the last fast-tier request. */
 } GSHSCENE_Test_Provider;
 
 /** One element of a test glyph: a verb (`M`, `L`, `Q`, `C`, `Z`) and its points, 26.6 design units. */
@@ -159,15 +161,17 @@ static inline const GSHSCENE_TP_Element * gshscene_tp_elements(uint32_t glyph, s
   }
 }
 
-/** Element @p i of glyph @p glyph (of @p count), from the tables or, for glyph 8, made: a move, 3000 lines, a close. */
-static inline GSHSCENE_TP_Element gshscene_tp_element(uint32_t glyph, size_t i, size_t * count) {
+/** Element @p i of glyph @p glyph (of @p count), from the tables or, for glyph 8, made: a move, the zigzag's lines, a close. */
+static inline GSHSCENE_TP_Element gshscene_tp_element(const GSHSCENE_Test_Provider * tp, uint32_t glyph, size_t i,
+    size_t * count) {
   GSHSCENE_TP_Element e;
   memset(&e, 0, sizeof e);
   if (glyph == 8) {
-    *count = GSHSCENE_TP_ZIGZAG + 2;
+    size_t lines = tp->zigzag ? tp->zigzag : GSHSCENE_TP_ZIGZAG;
+    *count = lines + 2;
     if (i == 0) {
       e.verb = 'M';
-    } else if (i <= GSHSCENE_TP_ZIGZAG) {
+    } else if (i <= lines) {
       e.verb = 'L';
       e.p[0] = GSHSCENE_TP_U((int32_t)i);
       e.p[1] = GSHSCENE_TP_U((int32_t)(i % 2u) * 700);
@@ -234,11 +238,11 @@ static inline GSHSCENE_Result gshscene_tp_outline(void * ctx, const GSHSCENE_Fac
     return failed;
   }
   size_t n = 0;
-  gshscene_tp_element(glyph, 0, &n);
+  gshscene_tp_element(tp, glyph, 0, &n);
   int32_t dx = gshscene_tp_shift(face, glyph);
   const unsigned b = GSHSCENE_GLYPH_OUTLINE_BITS;
   for (size_t i = 0; i < n; i++) {
-    GSHSCENE_TP_Element e = gshscene_tp_element(glyph, i, &n);
+    GSHSCENE_TP_Element e = gshscene_tp_element(tp, glyph, i, &n);
     const int32_t * p = e.p;
     GSHGEOM_Result r = GSHGEOM_OK;
     switch (e.verb) {
@@ -298,9 +302,15 @@ static inline GSHSCENE_Result gshscene_tp_device_path(void * ctx, const GSHSCENE
     const GSHSCENE_Glyph_Request * rq, GSHGEOM_Device_Path * out, GSHSCENE_Glyph_Answer * answer) {
   GSHSCENE_Test_Provider * tp = (GSHSCENE_Test_Provider *)ctx;
   gcu_atomic_size_fetch_add(&tp->fast_calls, 1);
+  gcu_atomic_size_store(&tp->last_hint_version, rq->hint_version);
   GSHSCENE_Result failed;
   if (gshscene_tp_fails(rq->glyph, &failed)) {
     return failed;
+  }
+  /* The request's scale is the seam's snapped scale of its size, or the request is not the seam's. */
+  int32_t scale = 0;
+  if (gshscene_glyph_scale(rq->ppem, tp->upem ? tp->upem : 2048u, &scale) != GSHSCENE_OK || rq->scale != scale) {
+    return GSHSCENE_ERR_INVALID;
   }
   int asks = rq->hint_mode != GSHSCENE_HINT_NONE;
   int strict = rq->hint_mode == GSHSCENE_HINT_FONT_STRICT;
@@ -321,10 +331,10 @@ static inline GSHSCENE_Result gshscene_tp_device_path(void * ctx, const GSHSCENE
     status = rq->glyph == 6 ? GSHSCENE_HINT_STATUS_WITH_ERRORS : GSHSCENE_HINT_STATUS_HINTED;
   }
   size_t n = 0;
-  gshscene_tp_element(rq->glyph, 0, &n);
+  gshscene_tp_element(tp, rq->glyph, 0, &n);
   int32_t dx = gshscene_tp_shift(face, rq->glyph);
   for (size_t i = 0; i < n; i++) {
-    GSHSCENE_TP_Element e = gshscene_tp_element(rq->glyph, i, &n);
+    GSHSCENE_TP_Element e = gshscene_tp_element(tp, rq->glyph, i, &n);
     const int32_t * p = e.p;
     GSHGEOM_Device_Point d[3];
     GSHGEOM_Result r = GSHGEOM_OK;
@@ -371,12 +381,12 @@ static inline GSHSCENE_Result gshscene_tp_box(void * ctx, const GSHSCENE_Face * 
     return failed;
   }
   size_t n = 0;
-  gshscene_tp_element(glyph, 0, &n);
+  gshscene_tp_element(tp, glyph, 0, &n);
   int32_t dx = gshscene_tp_shift(face, glyph);
   memset(out, 0, sizeof *out);
   out->empty = 1;
   for (size_t i = 0; i < n; i++) {
-    GSHSCENE_TP_Element e = gshscene_tp_element(glyph, i, &n);
+    GSHSCENE_TP_Element e = gshscene_tp_element(tp, glyph, i, &n);
     int k = e.verb == 'M' || e.verb == 'L' ? 1 : e.verb == 'Q' ? 2 : e.verb == 'C' ? 3 : 0;
     for (int j = 0; j < k; j++) {
       int32_t x = e.p[2 * j] + dx;
@@ -431,6 +441,7 @@ static inline void gshscene_tp_reset(GSHSCENE_Test_Provider * tp) {
   gcu_atomic_size_init(&tp->box_calls, 0);
   gcu_atomic_size_init(&tp->retains, 0);
   gcu_atomic_size_init(&tp->releases, 0);
+  gcu_atomic_size_init(&tp->last_hint_version, 0);
 }
 
 /** Intern a face of @p tp (key, index and one coordinate), bound with the fast tier or not; NULL on failure. */

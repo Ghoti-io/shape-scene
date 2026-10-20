@@ -661,8 +661,8 @@ static void scene_section(void) {
 
 /* --- glyphs (story 14a) -------------------------------------------------------------------------------- */
 
-static GSHSCENE_Test_Provider provider_program = {2048u, GSHSCENE_FACE_HINTING, 0, 0, {0}, {0}, {0}, {0}, {0}, {0}};
-static GSHSCENE_Test_Provider provider_plain = {1000u, 0, 0, 0, {0}, {0}, {0}, {0}, {0}, {0}};
+static GSHSCENE_Test_Provider provider_program = {2048u, GSHSCENE_FACE_HINTING, 0, 0, 0, {0}, {0}, {0}, {0}, {0}, {0}, {0}};
+static GSHSCENE_Test_Provider provider_plain = {1000u, 0, 0, 0, 0, {0}, {0}, {0}, {0}, {0}, {0}, {0}};
 
 /** A face of the test provider: @p which 0 (2048 units, a program, fast), 1 (1000, plain, fast), 2 (2048, no fast). */
 static const GSHSCENE_Resource * test_face(GSHSCENE_Store * store, unsigned which, int16_t coord) {

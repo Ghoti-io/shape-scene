@@ -671,6 +671,8 @@ TEST(GlyphRun, EveryForbiddenFieldIsRefusedAndNothingIsLeftBehind) {
   const GSHSCENE_Resource * r = nullptr;
   EXPECT_EQ(gshscene_store_intern_glyph_run(s.store, &fr0.run, nullptr), GSHSCENE_ERR_INVALID);
   EXPECT_EQ(gshscene_store_intern_glyph_run(nullptr, &fr0.run, &r), GSHSCENE_ERR_INVALID);
+  OutlineRun orun(sq.get(), sq.get());
+  EXPECT_EQ(gshscene_store_intern_glyph_run(nullptr, &orun.run, &r), GSHSCENE_ERR_INVALID) << "an outline run too";
   EXPECT_EQ(gshscene_store_intern_glyph_run(s.store, nullptr, &r), GSHSCENE_ERR_INVALID);
 
   GSHSCENE_Store_Stats after;

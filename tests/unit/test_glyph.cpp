@@ -46,8 +46,8 @@ struct Glyphs {
     return f;
   }
   const GSHSCENE_Resource * run(const GSHSCENE_Resource * f, std::vector<GSHSCENE_Glyph> glyphs, double size,
-      uint32_t mode = GSHSCENE_HINT_NONE) {
-    const GSHSCENE_Resource * r = intern_font_run(s.store, f, size, glyphs, mode);
+      uint32_t mode = GSHSCENE_HINT_NONE, uint32_t version = 0) {
+    const GSHSCENE_Resource * r = intern_font_run(s.store, f, size, glyphs, mode, version);
     held.push_back(r);
     return r;
   }
@@ -199,6 +199,33 @@ TEST(Face, EqualContentIsOneHandleAndTrailingZerosAreTheDefault) {
   EXPECT_EQ(gshscene_resource_bytes(fa.get()), 128u + 8u);
 }
 
+TEST(Face, TheCountOfCoordinatesIsContentEvenWhereTheHashesCollide) {
+  // Every content in one bucket: equality alone tells [100] from [100, 5], in either order.
+  for (int order = 0; order < 2; order++) {
+    StoreHolder s(nullptr, nullptr, all_zero);
+    int16_t one[1] = {100};
+    int16_t two[2] = {100, 5};
+    GSHSCENE_Face_Desc d{};
+    d.font_key = 7;
+    Ref a;
+    Ref b;
+    d.coord_count = order ? 2 : 1;
+    d.coords = order ? two : one;
+    ASSERT_EQ(gshscene_store_intern_face(s.store, &d, &a.resource), GSHSCENE_OK);
+    d.coord_count = order ? 1 : 2;
+    d.coords = order ? one : two;
+    ASSERT_EQ(gshscene_store_intern_face(s.store, &d, &b.resource), GSHSCENE_OK);
+    EXPECT_NE(a.get(), b.get()) << order;
+    int16_t other[2] = {100, 6};
+    d.coords = other;
+    d.coord_count = 2;
+    Ref c;
+    ASSERT_EQ(gshscene_store_intern_face(s.store, &d, &c.resource), GSHSCENE_OK);
+    EXPECT_NE(c.get(), a.get());
+    EXPECT_NE(c.get(), b.get());
+  }
+}
+
 TEST(Face, EveryBadDescriptionIsRefusedAndBuildsNothing) {
   Glyphs g;
   GSHSCENE_Store_Stats before;
@@ -321,6 +348,11 @@ TEST(Face, TheBindingIsRetainedOnceAndReleasedOnceAtTheLastRelease) {
   ASSERT_EQ(gshscene_face_binding(bound.get(), &ops, &ctx), GSHSCENE_OK);
   EXPECT_EQ(ctx, &tp);
   EXPECT_EQ(ops->glyph_device_path, nullptr) << "bound without the fast tier";
+  EXPECT_NE(dump_resource(bound.get()).find("\nbound=1 upem=1000 flags=0\n"), std::string::npos) << dump_resource(bound.get());
+  tp.flags = GSHSCENE_FACE_HINTING;
+  Ref hinting(gshscene_tp_face(s.store, &tp, 1, 11, 0));
+  EXPECT_NE(dump_resource(hinting.get()).find("\nbound=1 upem=1000 flags=1\n"), std::string::npos);
+  tp.flags = 0;
   Ref unbound(intern_face(s.store));
   EXPECT_EQ(gshscene_face_info(unbound.get(), &info), GSHSCENE_ERR_INVALID);
   EXPECT_EQ(gshscene_face_binding(unbound.get(), &ops, &ctx), GSHSCENE_ERR_INVALID);
@@ -509,6 +541,14 @@ TEST(GlyphRoute, EachRuleInItsOrder) {
       GSHSCENE_REASON_HINT_SIZE, "a product that only rounds to an integer");
   expect_route(route_of(g.run(fast, one, 0.5, GSHSCENE_HINT_FONT), id), GSHSCENE_GLYPH_GENERAL, H,
       GSHSCENE_REASON_HINT_SIZE, "below 1");
+  // Both factors with low halves: (1 - 2^-40)(1 + 2^-40) = 1 - 2^-80 rounds to 1, and only the product of the two low
+  // halves (2^-80) says so.
+  GSHGEOM_Map wide;
+  const double up = 1.0 + 0x1p-40;
+  gshgeom_map_scale(2, up, up, 1.0, &wide);
+  ASSERT_EQ((1.0 - 0x1p-40) * up, 1.0);
+  expect_route(route_of(g.run(fast, one, 1.0 - 0x1p-40, GSHSCENE_HINT_FONT), wide), GSHSCENE_GLYPH_GENERAL, H,
+      GSHSCENE_REASON_HINT_SIZE, "a product inexact by 2^-80");
   expect_route(route_of(g.run(fast, one, 4097, GSHSCENE_HINT_FONT), id), GSHSCENE_GLYPH_GENERAL, H,
       GSHSCENE_REASON_HINT_SIZE, "above 4096");
   r = route_of(g.run(fast, one, 4096, GSHSCENE_HINT_FONT), id);
@@ -870,6 +910,112 @@ TEST(GlyphNote, ALimitIsTheSinksOwnAndOutOfMemoryStopsTheRender) {
   EXPECT_EQ(box.y_max, 64 * 1501);
 }
 
+namespace {
+
+/** The test provider's fast tier, answering the status its context names past the test provider's. */
+uint32_t g_status = 0;
+GSHSCENE_Result status_device_path(void * ctx, const GSHSCENE_Face * face, const GSHSCENE_Glyph_Request * rq,
+    GSHGEOM_Device_Path * out, GSHSCENE_Glyph_Answer * answer) {
+  GSHSCENE_Result r = gshscene_tp_device_path(ctx, face, rq, out, answer);
+  answer->status = g_status;
+  return r;
+}
+
+}  // namespace
+
+TEST(GlyphNote, TheRequestCarriesTheRunsVersionAndTheSnappedScale) {
+  Glyphs g;
+  GSHGEOM_Map id = ident();
+  const GSHSCENE_Resource * run = g.run(g.face(1), {{1, 1.0, 1.0, nullptr}}, 16, GSHSCENE_HINT_FONT, 7);
+  GSHSCENE_Glyph_Route r = route_of(run, id);
+  ASSERT_EQ(r.route, (uint32_t)GSHSCENE_GLYPH_FAST);
+  GSHSCENE_Glyph_Origin o;
+  ASSERT_EQ(gshscene_glyph_origin(run, &id, 0, &o), GSHSCENE_OK);
+  GSHGEOM_Device_Path * p = nullptr;
+  GSHSCENE_Glyph_Note note;
+  ASSERT_EQ(gshscene_glyph_device_path(run, &r, 0, &o, nullptr, nullptr, &p, &note), GSHSCENE_OK);
+  ASSERT_NE(p, nullptr);
+  gshgeom_device_path_destroy(p);
+  EXPECT_EQ(gcu_atomic_size_load(&g.tp.last_hint_version), 7u) << "passed unread to the provider";
+  // The provider checks the scale against its ppem: a route whose scale is not the seam's is refused by it.
+  GSHSCENE_Glyph_Route off = r;
+  off.scale += 1;
+  ASSERT_EQ(gshscene_glyph_device_path(run, &off, 0, &o, nullptr, nullptr, &p, &note), GSHSCENE_OK);
+  EXPECT_EQ(p, nullptr);
+  EXPECT_EQ(note.entry_class, (uint32_t)GSHSCENE_ENTRY_REFUSED);
+  EXPECT_EQ(note.reason, (uint32_t)GSHSCENE_REASON_GLYPH_UNAVAILABLE);
+}
+
+TEST(GlyphNote, AStatusPastTheEnumRefusesTheGlyph) {
+  Glyphs g;
+  GSHSCENE_Glyph_Provider ops = *gshscene_tp_ops(1);
+  ops.glyph_device_path = status_device_path;
+  GSHSCENE_Face_Desc desc;
+  std::memset(&desc, 0, sizeof desc);
+  desc.font_key = 0x777;
+  desc.provider = &ops;
+  desc.ctx = &g.tp;
+  const GSHSCENE_Resource * face = nullptr;
+  ASSERT_EQ(gshscene_store_intern_face(g.s.store, &desc, &face), GSHSCENE_OK);
+  g.held.push_back(face);
+  GSHGEOM_Map id = ident();
+  for (uint32_t mode : {(uint32_t)GSHSCENE_HINT_FONT, (uint32_t)GSHSCENE_HINT_NONE}) {
+    const GSHSCENE_Resource * run = g.run(face, {{1, 1.0, 1.0, nullptr}}, 16, mode);
+    GSHSCENE_Glyph_Route r = route_of(run, id);
+    ASSERT_EQ(r.route, (uint32_t)GSHSCENE_GLYPH_FAST);
+    GSHSCENE_Glyph_Origin o;
+    ASSERT_EQ(gshscene_glyph_origin(run, &id, 0, &o), GSHSCENE_OK);
+    for (uint32_t status : {(uint32_t)GSHSCENE_HINT_STATUS_COUNT - 1u, (uint32_t)GSHSCENE_HINT_STATUS_COUNT, 0xFFFFFFFFu}) {
+      g_status = status;
+      tracker::Tracker t;
+      GSHGEOM_Allocator a = tracker::allocator_for(&t);
+      GSHGEOM_Device_Path * p = nullptr;
+      GSHSCENE_Glyph_Note note;
+      ASSERT_EQ(gshscene_glyph_device_path(run, &r, 0, &o, &a, nullptr, &p, &note), GSHSCENE_OK);
+      bool known = status < (uint32_t)GSHSCENE_HINT_STATUS_COUNT;
+      EXPECT_EQ(p != nullptr, known) << status << " mode " << mode;
+      EXPECT_EQ(note.entry_class, known ? (mode == GSHSCENE_HINT_NONE ? 0u : (uint32_t)GSHSCENE_ENTRY_HINT_STATUS)
+          : (uint32_t)GSHSCENE_ENTRY_REFUSED) << status << " mode " << mode;
+      EXPECT_EQ(note.reason, known ? (mode == GSHSCENE_HINT_NONE ? 0u : (uint32_t)GSHSCENE_REASON_HINT_WITH_ERRORS)
+          : (uint32_t)GSHSCENE_REASON_GLYPH_UNAVAILABLE) << status << " mode " << mode;
+      gshgeom_device_path_destroy(p);
+      EXPECT_TRUE(t.live.empty()) << status << " mode " << mode << ": a refused glyph's path is freed";
+    }
+  }
+  g_status = 0;
+}
+
+TEST(GlyphNote, ARefusedOrFailedGlyphLeavesNothingAllocated) {
+  Glyphs g;
+  GSHGEOM_Map id = ident();
+  // The fast tier: a glyph whose program fails under strict (its path is refused) and a corrupt glyph.
+  for (uint32_t glyph : {5u, 4u}) {
+    const GSHSCENE_Resource * run = g.run(g.face(1), {{glyph, 1.0, 1.0, nullptr}}, 16, GSHSCENE_HINT_FONT_STRICT);
+    GSHSCENE_Glyph_Route r = route_of(run, id);
+    GSHSCENE_Glyph_Origin o;
+    ASSERT_EQ(gshscene_glyph_origin(run, &id, 0, &o), GSHSCENE_OK);
+    tracker::Tracker t;
+    GSHGEOM_Allocator a = tracker::allocator_for(&t);
+    GSHGEOM_Device_Path * p = nullptr;
+    GSHSCENE_Glyph_Note note;
+    ASSERT_EQ(gshscene_glyph_device_path(run, &r, 0, &o, &a, nullptr, &p, &note), GSHSCENE_OK);
+    EXPECT_EQ(p, nullptr);
+    EXPECT_EQ(note.entry_class, (uint32_t)GSHSCENE_ENTRY_REFUSED) << glyph;
+    EXPECT_GT(t.calls, 0) << "the relative path was made";
+    EXPECT_TRUE(t.live.empty()) << glyph;
+  }
+  // The general route: a corrupt glyph's outline.
+  const GSHSCENE_Resource * run = g.run(g.face(1), {{4, 1.0, 1.0, nullptr}}, 16);
+  tracker::Tracker t;
+  GSHGEOM_Allocator a = tracker::allocator_for(&t);
+  GSHGEOM_Path * p = nullptr;
+  GSHSCENE_Glyph_Note note;
+  ASSERT_EQ(gshscene_glyph_outline(run, 0, &a, nullptr, &p, &note), GSHSCENE_OK);
+  EXPECT_EQ(p, nullptr);
+  EXPECT_GT(t.calls, 0);
+  EXPECT_TRUE(t.live.empty());
+}
+
 // --- damage --------------------------------------------------------------------------------------------------------
 
 TEST(GlyphDamage, ARunFromABoundFaceIsBoundedByWhatThePixelSinkDraws) {
@@ -921,6 +1067,107 @@ TEST(GlyphDamage, ARunFromABoundFaceIsBoundedByWhatThePixelSinkDraws) {
   EXPECT_EQ(damage.rect.x1, (int64_t)std::ceil(40.0 + 1501 * k + 1));
   EXPECT_EQ(damage.rect.y0, (int64_t)std::floor(3 * k - 1));
   EXPECT_EQ(damage.rect.y1, (int64_t)std::ceil(1021 * k + 1));
+}
+
+namespace {
+
+/** The damage of adding one node drawing @p run under @p map to an empty scene. */
+GSHSCENE_Damage damage_of_adding(SceneHolder & s, const GSHSCENE_Resource * run, const GSHGEOM_Map & map) {
+  GSHSCENE_Damage damage;
+  std::memset(&damage, 0, sizeof damage);
+  VersionRef v0;
+  EXPECT_EQ(gshscene_scene_current(s.scene, &v0.version), GSHSCENE_OK);
+  VersionRef v1;
+  {
+    EditHolder e(s);
+    GSHSCENE_Node n = shape_node(run);
+    n.map = map;
+    add(e.edit, GSHSCENE_ROOT_ID, n);
+    publish(s, e, &v1);
+  }
+  GSHSCENE_Diff * d = nullptr;
+  EXPECT_EQ(gshscene_diff(v0.get(), v1.get(), nullptr, nullptr, &d), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_diff_damage(d, &damage), GSHSCENE_OK);
+  gshscene_diff_destroy(d);
+  return damage;
+}
+
+}  // namespace
+
+TEST(GlyphDamage, AGlyphPastTheRangeIsUnboundedAndAnUnavailableOneAddsNothing) {
+  GSHSCENE_Test_Provider tp{};
+  tp.upem = 2048;
+  // The fast tier: an origin past 26.6.
+  {
+    SceneHolder s;
+    Ref face(gshscene_tp_face(s.store(), &tp, 1, 0x51, 0));
+    Ref run(intern_font_run(s.store(), face.get(), 16, {{1, 1.0e12, 0.0, nullptr}}, GSHSCENE_HINT_NONE));
+    EXPECT_EQ(damage_of_adding(s, run.get(), translate(0.0, 0.0)).unbounded, 1);
+  }
+  // The general route: a design scale that underflows to zero.
+  {
+    SceneHolder s;
+    Ref face(gshscene_tp_face(s.store(), &tp, 1, 0x51, 0));
+    Ref run(intern_font_run(s.store(), face.get(), 5.0e-324, {{1, 0.0, 0.0, nullptr}}, GSHSCENE_HINT_NONE));
+    ASSERT_NE(run.get(), nullptr);
+    EXPECT_EQ(damage_of_adding(s, run.get(), rotation(90)).unbounded, 1);
+  }
+  // The general route: a glyph the provider has no box for adds nothing, wherever it is.
+  GSHSCENE_Damage alone;
+  GSHSCENE_Damage with;
+  {
+    SceneHolder s;
+    Ref face(gshscene_tp_face(s.store(), &tp, 1, 0x51, 0));
+    Ref run(intern_font_run(s.store(), face.get(), 16, {{1, 0.0, 0.0, nullptr}}, GSHSCENE_HINT_NONE));
+    alone = damage_of_adding(s, run.get(), rotation(90));
+  }
+  {
+    SceneHolder s;
+    Ref face(gshscene_tp_face(s.store(), &tp, 1, 0x51, 0));
+    Ref run(intern_font_run(s.store(), face.get(), 16, {{1, 0.0, 0.0, nullptr}, {4, 200.0, 300.0, nullptr}},
+        GSHSCENE_HINT_NONE));
+    with = damage_of_adding(s, run.get(), rotation(90));
+  }
+  EXPECT_EQ(alone.unbounded, 0);
+  EXPECT_EQ(alone.empty, 0);
+  EXPECT_EQ(with.unbounded, 0);
+  EXPECT_EQ(with.rect.x0, alone.rect.x0);
+  EXPECT_EQ(with.rect.y0, alone.rect.y0);
+  EXPECT_EQ(with.rect.x1, alone.rect.x1);
+  EXPECT_EQ(with.rect.y1, alone.rect.y1);
+}
+
+TEST(GlyphDamage, TheFastTiersPathsComeFromTheScenesAllocatorAndAreFreed) {
+  tracker::Tracker t;
+  GSHSCENE_Allocator a = tracker::allocator_for(&t);
+  {
+    GSHSCENE_Test_Provider tp{};
+    tp.upem = 2048;
+    SceneHolder s(nullptr, &a);
+    Ref face(gshscene_tp_face(s.store(), &tp, 1, 0x51, 0));
+    std::vector<GSHSCENE_Glyph> glyphs;
+    for (int i = 0; i < 50; i++) {
+      glyphs.push_back(GSHSCENE_Glyph{2, 3.0 * i, 20.0, nullptr});
+    }
+    Ref run(intern_font_run(s.store(), face.get(), 16, glyphs, GSHSCENE_HINT_NONE));
+    VersionRef v0;
+    ASSERT_EQ(gshscene_scene_current(s.scene, &v0.version), GSHSCENE_OK);
+    VersionRef v1;
+    {
+      EditHolder e(s);
+      add(e.edit, GSHSCENE_ROOT_ID, shape_node(run.get()));
+      publish(s, e, &v1);
+    }
+    size_t live = t.live.size();
+    long calls = t.calls;
+    GSHSCENE_Diff * d = nullptr;
+    ASSERT_EQ(gshscene_diff(v0.get(), v1.get(), nullptr, nullptr, &d), GSHSCENE_OK);
+    gshscene_diff_destroy(d);
+    EXPECT_GE(t.calls - calls, 50) << "a device path per glyph, from the scene's allocator";
+    EXPECT_EQ(t.live.size(), live) << "and each one freed";
+    EXPECT_EQ(gcu_atomic_size_load(&tp.fast_calls), 50u);
+  }
+  EXPECT_TRUE(t.live.empty());
 }
 
 int main(int argc, char ** argv) {
