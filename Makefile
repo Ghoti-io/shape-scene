@@ -291,7 +291,7 @@ TESTFLAGS := `PKG_CONFIG_PATH=$(PKG_CONFIG_LOOKUP_PATH) pkg-config --libs --cfla
 # check-symbols is right to reject in a shipping library.
 PLANT_JOBS ?= 4
 
-TEST_GATES ?= check-symbols check-aliasing check-stamps check-fp-contract check-edges check-libm check-no-x87 check-gates check-float-free check-vectors check-sink-vectors check-composite check-corpus-hash check-publish-types check-fuzz-corpus fuzz-replay examples
+TEST_GATES ?= check-symbols check-aliasing check-stamps check-fp-contract check-edges check-libm check-no-x87 check-gates check-float-free check-vectors check-sink-vectors check-composite check-corpus-hash check-publish-types check-fuzz-corpus fuzz-replay run-examples
 
 VALGRIND_FLAGS := --leak-check=full --show-leak-kinds=definite,indirect,possible --track-origins=yes --error-exitcode=1 --suppressions=tests/valgrind.supp
 
@@ -408,6 +408,7 @@ $(APP_DIR)/examples/%$(EXE_EXTENSION): examples/%.c $(APP_DIR)/$(STATIC_TARGET) 
 	$(CC) $(CFLAGS) $(INCLUDE) -o $@ $< $(LDFLAGS) $(SELF_LIBRARY) $(DEP_LIBS)
 
 .PHONY: clean cloc docs docs-pdf examples coverage check-symbols check-stamps check-aliasing
+.PHONY: run-examples
 .PHONY: check-fp-contract check-edges check-libm check-no-x87 check-gates libver-gen
 .PHONY: check-vectors check-sink-vectors check-composite check-corpus-hash check-planted check-publish-types check-fuzz-corpus fuzz-replay
 .PHONY: all install test test-quiet test-asan test-valgrind test-valgrind-quiet test-watch uninstall watch
@@ -427,6 +428,13 @@ test-watch: ## Watch sources and rerun the tests
 		done
 
 examples: $(APP_DIR)/$(TARGET) $(EXAMPLES) ## Build the examples
+
+# Every example is run, not only compiled (story 16): one that is only compiled rots unseen, its calls still linking
+# while what it claims stops being true. Each example checks what it shows and exits non-zero when that does not
+# hold; tools/run-examples.sh first shows itself failing on planted examples, then runs these. A target that runs a
+# built program sets LD_LIBRARY_PATH (CONVENTIONS section 6).
+run-examples: $(EXAMPLES) ## Build and run every example; fail on one that exits non-zero
+	@LD_LIBRARY_PATH="$(TEST_LD_PATH)" sh tools/run-examples.sh $(BUILD_DIR)/examples-out $(EXAMPLES)
 
 # The dependencies' library directories, from the -L words pkg-config gave, so
 # a test run finds them when they are installed in a prefix of their own.
