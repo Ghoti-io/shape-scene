@@ -150,6 +150,49 @@ changes no result, cannot be seen by any test:
   - the ``fill_rule``, paint-kind and ``memset`` of ``item_init``: each is the
     zero the ``memset`` wrote already (a nonzero rule, kind or space is set
     afterwards by the caller)
+
+  sk-, rp-, ds-, cn-, rule-, and the sink's hdr- and core- plants (story 13a)
+               the sink contract: one named plant per S-rule (``rule-S1`` to
+               ``rule-S15``, each failing the conformance suite or the contract's
+               own tests), its pinned values and constants, and every generated
+               mutation of src/sink the sweep caught (tools/sink-plants.json, from
+               ``gen-scene-plants.py --sink``: 1295 candidates on the final tree,
+               999 caught, 194 that do not compile dropped).  The 103 survivors are
+               of these kinds, none a result a caller can see:
+
+  - the locks of the sink's busy table and of the test sink's pending runs and
+    cache (``GCU_MUTEX_LOCK``/``DESTROY`` deleted), and a loop bound moved one
+    past the end of a table allocated to its full size (a read of a NULL slot):
+    TSan and ASan see them, a result does not
+  - frees on paths no test can reach: a cutil mutex that cannot fail to be made,
+    a walk that cannot fail to start on memory sized for it; and the
+    ``SIZE_MAX / sizeof`` overflow guards (2^61 jobs)
+  - ties made unequal or equal where the two sides agree: ``max``/``min`` of
+    equal values (box, rectangle, work and frame peaks), the report's growth to
+    its cap, a sort key that two entries never share (one item is refused or
+    approximated once, a unit is the first of at most one tie), and the
+    order-of-addition key of entries equal in every field
+  - stores the next statement or the allocator already made: a ``memset`` of caps
+    every sink fills, the job's per-sink fields at ``begin`` (a sink sets them
+    before it reads them), a box's corners when it is empty (never read), the
+    walk's pending step at its end, the failure chain's room in the pool
+  - guards a valid input cannot reach: an encoding past the enum (the kind's own
+    check refuses it), a raster of zero width (``image`` refuses to make one),
+    the walk's level guard (it is sized for the deepest picture), the empty
+    rectangle met with the area inside ``stamp`` (every caller has met it with a
+    clip inside the area already), the skipped unit's ``X`` text (the refusal
+    that began the skip left the same text in the line), the low clamp of a box
+    edge (the conversion of a value below the ``int32_t`` range gives
+    ``INT32_MIN`` on every target, which is the clamp)
+  - the workspace's terms (``Run``, the walk, the stop chain): each is smaller
+    than the 320-byte line buffer at the end of the carving, which no record
+    fills, so a missing term moves no write past the end (the conformance suite's
+    canary is 4096 bytes after the workspace)
+  - the 16-digit width of a hash that has no leading zero digit in any fixture
+    (an instance's picture, a report's own hash)
+  - ``r.target = &copy`` in the workspace query: the test sink's need does not
+    depend on the target; resolving past the chain (a read of the pool's next
+    index into the caller's path), which only ASan sees
 """
 
 import concurrent.futures
@@ -1103,22 +1146,89 @@ PLANTS += [
 
 ]
 
+# The sink contract (story 13a): its constants and pinned values, and one named plant per S-rule that a violation of
+# the rule in the contract layer or the test sink must fail the conformance suite on.  The branches of src/sink are
+# also mutated one by one by the generator (tools/sink-plants.json, below).
+SK = "src/sink/sink.c"
+RP = "src/sink/report.c"
+DS = "src/sink/dump_sink.c"
+HS = "include/ghoti.io/shape-scene/sink.h"
+HRP = "include/ghoti.io/shape-scene/report.h"
+SINKT = ["testDump_sink", "testSink", "testReport"]
+PLANTS += [
+    ('core-string-cancelled', 'src', CO, '      return "cancelled";', '      return "refused";', C),
+    ('core-default-report-entries', 'src', CO, 'limits->max_report_entries = GSHSCENE_LIMITS_DEFAULT_MAX_REPORT_ENTRIES;', 'limits->max_report_entries = GSHSCENE_LIMITS_DEFAULT_MAX_REPORT_ENTRIES + 1;', C),
+    ('core-default-jobs', 'src', CO, 'limits->max_jobs = GSHSCENE_LIMITS_DEFAULT_MAX_JOBS;', 'limits->max_jobs = GSHSCENE_LIMITS_DEFAULT_MAX_JOBS - 1;', C),
+    ('hdr-result-cancelled-order', 'hdr', HC, '  GSHSCENE_ERR_REFUSED,\n  /** The render\'s cancel token was set (sink.h, S7): the target holds the finished work, a prefix of paint order. */\n  GSHSCENE_ERR_CANCELLED,', '  GSHSCENE_ERR_CANCELLED,\n  GSHSCENE_ERR_REFUSED,', C),
+    ('hdr-default-report-entries', 'hdr', HC, '#define GSHSCENE_LIMITS_DEFAULT_MAX_REPORT_ENTRIES ((size_t)1 << 16)', '#define GSHSCENE_LIMITS_DEFAULT_MAX_REPORT_ENTRIES ((size_t)1 << 15)', C),
+    ('hdr-default-jobs', 'hdr', HC, '#define GSHSCENE_LIMITS_DEFAULT_MAX_JOBS ((size_t)64)', '#define GSHSCENE_LIMITS_DEFAULT_MAX_JOBS ((size_t)63)', C),
+    ('hdr-entry-classes', 'hdr', HRP, '  GSHSCENE_ENTRY_APPROXIMATED = 2,', '  GSHSCENE_ENTRY_APPROXIMATED = 6,', ['testReport']),
+    ('hdr-reasons', 'hdr', HRP, '  GSHSCENE_REASON_SEAMLESS = 7,', '  GSHSCENE_REASON_SEAMLESS = 17,', ['testReport']),
+    ('hdr-target-kinds', 'hdr', HS, '  GSHSCENE_TARGET_STREAM = 2,', '  GSHSCENE_TARGET_STREAM = 5,', SINKT),
+    ('hdr-seamless', 'hdr', HS, '#define GSHSCENE_TARGET_SEAMLESS (UINT32_C(1) << 0)', '#define GSHSCENE_TARGET_SEAMLESS (UINT32_C(1) << 3)', SINKT),
+    ('hdr-render-strict', 'hdr', HS, '#define GSHSCENE_RENDER_STRICT (UINT32_C(1) << 0)', '#define GSHSCENE_RENDER_STRICT (UINT32_C(1) << 2)', SINKT),
+    ('hdr-cap-flags', 'hdr', HS, '#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 8) - 1)', '#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 7) - 1)', SINKT),
+    ('hdr-cancel-units', 'hdr', HS, '  GSHSCENE_CANCEL_BEFORE_SUBMIT = 2,', '  GSHSCENE_CANCEL_BEFORE_SUBMIT = 3,', SINKT),
+    ('rp-tag', 'src', RP, '#define REPORT_TAG UINT32_C(0x54525052)', '#define REPORT_TAG UINT32_C(0x54525053)', ['testDump_sink']),
+    ('rp-format', 'src', RP, '#define REPORT_FORMAT 1u', '#define REPORT_FORMAT 2u', ['testDump_sink']),
+    ('ds-format', 'src', DS, '#define DUMP_FORMAT 1u', '#define DUMP_FORMAT 2u', ['testDump_sink']),
+    ('ds-line-bytes', 'src', DS, '#define LINE_BYTES 320u', '#define LINE_BYTES 48u', ['testDump_sink']),
+    ('ds-edge-high', 'src', DS, '#define EDGE_HIGH 2147483647.0', '#define EDGE_HIGH 16.0', ['testDump_sink']),
+    ('ds-edge-low', 'src', DS, '#define EDGE_LOW (-2147483648.0)', '#define EDGE_LOW (16.0)', ['testDump_sink']),
+    # One per rule.
+    ('rule-S1-flags', 'src', SK, '(request->flags & ~GSHSCENE_RENDER_FLAGS_ALL) ||', '', SINKT),
+    ('rule-S1-reserved', 'src', SK, '      !bytes_zero(request->_reserved, sizeof request->_reserved) ||', '', SINKT),
+    ('rule-S2-caps-checked', 'src', SK, '  if ((c.flags & ~GSHSCENE_CAP_FLAGS_ALL) || c.cancel_unit == 0', '  if (0 || c.cancel_unit == 0', ['testSink']),
+    ('rule-S3-busy', 'src', SK, '    if (sink->busy[i] == surface) {\n      result = GSHSCENE_ERR_INVALID;', '    if (0) {\n      result = GSHSCENE_ERR_INVALID;', SINKT),
+    ('rule-S3-max-jobs', 'src', SK, '    if (free_slot == sink->max_jobs) {\n      result = GSHSCENE_ERR_LIMIT;', '    if (0) {\n      result = GSHSCENE_ERR_LIMIT;', SINKT),
+    ('rule-S3-done-before-callback', 'src', SK, '  if (job->request.on_complete) {\n    job->request.on_complete(job->request.on_complete_ctx, job, result);\n  }\n  gcu_atomic_int_store(&job->state, GSHSCENE_JOB_DONE);', '  gcu_atomic_int_store(&job->state, GSHSCENE_JOB_DONE);\n  if (job->request.on_complete) {\n    job->request.on_complete(job->request.on_complete_ctx, job, result);\n  }', SINKT),
+    ('rule-S3-report-busy', 'src', SK, '  if (!gcu_atomic_int_compare_exchange(&request->report->busy, &idle, 1)) {', '  if (!gcu_atomic_int_compare_exchange(&request->report->busy, &idle, 0)) {', SINKT),
+    ('rule-S4-damage', 'src', DS, '    run->area = target->damage ? rect_meet(target->extent, *target->damage) : target->extent;', '    run->area = target->extent;', SINKT),
+    ('rule-S4-pixel-fields', 'src', SK, '        target->encoding != GSHSCENE_ENCODING_SOFTWARE || !rect_zero(&target->extent) || target->damage) {', '        target->encoding != GSHSCENE_ENCODING_SOFTWARE) {', SINKT),
+    ('rule-S4-undescribed-srgb', 'src', SK, '    resolved.transfer = GCOL_TRANSFER_SRGB; /* the gamma', '    resolved.transfer = GCOL_TRANSFER_LINEAR; /* the gamma', SINKT),
+    ('rule-S5-sorted', 'src', RP, '  if (report->count > 1) {\n    qsort(', '  if (report->count > 1000000) {\n    qsort(', SINKT),
+    ('rule-S5-cap', 'src', RP, '  if (result == GSHSCENE_OK && report->summary.overflowed) {', '  if (0) {', SINKT),
+    ('rule-S6-strict', 'src', SK, '  if (refused && (request->flags & GSHSCENE_RENDER_STRICT)) {', '  if (0) {', SINKT),
+    ('rule-S6-skip-block', 'src', SK, '      (*refused)++;\n      gshscene_skip_begin(&skip, item, count);', '      (*refused)++;', SINKT),
+    ('rule-S6-ties', 'src', SK, '  result = plan_ties(report, list, key, 1); /* plan_ties writes key[0] */', '  result = GSHSCENE_OK;', SINKT),
+    ('rule-S7-first-check', 'src', SK, '  if (gshscene_job_checkpoint(job)) {\n    return end_early(job, GSHSCENE_ERR_CANCELLED', '  if (0) {\n    return end_early(job, GSHSCENE_ERR_CANCELLED', SINKT),
+    ('rule-S7-unit-check', 'src', SK, '  if (job->caps.cancel_unit == GSHSCENE_CANCEL_BETWEEN_UNITS) {\n    return gshscene_job_checkpoint(job);', '  if (job->caps.cancel_unit == GSHSCENE_CANCEL_BEFORE_SUBMIT) {\n    return gshscene_job_checkpoint(job);', SINKT),
+    ('rule-S7-progress-first', 'src', SK, '  if (job->request.progress) {\n    job->request.progress(job->request.progress_ctx, job, units_processed);\n  }\n  if (job->caps.cancel_unit', '  int planted = job->caps.cancel_unit == GSHSCENE_CANCEL_BETWEEN_UNITS && gshscene_job_checkpoint(job);\n  if (job->request.progress) {\n    job->request.progress(job->request.progress_ctx, job, units_processed);\n  }\n  if (job->caps.cancel_unit == GSHSCENE_CANCEL_BETWEEN_UNITS) {\n    return planted;\n  }\n  if (job->caps.cancel_unit', SINKT),
+    ('rule-S7-work-max', 'src', SK, '  if (job->work > job->work_max) {\n    job->work_max = job->work;\n  }\n  job->work = 0;\n  return gshscene_cancel_is_set', '  job->work = 0;\n  return gshscene_cancel_is_set', SINKT),
+    ('rule-S7-open-group-done', 'src', DS, '    if (run->groups_open == 0) {\n      run->done = run->processed;', '    if (1) {\n      run->done = run->processed;', SINKT),
+    ('rule-S7-open-group-stamped', 'src', DS, '  Block * g = innermost_group(run);\n  if (!g) {\n    stamp(run, r, mark, failed);\n    return;\n  }', '  Block * g = NULL;\n  if (!g) {\n    stamp(run, r, mark, failed);\n    return;\n  }', SINKT),
+    ('rule-S8-seamless', 'src', SK, '  if (copy.flags & GSHSCENE_TARGET_SEAMLESS) {', '  if (0) {', SINKT),
+    ('rule-S9-workspace-size', 'src', SK, '    if (request->workspace_bytes < need) {', '    if (request->workspace_bytes + 1 < need) {', SINKT),
+    ('rule-S9-caller-memory-cap', 'src', SK, '    if (!(caps.flags & GSHSCENE_CAP_CALLER_MEMORY) || !sink->ops.workspace_bytes) {', '    if (!sink->ops.workspace_bytes) {', SINKT),
+    ('rule-S9-allocates', 'src', DS, '  if (request->flags & GSHSCENE_RENDER_CALLER_MEMORY) {\n    base = request->workspace;', '  if (0) {\n    base = request->workspace;', SINKT),
+    ('rule-S10-evict-keeps', 'src', DS, '  GCU_MUTEX_UNLOCK(ds->lock);\n  gshscene_resource_release(released);', '  GCU_MUTEX_UNLOCK(ds->lock);', SINKT),
+    ('rule-S10-destroy-keeps', 'src', DS, '  for (size_t i = 0; i < ds->cache_count; i++) {\n    gshscene_resource_release(ds->cache[i].resource);\n  }', '', SINKT),
+    ('rule-S13-wait-blocks', 'src', SK, '  if (!(job->caps.flags & GSHSCENE_CAP_CAN_BLOCK)) {\n    return GSHSCENE_ERR_UNSUPPORTED;\n  }\n  if (!thread_ok(sink, &job->caps))', '  if (!thread_ok(sink, &job->caps))', SINKT),
+    ('rule-S13-render-blocks', 'src', SK, '  if (!(caps.flags & GSHSCENE_CAP_CAN_BLOCK)) {\n    return GSHSCENE_ERR_UNSUPPORTED;\n  }\n  GSHSCENE_Job job;', '  GSHSCENE_Job job;', SINKT),
+    ('rule-S14-affinity', 'src', SK, '  return !(caps->flags & GSHSCENE_CAP_THREAD_AFFINE) || gshscene_thread_token() == sink->creator;', '  return sink != NULL || caps != NULL;', SINKT),
+    ('rule-S15-readback-format', 'src', SK, '      !want || !have || !format_equal(want, have)) {', '      !want || !have) {', SINKT),
+    ('rule-S15-readback-cap', 'src', SK, '  if (!(job->caps.flags & GSHSCENE_CAP_READBACK) || !sink->ops.readback) {', '  if (!sink->ops.readback) {', SINKT),
+]
+
 # The generated plants (tools/gen-scene-plants.py): the mutations of src/scene
 # the sweep was seen to catch.  PLANT_EXTRA_JSON names another file to run
 # in addition, which is how a regenerated candidate list is triaged.
 import json
-for _file in [str(ROOT / "tools" / "scene-plants.json")] + (
+for _file in [str(ROOT / "tools" / "scene-plants.json"), str(ROOT / "tools" / "sink-plants.json")] + (
         [os.environ["PLANT_EXTRA_JSON"]] if os.environ.get("PLANT_EXTRA_JSON") else []):
     with open(_file) as _f:
         PLANTS += [tuple(x) for x in json.load(_f)]
 
 
-def run(cmd, shell=False, env_extra=None, cwd=None):
+def run(cmd, shell=False, env_extra=None, cwd=None, timeout=None, limits=None):
     environment = dict(os.environ)
     if env_extra:
         environment.update(env_extra)
-    return subprocess.run(cmd, shell=shell, capture_output=True, text=True,
-                          env=environment, cwd=cwd or ROOT)
+    try:
+        return subprocess.run(cmd, shell=shell, capture_output=True, text=True,
+                              env=environment, cwd=cwd or ROOT, timeout=timeout, preexec_fn=limits)
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(cmd, 124, "", "timed out after %ss" % timeout)
 
 
 def compile_all(destdir, srcs, extra=(), pre=()):
@@ -1168,20 +1278,21 @@ def probe_hash(objs, d, extra=()):
     r = run(cmd, shell=True)
     if r.returncode != 0:
         raise RuntimeError("cannot build the probe:\n%s" % r.stderr)
+    # A planted defect can make the probe loop: it is bounded like a test (the sink stories' walks made this real).
     c = run(["tools/check-corpus-hash.sh", str(exe), "tests/corpus/scene.hash"],
-            env_extra={"LD_LIBRARY_PATH": LD_PATH})
+            env_extra={"LD_LIBRARY_PATH": LD_PATH}, timeout=180, limits=_limits)
     return c.returncode, (c.stdout + c.stderr).strip()
 
 
-def replay_run(objs, d):
-    """The fuzz replay over the committed corpus, built against the planted objects."""
-    exe = d / "replay"
-    cmd = "%s -o %s tests/fuzz/fuzz_record.c tests/fuzz/replay_main.c %s %s" % (
-        " ".join(CC + PROBE_CFLAGS), exe, " ".join(objs), PROBE_LIBS)
+def replay_run(objs, d, target="record"):
+    """A fuzz replay (fuzz_record or fuzz_render) over its committed corpus, built against the planted objects."""
+    exe = d / ("replay-" + target)
+    cmd = "%s -o %s tests/fuzz/fuzz_%s.c tests/fuzz/replay_main.c %s %s" % (
+        " ".join(CC + PROBE_CFLAGS), exe, target, " ".join(objs), PROBE_LIBS)
     r = run(cmd, shell=True)
     if r.returncode != 0:
         raise RuntimeError("cannot build the replay:\n%s" % r.stderr)
-    inputs = sorted(str(p) for p in (ROOT / "tests" / "fuzz" / "corpus").rglob("*") if p.is_file())
+    inputs = sorted(str(p) for p in (ROOT / "tests" / "fuzz" / "corpus" / target).rglob("*") if p.is_file())
     environment = dict(os.environ)
     environment["LD_LIBRARY_PATH"] = LD_PATH
     try:
@@ -1294,6 +1405,9 @@ def do_plant(plant, control_objs):
         if test == "fuzz-replay":
             rc, msg = replay_run(objs, d)
             failing = [msg]
+        elif test == "fuzz-render":
+            rc, msg = replay_run(objs, d, "render")
+            failing = [msg]
         elif test == "probe":
             rc, msg = probe_hash(objs, d)
             failing = [msg]
@@ -1326,10 +1440,11 @@ def main():
     if rc != 0:
         print("FAIL  control: the probe does not print the committed hash: %s" % msg)
         return 1
-    rc, msg = replay_run(control, WORK)
-    if rc != 0:
-        print("FAIL  control: the fuzz replay fails on the unplanted build: %s" % msg)
-        return 1
+    for target in ("record", "render"):
+        rc, msg = replay_run(control, WORK, target)
+        if rc != 0:
+            print("FAIL  control: the %s fuzz replay fails on the unplanted build: %s" % (target, msg))
+            return 1
     print("ok    control: %d tests, the probe and the fuzz replay pass on the unplanted build" % len(TESTS))
 
     ids = [p[0] for p in PLANTS]
@@ -1346,12 +1461,19 @@ def main():
     with concurrent.futures.ThreadPoolExecutor(max_workers=JOBS) as pool:
         futures = {pool.submit(do_plant, p, control): p for p in plants}
         results = {}
-        for fut in concurrent.futures.as_completed(futures):
+        for done, fut in enumerate(concurrent.futures.as_completed(futures), 1):
             p = futures[fut]
             try:
                 results[p[0]] = fut.result()[1]
             except Exception as e:  # a plant that cannot be built is a defect of the harness
                 results[p[0]] = e
+            # Progress, as each plant ends, so a run cut short still says how far it got and what it found.
+            r = results[p[0]]
+            sys.stderr.write("[%d/%d] %s %s\n" % (done, len(plants), p[0],
+                             "error" if isinstance(r, Exception) else ("caught" if r else "NOT CAUGHT")))
+            sys.stderr.flush()
+            if r and not isinstance(r, Exception):
+                shutil.rmtree(WORK / p[0], ignore_errors=True)
     for p in plants:
         r = results[p[0]]
         if isinstance(r, Exception):

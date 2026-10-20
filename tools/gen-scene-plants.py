@@ -24,7 +24,13 @@ edit that moves a line means regenerating and re-running the sweep:
   python3 tools/gen-scene-plants.py > /tmp/candidates.json
   PLANT_EXTRA_JSON=/tmp/candidates.json make check-planted PREFIX=...
 
-then keep the lines the sweep reports as ok."""
+then keep the lines the sweep reports as ok.
+
+With --sink it writes the candidates of the sink contract's sources (story 13a, src/sink) instead, for
+tools/sink-plants.json:
+
+  python3 tools/gen-scene-plants.py --sink > /tmp/sink-candidates.json
+  PLANT_EXTRA_JSON=/tmp/sink-candidates.json PLANT_ONLY='^(sk|rp|ds|cn)-' make check-planted PREFIX=..."""
 import json, re, sys
 from pathlib import Path
 
@@ -69,6 +75,14 @@ TESTS_BY_FILE = {
     "src/scene/emit.c": ["testEmit", "testScene_limits", "testVersion", "testDiff", "testOrder", "testPaint_scene"],
     "src/scene/diff.c": ["testDiff", "testScene", "testVersion", "testPaint_scene"],
 }
+
+SINK_FILES = {
+    "src/sink/sink.c": "sk",
+    "src/sink/report.c": "rp",
+    "src/sink/dump_sink.c": "ds",
+    "src/sink/cancel.c": "cn",
+}
+SINK_TESTS = ["testDump_sink", "testSink", "testReport", "fuzz-render", "probe"]
 
 REL = [("==", "!="), ("!=", "=="), ("<=", "<"), (">=", ">"), ("<", "<="), (">", ">=")]
 
@@ -201,8 +215,8 @@ def candidates(path):
                 f = unique_fragment(raw, a, a + 1, new_ch)
                 if f:
                     out.append((no, "str", f[0], f[1]))
-            for m in re.finditer(r"%016llx", raw):
-                f = unique_fragment(raw, m.start(), m.end(), "%llx")
+            for m in re.finditer(r"%016llx|%016|%08" if path in SINK_FILES else r"%016llx", raw):
+                f = unique_fragment(raw, m.start(), m.end(), "%llx" if m.group(0) == "%016llx" else "%")
                 if f:
                     out.append((no, "wd", f[0], f[1]))
         # swap returned results
@@ -215,13 +229,19 @@ def candidates(path):
     return out
 
 
-STRING_FILES = {"src/scene/version.c", "src/scene/validate.c", "src/scene/node.c", "src/list/list.c"}
+STRING_FILES = {"src/scene/version.c", "src/scene/validate.c", "src/scene/node.c", "src/list/list.c",
+                "src/sink/report.c", "src/sink/dump_sink.c", "src/sink/sink.c"}
 
 
 def main():
     plants = []
-    allfiles = dict(FILES)
-    allfiles.update(EXTRA)
+    if "--sink" in sys.argv:
+        allfiles = dict(SINK_FILES)
+        for path in SINK_FILES:
+            TESTS_BY_FILE[path] = SINK_TESTS
+    else:
+        allfiles = dict(FILES)
+        allfiles.update(EXTRA)
     for path, tag in allfiles.items():
         seen = {}
         for no, kind, frag, new in candidates(path):
