@@ -794,6 +794,15 @@ LDCONF_INSTALL_PATH ?= /etc/ld.so.conf.d
 PC_REQUIRES := $(DEP_PCS)
 PKGCONFIG_INSTALL_PATH ?= $(PC_INSTALL_PATH)
 
+# What a sink library's tests take from this one (story 13b): the conformance
+# suite every sink passes unchanged, the allocator it counts with, and the
+# oracle's composite vectors a compositing sink is gated against. Installed as
+# <ghoti.io/shape-scene/testing/...>, so a sink finds them the way it finds
+# everything else of this library, through pkg-config, and runs the very text
+# this library's own tests run. They are C++ (GoogleTest) and only a test
+# includes them.
+TESTING_HEADERS := tests/sink_conformance.h tests/alloc_tracker.h tests/composite_vectors.h
+
 install: all ## Install the library
 	@mkdir -p $(LIB_INSTALL_PATH)/$(SUITE)
 ifeq ($(OS_NAME), Linux)
@@ -816,6 +825,8 @@ endif
 	@if [ -d $(GEN_DIR)/ghoti.io ]; then \
 		cp -r $(GEN_DIR)/ghoti.io $(INCLUDE_INSTALL_PATH)/$(SUITE)/$(PROJECT)$(BRANCH)/ ; \
 	fi
+	@mkdir -p $(INCLUDE_INSTALL_PATH)/$(SUITE)/$(PROJECT)$(BRANCH)/ghoti.io/$(PROJECT)/testing
+	@cp $(TESTING_HEADERS) $(INCLUDE_INSTALL_PATH)/$(SUITE)/$(PROJECT)$(BRANCH)/ghoti.io/$(PROJECT)/testing/
 	@mkdir -p $(PKGCONFIG_INSTALL_PATH)
 	@cat pkgconfig/$(SUITE)-$(PROJECT).pc | sed 's/(SUITE)/$(SUITE)/g; s/(PROJECT)/$(PROJECT)/g; s/(BRANCH)/$(BRANCH)/g; s/(VERSION)/$(VERSION)/g; s|(PC_LIB_DIR)|$(PC_LIB_DIR)|g; s|(PC_INCLUDE_DIR)|$(PC_INCLUDE_DIR)|g; s|(REQUIRES)|$(PC_REQUIRES)|g' > $(PKGCONFIG_INSTALL_PATH)/$(SUITE)-$(PROJECT)$(BRANCH).pc
 ifeq ($(OS_NAME), Linux)
