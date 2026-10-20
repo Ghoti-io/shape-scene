@@ -163,6 +163,9 @@ GSHSCENE_API GSHSCENE_Result gshscene_list_clip_pop(GSHSCENE_List * list);
 /** @brief End the innermost group (list.h, declared here too). */
 GSHSCENE_API GSHSCENE_Result gshscene_list_group_pop(GSHSCENE_List * list);
 
+/** @brief Drop a reference to a resource (resource.h, declared here too): a lowering releases the runs it interns. */
+GSHSCENE_API void gshscene_resource_release(const GSHSCENE_Resource * resource);
+
 /** @brief How many items (list.h, declared here too); 0 for NULL. */
 GSHSCENE_API size_t gshscene_list_count(const GSHSCENE_List * list);
 
