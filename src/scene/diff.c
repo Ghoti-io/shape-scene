@@ -46,6 +46,7 @@ struct GSHSCENE_Diff {
   GSHSCENE_Diff_Entry * entries;
   GSHSCENE_Damage damage;
   int foreground_changed;
+  int palette_changed;
 };
 
 static int foreground_differs(const GSHSCENE_Color * a, const GSHSCENE_Color * b) {
@@ -288,6 +289,7 @@ typedef struct Damage_Walk {
   const GSHGEOM_Map * device;
   size_t inside;
   int foreground; /* the foreground differs between the versions: the shapes that paint with it are damaged */
+  int palette;    /* likewise the palette (N14): the shapes that paint from it */
   int any;
   int unbounded;
   double min_x, min_y, max_x, max_y;
@@ -451,7 +453,8 @@ static GSHSCENE_Result damage_group_leave(void * ctx, const GSHSCENE_Walk * walk
 static GSHSCENE_Result damage_shape(
     void * ctx, const GSHSCENE_Walk * walk, const GSHSCENE_Node_Rec * shape, const GSHGEOM_Map * map) {
   Damage_Walk * d = ctx;
-  if (d->inside > 0 || is_marked(d, shape) || (d->foreground && shape->p.paint.kind == GSHSCENE_PAINT_FOREGROUND)) {
+  if (d->inside > 0 || is_marked(d, shape) || (d->foreground && shape->p.paint.kind == GSHSCENE_PAINT_FOREGROUND) ||
+      (d->palette && shape->p.paint.kind == GSHSCENE_PAINT_PALETTE)) {
     return add_shape(d, walk, shape, map);
   }
   return GSHSCENE_OK;
@@ -499,13 +502,13 @@ static GSHSCENE_Result walk_marked(const struct GSHSCENE_Version * v, const unsi
 
 static GSHSCENE_Result compute_damage(const struct GSHSCENE_Version * a, const struct GSHSCENE_Version * b,
     const GSHGEOM_Map * device, double aa, const GSHSCENE_Diff_Entry * entries, size_t n, int foreground,
-    GSHSCENE_Damage * out) {
+    int palette, GSHSCENE_Damage * out) {
   memset(out, 0, sizeof *out);
   if (device->dim != 2) {
     out->unbounded = 1;
     return GSHSCENE_OK;
   }
-  if (n == 0 && !foreground) {
+  if (n == 0 && !foreground && !palette) {
     out->empty = 1;
     return GSHSCENE_OK;
   }
@@ -523,6 +526,7 @@ static GSHSCENE_Result compute_damage(const struct GSHSCENE_Version * a, const s
   memset(&d, 0, sizeof d);
   d.alloc = alloc;
   d.foreground = foreground;
+  d.palette = palette;
   if (result == GSHSCENE_OK) {
     result = walk_marked(a, marks.a, device, &d);
   }
@@ -583,8 +587,10 @@ GSHSCENE_Result gshscene_diff(const GSHSCENE_Version * a, const GSHSCENE_Version
   diff->alloc = *alloc;
   GSHSCENE_Result result = gshscene_diff_entries(a, b, &diff->entries, &diff->count);
   diff->foreground_changed = foreground_differs(&a->foreground, &b->foreground);
+  diff->palette_changed = a->palette != b->palette;
   if (result == GSHSCENE_OK) {
-    result = compute_damage(a, b, &device, aa, diff->entries, diff->count, diff->foreground_changed, &diff->damage);
+    result = compute_damage(a, b, &device, aa, diff->entries, diff->count, diff->foreground_changed,
+        diff->palette_changed, &diff->damage);
   }
   if (result != GSHSCENE_OK) {
     gshscene_diff_destroy(diff);
@@ -610,6 +616,10 @@ GSHSCENE_Result gshscene_diff_get(
 
 int gshscene_diff_foreground_changed(const GSHSCENE_Diff * diff) {
   return diff ? diff->foreground_changed : 0;
+}
+
+int gshscene_diff_palette_changed(const GSHSCENE_Diff * diff) {
+  return diff ? diff->palette_changed : 0;
 }
 
 GSHSCENE_Result gshscene_diff_damage(const GSHSCENE_Diff * diff, GSHSCENE_Damage * out) {

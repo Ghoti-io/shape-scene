@@ -260,6 +260,19 @@ inline Px evaluate(const GSHSCENE_List * list, const std::vector<double> & cover
           }
           alpha = fgc.rgba[3] * item->paint.rgba[3];
           space = from(fgc.space);
+        } else if (item->paint.kind == GSHSCENE_PAINT_PALETTE) {
+          // N14: the entry's color, its alpha scaled; a missing entry is refused and draws nothing.
+          const GSHSCENE_Resource * palette = gshscene_list_palette(list);
+          GSHSCENE_Color e;
+          if (!palette || item->paint.entry >= gshscene_resource_palette_count(palette) ||
+              gshscene_resource_palette_color(palette, item->paint.entry, &e) != GSHSCENE_OK) {
+            break;
+          }
+          for (int k = 0; k < 3; k++) {
+            rgb[k] = e.rgba[k];
+          }
+          alpha = e.rgba[3] * item->paint.rgba[3];
+          space = from(e.space);
         } else {
           for (int k = 0; k < 3; k++) {
             rgb[k] = item->paint.rgba[k];

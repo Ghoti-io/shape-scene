@@ -292,11 +292,15 @@ TEST(NodeRules, AShapeNeedsAPathOrGlyphRunOfTheStoreAndAValidRuleAndPaint) {
   n.fill_rule = GSHGEOM_FILL_EVEN_ODD;
   EXPECT_EQ(f.add(n), GSHSCENE_OK);
   // The paint follows the rules of a list's fill.
-  for (GSHSCENE_Paint_Kind reserved : {GSHSCENE_PAINT_GRADIENT, GSHSCENE_PAINT_PALETTE}) {
-    n = shape_node(f.sq.get());
-    n.paint.kind = reserved;
-    EXPECT_EQ(f.add(n), GSHSCENE_ERR_UNSUPPORTED) << reserved;
-  }
+  n = shape_node(f.sq.get());
+  n.paint.kind = GSHSCENE_PAINT_GRADIENT;
+  EXPECT_EQ(f.add(n), GSHSCENE_ERR_UNSUPPORTED);
+  n = shape_node(f.sq.get());
+  n.paint.kind = GSHSCENE_PAINT_PALETTE;
+  n.paint.entry = 0xFFFFu;
+  EXPECT_EQ(f.add(n), GSHSCENE_ERR_INVALID) << "0xFFFF is a font's foreground and is never an entry (N14)";
+  n.paint.entry = GSHSCENE_PALETTE_ENTRY_MAX;
+  EXPECT_EQ(f.add(n), GSHSCENE_OK) << "a palette paint follows a list fill's rules";
   n = shape_node(f.sq.get());
   n.paint.kind = (GSHSCENE_Paint_Kind)9;
   EXPECT_EQ(f.add(n), GSHSCENE_ERR_INVALID);

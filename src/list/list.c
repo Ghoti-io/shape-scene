@@ -38,7 +38,7 @@
 #include <string.h>
 
 /** The format of a list's hash and dump. */
-#define LIST_FORMAT_VERSION 2u
+#define LIST_FORMAT_VERSION 3u
 
 /** The kind field of a list's hash: "LIST" in little-endian ASCII. */
 #define LIST_HASH_KIND UINT32_C(0x5453494c)
@@ -193,6 +193,8 @@ static void items_release(GSHSCENE_List * list);
 
 static void list_clear(GSHSCENE_List * list) {
   items_release(list);
+  gshscene_resource_release(list->palette);
+  list->palette = NULL;
   chunks_free(list, list->head, list->first);
   chunks_free(list, list->big, NULL);
   list->big = NULL;
@@ -233,6 +235,7 @@ void gshscene_list_destroy(GSHSCENE_List * list) {
     return;
   }
   items_release(list);
+  gshscene_resource_release(list->palette);
   chunks_free(list, list->head, NULL);
   chunks_free(list, list->big, NULL);
   gshscene_free(&list->alloc, list->ties);
@@ -376,10 +379,16 @@ static GSHSCENE_Result canonical_paint(const GSHSCENE_Paint * paint, GSHSCENE_Pa
   if (!paint) {
     return GSHSCENE_OK;
   }
-  if (paint->kind == GSHSCENE_PAINT_GRADIENT || paint->kind == GSHSCENE_PAINT_PALETTE) {
+  if (paint->kind == GSHSCENE_PAINT_GRADIENT) {
     return GSHSCENE_ERR_UNSUPPORTED;
   }
-  if ((paint->kind != GSHSCENE_PAINT_SOLID && paint->kind != GSHSCENE_PAINT_FOREGROUND) || paint->gradient) {
+  if ((paint->kind != GSHSCENE_PAINT_SOLID && paint->kind != GSHSCENE_PAINT_FOREGROUND &&
+          paint->kind != GSHSCENE_PAINT_PALETTE) ||
+      paint->gradient) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  /* One spelling: only a palette paint has an entry, and 0xFFFF (a font's foreground) is never one (N14). */
+  if (paint->kind == GSHSCENE_PAINT_PALETTE ? paint->entry > GSHSCENE_PALETTE_ENTRY_MAX : paint->entry != 0) {
     return GSHSCENE_ERR_INVALID;
   }
   for (int i = 0; i < 4; i++) {
@@ -390,14 +399,16 @@ static GSHSCENE_Result canonical_paint(const GSHSCENE_Paint * paint, GSHSCENE_Pa
   if (!(paint->rgba[3] >= 0.0 && paint->rgba[3] <= 1.0)) {
     return GSHSCENE_ERR_INVALID;
   }
-  if (paint->kind == GSHSCENE_PAINT_FOREGROUND) {
-    /* One spelling: the foreground's color is the version's, so only the alpha multiplier is the paint's. */
+  if (paint->kind != GSHSCENE_PAINT_SOLID) {
+    /* One spelling: the foreground's color is the version's, and an entry's the palette's, so only the alpha
+     * multiplier (and the entry) is the paint's. */
     if (gshgeom_f64_bits(paint->rgba[0]) != 0 || gshgeom_f64_bits(paint->rgba[1]) != 0 ||
         gshgeom_f64_bits(paint->rgba[2]) != 0 || !gshscene_color_space_is_target(&paint->space)) {
       return GSHSCENE_ERR_INVALID;
     }
-    out->kind = GSHSCENE_PAINT_FOREGROUND;
+    out->kind = paint->kind;
     out->rgba[3] = paint->rgba[3];
+    out->entry = paint->entry;
     return GSHSCENE_OK;
   }
   GSHSCENE_Result result = gshscene_color_space_check(&paint->space);
@@ -617,6 +628,39 @@ GSHSCENE_Result gshscene_list_instance(
   return list_append(list, &item);
 }
 
+/* --- truncate (fixed.h) ------------------------------------------------------------ */
+
+GSHSCENE_Result gshscene_list_truncate(GSHSCENE_List * list, size_t count) {
+  if (!list || list->closed || count > list->count) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  for (size_t i = count; i < list->count; i++) {
+    gshscene_resource_release(item_at(list, i)->resource);
+  }
+  list->count = count;
+  /* What recording the first @p count items made, counted again: the open pushes, the expansion, the deepest
+   * picture, the non-flat groups.  The stack was at least this deep when they were recorded, so it has room. */
+  list->nonflat = 0;
+  list->picture_depth = 0;
+  list->expansion = 0;
+  list->depth = 0;
+  for (size_t i = 0; i < count; i++) {
+    const GSHSCENE_Item * item = item_at(list, i);
+    note_item(list, item);
+    int instance = item->kind == GSHSCENE_ITEM_INSTANCE;
+    size_t picture = instance ? item->resource->u.picture.depth : 0;
+    list->picture_depth = picture > list->picture_depth ? picture : list->picture_depth;
+    list->expansion = saturating_add(list->expansion,
+        instance ? saturating_add(1u, gshscene_list_expansion(gshscene_resource_picture(item->resource))) : 1u);
+    if (item->kind == GSHSCENE_ITEM_CLIP_PUSH || item->kind == GSHSCENE_ITEM_GROUP_PUSH) {
+      list->stack[list->depth++] = item->kind == GSHSCENE_ITEM_CLIP_PUSH ? PUSH_CLIP : PUSH_GROUP;
+    } else if (item->kind == GSHSCENE_ITEM_CLIP_POP || item->kind == GSHSCENE_ITEM_GROUP_POP) {
+      list->depth--;
+    }
+  }
+  return GSHSCENE_OK;
+}
+
 /* --- the foreground ------------------------------------------------------------ */
 
 GSHSCENE_Result gshscene_list_set_foreground(GSHSCENE_List * list, const GSHSCENE_Color * color) {
@@ -641,6 +685,53 @@ GSHSCENE_Result gshscene_list_foreground(const GSHSCENE_List * list, GSHSCENE_Co
     return GSHSCENE_ERR_INVALID;
   }
   *out = list->foreground;
+  return GSHSCENE_OK;
+}
+
+/* --- the palette (N14) ------------------------------------------------------------ */
+
+GSHSCENE_Result gshscene_list_set_palette(GSHSCENE_List * list, const GSHSCENE_Resource * palette) {
+  if (!list || list->closed ||
+      (palette && (palette->store != list->store || palette->kind != GSHSCENE_RESOURCE_PALETTE))) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  gshscene_resource_retain(palette);
+  gshscene_resource_release(list->palette);
+  list->palette = palette;
+  return GSHSCENE_OK;
+}
+
+const GSHSCENE_Resource * gshscene_list_palette(const GSHSCENE_List * list) {
+  return list ? list->palette : NULL;
+}
+
+GSHSCENE_Result gshscene_paint_resolve(const GSHSCENE_Paint * paint, const GSHSCENE_Color * foreground,
+    const GSHSCENE_Resource * palette, GSHSCENE_Color * out) {
+  if (!paint || !foreground || !out || (palette && palette->kind != GSHSCENE_RESOURCE_PALETTE)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  GSHSCENE_Color c;
+  switch (paint->kind) {
+    case GSHSCENE_PAINT_SOLID:
+      memcpy(c.rgba, paint->rgba, sizeof c.rgba);
+      c.space = paint->space;
+      break;
+    case GSHSCENE_PAINT_FOREGROUND:
+      c = *foreground;
+      c.rgba[3] = foreground->rgba[3] * paint->rgba[3];
+      break;
+    case GSHSCENE_PAINT_PALETTE:
+      /* N14: a missing entry (no palette, or past its count) is refused, never drawn in another color. */
+      if (!palette || paint->entry >= palette->u.palette.count) {
+        return GSHSCENE_ERR_REFUSED;
+      }
+      c = palette->u.palette.colors[paint->entry];
+      c.rgba[3] = c.rgba[3] * paint->rgba[3];
+      break;
+    default:
+      return GSHSCENE_ERR_INVALID;
+  }
+  *out = c;
   return GSHSCENE_OK;
 }
 
@@ -1079,7 +1170,7 @@ int gshscene_space_equal(const GSHSCENE_Color_Space * a, const GSHSCENE_Color_Sp
          gshgeom_f64_bits(a->gamma) == gshgeom_f64_bits(b->gamma);
 }
 
-static int color_equal(const GSHSCENE_Color * a, const GSHSCENE_Color * b) {
+int gshscene_color_equal(const GSHSCENE_Color * a, const GSHSCENE_Color * b) {
   for (int i = 0; i < 4; i++) {
     if (gshgeom_f64_bits(a->rgba[i]) != gshgeom_f64_bits(b->rgba[i])) {
       return 0;
@@ -1095,7 +1186,7 @@ static int item_equal(const GSHSCENE_Item * a, const GSHSCENE_Item * b) {
     return 0;
   }
   if (a->paint.kind != b->paint.kind || !gshscene_space_equal(&a->paint.space, &b->paint.space) ||
-      a->paint.gradient != b->paint.gradient) {
+      a->paint.gradient != b->paint.gradient || a->paint.entry != b->paint.entry) {
     return 0;
   }
   for (int i = 0; i < 4; i++) {
@@ -1109,7 +1200,7 @@ static int item_equal(const GSHSCENE_Item * a, const GSHSCENE_Item * b) {
 }
 
 int gshscene_list_equal(const GSHSCENE_List * a, const GSHSCENE_List * b) {
-  if (!a || !b || a->count != b->count || !color_equal(&a->foreground, &b->foreground)) {
+  if (!a || !b || a->count != b->count || !gshscene_color_equal(&a->foreground, &b->foreground) || a->palette != b->palette) {
     return 0;
   }
   for (size_t i = 0; i < a->count; i++) {
@@ -1149,6 +1240,7 @@ uint64_t gshscene_list_hash(const GSHSCENE_List * list) {
   gshgeom_hash_u32(&h, LIST_FORMAT_VERSION);
   gshgeom_hash_u32(&h, LIST_HASH_KIND);
   gshscene_color_hash(&h, &list->foreground);
+  gshgeom_hash_u64(&h, list->palette ? gshscene_resource_hash(list->palette) : 0);
   gshgeom_hash_u64(&h, (uint64_t)list->count);
   for (size_t i = 0; i < list->count; i++) {
     const GSHSCENE_Item * item = item_at(list, i);
@@ -1162,6 +1254,7 @@ uint64_t gshscene_list_hash(const GSHSCENE_List * list) {
           gshgeom_hash_f64(&h, item->paint.rgba[k]);
         }
         gshscene_space_hash(&h, &item->paint.space);
+        gshgeom_hash_u32(&h, item->paint.entry);
         gshgeom_hash_i32(&h, item->layer);
         gshgeom_hash_f64(&h, item->depth);
         break;
@@ -1222,7 +1315,8 @@ GSHSCENE_Result gshscene_list_dump(const GSHSCENE_List * list, FILE * out) {
           HEX(list->count), HEX(list->closed ? list->tie_count : 0), HEX(gshgeom_f64_bits(fg->rgba[0])),
           HEX(gshgeom_f64_bits(fg->rgba[1])), HEX(gshgeom_f64_bits(fg->rgba[2])), HEX(gshgeom_f64_bits(fg->rgba[3]))) < 0 ||
       gshscene_space_dump(out, &fg->space) < 0 ||
-      fprintf(out, " hash=%016llx\n", HEX(gshscene_list_hash(list))) < 0) {
+      fprintf(out, " palette=%016llx hash=%016llx\n", HEX(list->palette ? gshscene_resource_hash(list->palette) : 0),
+          HEX(gshscene_list_hash(list))) < 0) {
     return GSHSCENE_ERR_IO;
   }
   for (size_t i = 0; i < list->count; i++) {
@@ -1239,6 +1333,9 @@ GSHSCENE_Result gshscene_list_dump(const GSHSCENE_List * list, FILE * out) {
         }
         if (written >= 0) {
           written = gshscene_space_dump(out, &item->paint.space);
+        }
+        if (written >= 0) {
+          written = fprintf(out, " entry=%u", (unsigned)item->paint.entry);
         }
         if (written >= 0) {
           written = dump_layer_depth(out, item);

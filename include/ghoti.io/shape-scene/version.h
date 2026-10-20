@@ -67,6 +67,14 @@
  * and not to any node, and the version's list carries it.  Changing it publishes a new
  * version whose diff reports it and whose damage is the shapes that paint with it.
  *
+ * ### The palette
+ *
+ * A version carries the **palette** (N14, paint.h) the same way: a palette resource
+ * of the scene's store, or none until an edit sets one (::gshscene_edit_set_palette).
+ * A ::GSHSCENE_PAINT_PALETTE shape names an entry of it; the version's list carries
+ * it; changing it publishes a new version whose diff reports it
+ * (::gshscene_diff_palette_changed) and whose damage is the shapes that paint from it.
+ *
  * ### The emitted list
  *
  * ::gshscene_version_list builds, on the first call, the version's list over
@@ -88,13 +96,14 @@
  * that draws the same.  ::gshscene_version_item_node says which node an item
  * came from.
  *
- * ### The hash of a version (version 2)
+ * ### The hash of a version (version 3)
  *
- * FNV-1a 64 in the spelling of shape-geometry's hash.h, over the foreground and the
- * nodes in ascending ID order and over nothing else: not the version number, the
- * allocator, a handle or the ID counter, so it reproduces run to run and across
- * targets.  The stream is `u32` 2 (this format), `u32` `0x4e454353`, the
- * foreground (four `f64` and a space), `u64` the node count, then for each node: `u64` id, `u8` kind (::GSHSCENE_Node_Kind,
+ * FNV-1a 64 in the spelling of shape-geometry's hash.h, over the foreground, the
+ * palette and the nodes in ascending ID order and over nothing else: not the
+ * version number, the allocator, a handle or the ID counter, so it reproduces run
+ * to run and across targets.  The stream is `u32` 3 (this format), `u32`
+ * `0x4e454353`, the foreground (four `f64` and a space), `u64` the palette's content
+ * hash (0 for none), `u64` the node count, then for each node: `u64` id, `u8` kind (::GSHSCENE_Node_Kind,
  * pinned), `u8` flags, `u64` parent (0 for the root), `u8` 1 if the node has a
  * key and then `u64` domain and `u64` value; and, by kind,
  * - **group**: `u64` the map's hash (`gshgeom_map_hash`), `f64` opacity, the blend
@@ -104,20 +113,20 @@
  *   each child's `u64` ID in draw order;
  * - **shape**: `u64` the resource's content hash, `u64` the map's hash, `u8` the
  *   fill rule, `u8` the paint kind, four `f64` (the straight `r, g, b, a`), the
- *   paint's space, `i32` layer, `f64` depth;
+ *   paint's space, `u32` the paint's palette entry, `i32` layer, `f64` depth;
  * - **instance**: `u64` the target's ID, `u64` the map's hash, `i32` layer, `f64` depth.
  *
  * A **space** is `u8` primaries, `u8` transfer, `f64` gamma.
  *
  * ### The dump
  *
- * `gshscene.version 2 nodes=N root=1 fg=<r> <g> <b> <a> <space> hash=<16 hex digits>`
+ * `gshscene.version 3 nodes=N root=1 fg=<r> <g> <b> <a> <space> palette=<16 hex digits> hash=<16 hex digits>`
  * and one line per node in ascending ID order, tokens separated by one space, every
  * `double` as the 16 hexadecimal digits of its bit pattern, every hash as 16 digits,
  * every ID, layer, flag and rule in decimal, a `<space>` as `P:T:<gamma hex>`:
  *
  * - `G id=I parent=P flags=F key=K map=H opacity=X blend=<space> composite=N order=N layer=L depth=D clip=C children=LIST`
- * - `S id=I parent=P flags=F key=K res=KIND:H map=H rule=R paint=PK r g b a space=<space> layer=L depth=D`
+ * - `S id=I parent=P flags=F key=K res=KIND:H map=H rule=R paint=PK r g b a space=<space> entry=E layer=L depth=D`
  * - `I id=I parent=P flags=F key=K target=T map=H layer=L depth=D`
  *
  * where `K` is `-` or `DOMAIN:VALUE` as 16 digits each, `C` is `-` or
@@ -196,7 +205,7 @@ typedef struct GSHSCENE_Node {
   GSHGEOM_Fill_Rule clip_rule;       ///< Group with a clip: its rule.  Else nonzero.
   const GSHSCENE_Resource * resource; ///< Shape: the path or glyph run.  Else NULL.
   GSHGEOM_Fill_Rule fill_rule;       ///< Shape: the rule.  Else nonzero.
-  GSHSCENE_Paint paint;              ///< Shape: the paint (solid or foreground).  Else as ::gshscene_node_init leaves it.
+  GSHSCENE_Paint paint;              ///< Shape: the paint (solid, foreground or palette).  Else as ::gshscene_node_init leaves it.
   uint64_t target;                   ///< Instance: the ID of the node it draws.  Else 0.
 } GSHSCENE_Node;
 
@@ -257,6 +266,9 @@ GSHSCENE_API size_t gshscene_version_key_count(const GSHSCENE_Version * version)
 
 /** @brief The version's foreground (N10); ::GSHSCENE_ERR_INVALID for NULL.  Written only on success. */
 GSHSCENE_API GSHSCENE_Result gshscene_version_foreground(const GSHSCENE_Version * version, GSHSCENE_Color * out);
+
+/** @brief The version's palette (N14), or NULL for none and for a NULL version.  The version holds the reference. */
+GSHSCENE_API const GSHSCENE_Resource * gshscene_version_palette(const GSHSCENE_Version * version);
 
 /** @brief The hash of the version, as the file comment spells it; the offset basis for NULL. */
 GSHSCENE_API uint64_t gshscene_version_hash(const GSHSCENE_Version * version);

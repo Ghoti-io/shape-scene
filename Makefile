@@ -500,7 +500,7 @@ check-corpus-hash: $(HASH_PROBE) ## Fail unless the probe prints the committed c
 # The float-free seam (story 14a, AD-5): the headers `font` includes from a
 # GFNT_ header name no floating type, nor does any suite header they include.
 # The script plants a double and runs a control in every run.
-FLOAT_FREE_HEADERS := include/ghoti.io/shape-scene/glyph_provider.h
+FLOAT_FREE_HEADERS := include/ghoti.io/shape-scene/glyph_provider.h include/ghoti.io/shape-scene/fixed.h
 
 check-float-free: $(LIBVER_GEN) ## Fail if the glyph provider seam (a float-free header) names a floating type
 	@python3 tools/check-float-free.py --cc '$(CC)' --flags '$(INCLUDE)' $(FLOAT_FREE_HEADERS)

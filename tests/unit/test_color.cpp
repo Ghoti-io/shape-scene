@@ -386,10 +386,24 @@ TEST(Paint, AForegroundPaintCarriesOnlyItsAlphaAndAZeroSpace) {
     q.rgba[3] = a;
     EXPECT_EQ(fill(q), GSHSCENE_OK) << a;
   }
-  // The palette stays refused: AD-23 says only that its index is a scene parameter, not whose table it indexes.
+  // A palette paint is an entry of the palette in force (N14, story 14c), spelled as a foreground paint is plus its
+  // entry; only a palette paint has one, and 0xFFFF (a font's foreground) is never one.
+  q = p;
+  q.entry = 1;
+  EXPECT_EQ(fill(q), GSHSCENE_ERR_INVALID) << "a foreground paint has no entry";
+  q.kind = GSHSCENE_PAINT_PALETTE;
+  EXPECT_EQ(fill(q), GSHSCENE_OK);
+  q.entry = GSHSCENE_PALETTE_ENTRY_MAX;
+  EXPECT_EQ(fill(q), GSHSCENE_OK);
+  q.entry = 0xFFFFu;
+  EXPECT_EQ(fill(q), GSHSCENE_ERR_INVALID);
+  q.entry = 0;
+  q.rgba[0] = 0.5;
+  EXPECT_EQ(fill(q), GSHSCENE_ERR_INVALID) << "an entry's color is the palette's";
   q = p;
   q.kind = GSHSCENE_PAINT_PALETTE;
-  EXPECT_EQ(fill(q), GSHSCENE_ERR_UNSUPPORTED);
+  q.space = srgb_space();
+  EXPECT_EQ(fill(q), GSHSCENE_ERR_INVALID) << "and so is its space";
   q.kind = GSHSCENE_PAINT_GRADIENT;
   EXPECT_EQ(fill(q), GSHSCENE_ERR_UNSUPPORTED);
 }

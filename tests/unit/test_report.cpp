@@ -41,7 +41,7 @@ TEST(Report, EveryClassAndReasonHasItsOwnString) {
   const char * names[] = {"item-kind", "composite", "glyph-source", "blend-space", "clip-aliased", "resource-limit",
       "seamless", "caller-memory", "tie-layer", "tie-path", "tie-declared", "hint-route", "hint-size",
       "hint-no-program", "hint-program-failed", "hint-with-errors", "hint-strict-route", "glyph-unavailable",
-      "face-unbound"};
+      "face-unbound", "palette-entry"};
   ASSERT_EQ(sizeof names / sizeof names[0], (size_t)GSHSCENE_REASON_COUNT - 1);
   for (int r = GSHSCENE_REASON_ITEM_KIND; r < GSHSCENE_REASON_COUNT; r++) {
     EXPECT_STREQ(gshscene_reason_string((GSHSCENE_Reason)r), names[r - 1]) << r;
@@ -69,7 +69,8 @@ TEST(Report, ThePinnedValuesArePinned) {
   EXPECT_EQ((int)GSHSCENE_REASON_TIE_DECLARED, 11);
   EXPECT_EQ((int)GSHSCENE_REASON_HINT_ROUTE, 12);
   EXPECT_EQ((int)GSHSCENE_REASON_FACE_UNBOUND, 19);
-  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 20);
+  EXPECT_EQ((int)GSHSCENE_REASON_PALETTE_ENTRY, 20);
+  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 21);
 }
 
 TEST(Report, CreateDestroyAndTheEmptyReport) {

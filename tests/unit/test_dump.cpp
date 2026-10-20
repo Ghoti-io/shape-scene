@@ -49,6 +49,8 @@ struct Fixture {
   const GSHSCENE_Resource * font_run = nullptr;
   const GSHSCENE_Resource * outline_run = nullptr;
   const GSHSCENE_Resource * picture = nullptr;
+  const GSHSCENE_Resource * palette = nullptr;   // three entries from doubles (story 14c)
+  const GSHSCENE_Resource * palette8 = nullptr;  // three entries from RGBA8 (fixed.h)
   GSHSCENE_List * list = nullptr;
   GSHSCENE_List * order_list = nullptr;  // recorded in declared order, closed into paint order
 
@@ -97,6 +99,16 @@ struct Fixture {
     currentcolor.kind = GSHSCENE_PAINT_FOREGROUND;
     GSHSCENE_Color fg = {{0.1, 0.2, 0.3, 0.5}, linear_srgb_space()};
     gshscene_list_set_foreground(list, &fg);
+    const GSHSCENE_Color entries[3] = {{{1.0, 0.5, 0.25, 1.0}, space_of(GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_SRGB, 0.0)},
+        {{0.0, 0.75, 1.0, 0.5}, space_of(GCOL_PRIMARIES_DISPLAY_P3, GCOL_TRANSFER_GAMMA, 2.2)},
+        {{0.125, 0.0, 2.0, 0.25}, linear_srgb_space()}};
+    gshscene_store_intern_palette(store, 3, entries, &palette);
+    const uint8_t bytes[12] = {255, 0, 0, 255, 0, 128, 255, 51, 1, 2, 254, 0};
+    gshscene_store_intern_palette_rgba8(store, 3, bytes, &palette8);
+    gshscene_list_set_palette(list, palette);
+    GSHSCENE_Paint entry2 = solid(0.0, 0.0, 0.0, 0.5);
+    entry2.kind = GSHSCENE_PAINT_PALETTE;
+    entry2.entry = 2;
     gshscene_list_fill(list, sq, &design, GSHGEOM_FILL_NONZERO, &blue, -3, 0.5);
     gshscene_list_fill(list, font_run, nullptr, GSHGEOM_FILL_EVEN_ODD, nullptr, 0, 0);
     gshscene_list_clip_push(list, p2, &tr, GSHGEOM_FILL_EVEN_ODD, 4, -2.0);
@@ -106,6 +118,7 @@ struct Fixture {
     gshscene_list_instance(list, picture, &tr, 1, 3.25);
     gshscene_list_fill(list, outline_run, nullptr, GSHGEOM_FILL_NONZERO, &wide, 5, 0);
     gshscene_list_fill(list, sq, nullptr, GSHGEOM_FILL_NONZERO, &currentcolor, 6, 0);
+    gshscene_list_fill(list, p2, nullptr, GSHGEOM_FILL_EVEN_ODD, &entry2, 8, 0);
     gshscene_list_group_pop(list);
     gshscene_list_clip_pop(list);
     gshscene_list_close(list);
@@ -150,6 +163,8 @@ struct Fixture {
   ~Fixture() {
     gshscene_list_destroy(order_list);
     gshscene_list_destroy(list);
+    gshscene_resource_release(palette8);
+    gshscene_resource_release(palette);
     gshscene_resource_release(picture);
     gshscene_resource_release(outline_run);
     gshscene_resource_release(font_run);
@@ -198,13 +213,15 @@ TEST(KnownAnswers, EveryResourceHashesAsTheIndependentGeneratorSays) {
   EXPECT_EQ(gshscene_resource_hash(f.font_run), known::kFontRunHash);
   EXPECT_EQ(gshscene_resource_hash(f.outline_run), known::kOutlineRunHash);
   EXPECT_EQ(gshscene_resource_hash(f.picture), known::kPictureHash);
+  EXPECT_EQ(gshscene_resource_hash(f.palette), known::kPaletteHash);
+  EXPECT_EQ(gshscene_resource_hash(f.palette8), known::kPalette8Hash);
   EXPECT_EQ(gshscene_list_hash(gshscene_resource_picture(f.picture)), known::kPictureListHash);
 }
 
 TEST(KnownAnswers, TheListHashesAsTheIndependentGeneratorSays) {
   StoreHolder s;
   Fixture f(s.store);
-  ASSERT_EQ(gshscene_list_count(f.list), 9u);
+  ASSERT_EQ(gshscene_list_count(f.list), 10u);
   EXPECT_EQ(gshscene_list_hash(f.list), known::kListHash);
   ASSERT_EQ(gshscene_list_count(f.order_list), 26u);
   EXPECT_EQ(gshscene_list_hash(f.order_list), known::kOrderListHash)
@@ -221,6 +238,8 @@ TEST(KnownAnswers, EveryDumpIsTheIndependentGeneratorsText) {
   EXPECT_EQ(dump_resource(f.font_run), known::kFontRunDump);
   EXPECT_EQ(dump_resource(f.outline_run), known::kOutlineRunDump);
   EXPECT_EQ(dump_resource(f.picture), known::kPictureDump);
+  EXPECT_EQ(dump_resource(f.palette), known::kPaletteDump);
+  EXPECT_EQ(dump_resource(f.palette8), known::kPalette8Dump);
   EXPECT_EQ(dump_list(f.list), known::kListDump);
   EXPECT_EQ(dump_list(f.order_list), known::kOrderListDump);
 }
@@ -275,7 +294,7 @@ std::string item_text(const GSHSCENE_Item * item) {
              " paint=" + std::to_string((int)item->paint.kind) + " " + hex16(gshgeom_f64_bits(item->paint.rgba[0])) +
              " " + hex16(gshgeom_f64_bits(item->paint.rgba[1])) + " " + hex16(gshgeom_f64_bits(item->paint.rgba[2])) +
              " " + hex16(gshgeom_f64_bits(item->paint.rgba[3])) + " space=" + space_text(item->paint.space) +
-             layer_depth_text(item);
+             " entry=" + std::to_string(item->paint.entry) + layer_depth_text(item);
     case GSHSCENE_ITEM_CLIP_PUSH:
       return "C" + res + map + " rule=" + std::to_string((int)item->fill_rule) + layer_depth_text(item);
     case GSHSCENE_ITEM_CLIP_POP:
@@ -303,10 +322,12 @@ TEST(Dump, ParsesBackToTheHashedFields) {
     ASSERT_EQ(lines.size(), 1 + n + ties);
     GSHSCENE_Color fg;
     ASSERT_EQ(gshscene_list_foreground(list, &fg), GSHSCENE_OK);
-    EXPECT_EQ(lines[0], "gshscene.list 2 items=" + std::to_string(n) + " ties=" + std::to_string(ties) + " fg=" +
+    const GSHSCENE_Resource * palette = gshscene_list_palette(list);
+    EXPECT_EQ(lines[0], "gshscene.list 3 items=" + std::to_string(n) + " ties=" + std::to_string(ties) + " fg=" +
                             hex16(gshgeom_f64_bits(fg.rgba[0])) + " " + hex16(gshgeom_f64_bits(fg.rgba[1])) + " " +
                             hex16(gshgeom_f64_bits(fg.rgba[2])) + " " + hex16(gshgeom_f64_bits(fg.rgba[3])) + " " +
-                            space_text(fg.space) + " hash=" + hex16(gshscene_list_hash(list)));
+                            space_text(fg.space) + " palette=" + hex16(palette ? gshscene_resource_hash(palette) : 0) +
+                            " hash=" + hex16(gshscene_list_hash(list)));
     for (size_t i = 0; i < n; i++) {
       const GSHSCENE_Item * item = nullptr;
       ASSERT_EQ(gshscene_list_item(list, i, &item), GSHSCENE_OK);
@@ -325,8 +346,8 @@ TEST(Dump, ParsesBackToTheHashedFields) {
 TEST(Dump, ADumpOfAnOpenAndAnEmptyListIsWellFormed) {
   StoreHolder s;
   ListHolder l(s.store);
-  EXPECT_EQ(dump_list(l.list), "gshscene.list 2 items=0 ties=0 fg=0000000000000000 0000000000000000 0000000000000000 "
-                                   "3ff0000000000000 0:0:0000000000000000 hash=" +
+  EXPECT_EQ(dump_list(l.list), "gshscene.list 3 items=0 ties=0 fg=0000000000000000 0000000000000000 0000000000000000 "
+                                   "3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=" +
                                    hex16(gshscene_list_hash(l.list)) + "\n");
   Ref sq(intern_square(s.store));
   ASSERT_EQ(gshscene_list_group_push(l.list, nullptr, 0, 0), GSHSCENE_OK);
@@ -572,6 +593,7 @@ TEST(Dump, EveryWriteOfEveryDumpIsChecked) {
   expect_every_write_checked(gshscene_resource_dump, f.font_run, "font run");
   expect_every_write_checked(gshscene_resource_dump, f.outline_run, "outline run");
   expect_every_write_checked(gshscene_resource_dump, f.picture, "picture");
+  expect_every_write_checked(gshscene_resource_dump, f.palette, "palette");
 }
 #endif
 

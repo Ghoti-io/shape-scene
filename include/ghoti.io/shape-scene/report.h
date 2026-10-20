@@ -146,6 +146,7 @@ typedef enum GSHSCENE_Reason {
   GSHSCENE_REASON_HINT_STRICT_ROUTE = 17, ///< Refused, per run: a strict-hinted run whose map or size sends it to the general route (D6).
   GSHSCENE_REASON_GLYPH_UNAVAILABLE = 18, ///< Refused, per glyph: the provider cannot give the glyph.
   GSHSCENE_REASON_FACE_UNBOUND = 19,  ///< Refused, per run: the run's face has no glyph path provider.
+  GSHSCENE_REASON_PALETTE_ENTRY = 20, ///< Refused, per fill: its palette paint names an entry the palette in force does not have (N14).
   GSHSCENE_REASON_COUNT               ///< Closes the enum.
 } GSHSCENE_Reason;
 

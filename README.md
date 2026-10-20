@@ -10,8 +10,13 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
 
 - **Resources** (`resource.h`). A store interns content, by hash and then by equality, so equal
   content gets one reference-counted handle. Kinds: a model path, a glyph run (glyphs named by
-  font key and glyph id, or given as path outlines), and a picture (a closed list, frozen, which an
-  instance draws under a map). Gradients and images are named and reserved. Each handle has a
+  a face resource and glyph id, or given as path outlines), a face (a font's face and instance,
+  bound to a glyph path provider), a palette (a table of colors), and a picture (a closed list,
+  frozen, which an instance draws under a map). Gradients and images are named and reserved.
+- **Recording without floats** (`fixed.h`). Integer-only calls, for a front end whose headers
+  name no floating type: fills and clips of glyph runs under a design map of fixed-point ops,
+  palette and foreground paints, groups by operator, a palette from 8-bit entries, and truncation
+  so that a lowering is all or nothing. Each handle has a
   64-bit id that is never reused, and a release-listener API lets a sink's cache drop an entry
   when the last reference goes. A store and its handles are thread-safe.
 - **Lists** (`list.h`). An arena-backed sequence of fills, clips, groups and instances, with a
@@ -21,7 +26,9 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
 - **Paint, color and composition** (`paint.h`, `list.h`; the normative text is in
   `documentation/design.md`). A solid paint is straight `double`s in a color space (four D65
   gamuts, three transfers, from `color`); `currentColor` is a foreground paint that resolves
-  against the version's or list's foreground; a group has a blend space, an opacity, a Porter-Duff
+  against the version's or list's foreground; a palette paint names an entry of the version's or
+  list's palette, an interned table of colors (a font's CPAL palette, for instance), and a fill
+  whose entry is missing is refused, never drawn in another color; a group has a blend space, an opacity, a Porter-Duff
   operator and an ordering context. An exact reference (`tools/composite-oracle.py`) and committed
   known answers define what two sinks must agree on.
 - **Hash and dump** of every resource and list, in `shape-geometry`'s spelling (FNV-1a 64 over

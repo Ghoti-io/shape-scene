@@ -53,6 +53,11 @@ def currentcolor(alpha, cov=1.0):
     return dict(k=FILL, paint=2, rgba=(0.0, 0.0, 0.0, alpha), space=TARGET, cov=cov)
 
 
+def entry(index, alpha, cov=1.0):
+    """A palette fill (N14): entry @p index of the case's palette, its alpha scaled by @p alpha."""
+    return dict(k=FILL, paint=3, entry=index, rgba=(0.0, 0.0, 0.0, alpha), space=TARGET, cov=cov)
+
+
 def group(opacity=1.0, op="src-over", blend=TARGET):
     return dict(k=GROUP_PUSH, opacity=opacity, blend=blend, composite=oracle.OP_INDEX[op], cov=0.0)
 
@@ -74,8 +79,8 @@ OPAQUE_BACKDROP = (0.0, 0.0, 1.0, 1.0)   # opaque blue
 CASES = []
 
 
-def case(name, items, target=SRGB, backdrop=BACKDROP, fg=FG):
-    CASES.append(dict(name=name, items=items, target=target, backdrop=backdrop, fg=fg))
+def case(name, items, target=SRGB, backdrop=BACKDROP, fg=FG, palette=None):
+    CASES.append(dict(name=name, items=items, target=target, backdrop=backdrop, fg=fg, palette=palette))
 
 
 SOURCE = (1.0, 0.5, 0.0, 0.75)  # straight; premultiplied (0.75, 0.375, 0, 0.75)
@@ -157,6 +162,17 @@ case("foreground in another space", [currentcolor(1.0)], fg=((0.5, 0.25, 0.75, 1
 case("foreground in another space inside a linear group", [group(1.0, "src-over", LIN), currentcolor(0.5), pop()],
      fg=((0.5, 0.25, 0.75, 1.0), P3))
 case("a gamma space target", [fill((0.5, 0.25, 0.75, 0.5), 1.0, SRGB)], target=P3G)
+# The palette (N14, story 14c): an entry's color with its alpha scaled; a missing entry draws nothing.
+PALETTE = [((1.0, 0.5, 0.0, 1.0), TARGET), ((0.0, 0.25, 1.0, 0.5), TARGET), ((0.5, 0.5, 0.5, 1.0), LIN),
+           ((255 / 255.0, 128 / 255.0, 1 / 255.0, 51 / 255.0), SRGB)]
+case("a palette entry", [entry(0, 1.0, 0.5)], palette=PALETTE)
+case("a palette entry's alpha times the paint's", [entry(1, 0.5)], palette=PALETTE)
+case("a palette entry in another space", [entry(2, 1.0)], palette=PALETTE, backdrop=(0.0, 0.0, 0.0, 0.0))
+case("a palette entry from 8 bits, its space stated", [entry(3, 1.0)], palette=PALETTE, target=LIN)
+case("palette entries in a group of an operator", [group(1.0, "src-in"), entry(0, 1.0), entry(1, 1.0, 0.25), pop()],
+     palette=PALETTE)
+case("a missing palette entry draws nothing", [entry(4, 1.0), entry(0, 0.5)], palette=PALETTE)
+case("no palette: every palette fill draws nothing", [entry(0, 1.0), fill(SOURCE, 0.5)])
 case("a linear target and an sRGB paint", [fill((0.5, 0.25, 0.75, 0.5), 1.0, SRGB)], target=LIN)
 
 
@@ -165,7 +181,13 @@ def converts(c):
     stack = [c["target"]]
     for it in c["items"]:
         if it["k"] == FILL:
-            space = it["space"] if it["paint"] != 2 else c["fg"][1]
+            if it["paint"] == 3:
+                table = c["palette"] or []
+                if it["entry"] >= len(table):
+                    continue
+                space = table[it["entry"]][1]
+            else:
+                space = it["space"] if it["paint"] != 2 else c["fg"][1]
             space = c["target"] if oracle.is_target(space) else space
             if space != stack[-1]:
                 return True
@@ -187,7 +209,7 @@ def evaluate_case(c):
             d["rgba"] = it["rgba"]
         items.append(d)
         cov.append(it["cov"])
-    got, inexact = oracle.evaluate(items, cov, c["fg"], c["target"], c["backdrop"])
+    got, inexact = oracle.evaluate(items, cov, c["fg"], c["target"], c["backdrop"], c["palette"])
     return got, inexact
 
 
@@ -210,12 +232,16 @@ def render():
     out.append("#ifndef GHOTI_IO_GSHSCENE_TEST_COMPOSITE_VECTORS_H\n#define GHOTI_IO_GSHSCENE_TEST_COMPOSITE_VECTORS_H\n\n")
     out.append("namespace composite_vectors {\n\n")
     out.append("struct VSpace {\n  int primaries;\n  int transfer;\n  double gamma;\n};\n\n")
-    out.append("// kind: 1 fill, 2 clip push, 3 clip pop, 4 group push, 5 group pop.  paint: 0 solid, 2 foreground.\n")
+    out.append("// kind: 1 fill, 2 clip push, 3 clip pop, 4 group push, 5 group pop.  paint: 0 solid, 2 foreground, 3 palette.\n")
     out.append("struct VItem {\n  int kind;\n  int paint;\n  double rgba[4];\n  VSpace space;\n  double opacity;\n  VSpace blend;\n"
-               "  int composite;\n  double coverage;\n};\n\n")
+               "  int composite;\n  double coverage;\n  int entry;\n};\n\n")
+    out.append("// A palette entry (N14): straight rgba and its space.\n")
+    out.append("struct VColor {\n  double rgba[4];\n  VSpace space;\n};\n\n")
     out.append("// exact: dyadic values and no conversion between spaces, so a double evaluator matches bit for bit.\n")
+    out.append("// palette_count -1: the list has no palette (and palette is NULL).\n")
     out.append("struct VCase {\n  const char * name;\n  bool exact;\n  VSpace target;\n  double backdrop[4];\n  double fg[4];\n"
-               "  VSpace fg_space;\n  int item_count;\n  const VItem * items;\n  double want[4];\n};\n\n")
+               "  VSpace fg_space;\n  int item_count;\n  const VItem * items;\n  double want[4];\n  int palette_count;\n"
+               "  const VColor * palette;\n};\n\n")
     exact_count = 0
     for n, c in enumerate(CASES):
         got, inexact = evaluate_case(c)
@@ -225,19 +251,26 @@ def render():
         for it in c["items"]:
             k = it["k"]
             rgba = it.get("rgba", (0.0, 0.0, 0.0, 0.0))
-            out.append("    {%d, %d, {%s, %s, %s, %s}, %s, %s, %s, %d, %s},\n" % (
+            out.append("    {%d, %d, {%s, %s, %s, %s}, %s, %s, %s, %d, %s, %d},\n" % (
                 k, it.get("paint", 0), hexf(F(rgba[0])), hexf(F(rgba[1])), hexf(F(rgba[2])), hexf(F(rgba[3])),
                 space_cxx(it.get("space", TARGET)), hexf(F(it.get("opacity", 1.0))), space_cxx(it.get("blend", TARGET)),
-                it.get("composite", 0), hexf(F(it["cov"]))))
+                it.get("composite", 0), hexf(F(it["cov"])), it.get("entry", 0)))
         out.append("};\n")
+        if c["palette"]:
+            out.append("static const VColor kPalette%d[] = {\n" % n)
+            for rgba, sp in c["palette"]:
+                out.append("    {{%s}, %s},\n" % (", ".join(hexf(F(v)) for v in rgba), space_cxx(sp)))
+            out.append("};\n")
     out.append("\nstatic const VCase kCases[] = {\n")
     for n, c in enumerate(CASES):
         got, inexact = evaluate_case(c)
         exact = (not inexact) and not converts(c) and all(is_dyadic_double(v) for v in got)
-        out.append("    {\"%s\", %s, %s, {%s}, {%s}, %s, %d, kItems%d, {%s}},\n" % (
+        out.append("    {\"%s\", %s, %s, {%s}, {%s}, %s, %d, kItems%d, {%s}, %d, %s},\n" % (
             c["name"], "true" if exact else "false", space_cxx(c["target"]),
             ", ".join(hexf(F(v)) for v in c["backdrop"]), ", ".join(hexf(F(v)) for v in c["fg"][0]),
-            space_cxx(c["fg"][1]), len(c["items"]), n, ", ".join(hexf(v) for v in got)))
+            space_cxx(c["fg"][1]), len(c["items"]), n, ", ".join(hexf(v) for v in got),
+            len(c["palette"]) if c["palette"] is not None else -1,
+            ("kPalette%d" % n) if c["palette"] else "nullptr"))
     out.append("};\n\nstatic const int kCaseCount = %d;\nstatic const int kExactCaseCount = %d;\n\n" % (len(CASES), exact_count))
     out.append("}  // namespace composite_vectors\n\n#endif\n")
     return "".join(out)

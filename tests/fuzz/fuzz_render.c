@@ -338,6 +338,14 @@ static GSHSCENE_List * build(Scene * s, Input * in, int * ties) {
   uint8_t stack[64];
   size_t depth = 0;
   size_t ops = 1 + next(in) % OPS_MAX;
+  if (ops % 3 != 0) {
+    /* N14: two entries, so that a palette fill of entry 2 is missing and refused by the plan. */
+    static const uint8_t entries[8] = {255, 0, 0, 255, 0, 64, 255, 128};
+    const GSHSCENE_Resource * palette = NULL;
+    if (gshscene_store_intern_palette_rgba8(s->store, 2, entries, &palette) == GSHSCENE_OK) {
+      gshscene_list_set_palette(list, keep(s, palette));
+    }
+  }
   for (size_t i = 0; i < ops && in->at < in->size; i++) {
     uint8_t op = next(in) % 10;
     uint8_t a = next(in);
@@ -355,7 +363,8 @@ static GSHSCENE_List * build(Scene * s, Input * in, int * ties) {
       case 9: {
         if (op == 9) {
           memset(&paint, 0, sizeof paint);
-          paint.kind = GSHSCENE_PAINT_FOREGROUND;
+          paint.kind = (a & 2) ? GSHSCENE_PAINT_PALETTE : GSHSCENE_PAINT_FOREGROUND;
+          paint.entry = (a & 2) ? (uint32_t)(b % 3) : 0;
           paint.rgba[3] = 0.75;
         }
         const GSHSCENE_Resource * r = square(s, a % SIDE, b % SIDE, 1 + c % 20);
@@ -423,6 +432,9 @@ static GSHSCENE_List * build(Scene * s, Input * in, int * ties) {
               gshscene_list_group_pop(list);
             }
           }
+          /* A picture has no palette of its own (N14): its palette fills resolve against the list that draws it. */
+          const GSHSCENE_Resource * palette = gshscene_list_palette(list); /* held by the scene (keep) */
+          gshscene_list_set_palette(list, NULL);
           const GSHSCENE_Resource * picture = NULL;
           if (gshscene_list_close(list) == GSHSCENE_OK &&
               gshscene_store_intern_picture(s->store, list, &picture) == GSHSCENE_OK) {
@@ -431,6 +443,7 @@ static GSHSCENE_List * build(Scene * s, Input * in, int * ties) {
             }
           }
           gshscene_list_reset(list);
+          gshscene_list_set_palette(list, palette);
         }
         break;
     }

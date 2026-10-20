@@ -22,8 +22,9 @@ test_dump.cpp builds with the API).
     python3 tools/gen-scene-vectors.py --check      # fails if the file differs
 
 The fixtures: a square path, shape-geometry's own fixture path (every verb), a
-face, a glyph run from that face and one from outlines, a picture, and a list holding every
-kind of item, each also in its dump text; and a scene (version.h) holding every kind
+face, a glyph run from that face and one from outlines, a palette (story 14c; one
+made from doubles and the same entries from RGBA8), a picture, and a list holding every
+kind of item and every paint, with a foreground and a palette, each also in its dump text; and a scene (version.h) holding every kind
 of node, with a clip, a key, a hidden node and an instance, built by the test in the
 order of the IDs below (the root 1, then 2 to 7), with its hash and its dump, and the
 empty scene, and the keys of some instance paths.
@@ -133,8 +134,9 @@ TRANSLATE = map_hash(2, [1, 0, 0, 1], [1.5, -2.25], 1)
 DESIGN = map_hash(2, [2.5, 0, 0, -2.5], [10, 20], 1 | 2 | 8)
 
 # --- resources (resource.h) ----------------------------------------------------
-KIND_PATH, KIND_RUN, KIND_PICTURE, KIND_FACE = 1, 2, 3, 6
-KIND_NAME = {KIND_PATH: "path", KIND_RUN: "glyph-run", KIND_PICTURE: "picture", KIND_FACE: "face"}
+KIND_PATH, KIND_RUN, KIND_PICTURE, KIND_FACE, KIND_PALETTE = 1, 2, 3, 6, 7
+KIND_NAME = {KIND_PATH: "path", KIND_RUN: "glyph-run", KIND_PICTURE: "picture", KIND_FACE: "face",
+             KIND_PALETTE: "palette"}
 # The format is per kind (resource.h): a glyph run's is 2 since story 14a, the rest 1.
 RUN_FORMAT = 2
 
@@ -222,9 +224,37 @@ def color_text(rgba, sp):
     return "%s %s" % (" ".join("%016x" % bits(c) for c in rgba), space_text(sp))
 
 
+# --- palettes (resource.h, N14; story 14c) ---------------------------------------------------
+def palette_hash(entries):
+    out = u32(1) + u32(KIND_PALETTE) + u64(len(entries))
+    for rgba, sp in entries:
+        out += color_bytes(rgba, sp)
+    return fnv(out)
+
+
+def palette_dump(entries):
+    lines = ["gshscene.resource 1 kind=palette hash=%016x" % palette_hash(entries),
+             "palette entries=%d" % len(entries)]
+    lines += ["p %s" % color_text(rgba, sp) for rgba, sp in entries]
+    return "\n".join(lines) + "\n"
+
+
+def rgba8(r, g, b, a):
+    """fixed.h: each component c / 255 (Python's division of two floats is IEEE's, correctly rounded), in sRGB."""
+    return ((r / 255.0, g / 255.0, b / 255.0, a / 255.0), SRGB_SRGB)
+
+
+# Three entries in three spaces, and the same three as a CPAL table would give them (8-bit sRGB).
+PALETTE = [((1.0, 0.5, 0.25, 1.0), SRGB_SRGB), ((0.0, 0.75, 1.0, 0.5), P3_GAMMA), ((0.125, 0.0, 2.0, 0.25), SRGB_LINEAR)]
+PALETTE_HASH = palette_hash(PALETTE)
+PALETTE8_BYTES = [(255, 0, 0, 255), (0, 128, 255, 51), (1, 2, 254, 0)]
+PALETTE8 = [rgba8(*c) for c in PALETTE8_BYTES]
+PALETTE8_HASH = palette_hash(PALETTE8)
+
+
 # --- lists (list.h) ---------------------------------------------------------------
 FILL, CLIP_PUSH, CLIP_POP, GROUP_PUSH, GROUP_POP, INSTANCE = 1, 2, 3, 4, 5, 6
-PAINT_SOLID, PAINT_FOREGROUND = 0, 2
+PAINT_SOLID, PAINT_FOREGROUND, PAINT_PALETTE = 0, 2, 3
 ORDER_FLAT, ORDER_DEPTH, ORDER_OVERLAY = 0, 1, 2
 COMPOSITE = {"src-over": 0, "clear": 1, "src": 2, "dest": 3, "dest-over": 4, "src-in": 5, "dest-in": 6,
              "src-out": 7, "dest-out": 8, "src-atop": 9, "dest-atop": 10, "xor": 11, "plus": 12}
@@ -232,9 +262,9 @@ TIE_LAYER, TIE_PATH, TIE_DECLARED = 1, 2, 3
 DEFAULT_FG = ((0.0, 0.0, 0.0, 1.0), TARGET)
 
 
-def fill(rkind, rhash, mhash, rule, rgba, space=TARGET, layer=0, depth=0.0, paint=PAINT_SOLID):
+def fill(rkind, rhash, mhash, rule, rgba, space=TARGET, layer=0, depth=0.0, paint=PAINT_SOLID, entry=0):
     return dict(k=FILL, rkind=rkind, rhash=rhash, mhash=mhash, rule=rule, rgba=rgba, space=space, layer=layer,
-                depth=depth, paint=paint)
+                depth=depth, paint=paint, entry=entry)
 
 
 def clip_push(rkind, rhash, mhash, rule, layer=0, depth=0.0):
@@ -258,7 +288,7 @@ def item_bytes(it):
     out = u8(k)
     if k == FILL:
         out += u64(it["rhash"]) + u64(it["mhash"]) + u8(it["rule"]) + u8(it["paint"])
-        out += color_bytes(it["rgba"], it["space"]) + i32(it["layer"]) + f64(it["depth"])
+        out += color_bytes(it["rgba"], it["space"]) + u32(it["entry"]) + i32(it["layer"]) + f64(it["depth"])
     elif k == CLIP_PUSH:
         out += u64(it["rhash"]) + u64(it["mhash"]) + u8(it["rule"]) + i32(it["layer"]) + f64(it["depth"])
     elif k == GROUP_PUSH:
@@ -269,8 +299,8 @@ def item_bytes(it):
     return out
 
 
-def list_hash(items, fg=DEFAULT_FG):
-    out = u32(2) + u32(0x5453494C) + color_bytes(fg[0], fg[1]) + u64(len(items))
+def list_hash(items, fg=DEFAULT_FG, palette=0):
+    out = u32(3) + u32(0x5453494C) + color_bytes(fg[0], fg[1]) + u64(palette) + u64(len(items))
     for it in items:
         out += item_bytes(it)
     return fnv(out)
@@ -280,9 +310,9 @@ def item_line(it):
     k = it["k"]
     ld = "layer=%d depth=%016x" % (it["layer"], bits(it["depth"])) if k != CLIP_POP and k != GROUP_POP else ""
     if k == FILL:
-        return "F res=%s:%016x map=%016x rule=%d paint=%d %s space=%s %s" % (
+        return "F res=%s:%016x map=%016x rule=%d paint=%d %s space=%s entry=%d %s" % (
             KIND_NAME[it["rkind"]], it["rhash"], it["mhash"], it["rule"], it["paint"],
-            " ".join("%016x" % bits(c) for c in it["rgba"]), space_text(it["space"]), ld)
+            " ".join("%016x" % bits(c) for c in it["rgba"]), space_text(it["space"]), it["entry"], ld)
     if k == CLIP_PUSH:
         return "C res=%s:%016x map=%016x rule=%d %s" % (KIND_NAME[it["rkind"]], it["rhash"], it["mhash"], it["rule"], ld)
     if k == CLIP_POP:
@@ -295,9 +325,9 @@ def item_line(it):
     return "I res=%s:%016x map=%016x %s" % (KIND_NAME[it["rkind"]], it["rhash"], it["mhash"], ld)
 
 
-def list_dump(items, fg=DEFAULT_FG, ties=()):
-    lines = ["gshscene.list 2 items=%d ties=%d fg=%s hash=%016x" % (
-        len(items), len(ties), color_text(fg[0], fg[1]), list_hash(items, fg))]
+def list_dump(items, fg=DEFAULT_FG, ties=(), palette=0):
+    lines = ["gshscene.list 3 items=%d ties=%d fg=%s palette=%016x hash=%016x" % (
+        len(items), len(ties), color_text(fg[0], fg[1]), palette, list_hash(items, fg, palette))]
     lines += [item_line(it) for it in items]
     for first, second, depth, reason in ties:
         lines.append("T first=%d second=%d depth=%016x reason=%d" % (first, second, bits(depth), reason))
@@ -381,10 +411,11 @@ LIST_ITEMS = [
     instance(KIND_PICTURE, PICTURE_RES, TRANSLATE, layer=1, depth=3.25),
     fill(KIND_RUN, OUTLINE_RUN_HASH, IDENTITY, 0, (2.0, -0.5, 0.0, 0.5), layer=5),
     fill(KIND_PATH, SQ_RES, IDENTITY, 0, (0.0, 0.0, 0.0, 0.75), paint=PAINT_FOREGROUND, layer=6),
+    fill(KIND_PATH, P2_RES, IDENTITY, 1, (0.0, 0.0, 0.0, 0.5), paint=PAINT_PALETTE, entry=2, layer=8),
     GROUP_POP_ITEM,
     CLIP_POP_ITEM,
 ]
-LIST_HASH = list_hash(LIST_ITEMS, LIST_FG)
+LIST_HASH = list_hash(LIST_ITEMS, LIST_FG, PALETTE_HASH)
 
 # The order fixture: recorded in declared order (ORDER_ITEMS_DECLARED); the generator puts it in paint order.
 # A depth group holding: a (depth 1), b (depth 2, layer 1), c (depth 2, layer 0), d (depth 2, layer 0: declared
@@ -446,14 +477,15 @@ def node_bytes(n):
         out += u64(len(n["children"])) + b"".join(u64(c) for c in n["children"])
     elif n["kind"] == NODE_SHAPE:
         out += u64(n["res"][1]) + u64(n["map"]) + u8(n["rule"]) + u8(n["paint"])
-        out += b"".join(f64(c) for c in n["rgba"]) + space_bytes(n["space"]) + i32(n["layer"]) + f64(n["depth"])
+        out += b"".join(f64(c) for c in n["rgba"]) + space_bytes(n["space"]) + u32(n["entry"]) + i32(n["layer"])
+        out += f64(n["depth"])
     else:
         out += u64(n["target"]) + u64(n["map"]) + i32(n["layer"]) + f64(n["depth"])
     return out
 
 
-def version_hash(nodes, fg=DEFAULT_FG):
-    out = u32(2) + u32(0x4E454353) + color_bytes(fg[0], fg[1]) + u64(len(nodes))
+def version_hash(nodes, fg=DEFAULT_FG, palette=0):
+    out = u32(3) + u32(0x4E454353) + color_bytes(fg[0], fg[1]) + u64(palette) + u64(len(nodes))
     for n in nodes:
         out += node_bytes(n)
     return fnv(out)
@@ -473,15 +505,16 @@ def node_line(n):
             head, n["map"], bits(n["opacity"]), space_text(n["blend"]), n["composite"], n["order"], n["layer"],
             bits(n["depth"]), clip_text, children)
     if n["kind"] == NODE_SHAPE:
-        return "%s res=%s:%016x map=%016x rule=%d paint=%d %s space=%s layer=%d depth=%016x" % (
+        return "%s res=%s:%016x map=%016x rule=%d paint=%d %s space=%s entry=%d layer=%d depth=%016x" % (
             head, KIND_NAME[n["res"][0]], n["res"][1], n["map"], n["rule"], n["paint"],
-            " ".join("%016x" % bits(c) for c in n["rgba"]), space_text(n["space"]), n["layer"], bits(n["depth"]))
+            " ".join("%016x" % bits(c) for c in n["rgba"]), space_text(n["space"]), n["entry"], n["layer"],
+            bits(n["depth"]))
     return "%s target=%d map=%016x layer=%d depth=%016x" % (head, n["target"], n["map"], n["layer"], bits(n["depth"]))
 
 
-def version_dump(nodes, fg=DEFAULT_FG):
-    lines = ["gshscene.version 2 nodes=%d root=1 fg=%s hash=%016x" % (
-        len(nodes), color_text(fg[0], fg[1]), version_hash(nodes, fg))]
+def version_dump(nodes, fg=DEFAULT_FG, palette=0):
+    lines = ["gshscene.version 3 nodes=%d root=1 fg=%s palette=%016x hash=%016x" % (
+        len(nodes), color_text(fg[0], fg[1]), palette, version_hash(nodes, fg, palette))]
     lines += [node_line(n) for n in nodes]
     return "\n".join(lines) + "\n"
 
@@ -495,7 +528,7 @@ def group_node(i, parent, children, **kw):
 
 def shape_node(i, parent, res, **kw):
     n = dict(id=i, kind=NODE_SHAPE, flags=0, parent=parent, key=None, res=res, map=IDENTITY, rule=0, paint=PAINT_SOLID,
-             rgba=BLACK, space=TARGET, layer=0, depth=0.0)
+             rgba=BLACK, space=TARGET, entry=0, layer=0, depth=0.0)
     n.update(kw)
     return n
 
@@ -517,8 +550,10 @@ SCENE_NODES = [
     shape_node(5, 4, (KIND_RUN, OUTLINE_RUN_HASH), key=(1, 2), map=TRANSLATE, rule=1, rgba=(2.0, -0.5, 0.0, 0.5), layer=5),
     shape_node(6, 4, (KIND_RUN, FONT_RUN_HASH), paint=PAINT_FOREGROUND, rgba=(0.0, 0.0, 0.0, 0.25)),
     instance_node(7, 1, 4, map=DESIGN, layer=9, depth=-4.5),
+    shape_node(8, 1, (KIND_PATH, P2_RES), paint=PAINT_PALETTE, entry=65534, rgba=(0.0, 0.0, 0.0, 1.0), layer=2),
 ]
-SCENE_HASH = version_hash(SCENE_NODES, SCENE_FG)
+SCENE_NODES[0]["children"].append(8)
+SCENE_HASH = version_hash(SCENE_NODES, SCENE_FG, PALETTE_HASH)
 EMPTY_NODES = [group_node(1, 0, [])]
 EMPTY_HASH = version_hash(EMPTY_NODES)
 
@@ -570,6 +605,7 @@ def render():
     o.append("namespace known {\n\n")
     for name, v in (("kSquareResourceHash", SQ_RES), ("kFixturePathResourceHash", P2_RES),
                     ("kFaceHash", FACE_HASH), ("kFontRunHash", FONT_RUN_HASH), ("kOutlineRunHash", OUTLINE_RUN_HASH),
+                    ("kPaletteHash", PALETTE_HASH), ("kPalette8Hash", PALETTE8_HASH),
                     ("kPictureListHash", PICTURE_LIST_HASH), ("kPictureHash", PICTURE_RES),
                     ("kListHash", LIST_HASH), ("kOrderListHash", ORDER_LIST_HASH), ("kMapIdentityHash", IDENTITY),
                     ("kMapTranslateHash", TRANSLATE), ("kMapDesignHash", DESIGN),
@@ -585,10 +621,12 @@ def render():
     o.append(cxx_string("kFaceDump", face_dump(*FACE)))
     o.append(cxx_string("kFontRunDump", run_dump(*FONT_RUN)))
     o.append(cxx_string("kOutlineRunDump", run_dump(*OUTLINE_RUN)))
+    o.append(cxx_string("kPaletteDump", palette_dump(PALETTE)))
+    o.append(cxx_string("kPalette8Dump", palette_dump(PALETTE8)))
     o.append(cxx_string("kPictureDump", "gshscene.resource 1 kind=picture hash=%016x\n" % PICTURE_RES + list_dump(PICTURE_ITEMS)))
-    o.append(cxx_string("kListDump", list_dump(LIST_ITEMS, LIST_FG)))
+    o.append(cxx_string("kListDump", list_dump(LIST_ITEMS, LIST_FG, palette=PALETTE_HASH)))
     o.append(cxx_string("kOrderListDump", list_dump(ORDER_ITEMS, DEFAULT_FG, ORDER_TIES)))
-    o.append(cxx_string("kSceneDump", version_dump(SCENE_NODES, SCENE_FG)))
+    o.append(cxx_string("kSceneDump", version_dump(SCENE_NODES, SCENE_FG, PALETTE_HASH)))
     o.append(cxx_string("kEmptySceneDump", version_dump(EMPTY_NODES)))
     o.append(cxx_string("kSceneBDump", version_dump(SCENE_B)))
     o.append("\n}  // namespace known\n\n#endif\n")

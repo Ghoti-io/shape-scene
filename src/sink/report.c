@@ -99,6 +99,8 @@ const char * gshscene_reason_string(GSHSCENE_Reason reason) {
       return "glyph-unavailable";
     case GSHSCENE_REASON_FACE_UNBOUND:
       return "face-unbound";
+    case GSHSCENE_REASON_PALETTE_ENTRY:
+      return "palette-entry";
     case GSHSCENE_REASON_COUNT:
       break;
   }

@@ -77,7 +77,8 @@ enum {
   OP_FREEZE, OP_LIST_DESTROY, OP_INTERN_PATH, OP_INTERN_RUN, OP_INTERN_OUTLINES, OP_RELEASE_RES, OP_SCENE_CREATE,
   OP_SCENE_DESTROY, OP_OPEN_EDIT, OP_DESTROY_EDIT, OP_ADD, OP_SET, OP_REMOVE, OP_MOVE, OP_UPSERT, OP_REMOVE_KEY,
   OP_PUBLISH, OP_MERGE, OP_HOLD, OP_RELEASE_VERSION, OP_DIFF, OP_EMIT, OP_VISIT, OP_DUMP, OP_SCENE_INTERN,
-  OP_FILL_EX, OP_CLIP_PUSH_EX, OP_GROUP_PUSH_EX, OP_LIST_FOREGROUND, OP_NODE_PROPS, OP_EDIT_FOREGROUND, OP_COUNT
+  OP_FILL_EX, OP_CLIP_PUSH_EX, OP_GROUP_PUSH_EX, OP_LIST_FOREGROUND, OP_NODE_PROPS, OP_EDIT_FOREGROUND, OP_LIST_PALETTE,
+  OP_FILL_FIXED, OP_TRUNCATE, OP_EDIT_PALETTE, OP_COUNT
 };
 
 /* --- the outcomes the corpus must reach ------------------------------------------------------------ */
@@ -85,13 +86,13 @@ enum {
 enum {
   OUT_LIST_LIMIT = 0, OUT_INTERN_LIMIT, OUT_EDIT_LIMIT, OUT_PUBLISH_LIMIT, OUT_PUBLISH_REFUSED, OUT_PUBLISH_INVALID,
   OUT_PUBLISH_OK, OUT_MERGE_OK, OUT_EMIT_OK, OUT_DIFF_OK, OUT_INSTANCE_PICTURE, OUT_LIST_TIES, OUT_FOREGROUND_VERSION,
-  OUT_PARAMETER_REFUSED, OUT_EMIT_TIES, OUT_COUNT
+  OUT_PARAMETER_REFUSED, OUT_EMIT_TIES, OUT_PALETTE_FILL, OUT_TRUNCATED, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limit", "edit limit", "publish limit",
     "publish refused", "publish invalid", "publish ok", "merge ok", "emit ok", "diff ok", "instance of a picture",
     "a closed list with ties", "a version whose foreground changed", "a merge refused over the foreground",
-    "an emitted list with ties"};
+    "an emitted list with ties", "a palette fill recorded", "a list truncated"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -1076,8 +1077,12 @@ static void op(S * s, unsigned code) {
                    : kind == 2             ? GSHSCENE_PAINT_PALETTE
                    : kind == 3             ? GSHSCENE_PAINT_GRADIENT
                                            : GSHSCENE_PAINT_SOLID;
-      if (paint.kind == GSHSCENE_PAINT_FOREGROUND && pick(s, 4) != 0) {
+      if ((paint.kind == GSHSCENE_PAINT_FOREGROUND || paint.kind == GSHSCENE_PAINT_PALETTE) && pick(s, 4) != 0) {
         paint.rgba[0] = paint.rgba[1] = paint.rgba[2] = 0.0; /* mostly valid, sometimes not */
+      }
+      if (paint.kind == GSHSCENE_PAINT_PALETTE) {
+        unsigned e = arg(s);
+        paint.entry = e == 255 ? 0xFFFFu : e % 6; /* 0xFFFF is never an entry (N14) */
       }
       paint.space = pool_space(arg(s));
       const GSHSCENE_Resource * target = s->res[pick(s, POOL)];
@@ -1181,6 +1186,105 @@ static void op(S * s, unsigned code) {
         CHECK(memcmp(&now.node.depth, &info.node.depth, sizeof now.node.depth) == 0 &&
               now.node.ordering == info.node.ordering && now.node.composite == info.node.composite);
       }
+      break;
+    }
+    case OP_LIST_PALETTE: {
+      /* N14: a palette of a few 8-bit entries (or none), set on the list; a refusal changes nothing. */
+      if (!s->list) {
+        break;
+      }
+      uint8_t bytes[4 * 4];
+      unsigned count = pick(s, 5);
+      for (unsigned i = 0; i < 4 * count; i++) {
+        bytes[i] = (uint8_t)arg(s);
+      }
+      const GSHSCENE_Resource * palette = NULL;
+      int none = pick(s, 4) == 0;
+      if (!none) {
+        r = gshscene_store_intern_palette_rgba8(s->store, count, bytes, &palette);
+        CHECK(r == GSHSCENE_OK || r == GSHSCENE_ERR_LIMIT);
+        if (r != GSHSCENE_OK) {
+          outcomes[OUT_INTERN_LIMIT]++;
+          break;
+        }
+        CHECK(gshscene_resource_palette_count(palette) == count);
+      }
+      const GSHSCENE_Resource * was = gshscene_list_palette(s->list);
+      int closed = gshscene_list_is_closed(s->list);
+      r = gshscene_list_set_palette(s->list, palette);
+      CHECK(r == (closed ? GSHSCENE_ERR_INVALID : GSHSCENE_OK));
+      CHECK(gshscene_list_palette(s->list) == (r == GSHSCENE_OK ? palette : was));
+      gshscene_resource_release(palette); /* the list holds its own */
+      break;
+    }
+    case OP_FILL_FIXED: {
+      /* fixed.h: a fill or clip push with a design map and a fixed paint, palette entries of every kind. */
+      if (!s->list) {
+        break;
+      }
+      ListSnap b = snap(s->list);
+      const GSHSCENE_Resource * target = s->res[pick(s, POOL)];
+      GSHSCENE_Fixed_Op ops[3];
+      memset(ops, 0, sizeof ops);
+      size_t op_count = pick(s, 4);
+      for (size_t k = 0; k < op_count; k++) {
+        ops[k].kind = pick(s, GSHSCENE_FIXED_OP_COUNT + 1);
+        ops[k].bits = pick(s, 33);
+        for (int v = 0; v < 6; v++) {
+          ops[k].v[v] = pick(s, 3) ? 0 : (int32_t)arg(s) - 128;
+        }
+      }
+      GSHSCENE_Paint_Fixed paint = {2u + pick(s, 2), 0, (int32_t)pick(s, 20) - 2, pick(s, 4)};
+      unsigned e = arg(s);
+      paint.entry = e == 255 ? 0xFFFFu : e == 254 ? 0x10000u : e % 6;
+      int clip = pick(s, 4) == 0;
+      r = clip ? gshscene_list_clip_push_fixed(s->list, target, ops, op_count, GSHGEOM_FILL_NONZERO, (int32_t)pick(s, 3))
+               : gshscene_list_fill_fixed(s->list, target, ops, op_count, GSHGEOM_FILL_NONZERO, &paint, (int32_t)pick(s, 3));
+      list_after(s, b, r, clip, 0);
+      if (r == GSHSCENE_OK && !clip) {
+        const GSHSCENE_Item * item;
+        CHECK(gshscene_list_item(s->list, b.count, &item) == GSHSCENE_OK);
+        CHECK(item->paint.kind == GSHSCENE_PAINT_PALETTE || item->paint.kind == GSHSCENE_PAINT_FOREGROUND);
+        CHECK(item->paint.kind == GSHSCENE_PAINT_FOREGROUND ? item->paint.entry == 0
+                                                            : item->paint.entry <= GSHSCENE_PALETTE_ENTRY_MAX);
+        CHECK(paint.entry != 0xFFFFu || item->paint.kind == GSHSCENE_PAINT_FOREGROUND);
+        outcomes[OUT_PALETTE_FILL] += item->paint.kind == GSHSCENE_PAINT_PALETTE;
+      }
+      break;
+    }
+    case OP_TRUNCATE: {
+      if (!s->list) {
+        break;
+      }
+      ListSnap b = snap(s->list);
+      size_t to = b.count ? (size_t)pick(s, (unsigned)(b.count < 255 ? b.count + 1 : 255)) : 0;
+      r = gshscene_list_truncate(s->list, to);
+      CHECK(r == (b.closed ? GSHSCENE_ERR_INVALID : GSHSCENE_OK));
+      CHECK(gshscene_list_count(s->list) == (r == GSHSCENE_OK ? to : b.count));
+      CHECK(gshscene_list_expansion(s->list) <= b.expansion);
+      outcomes[OUT_TRUNCATED] += r == GSHSCENE_OK && to < b.count;
+      break;
+    }
+    case OP_EDIT_PALETTE: {
+      unsigned k = pick(s, EDITS);
+      if (!has_edit(s, k)) {
+        break;
+      }
+      GSHSCENE_Store * store = gshscene_edit_store(s->edits[k]);
+      uint8_t bytes[4] = {(uint8_t)arg(s), (uint8_t)arg(s), (uint8_t)arg(s), (uint8_t)arg(s)};
+      const GSHSCENE_Resource * palette = NULL;
+      if (pick(s, 3) != 0) {
+        r = gshscene_store_intern_palette_rgba8(store, 1u + pick(s, 1), bytes, &palette);
+        if (r != GSHSCENE_OK) {
+          CHECK(r == GSHSCENE_ERR_LIMIT);
+          break;
+        }
+      }
+      const GSHSCENE_Resource * was = gshscene_edit_palette(s->edits[k]);
+      r = gshscene_edit_set_palette(s->edits[k], palette);
+      CHECK(r == GSHSCENE_OK || r == GSHSCENE_ERR_INVALID);
+      CHECK(gshscene_edit_palette(s->edits[k]) == (r == GSHSCENE_OK ? palette : was));
+      gshscene_resource_release(palette); /* the edit holds its own */
       break;
     }
     case OP_EDIT_FOREGROUND: {

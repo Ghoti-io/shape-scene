@@ -44,7 +44,7 @@ namespace {
 /** The fixture of tools/gen-scene-vectors.py, built through the API in the order of its IDs. */
 struct Fixture {
   SceneHolder s;
-  Ref sq, p2, face, font_run, outline_run;
+  Ref sq, p2, face, font_run, outline_run, palette;
   VersionRef v;
   Fixture() {
     sq.resource = intern_square(s.store());
@@ -104,8 +104,19 @@ struct Fixture {
     i7.map = design;
     i7.depth = -4.5;
     add(e.edit, GSHSCENE_ROOT_ID, i7);                                           // 7
+    GSHSCENE_Node s8 = shape_node(p2.get(), 2);
+    s8.paint = solid(0.0, 0.0, 0.0, 1.0);
+    s8.paint.kind = GSHSCENE_PAINT_PALETTE;
+    s8.paint.entry = GSHSCENE_PALETTE_ENTRY_MAX;
+    add(e.edit, GSHSCENE_ROOT_ID, s8);                                           // 8
     GSHSCENE_Color fg = {{1.0, 0.5, 0.25, 0.75}, space_of(GCOL_PRIMARIES_DISPLAY_P3, GCOL_TRANSFER_GAMMA, 2.2)};
     EXPECT_EQ(gshscene_edit_set_foreground(e.edit, &fg), GSHSCENE_OK);
+    // The palette of tools/gen-scene-vectors.py (PALETTE).
+    const GSHSCENE_Color entries[3] = {{{1.0, 0.5, 0.25, 1.0}, space_of(GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_SRGB, 0.0)},
+        {{0.0, 0.75, 1.0, 0.5}, space_of(GCOL_PRIMARIES_DISPLAY_P3, GCOL_TRANSFER_GAMMA, 2.2)},
+        {{0.125, 0.0, 2.0, 0.25}, linear_srgb_space()}};
+    EXPECT_EQ(gshscene_store_intern_palette(s.store(), 3, entries, &palette.resource), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_edit_set_palette(e.edit, palette.get()), GSHSCENE_OK);
     publish(s, e, &v);
   }
 };
@@ -125,7 +136,7 @@ std::vector<std::string> lines_of(const std::string & text) {
 TEST(VersionHash, TheFixtureHashesAndDumpsAsTheIndependentGeneratorSays) {
   Fixture f;
   ASSERT_NE(f.v.get(), nullptr);
-  EXPECT_EQ(gshscene_version_node_count(f.v.get()), 7u);
+  EXPECT_EQ(gshscene_version_node_count(f.v.get()), 8u);
   EXPECT_EQ(gshscene_version_hash(f.v.get()), known::kSceneHash);
   EXPECT_EQ(dump_version(f.v.get()), known::kSceneDump);
 }
@@ -340,12 +351,12 @@ TEST(VersionDump, ParsesBackToTheFieldsTheHashIsOver) {
   std::vector<std::string> lines = lines_of(dump_version(f.v.get()));
   ASSERT_GE(lines.size(), 2u);
   auto header = fields_of(lines[0], 2);
-  ASSERT_EQ(lines[0].substr(0, 18), "gshscene.version 2");
+  ASSERT_EQ(lines[0].substr(0, 18), "gshscene.version 3");
   EXPECT_EQ(std::stoull(header["nodes"]), lines.size() - 1);
   EXPECT_EQ(header["root"], "1");
   GSHGEOM_Hash h;
   gshgeom_hash_init(&h);
-  gshgeom_hash_u32(&h, 2);
+  gshgeom_hash_u32(&h, 3);
   gshgeom_hash_u32(&h, 0x4e454353u);
   {
     // The foreground: four bare doubles and a space after `fg=`.
@@ -357,7 +368,7 @@ TEST(VersionDump, ParsesBackToTheFieldsTheHashIsOver) {
       if (tok.rfind("fg=", 0) == 0) {
         after = true;
         fgtok.push_back(tok.substr(3));
-      } else if (after && tok.rfind("hash=", 0) != 0) {
+      } else if (after && tok.rfind("hash=", 0) != 0 && tok.rfind("palette=", 0) != 0) {
         fgtok.push_back(tok);
       }
     }
@@ -367,6 +378,7 @@ TEST(VersionDump, ParsesBackToTheFieldsTheHashIsOver) {
     }
     hash_space(&h, fgtok[4]);
   }
+  gshgeom_hash_u64(&h, hex(header["palette"]));
   gshgeom_hash_u64(&h, lines.size() - 1);
   uint64_t last_id = 0;
   for (size_t i = 1; i < lines.size(); i++) {
@@ -442,6 +454,7 @@ TEST(VersionDump, ParsesBackToTheFieldsTheHashIsOver) {
         gshgeom_hash_f64(&h, rgba[k]);
       }
       hash_space(&h, fld["space"]);
+      gshgeom_hash_u32(&h, (uint32_t)std::stoul(fld["entry"]));
       gshgeom_hash_i32(&h, (int32_t)std::stol(fld["layer"]));
       gshgeom_hash_f64(&h, dbl(fld["depth"]));
     } else {

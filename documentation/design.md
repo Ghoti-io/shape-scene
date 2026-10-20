@@ -35,7 +35,13 @@ F2.14 (trailing zeros dropped, so equal instances are one handle), with the prov
 non-content field: the first intern of a content builds the face, asks `face_info` once and retains the
 binding, and the face's last release releases it once. A run from a font names a face handle, which it
 holds. The formats are per kind: a glyph run's hash and dump are format 2 since the face replaced the key; a
-path's, a picture's and a face's are 1.
+path's, a picture's, a face's and a palette's are 1.
+
+A palette (story 14c, N14) is a resource too: a table of at most 65,535 colors, each straight `double`s and a
+space, interned by content. A font's CPAL reaches it through the float-free `gshscene_store_intern_palette_rgba8`
+(fixed.h): each 8-bit component becomes `c / 255`, the double nearest (one correctly rounded division of two exact
+integers, so every target gives the same bits; the probe checks it), and the space is sRGB, which is what CPAL
+states.
 
 ## Lists
 
@@ -53,13 +59,33 @@ The spellings are in `resource.h` and `list.h`, field by field, in `shape-geomet
 `struct`, and `tests/known_answers.h` is what it writes. `tools/corpus-hash.c` is the cross-target probe:
 `suite/tools/xarch/shape.sh` and `xwin/shape.sh` check its hash on every target.
 
+## Recording without floats (fixed.h; story 14c)
+
+A front end whose headers name no floating type (`font`, AD-5) records with `fixed.h`, which is float-free and
+read by the same gate as `glyph_provider.h`: a fill or clip push of a run from a font with a **design map** (a chain
+of integer ops: affine, translate, scale, rotate and skew in turns, each about a center, every value `v / 2^bits`), a
+foreground or palette paint with a fixed alpha, a group push of an operator, the two pops, the count and
+**truncation**. Each converts exactly and calls the list's own record call, so the rules and failures are the list's.
+
+The design map is in the face's design units, y up, about the run's first glyph `g`, at the run's scale `s =
+size / upem`. Each op's map is shape-geometry's (a rotation in turns, so quarter turns are exact; a skew's tangent is
+the sine over the cosine of that rotation), the chain is `gshgeom_map_compose_chain` of them, and with `T = (A, b)`
+the item map is `translate(s b_x, -(s b_y))` when `A` is exactly the identity, else the composer's chain of
+`translate(g)`, `flip_y`, `(A, s b)`, `flip_y` and `translate(-g)`. No inverse is formed: `diag(s, -s) A diag(s,
+-s)^-1` is `diag(1, -1) A diag(1, -1)`, which the two flips compute exactly. A translation stays a translation, so a
+run that the design map only moves keeps the fast tier (D2's route).
+
+A **palette entry of `0xFFFF`** (a font's foreground) becomes the foreground paint in the fixed paint, so every front
+end lowers it alike; the `double` paint refuses it. **`gshscene_list_truncate`** drops items from a count on as if
+they had not been recorded (references released, the open pushes, the expansion and the deepest picture counted
+again from the items kept), so a front end that lowers one construct into several items leaves the list with all of
+it or none.
+
 ## Reserved
 
-The gradient and image resource kinds, a gradient paint and a palette paint are named and refused with
+The gradient and image resource kinds and a gradient paint are named and refused with
 `ERR_UNSUPPORTED`; their values are pinned because they are hashed. A story that gives one a meaning adds a
-constructor or loosens one check. A palette paint stays refused because AD-23 says only that the palette
-index is a scene parameter, not whose table it selects in, how the table reaches the scene, or what a
-missing entry is; that is settled with the font's CPAL. Also refused with `ERR_UNSUPPORTED` are ProPhoto
+constructor or loosens one check. (The palette paint, refused until story 14c, is N14 below.) Also refused with `ERR_UNSUPPORTED` are ProPhoto
 (D50: converting to it needs a chromatic adaptation), the parametric, BT.1886, PQ and HLG transfers and ICC
 profiles, and every blend mode (multiply, screen, ...): the composite operator has room for them.
 
@@ -174,10 +200,24 @@ drawing. The ties are an annotation for a report: they are in the dump and in ne
 
 **N13 Damage.** An occurrence of a group whose operator is unbounded that lies in a damaged subtree makes the damage
 unbounded (a sink redraws the whole target); a changed foreground damages the occurrences of the shapes that paint with
-it and nothing else; a change of anything else a node carries damages its subtree, as before.
+it and nothing else; a changed palette (N14) damages the occurrences of the shapes that paint from it and nothing
+else; a change of anything else a node carries damages its subtree, as before.
 
-**Not decided here, and where it is recorded.** Blend modes (multiply, screen, ...), the other color spaces, the
-palette paint, gradients, the depth predicate for 3D maps, and the merge of adds to one parent are Deferred rows in the
+**N14 Palette** (story 14c; AD-23's palette index). A **palette** is a resource: a table of colors, each a straight
+color and a space as a foreground is. A version and a list carry a **palette parameter**, a palette handle or none,
+beside the foreground; a version's list carries its version's; a picture has none (its palette paints resolve against
+the list that draws it). A `PALETTE` paint names an **entry** in `[0, 0xFFFE]` with an alpha multiplier `a`: it is
+the entry's color `(pr, pg, pb, pa)` with its alpha multiplied, straight `(pr, pg, pb, pa * a)` in the entry's
+space; its `r, g, b` are zero and its space is zero (one spelling). `0xFFFF`, which a font uses for the foreground,
+is never an entry: the float-free paint lowers it to `FOREGROUND`. An entry the palette in force does not have (no
+palette, or an entry at or past its count) is **missing**: the fill is **refused by the planning pass**, reason
+`PALETTE_ENTRY`, on every sink, and is never drawn in another color (transparent, the foreground or a default would
+each be a color the author did not state). The one resolution is `gshscene_paint_resolve`, and the one disposition
+(`gshscene_caps_disposition`) takes the palette, so a writer, a GPU sink and shape-cpu refuse the same fills. A
+palette change is a new parameter, never a re-lowering (AD-23): a theme picks another handle.
+
+**Not decided here, and where it is recorded.** Blend modes (multiply, screen, ...), the other color spaces,
+gradients, the depth predicate for 3D maps, and the merge of adds to one parent are Deferred rows in the
 spine; `notes/shape/merge-adds-to-one-parent.md` assesses the last.
 
 ## The retained scene

@@ -90,7 +90,7 @@ GSHSCENE_Result gshscene_scene_create(const GSHSCENE_Allocator * alloc, const GS
     nodes[0] = root;
     GSHSCENE_Color foreground;
     gshscene_color_init(&foreground);
-    result = gshscene_version_make(core, 0, nodes, 1, NULL, &foreground, &core->current);
+    result = gshscene_version_make(core, 0, nodes, 1, NULL, &foreground, NULL, &core->current);
   }
   if (result != GSHSCENE_OK) {
     gshscene_free(&core->alloc, nodes);
@@ -170,6 +170,7 @@ typedef struct Plan {
   GSHSCENE_Key_Change * kc; /* ascending by key */
   size_t kc_n;
   int fg; /* the edit sets the foreground to something its base does not have */
+  int pal; /* the edit sets the palette to another than its base's */
 } Plan;
 
 static int color_equal(const GSHSCENE_Color * a, const GSHSCENE_Color * b) {
@@ -234,6 +235,7 @@ static GSHSCENE_Result plan_make(const GSHSCENE_Allocator * alloc, GSHSCENE_Edit
     qsort(plan->kc, plan->kc_n, sizeof *plan->kc, key_change_compare);
   }
   plan->fg = edit->fg_set && !color_equal(&edit->fg, &base->foreground);
+  plan->pal = edit->pal_set && edit->pal != base->palette;
   return GSHSCENE_OK;
 }
 
@@ -309,18 +311,27 @@ static void key_conflicts(Conflicts * c, const Plan * plans, size_t n, const str
   }
 }
 
-/* The version's parameters: two plans that both set the foreground, or one that does where a publish since its base did. */
+/* The version's parameters: two plans that both set the foreground, or one that does where a publish since its base
+ * did; likewise the palette (N14). */
 static void parameter_conflicts(Conflicts * c, const Plan * plans, size_t n, const struct GSHSCENE_Version * current) {
   for (size_t i = 0; i < n; i++) {
-    if (!plans[i].fg) {
-      continue;
+    if (plans[i].fg) {
+      int clash = !color_equal(&plans[i].edit->base->foreground, &current->foreground);
+      for (size_t j = i + 1; j < n && !clash; j++) {
+        clash = plans[j].fg;
+      }
+      if (clash) {
+        conflict(c, GSHSCENE_ROOT_ID, GSHSCENE_PROBLEM_PARAMETER);
+      }
     }
-    int clash = !color_equal(&plans[i].edit->base->foreground, &current->foreground);
-    for (size_t j = i + 1; j < n && !clash; j++) {
-      clash = plans[j].fg;
-    }
-    if (clash) {
-      conflict(c, GSHSCENE_ROOT_ID, GSHSCENE_PROBLEM_PARAMETER);
+    if (plans[i].pal) {
+      int clash = plans[i].edit->base->palette != current->palette;
+      for (size_t j = i + 1; j < n && !clash; j++) {
+        clash = plans[j].pal;
+      }
+      if (clash) {
+        conflict(c, GSHSCENE_ROOT_ID, GSHSCENE_PROBLEM_PARAMETER);
+      }
     }
   }
 }
@@ -487,7 +498,7 @@ static GSHSCENE_Result publish_locked(GSHSCENE_Core * core, GSHSCENE_Edit * cons
     result = plan_make(alloc, edits[i], &plans[i]);
     if (result == GSHSCENE_OK) {
       made++;
-      touched += plans[i].ch_n + plans[i].kc_n + (plans[i].fg ? 1u : 0u);
+      touched += plans[i].ch_n + plans[i].kc_n + (plans[i].fg ? 1u : 0u) + (plans[i].pal ? 1u : 0u);
     }
   }
   GSHSCENE_Diff_Entry * since = NULL;
@@ -548,12 +559,16 @@ static GSHSCENE_Result publish_locked(GSHSCENE_Core * core, GSHSCENE_Edit * cons
   }
   if (result == GSHSCENE_OK) {
     GSHSCENE_Color foreground = current->foreground;
+    const GSHSCENE_Resource * palette = current->palette;
     for (size_t i = 0; i < n; i++) {
       if (plans[i].fg) {
         foreground = plans[i].edit->fg;
       }
+      if (plans[i].pal) {
+        palette = plans[i].edit->pal;
+      }
     }
-    result = gshscene_version_make(core, core->versions + 1, nodes, node_n, keys, &foreground, &version);
+    result = gshscene_version_make(core, core->versions + 1, nodes, node_n, keys, &foreground, palette, &version);
   }
   if (result == GSHSCENE_OK) {
     /* Commit: nothing below fails. */

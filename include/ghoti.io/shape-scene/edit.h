@@ -156,6 +156,22 @@ GSHSCENE_API GSHSCENE_Result gshscene_edit_set_foreground(GSHSCENE_Edit * edit, 
 /** @brief The foreground of the edit's view (its own, if set, else its base's); ::GSHSCENE_ERR_INVALID for NULL.  Written only on success. */
 GSHSCENE_API GSHSCENE_Result gshscene_edit_foreground(const GSHSCENE_Edit * edit, GSHSCENE_Color * out);
 
+/**
+ * @brief Set the palette of the version this edit makes (N14): the table a ::GSHSCENE_PAINT_PALETTE shape's entry
+ *   indexes.
+ *
+ * An edit that sets the palette its base has changes nothing.  Two edits of one base that both set it overlap (the
+ * root is named, with ::GSHSCENE_PROBLEM_PARAMETER), as does one whose base's palette a publish since has changed.
+ *
+ * @param palette A palette resource of the scene's store (retained by the edit), or NULL for none.
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL edit, a spent edit, a resource that is not a palette of the
+ *   scene's store).  A failing call changes nothing.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_edit_set_palette(GSHSCENE_Edit * edit, const GSHSCENE_Resource * palette);
+
+/** @brief The palette of the edit's view (its own, if set, else its base's); NULL for none and for NULL. */
+GSHSCENE_API const GSHSCENE_Resource * gshscene_edit_palette(const GSHSCENE_Edit * edit);
+
 /** @brief Read a node of the edit's view (its base and its own changes).  As ::gshscene_version_node. */
 GSHSCENE_API GSHSCENE_Result gshscene_edit_node(
     const GSHSCENE_Edit * edit, uint64_t id, GSHSCENE_Node_Info * out);

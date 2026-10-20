@@ -671,7 +671,8 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
     emit_text(run, run->line, &failed);
     return failed;
   }
-  GSHSCENE_Disposition d = gshscene_caps_disposition(&run->job->caps, item, &run->job->target_space);
+  GSHSCENE_Disposition d = gshscene_caps_disposition(
+      &run->job->caps, item, &run->job->target_space, gshscene_list_palette(run->job->request.list));
   if (d.entry_class == GSHSCENE_ENTRY_REFUSED) {
     snprintf(run->line, LINE_BYTES, " X class=%d reason=%d\n", (int)d.entry_class, (int)d.reason);
     emit_text(run, run->line, &failed);

@@ -73,7 +73,8 @@ uint64_t gshscene_keys_find(const GSHSCENE_Keys * keys, const GSHSCENE_Key * key
 /* --- making and freeing ------------------------------------------------------------------- */
 
 GSHSCENE_Result gshscene_version_make(GSHSCENE_Core * core, uint64_t number, GSHSCENE_Node_Rec ** nodes,
-    size_t count, GSHSCENE_Keys * keys, const GSHSCENE_Color * foreground, const struct GSHSCENE_Version ** out) {
+    size_t count, GSHSCENE_Keys * keys, const GSHSCENE_Color * foreground, const GSHSCENE_Resource * palette,
+    const struct GSHSCENE_Version ** out) {
   struct GSHSCENE_Version * version = gshscene_calloc(&core->alloc, 1, sizeof *version);
   if (!version) {
     return GSHSCENE_ERR_OOM;
@@ -94,6 +95,7 @@ GSHSCENE_Result gshscene_version_make(GSHSCENE_Core * core, uint64_t number, GSH
   version->keys = keys;
   gshscene_keys_ref(keys);
   version->foreground = *foreground;
+  version->palette = gshscene_resource_retain(palette);
   *out = version;
   return GSHSCENE_OK;
 }
@@ -121,6 +123,7 @@ void gshscene_version_release(const GSHSCENE_Version * handle) {
   }
   gshscene_free(&alloc, version->nodes);
   gshscene_keys_unref(version->keys);
+  gshscene_resource_release(version->palette);
   GCU_MUTEX_DESTROY(version->lock);
   gshscene_free(&alloc, version);
   gshscene_core_unref(core);
@@ -142,6 +145,10 @@ GSHSCENE_Result gshscene_version_foreground(const GSHSCENE_Version * version, GS
   }
   *out = version->foreground;
   return GSHSCENE_OK;
+}
+
+const GSHSCENE_Resource * gshscene_version_palette(const GSHSCENE_Version * version) {
+  return version ? version->palette : NULL;
 }
 
 size_t gshscene_version_key_count(const GSHSCENE_Version * version) {
@@ -227,6 +234,7 @@ uint64_t gshscene_version_hash(const GSHSCENE_Version * version) {
   gshgeom_hash_u32(&h, VERSION_FORMAT_VERSION);
   gshgeom_hash_u32(&h, VERSION_HASH_KIND);
   gshscene_color_hash(&h, &version->foreground);
+  gshgeom_hash_u64(&h, version->palette ? gshscene_resource_hash(version->palette) : 0);
   gshgeom_hash_u64(&h, (uint64_t)version->count);
   for (size_t i = 0; i < version->count; i++) {
     gshscene_node_hash(&h, version->nodes[i]);
@@ -292,7 +300,8 @@ static int put_node(FILE * out, const GSHSCENE_Node_Rec * node) {
               (unsigned)p->paint.kind, HEX(gshgeom_f64_bits(p->paint.rgba[0])), HEX(gshgeom_f64_bits(p->paint.rgba[1])),
               HEX(gshgeom_f64_bits(p->paint.rgba[2])), HEX(gshgeom_f64_bits(p->paint.rgba[3]))) < 0 ||
           gshscene_space_dump(out, &p->paint.space) < 0 ||
-          fprintf(out, " layer=%lld depth=%016llx", (long long)p->layer, HEX(gshgeom_f64_bits(p->depth))) < 0) {
+          fprintf(out, " entry=%u layer=%lld depth=%016llx", (unsigned)p->paint.entry, (long long)p->layer,
+              HEX(gshgeom_f64_bits(p->depth))) < 0) {
         return -1;
       }
       return 0;
@@ -315,7 +324,8 @@ GSHSCENE_Result gshscene_version_dump(const GSHSCENE_Version * version, FILE * o
           HEX(version->count), HEX(GSHSCENE_ROOT_ID), HEX(gshgeom_f64_bits(fg->rgba[0])),
           HEX(gshgeom_f64_bits(fg->rgba[1])), HEX(gshgeom_f64_bits(fg->rgba[2])), HEX(gshgeom_f64_bits(fg->rgba[3]))) < 0 ||
       gshscene_space_dump(out, &fg->space) < 0 ||
-      fprintf(out, " hash=%016llx\n", HEX(gshscene_version_hash(version))) < 0) {
+      fprintf(out, " palette=%016llx hash=%016llx\n",
+          HEX(version->palette ? gshscene_resource_hash(version->palette) : 0), HEX(gshscene_version_hash(version))) < 0) {
     return GSHSCENE_ERR_IO;
   }
   for (size_t i = 0; i < version->count; i++) {

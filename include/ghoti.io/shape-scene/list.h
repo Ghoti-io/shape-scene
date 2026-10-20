@@ -75,7 +75,9 @@
  * **N9**: the clips in force are those pushed and not popped within the same
  * group (the root counts as one); a group push does not take them into its own
  * layer.  **N10**: a ::GSHSCENE_PAINT_FOREGROUND fill uses the list's foreground
- * (::gshscene_list_set_foreground).  **N11, N12**: the order is made by
+ * (::gshscene_list_set_foreground).  **N14**: a ::GSHSCENE_PAINT_PALETTE fill
+ * uses an entry of the list's palette (::gshscene_list_set_palette), and one
+ * whose entry is missing is refused.  **N11, N12**: the order is made by
  * ::gshscene_list_close, as below.
  *
  * ### Order and ties (N11, N12)
@@ -104,15 +106,16 @@
  * list is used from one thread at a time, and a closed list is immutable and may
  * be read from many.
  *
- * ### The hash of a list (version 2)
+ * ### The hash of a list (version 3)
  *
- * In the spelling of shape-geometry's hash.h: `u32` 2 (this format), `u32`
- * `0x5453494c`, the foreground (four `f64` and a space), `u64` the item count;
- * then for each item a `u8` kind (::GSHSCENE_Item_Kind, pinned) and:
+ * In the spelling of shape-geometry's hash.h: `u32` 3 (this format), `u32`
+ * `0x5453494c`, the foreground (four `f64` and a space), `u64` the palette's
+ * content hash (0 for none), `u64` the item count; then for each item a `u8`
+ * kind (::GSHSCENE_Item_Kind, pinned) and:
  *
  * - **fill**: `u64` the resource's content hash, `u64` the map's hash
  *   (`gshgeom_map_hash`), `u8` the fill rule, the paint (`u8` kind, four `f64`, a
- *   space), `i32` layer, `f64` depth.
+ *   space, `u32` entry), `i32` layer, `f64` depth.
  * - **clip push**: `u64` resource hash, `u64` map hash, `u8` fill rule, `i32`
  *   layer, `f64` depth.
  * - **group push**: `f64` opacity, a space (the blend space), `u8` composite,
@@ -125,9 +128,9 @@
  *
  * ### The dump
  *
- * `gshscene.list 2 items=N ties=T fg=<r> <g> <b> <a> <space> hash=<16 hex digits>`
- * and one line per item:
- * `F res=<kind>:<hash> map=<hash> rule=N paint=N <r> <g> <b> <a> space=<space> layer=N depth=<hex>`,
+ * `gshscene.list 3 items=N ties=T fg=<r> <g> <b> <a> <space> palette=<hash> hash=<16 hex digits>`
+ * (the palette's content hash, 0 for none) and one line per item:
+ * `F res=<kind>:<hash> map=<hash> rule=N paint=N <r> <g> <b> <a> space=<space> entry=E layer=N depth=<hex>`,
  * `C res=<kind>:<hash> map=<hash> rule=N layer=N depth=<hex>`, `c`,
  * `G opacity=<hex> blend=<space> composite=N order=N layer=N depth=<hex>`, `g`,
  * `I res=<kind>:<hash> map=<hash> layer=N depth=<hex>`, then one line per tie,
@@ -282,7 +285,7 @@ GSHSCENE_API GSHSCENE_Result gshscene_list_reset(GSHSCENE_List * list);
  * @param resource A path or glyph run of the list's store.
  * @param map The placement, or NULL for the 2D identity.
  * @param rule The fill rule.
- * @param paint The paint (solid or foreground), or NULL for opaque black.
+ * @param paint The paint (solid, foreground or palette), or NULL for opaque black.
  * @param layer The declared layer.
  * @param depth The declared depth: finite (else ::GSHSCENE_ERR_INVALID).
  */
@@ -324,6 +327,19 @@ GSHSCENE_API GSHSCENE_Result gshscene_list_set_foreground(GSHSCENE_List * list, 
 
 /** @brief The list's foreground; ::GSHSCENE_ERR_INVALID for NULL.  Written only on success. */
 GSHSCENE_API GSHSCENE_Result gshscene_list_foreground(const GSHSCENE_List * list, GSHSCENE_Color * out);
+
+/**
+ * @brief Set the list's palette (N14), whose entries ::GSHSCENE_PAINT_PALETTE fills name.
+ *
+ * @param palette A palette resource of the list's store, which the list retains (releasing the one it had), or NULL
+ *   for none.
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL list, a closed list, a resource that is not a palette of the
+ *   list's store).  A failing call changes nothing.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_list_set_palette(GSHSCENE_List * list, const GSHSCENE_Resource * palette);
+
+/** @brief The list's palette, or NULL for none and for a NULL list.  The list holds the reference. */
+GSHSCENE_API const GSHSCENE_Resource * gshscene_list_palette(const GSHSCENE_List * list);
 
 /**
  * @brief Seal the list, putting it in paint order (N11, N12).
@@ -375,7 +391,7 @@ GSHSCENE_API size_t gshscene_list_expansion(const GSHSCENE_List * list);
 GSHSCENE_API size_t gshscene_list_bytes(const GSHSCENE_List * list);
 
 /**
- * @brief Whether two lists are the same: foreground, then item for item, resources by handle, maps and doubles bit for bit (the ties are not compared).
+ * @brief Whether two lists are the same: foreground, palette (by handle), then item for item, resources by handle, maps and doubles bit for bit (the ties are not compared).
  *
  * @return 1 if equal, 0 if not (or if either is NULL).
  */

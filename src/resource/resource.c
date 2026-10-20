@@ -51,6 +51,8 @@ const char * gshscene_resource_kind_string(GSHSCENE_Resource_Kind kind) {
       return "image";
     case GSHSCENE_RESOURCE_FACE:
       return "face";
+    case GSHSCENE_RESOURCE_PALETTE:
+      return "palette";
     case GSHSCENE_RESOURCE_KIND_COUNT:
       break;
   }
@@ -109,6 +111,17 @@ static uint64_t face_content_hash(uint64_t font_key, uint32_t face_index, uint32
   gshgeom_hash_u32(&h, count);
   for (uint32_t i = 0; i < count; i++) {
     gshgeom_hash_u32(&h, (uint32_t)(int32_t)coords[i]);
+  }
+  return gshgeom_hash_value(&h);
+}
+
+/* A palette's content: its entries, each a color (four f64 and a space). */
+static uint64_t palette_content_hash(size_t count, const GSHSCENE_Color * colors) {
+  GSHGEOM_Hash h;
+  hash_begin(&h, GSHSCENE_RESOURCE_PALETTE);
+  gshgeom_hash_u64(&h, (uint64_t)count);
+  for (size_t i = 0; i < count; i++) {
+    gshscene_color_hash(&h, &colors[i]);
   }
   return gshgeom_hash_value(&h);
 }
@@ -200,6 +213,12 @@ static int run_equal(const GSHSCENE_Glyph_Run * a, const GSHSCENE_Glyph * ga, co
   return 1;
 }
 
+/* What a palette is built from. */
+typedef struct Palette_Source {
+  size_t count;
+  const GSHSCENE_Color * colors;
+} Palette_Source;
+
 /* --- matching a resource against a probe ----------------------------------- */
 
 int gshscene_resource_matches(const GSHSCENE_Resource * resource, const GSHSCENE_Probe * probe) {
@@ -221,6 +240,18 @@ int gshscene_resource_matches(const GSHSCENE_Resource * resource, const GSHSCENE
       }
       for (uint32_t i = 0; i < want->coord_count; i++) {
         if (have->coords[i] != want->coords[i]) {
+          return 0;
+        }
+      }
+      return 1;
+    }
+    case GSHSCENE_RESOURCE_PALETTE: {
+      const Palette_Source * want = (const Palette_Source *)probe->source;
+      if (resource->u.palette.count != want->count) {
+        return 0;
+      }
+      for (size_t i = 0; i < want->count; i++) {
+        if (!gshscene_color_equal(&resource->u.palette.colors[i], &want->colors[i])) {
           return 0;
         }
       }
@@ -255,6 +286,9 @@ void gshscene_resource_free_content(GSHSCENE_Resource * resource) {
       break;
     case GSHSCENE_RESOURCE_PICTURE:
       gshscene_list_destroy(resource->u.picture.list);
+      break;
+    case GSHSCENE_RESOURCE_PALETTE:
+      gshscene_free(alloc, resource->u.palette.colors);
       break;
     default:
       break;
@@ -581,6 +615,89 @@ GSHSCENE_Result gshscene_face_binding(
   return GSHSCENE_OK;
 }
 
+/* --- palette (N14) ---------------------------------------------------------- */
+
+static GSHSCENE_Result build_palette(GSHSCENE_Store * store, const void * source, GSHSCENE_Resource ** out) {
+  const Palette_Source * src = (const Palette_Source *)source;
+  GSHSCENE_Resource * resource = gshscene_store_new_resource(store, GSHSCENE_RESOURCE_PALETTE);
+  if (!resource) {
+    return GSHSCENE_ERR_OOM;
+  }
+  if (src->count) {
+    resource->u.palette.colors = gshscene_alloc(&store->alloc, src->count * sizeof(GSHSCENE_Color));
+    if (!resource->u.palette.colors) {
+      gshscene_store_discard_resource(resource);
+      return GSHSCENE_ERR_OOM;
+    }
+    memcpy(resource->u.palette.colors, src->colors, src->count * sizeof(GSHSCENE_Color));
+  }
+  resource->u.palette.count = src->count;
+  *out = resource;
+  return GSHSCENE_OK;
+}
+
+GSHSCENE_Result gshscene_store_intern_palette(
+    GSHSCENE_Store * store, size_t count, const GSHSCENE_Color * colors, const GSHSCENE_Resource ** out) {
+  if (!store || !out || (count && !colors)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  if (count > GSHSCENE_PALETTE_MAX_ENTRIES) {
+    return GSHSCENE_ERR_LIMIT;
+  }
+  for (size_t i = 0; i < count; i++) {
+    GSHSCENE_Result checked = gshscene_color_check(&colors[i]);
+    if (checked != GSHSCENE_OK) {
+      return checked;
+    }
+  }
+  Palette_Source src = {count, colors};
+  GSHSCENE_Probe probe = {GSHSCENE_RESOURCE_PALETTE, palette_content_hash(count, colors),
+      gshscene_sat_add(GSHSCENE_BYTES_BASE, gshscene_sat_mul(count, GSHSCENE_BYTES_PER_COLOR)), &src, build_palette};
+  return gshscene_store_intern(store, &probe, out);
+}
+
+GSHSCENE_Result gshscene_store_intern_palette_rgba8(
+    GSHSCENE_Store * store, size_t count, const uint8_t * rgba, const GSHSCENE_Resource ** out) {
+  if (!store || !out || (count && !rgba)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  if (count > GSHSCENE_PALETTE_MAX_ENTRIES) {
+    return GSHSCENE_ERR_LIMIT;
+  }
+  GSHSCENE_Color * colors = NULL;
+  if (count) {
+    colors = gshscene_alloc(&store->alloc, count * sizeof *colors);
+    if (!colors) {
+      return GSHSCENE_ERR_OOM;
+    }
+  }
+  for (size_t i = 0; i < count; i++) {
+    memset(&colors[i], 0, sizeof colors[i]);
+    for (int k = 0; k < 4; k++) {
+      /* fixed.h: c / 255, the double nearest (one correctly rounded division of two exact integers). */
+      colors[i].rgba[k] = (double)(int32_t)rgba[4u * i + (size_t)k] / 255.0;
+    }
+    colors[i].space.primaries = GCOL_PRIMARIES_SRGB;
+    colors[i].space.transfer = GCOL_TRANSFER_SRGB;
+  }
+  GSHSCENE_Result result = gshscene_store_intern_palette(store, count, colors, out);
+  gshscene_free(&store->alloc, colors);
+  return result;
+}
+
+size_t gshscene_resource_palette_count(const GSHSCENE_Resource * resource) {
+  return resource && resource->kind == GSHSCENE_RESOURCE_PALETTE ? resource->u.palette.count : 0;
+}
+
+GSHSCENE_Result gshscene_resource_palette_color(
+    const GSHSCENE_Resource * resource, size_t index, GSHSCENE_Color * out) {
+  if (!resource || !out || resource->kind != GSHSCENE_RESOURCE_PALETTE || index >= resource->u.palette.count) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  *out = resource->u.palette.colors[index];
+  return GSHSCENE_OK;
+}
+
 /* --- picture ---------------------------------------------------------------- */
 
 static GSHSCENE_Result build_picture(GSHSCENE_Store * store, const void * source, GSHSCENE_Resource ** out) {
@@ -604,8 +721,9 @@ GSHSCENE_Result gshscene_store_intern_picture(
   if (!store || !list || !out || !gshscene_list_is_closed(list) || list->store != store) {
     return GSHSCENE_ERR_INVALID;
   }
-  /* A picture has no foreground of its own: a foreground paint in it resolves against the list that draws it. */
-  if (!gshscene_color_is_default(&list->foreground)) {
+  /* A picture has no foreground and no palette of its own: its foreground and palette paints resolve against the
+   * list that draws it (N10, N14). */
+  if (!gshscene_color_is_default(&list->foreground) || list->palette) {
     return GSHSCENE_ERR_INVALID;
   }
   if (gshscene_list_count(list) > store->limits.max_resource_elements ||
@@ -691,6 +809,22 @@ GSHSCENE_Result gshscene_resource_dump(const GSHSCENE_Resource * resource, FILE 
       if (fprintf(out, "\nbound=%d upem=%u flags=%u\n", resource->u.face.bound, resource->u.face.info.upem,
               resource->u.face.info.flags) < 0) {
         return GSHSCENE_ERR_IO;
+      }
+      break;
+    }
+    case GSHSCENE_RESOURCE_PALETTE: {
+      size_t count = resource->u.palette.count;
+      if (fprintf(out, "palette entries=%llu\n", HEX(count)) < 0) {
+        return GSHSCENE_ERR_IO;
+      }
+      for (size_t i = 0; i < count; i++) {
+        const GSHSCENE_Color * c = &resource->u.palette.colors[i];
+        if (fprintf(out, "p %016llx %016llx %016llx %016llx ", HEX(gshgeom_f64_bits(c->rgba[0])),
+                HEX(gshgeom_f64_bits(c->rgba[1])), HEX(gshgeom_f64_bits(c->rgba[2])),
+                HEX(gshgeom_f64_bits(c->rgba[3]))) < 0 ||
+            gshscene_space_dump(out, &c->space) < 0 || fputc('\n', out) == EOF) {
+          return GSHSCENE_ERR_IO;
+        }
       }
       break;
     }

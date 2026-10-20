@@ -122,7 +122,7 @@ static int glyphs_from_font(const GSHSCENE_Resource * resource) {
 }
 
 GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps,
-    const GSHSCENE_Item * item, const GSHSCENE_Color_Space * target_space) {
+    const GSHSCENE_Item * item, const GSHSCENE_Color_Space * target_space, const GSHSCENE_Resource * palette) {
   GSHSCENE_Disposition d = {(GSHSCENE_Entry_Class)0, (GSHSCENE_Reason)0};
   if (!caps || !item) {
     return d;
@@ -138,6 +138,17 @@ GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps,
     d.entry_class = GSHSCENE_ENTRY_REFUSED;
     d.reason = GSHSCENE_REASON_GLYPH_SOURCE;
     return d;
+  }
+  if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_PALETTE) {
+    /* N14: the one resolution decides; the foreground is not read for a palette paint. */
+    GSHSCENE_Color unused;
+    GSHSCENE_Color resolved;
+    gshscene_color_init(&unused);
+    if (gshscene_paint_resolve(&item->paint, &unused, palette, &resolved) != GSHSCENE_OK) {
+      d.entry_class = GSHSCENE_ENTRY_REFUSED;
+      d.reason = GSHSCENE_REASON_PALETTE_ENTRY;
+      return d;
+    }
   }
   if (item->kind == GSHSCENE_ITEM_GROUP_PUSH &&
       (item->group.composite >= 32 || !(caps->composites & (UINT32_C(1) << item->group.composite)))) {
@@ -637,7 +648,7 @@ static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
     if (gshscene_skip_step(&skip, item, count)) {
       continue;
     }
-    GSHSCENE_Disposition d = gshscene_caps_disposition(&job->caps, item, &job->target_space);
+    GSHSCENE_Disposition d = gshscene_caps_disposition(&job->caps, item, &job->target_space, gshscene_list_palette(list));
     if (d.entry_class) {
       result = gshscene_report_add(report, d.entry_class, d.reason, chain, count, 0, 0.0);
       if (result != GSHSCENE_OK) {

@@ -397,7 +397,7 @@ TEST(ListRecord, EveryInvalidArgumentIsRefusedAndTheListIsAsItWas) {
     p.kind = GSHSCENE_PAINT_FOREGROUND;
     EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &p), INV) << "a foreground paint's color is the version's: only its alpha is its own";
     p.kind = GSHSCENE_PAINT_PALETTE;
-    EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &p), UNS) << "a palette entry is reserved";
+    EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &p), INV) << "a palette paint's color is its entry's: only its alpha is its own";
     p.kind = GSHSCENE_PAINT_KIND_COUNT;
     EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &p), INV) << "the end of the enum";
     p.kind = (GSHSCENE_Paint_Kind)9;

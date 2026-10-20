@@ -33,6 +33,7 @@
 #include <ghoti.io/shape-scene/diff.h>
 #include <ghoti.io/shape-scene/dump_sink.h>
 #include <ghoti.io/shape-scene/edit.h>
+#include <ghoti.io/shape-scene/fixed.h>
 #include <ghoti.io/shape-scene/glyph.h>
 #include <ghoti.io/shape-scene/glyph_provider.h>
 #include <ghoti.io/shape-scene/list.h>

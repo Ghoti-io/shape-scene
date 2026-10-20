@@ -100,6 +100,10 @@ struct GSHSCENE_Resource {
       GSHSCENE_Face_Info info;      /* as face_info gave it when the face was built */
       int bound;
     } face;
+    struct {
+      GSHSCENE_Color * colors; /* count of them, copied */
+      size_t count;
+    } palette;
   } u;
 };
 
@@ -140,6 +144,7 @@ struct GSHSCENE_List {
   size_t picture_depth; /* the deepest picture an instance names */
   size_t nonflat;       /* group pushes whose ordering is not flat: close has an order to make when it is not 0 */
   GSHSCENE_Color foreground;
+  const GSHSCENE_Resource * palette; /* the palette parameter (N14), retained; NULL for none */
   GSHSCENE_Tie * ties;  /* the resolved depth ties, ascending by second item */
   size_t tie_count;
   size_t tie_capacity;
@@ -248,6 +253,8 @@ int gshscene_space_equal(const GSHSCENE_Color_Space * a, const GSHSCENE_Color_Sp
 
 /** Whether a color is the default foreground (opaque black in the target's space), bit for bit. */
 int gshscene_color_is_default(const GSHSCENE_Color * color);
+/** Whether two colors are equal, bit for bit (the components and the space). */
+int gshscene_color_equal(const GSHSCENE_Color * a, const GSHSCENE_Color * b);
 
 /** A space, then a color, in the spelling of paint.h's N-text (hash.h's primitives): u8 primaries, u8 transfer, f64 gamma; four f64 and a space. */
 void gshscene_space_hash(GSHGEOM_Hash * h, const GSHSCENE_Color_Space * space);

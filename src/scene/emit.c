@@ -302,8 +302,11 @@ static GSHSCENE_Result build(const struct GSHSCENE_Version * version, struct GSH
     gshscene_emission_free(em, &core->alloc);
     return result;
   }
-  /* The foreground is the version's; a picture, which any list may draw, has none of its own. */
+  /* The foreground and the palette are the version's; a picture, which any list may draw, has neither of its own. */
   result = gshscene_list_set_foreground(sink.list, &version->foreground);
+  if (result == GSHSCENE_OK) {
+    result = gshscene_list_set_palette(sink.list, version->palette);
+  }
   if (result != GSHSCENE_OK) {
     sink_discard(&sink);
     gshscene_emission_free(em, &core->alloc);

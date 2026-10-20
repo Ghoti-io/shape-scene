@@ -599,16 +599,17 @@ typedef struct GSHSCENE_Disposition {
 
 /**
  * @brief The one predicate of the planning pass (S6): what @p caps make of @p item on a target whose resolved blend
- *   space is @p target_space.
+ *   space is @p target_space, under the palette @p palette (the request's list's, or NULL for none; N14).
  *
  * In this order: a kind the caps do not draw is refused (`ITEM_KIND`); a fill or clip of a glyph run from a font
- * without `GLYPHS_FROM_FONT` is refused (`GLYPH_SOURCE`); a group whose operator the caps do not composite is refused
+ * without `GLYPHS_FROM_FONT` is refused (`GLYPH_SOURCE`); a fill whose palette paint names an entry @p palette does
+ * not have (::gshscene_paint_resolve) is refused (`PALETTE_ENTRY`); a group whose operator the caps do not composite is refused
  * (`COMPOSITE`); a clip push without `CLIP_AA` is approximated (`CLIP_ALIASED`); a group whose own blend space is
  * stated and differs from @p target_space, without `BLEND_SPACES`, is approximated (`BLEND_SPACE`).  A pop is drawn
  * as its push was decided (the walk tells).  Anything else is drawn.
  */
 GSHSCENE_API GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps,
-    const GSHSCENE_Item * item, const GSHSCENE_Color_Space * target_space);
+    const GSHSCENE_Item * item, const GSHSCENE_Color_Space * target_space, const GSHSCENE_Resource * palette);
 
 /**
  * @brief A walk over a closed list's expansion in paint order (S16): every item, an instance followed by its

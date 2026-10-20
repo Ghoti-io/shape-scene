@@ -77,6 +77,25 @@
  * by the paint's `rgba[3]`: straight `(fr, fg, fb, fa * a)` in the foreground's
  * space.  It is what SVG's `currentColor` lowers to, and is never baked into a
  * fill, so an icon used in ten colors is one picture.
+ *
+ * ### N14 The palette
+ *
+ * A **palette** is a resource (resource.h): an interned table of colors, each a
+ * ::GSHSCENE_Color.  A version and a list carry a **palette parameter**, a palette
+ * handle or none, beside the foreground (story 14c): it is AD-23's "palette
+ * index", made a handle by the front end once (a font's CPAL palette number
+ * becomes a palette resource), so a theme change is a new parameter and never a
+ * re-lowering.  A ::GSHSCENE_PAINT_PALETTE paint names an **entry** of it, in
+ * `[0, 0xFFFE]`, with an alpha multiplier `a`: it is the entry's color with its
+ * alpha multiplied by `a`, straight `(pr, pg, pb, pa * a)` in the entry's space.
+ * `0xFFFF`, which a font's tables use for the foreground, is never stored: the
+ * float-free paint (fixed.h) lowers it to ::GSHSCENE_PAINT_FOREGROUND, and a
+ * `double` paint that names it is ::GSHSCENE_ERR_INVALID.  An entry that the
+ * palette in force does not have (no palette, or an entry at or past its count)
+ * is **missing**: the fill is refused by the planning pass, reason
+ * `GSHSCENE_REASON_PALETTE_ENTRY`, on every sink, and is never drawn in another
+ * color.  A picture has no palette of its own: its palette paints, like its
+ * foreground paints, resolve against the list that draws it.
  */
 
 #ifndef GHOTI_IO_GSHSCENE_PAINT_H
@@ -143,13 +162,15 @@ typedef enum GSHSCENE_Paint_Kind {
   /** The foreground color (`currentColor`), a parameter of the version and of the list (N10): `rgba[0..2]` zero, `rgba[3]` its alpha multiplier, the space zero. */
   GSHSCENE_PAINT_FOREGROUND = 2,
   /**
-   * Reserved: an entry of the font's color palette, by index, with an alpha (a COLRv1 solid paint; AD-23).  Refused,
-   * because AD-23 says only that the palette index is a scene parameter, not whose table it selects in or what a
-   * missing entry is; that is settled with the font's CPAL (story 14).  ::GSHSCENE_ERR_UNSUPPORTED.
+   * An entry of the palette in force, a parameter of the version and of the list (N14): `entry` in `[0, 0xFFFE]`,
+   * `rgba[0..2]` zero, `rgba[3]` its alpha multiplier, the space zero.  A COLR solid paint lowers to it (story 14c).
    */
   GSHSCENE_PAINT_PALETTE = 3,
   GSHSCENE_PAINT_KIND_COUNT    ///< Closes the enum.
 } GSHSCENE_Paint_Kind;
+
+/** The largest palette entry a paint names: `0xFFFF` is a font's foreground and is never stored (N14). */
+#define GSHSCENE_PALETTE_ENTRY_MAX 0xFFFEu
 
 /** @brief A paint. */
 typedef struct GSHSCENE_Paint {
@@ -158,9 +179,27 @@ typedef struct GSHSCENE_Paint {
   double rgba[4];
   /** Solid: the color space of the components (zero is the target's).  Foreground: zero. */
   GSHSCENE_Color_Space space;
-  /** Gradient: the gradient resource.  NULL for a solid or foreground paint (and required to be). */
+  /** Gradient: the gradient resource.  NULL for a solid, foreground or palette paint (and required to be). */
   const GSHSCENE_Resource * gradient;
+  /** Palette: the entry, in `[0, GSHSCENE_PALETTE_ENTRY_MAX]`.  Zero for every other kind (and required to be). */
+  uint32_t entry;
 } GSHSCENE_Paint;
+
+/**
+ * @brief The straight color a paint stands for (N7, N10, N14): a solid paint's own color, a foreground paint's
+ *   foreground with its alpha scaled, a palette paint's entry with its alpha scaled.
+ *
+ * The one resolution every sink uses, so that every sink refuses the same fills.
+ *
+ * @param paint The paint (as a closed list holds it).
+ * @param foreground The foreground in force (the drawing list's).
+ * @param palette The palette in force (the drawing list's), or NULL for none.
+ * @param out The color; written only on success.  A space of zero is still the target's (N7).
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_REFUSED for a palette paint whose entry is missing (N14);
+ *   ::GSHSCENE_ERR_INVALID for NULL, a paint of another kind, or a @p palette that is not a palette resource.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_paint_resolve(const GSHSCENE_Paint * paint, const GSHSCENE_Color * foreground,
+    const GSHSCENE_Resource * palette, GSHSCENE_Color * out);
 
 #ifdef __cplusplus
 }

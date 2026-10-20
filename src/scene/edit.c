@@ -245,6 +245,7 @@ void gshscene_edit_destroy(GSHSCENE_Edit * edit) {
   gshscene_free(&alloc, edit->kc);
   gshscene_index_free(&edit->kc_idx, &alloc);
   gshscene_version_release(edit->base);
+  gshscene_resource_release(edit->pal);
   gshscene_free(&alloc, edit);
   gshscene_core_unref(core);
 }
@@ -253,6 +254,9 @@ void gshscene_edit_destroy(GSHSCENE_Edit * edit) {
 void gshscene_edit_spend(GSHSCENE_Edit * edit) {
   edit_release_changes(edit);
   edit->fg_set = 0;
+  gshscene_resource_release(edit->pal);
+  edit->pal = NULL;
+  edit->pal_set = 0;
   edit->spent = 1;
 }
 
@@ -275,6 +279,26 @@ GSHSCENE_Result gshscene_edit_foreground(const GSHSCENE_Edit * edit, GSHSCENE_Co
   }
   *out = edit->fg_set ? edit->fg : edit->base->foreground;
   return GSHSCENE_OK;
+}
+
+GSHSCENE_Result gshscene_edit_set_palette(GSHSCENE_Edit * edit, const GSHSCENE_Resource * palette) {
+  if (!edit || edit->spent ||
+      (palette && (gshscene_resource_kind(palette) != GSHSCENE_RESOURCE_PALETTE ||
+                      palette->store != edit->core->store))) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  gshscene_resource_retain(palette);
+  gshscene_resource_release(edit->pal);
+  edit->pal = palette;
+  edit->pal_set = 1;
+  return GSHSCENE_OK;
+}
+
+const GSHSCENE_Resource * gshscene_edit_palette(const GSHSCENE_Edit * edit) {
+  if (!edit) {
+    return NULL;
+  }
+  return edit->pal_set ? edit->pal : edit->base->palette;
 }
 
 const GSHSCENE_Version * gshscene_edit_base(const GSHSCENE_Edit * edit) {

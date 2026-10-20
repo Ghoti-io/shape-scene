@@ -95,7 +95,7 @@ int main(void) {
   failed |= check(gshscene_store_intern_glyph_run(store, &run, &text), "glyph run");
   gshscene_resource_release(face);
 
-  GSHSCENE_Paint red = {GSHSCENE_PAINT_SOLID, {1, 0, 0, 1}, {0, 0, 0.0}, NULL};
+  GSHSCENE_Paint red = {GSHSCENE_PAINT_SOLID, {1, 0, 0, 1}, {0, 0, 0.0}, NULL, 0};
   GSHSCENE_Group half = {0.5, {0, 0, 0.0}, GSHSCENE_ORDER_FLAT, GSHSCENE_COMPOSITE_SRC_OVER};
   GSHSCENE_List * list = NULL;
   failed |= check(gshscene_list_create(NULL, NULL, store, &list), "list");

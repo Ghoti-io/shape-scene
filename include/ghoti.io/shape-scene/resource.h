@@ -26,10 +26,11 @@
  *
  * ### The model
  *
- * A **resource** is a path, a glyph run, a picture (a closed list, frozen) or
+ * A **resource** is a path, a glyph run, a picture (a closed list, frozen),
  * a face (glyph_provider.h: a font's face and variation instance, which a run
- * from a font names); two further kinds, a gradient and an image, are named
- * and reserved.  A
+ * from a font names) or a palette (a table of colors, which a palette paint's
+ * entry indexes; paint.h, N14); two further kinds, a gradient and an image, are
+ * named and reserved.  A
  * **store** interns resources: asking it for content it already holds, while a
  * handle to that content is held, returns that handle, so equality of content
  * is equality of pointers within one store.  The store decides by the index
@@ -58,9 +59,9 @@
  * the id, nor the pointer, nor the allocator, nor the limits, nor a face's
  * binding are part of it.  Each stream starts with `u32` the format of its
  * kind and `u32` the resource's kind (::GSHSCENE_Resource_Kind, pinned).  The
- * format is per kind: a path's, a picture's and a face's are 1; a glyph run's
- * is 2 (story 14a: the run names a face where format 1 named a key).  It goes
- * on:
+ * format is per kind: a path's, a picture's, a face's and a palette's are 1; a
+ * glyph run's is 2 (story 14a: the run names a face where format 1 named a
+ * key).  It goes on:
  *
  * - **path** (1): `u64` the path's own hash (`gshgeom_path_hash`).
  * - **glyph run** (2): `u32` the source, `u64` the content hash of the face
@@ -71,6 +72,9 @@
  * - **picture** (1): `u64` the hash of its list (list.h).
  * - **face** (1): `u64` font key, `u32` face index, `u32` coordinate count and
  *   `u32` each coordinate (its `int16_t` value sign-extended to 32 bits).
+ * - **palette** (1): `u64` the entry count, then per entry four `f64` (straight
+ *   `r, g, b, a`) and its space (`u8` primaries, `u8` transfer, `f64` gamma, as
+ *   list.h spells a space).
  *
  * The hash is of the content, not of the reference to it: a glyph run hashes
  * its face's and its outlines' content hashes, so two stores that were given
@@ -86,7 +90,9 @@
  * glyph; a picture is `gshscene_list_dump`'s text; a face is a line `face
  * font=<hex> index=N coords=N` followed, on the same line, by ` C` for each
  * coordinate in signed decimal, and a line `bound=B upem=N flags=N` (B 0 for an
- * unbound face, whose upem and flags are 0).
+ * unbound face, whose upem and flags are 0); a palette is a line `palette
+ * entries=N` and a line `p <r> <g> <b> <a> <space>` per entry, a space spelled
+ * `P:T:<gamma hex>` as in list.h.
  */
 
 #ifndef GHOTI_IO_GSHSCENE_RESOURCE_H
@@ -96,6 +102,7 @@
 #include <ghoti.io/shape-scene/core.h>
 #include <ghoti.io/shape-scene/glyph_provider.h>
 #include <ghoti.io/shape-scene/macros.h>
+#include <ghoti.io/shape-scene/paint.h>
 #include <ghoti.io/shape-scene/types.h>
 
 #include <ghoti.io/shape-geometry/path.h>
@@ -116,6 +123,7 @@ typedef enum GSHSCENE_Resource_Kind {
   GSHSCENE_RESOURCE_GRADIENT = 4,  ///< Reserved for story 12: no constructor yet.
   GSHSCENE_RESOURCE_IMAGE = 5,     ///< Reserved for the raster stories: no constructor yet.
   GSHSCENE_RESOURCE_FACE = 6,      ///< A font's face and variation instance, bound to a glyph path provider (glyph_provider.h).
+  GSHSCENE_RESOURCE_PALETTE = 7,   ///< A table of colors, which a palette paint's entry indexes (paint.h, N14).
   GSHSCENE_RESOURCE_KIND_COUNT     ///< Closes the enum.
 } GSHSCENE_Resource_Kind;
 
@@ -124,7 +132,7 @@ typedef enum GSHSCENE_Resource_Kind {
  *
  * @param kind The kind, including a value outside the enum.
  * @return A static string, never NULL: "path", "glyph-run", "picture",
- *   "gradient", "image", "face", or "unknown resource kind".
+ *   "gradient", "image", "face", "palette", or "unknown resource kind".
  */
 GSHSCENE_API const char * gshscene_resource_kind_string(GSHSCENE_Resource_Kind kind);
 
@@ -176,8 +184,9 @@ typedef struct GSHSCENE_Glyph_Run {
  * every allocator: a resource's base, plus, for a path, the per-element figure
  * for each element (the most a path element, a rational cubic in 3D, can take),
  * for a glyph run the per-glyph figure for each glyph, and for a picture the
- * per-item figure for each item of its list, and for a face the per-axis
- * figure for each coordinate.  What a resource holds by handle (a run's face,
+ * per-item figure for each item of its list, for a face the per-axis
+ * figure for each coordinate, and for a palette the per-color figure for each
+ * entry.  What a resource holds by handle (a run's face,
  * a glyph's outline, an instanced picture) is a resource of its own and is
  * counted there.  An intern that would pass the limit is
  * ::GSHSCENE_ERR_LIMIT and builds and keeps nothing; a hit costs nothing; the
@@ -189,6 +198,7 @@ typedef struct GSHSCENE_Glyph_Run {
 #define GSHSCENE_BYTES_PER_GLYPH ((size_t)32)    ///< Added for each glyph of a run.
 #define GSHSCENE_BYTES_PER_ITEM ((size_t)256)    ///< Added for each item of a picture's list.
 #define GSHSCENE_BYTES_PER_AXIS ((size_t)8)      ///< Added for each variation coordinate of a face.
+#define GSHSCENE_BYTES_PER_COLOR ((size_t)48)    ///< Added for each entry of a palette.
 /** @} */
 
 /** @brief Counters of a store, for tests and diagnostics. */
@@ -317,14 +327,44 @@ GSHSCENE_API GSHSCENE_Result gshscene_store_intern_glyph_run(GSHSCENE_Store * st
  * @brief Freeze a closed list into a picture and intern it.
  *
  * The list is copied (items, ties, and a reference on each resource they name).  A picture has no
- * foreground of its own (N10): a foreground paint in it resolves against the list that draws it, so a
- * list whose foreground is not the default is ::GSHSCENE_ERR_INVALID here.
+ * foreground and no palette of its own (N10, N14): a foreground or palette paint in it resolves against
+ * the list that draws it, so a list whose foreground is not the default, or that has a palette, is
+ * ::GSHSCENE_ERR_INVALID here.
  * ::GSHSCENE_ERR_INVALID for an open list or one made for another store;
  * ::GSHSCENE_ERR_LIMIT when the picture's depth passes `max_picture_depth` or
  * its expansion passes `max_expansion`.
  */
 GSHSCENE_API GSHSCENE_Result gshscene_store_intern_picture(GSHSCENE_Store * store,
     const GSHSCENE_List * list, const GSHSCENE_Resource ** out);
+
+/** The most entries a palette holds: an entry is in `[0, 0xFFFE]` (paint.h), so 65,535 of them. */
+#define GSHSCENE_PALETTE_MAX_ENTRIES 65535u
+
+/**
+ * @brief Intern a palette: @p count colors, copied.
+ *
+ * Each color is checked as a foreground is (::gshscene_color_check: finite components, `a` in `[0, 1]`, a space
+ * this library carries).  A palette of no entries is legal (every palette paint against it is missing).  An 8-bit
+ * table (a font's CPAL) is interned without floats by `gshscene_store_intern_palette_rgba8` (fixed.h).
+ *
+ * @param colors The colors; may be NULL only when @p count is 0.
+ * @param out The handle, with a reference for the caller; written only on success.
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, an invalid color); ::GSHSCENE_ERR_UNSUPPORTED (a reserved
+ *   space); ::GSHSCENE_ERR_LIMIT (more than ::GSHSCENE_PALETTE_MAX_ENTRIES, the store's limits); ::GSHSCENE_ERR_OOM.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_store_intern_palette(GSHSCENE_Store * store, size_t count,
+    const GSHSCENE_Color * colors, const GSHSCENE_Resource ** out);
+
+/** @brief How many entries a palette resource has; 0 for NULL and for anything else. */
+GSHSCENE_API size_t gshscene_resource_palette_count(const GSHSCENE_Resource * resource);
+
+/**
+ * @brief One entry of a palette resource.
+ *
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, not a palette, @p index at or past the count).
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_resource_palette_color(
+    const GSHSCENE_Resource * resource, size_t index, GSHSCENE_Color * out);
 
 /**
  * @brief Take another reference.

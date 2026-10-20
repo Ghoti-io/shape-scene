@@ -43,7 +43,7 @@
 struct GSHSCENE_Version;
 
 /** The format of a version's hash and dump. */
-#define VERSION_FORMAT_VERSION 2u
+#define VERSION_FORMAT_VERSION 3u
 
 /** The kind field of a version's hash: "SCEN" in little-endian ASCII. */
 #define VERSION_HASH_KIND UINT32_C(0x4e454353)
@@ -129,6 +129,7 @@ struct GSHSCENE_Version {
   size_t count;
   GSHSCENE_Keys * keys;       /* may be NULL for none */
   GSHSCENE_Color foreground;
+  const GSHSCENE_Resource * palette; /* the palette parameter (N14), retained; NULL for none */
   GCU_MUTEX_T lock;         /* guards the emission */
   struct GSHSCENE_Emission * emission;
 };
@@ -160,6 +161,8 @@ struct GSHSCENE_Edit {
   size_t view_count;
   int fg_set;             /* the edit has set the foreground (it may still equal the base's) */
   GSHSCENE_Color fg;
+  int pal_set;            /* the edit has set the palette (it may still be the base's) */
+  const GSHSCENE_Resource * pal; /* retained; NULL for none */
 };
 
 /** One problem found. */
@@ -254,11 +257,12 @@ void gshscene_keys_ref(GSHSCENE_Keys * keys);
 void gshscene_keys_unref(GSHSCENE_Keys * keys);
 
 /**
- * A new version over @p nodes (the version retains each and takes the array), @p keys (retained), the foreground and
- * the core.
+ * A new version over @p nodes (the version retains each and takes the array), @p keys (retained), the foreground, the
+ * palette (retained; NULL for none) and the core.
  */
 GSHSCENE_Result gshscene_version_make(GSHSCENE_Core * core, uint64_t number, GSHSCENE_Node_Rec ** nodes,
-    size_t count, GSHSCENE_Keys * keys, const GSHSCENE_Color * foreground, const struct GSHSCENE_Version ** out);
+    size_t count, GSHSCENE_Keys * keys, const GSHSCENE_Color * foreground, const GSHSCENE_Resource * palette,
+    const struct GSHSCENE_Version ** out);
 
 void gshscene_emission_free(struct GSHSCENE_Emission * emission, const GSHSCENE_Allocator * alloc);
 

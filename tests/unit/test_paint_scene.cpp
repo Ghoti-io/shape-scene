@@ -212,6 +212,10 @@ TEST(PaintNode, EveryInvalidFieldIsRefusedAndTheEditIsAsItWas) {
   EXPECT_EQ(add_group(s), INV);
   s = d.foreground_shape(0, 0);
   s.paint.kind = GSHSCENE_PAINT_PALETTE;
+  s.paint.entry = 0xFFFFu;
+  EXPECT_EQ(add_group(s), INV) << "0xFFFF is never a palette entry (N14)";
+  s = d.foreground_shape(0, 0);
+  s.paint.kind = GSHSCENE_PAINT_GRADIENT;
   EXPECT_EQ(add_group(s), UNS);
   EXPECT_EQ(gshscene_edit_node_count(e.edit), before) << "nothing was added";
 }

@@ -37,6 +37,10 @@
  * so the renders go through both routes, and a glyph section folds in each route's decision, the fast tier's device
  * paths and the general route's under the snapped map (which must be the same paths: AD-5's gate, checked here on
  * every target) and test-sink renders at integer, fractional and rotated sizes.
+ * Since story 14c a palette section folds in palettes from 8-bit and double entries (`c / 255` is a division every
+ * target must round alike), lists and versions with a palette parameter and palette fills (some entries missing,
+ * which every sink refuses), the item maps of the float-free design maps (rotations and skews through shape-geometry's
+ * rotation, composed by the one composer), their renders and a diff of a palette change.
  * It is built by `make check-corpus-hash` on the host and by
  * suite/tools/xarch/shape.sh and suite/tools/xwin/shape.sh for the others.
  *
@@ -396,6 +400,7 @@ static void feed_diff(const GSHSCENE_Version * a, const GSHSCENE_Version * b, co
     feed((uint64_t)kind);
   }
   feed((uint64_t)gshscene_diff_foreground_changed(d));
+  feed((uint64_t)gshscene_diff_palette_changed(d));
   GSHSCENE_Damage damage;
   check(gshscene_diff_damage(d, &damage), "damage");
   feed((uint64_t)damage.unbounded);
@@ -782,6 +787,151 @@ static void glyph_section(void) {
   gshscene_store_destroy(store);
 }
 
+/* --- palettes and the float-free calls (story 14c) --------------------------------------------------- */
+
+static void palette_section(void) {
+  GSHSCENE_Store * store = NULL;
+  check(gshscene_store_create(NULL, NULL, &store), "palette store");
+  const GSHSCENE_Resource * palettes[6];
+  for (unsigned p = 0; p < 6; p++) {
+    uint8_t bytes[4u * 12u];
+    unsigned n = between(0, 12);
+    for (unsigned i = 0; i < 4u * n; i++) {
+      bytes[i] = (uint8_t)between(0, 255);
+    }
+    check(gshscene_store_intern_palette_rgba8(store, n, bytes, &palettes[p]), "rgba8 palette");
+    feed(gshscene_resource_hash(palettes[p]));
+    feed((uint64_t)gshscene_resource_palette_count(palettes[p]));
+    for (size_t i = 0; i < n; i++) {
+      GSHSCENE_Color c;
+      check(gshscene_resource_palette_color(palettes[p], i, &c), "palette color");
+      feed_color(&c);
+    }
+  }
+  {
+    GSHSCENE_Color colors[3];
+    for (int i = 0; i < 3; i++) {
+      colors[i] = random_foreground();
+    }
+    const GSHSCENE_Resource * d = NULL;
+    check(gshscene_store_intern_palette(store, 3, colors, &d), "double palette");
+    feed(gshscene_resource_hash(d));
+    gshscene_resource_release(d);
+  }
+  /* Runs from a face of the test provider, at fractional sizes, for the design maps. */
+  const GSHSCENE_Resource * face = test_face(store, (unsigned)between(0, 1), 0);
+  for (unsigned l = 0; l < 12; l++) {
+    GSHSCENE_List * list = NULL;
+    check(gshscene_list_create(NULL, NULL, store, &list), "palette list");
+    const GSHSCENE_Resource * palette = palettes[between(0, 5)];
+    if (l % 4 != 3) {
+      check(gshscene_list_set_palette(list, palette), "set palette");
+    }
+    unsigned n = between(1, 8);
+    for (unsigned i = 0; i < n; i++) {
+      GSHSCENE_Glyph_Fixed g = {between(0, 9), (int32_t)between(0, 4096) - 2048, (int32_t)between(0, 4096) - 2048};
+      const GSHSCENE_Resource * run = NULL;
+      check(gshscene_store_intern_glyph_run_fixed(store, face, (int32_t)between(64, 2048), between(0, 1), 0, 6u, 1, &g,
+                &run), "fixed run");
+      GSHSCENE_Fixed_Op ops[4];
+      size_t op_count = between(0, 4);
+      memset(ops, 0, sizeof ops);
+      for (size_t k = 0; k < op_count; k++) {
+        ops[k].kind = between(0, GSHSCENE_FIXED_OP_COUNT - 1);
+        ops[k].bits = between(0, 16);
+        static const unsigned used[GSHSCENE_FIXED_OP_COUNT] = {6u, 2u, 4u, 3u, 4u};
+        for (unsigned v = 0; v < used[ops[k].kind]; v++) {
+          ops[k].v[v] = (int32_t)between(0, 65536) - 32768;
+        }
+        if (ops[k].kind == GSHSCENE_FIXED_SKEW) {
+          ops[k].bits = 16u; /* angles below a quarter turn: a skew of a quarter turn is infinite */
+          ops[k].v[0] /= 4;
+          ops[k].v[1] /= 4;
+        }
+      }
+      GSHSCENE_Paint_Fixed paint = {between(2, 3), between(0, 13), (int32_t)between(0, 16384), 14u};
+      if (paint.kind == GSHSCENE_FIXED_PAINT_FOREGROUND) {
+        paint.entry = 0;
+      } else if (paint.entry == 13) {
+        paint.entry = GSHSCENE_FIXED_ENTRY_FOREGROUND;
+      }
+      GSHSCENE_Result r = (i % 3 == 2) ? gshscene_list_clip_push_fixed(list, run, ops, op_count, GSHGEOM_FILL_NONZERO, 0)
+                                       : gshscene_list_fill_fixed(list, run, ops, op_count, GSHGEOM_FILL_NONZERO, &paint, 0);
+      feed((uint64_t)r);
+      if (r == GSHSCENE_OK && i % 3 == 2) {
+        check(gshscene_list_group_push_fixed(list, between(0, GSHSCENE_COMPOSITE_COUNT - 1), 0), "fixed group");
+        check(gshscene_list_fill_fixed(list, run, NULL, 0, GSHGEOM_FILL_NONZERO, &paint, 0), "fixed fill");
+        check(gshscene_list_group_pop(list), "fixed group pop");
+        check(gshscene_list_clip_pop(list), "fixed clip pop");
+      }
+      gshscene_resource_release(run);
+    }
+    size_t count = gshscene_list_count(list);
+    for (size_t i = 0; i < count; i++) {
+      const GSHSCENE_Item * item = NULL;
+      check(gshscene_list_item(list, i, &item), "palette item");
+      feed(gshgeom_map_hash(&item->map));
+      feed((uint64_t)item->paint.kind);
+      feed((uint64_t)item->paint.entry);
+    }
+    check(gshscene_list_truncate(list, count / 2 + (count % 2)), "truncate");
+    check(gshscene_list_truncate(list, gshscene_list_count(list)), "truncate to itself");
+    while (gshscene_list_close(list) == GSHSCENE_ERR_INVALID) { /* a truncation inside a block: close what is open */
+      if (gshscene_list_group_pop(list) != GSHSCENE_OK) {
+        check(gshscene_list_clip_pop(list), "close the clip");
+      }
+    }
+    feed(gshscene_list_hash(list));
+    feed((uint64_t)gshscene_list_count(list));
+    feed_render(list);
+    gshscene_list_destroy(list);
+  }
+  /* A version whose palette changes: its hash, its list and the diff's damage of the palette shapes. */
+  {
+    GSHSCENE_Scene * scene = NULL;
+    check(gshscene_scene_create(NULL, NULL, store, &scene), "palette scene");
+    GSHSCENE_Edit * e = NULL;
+    check(gshscene_scene_open_edit(scene, NULL, &e), "palette edit");
+    for (unsigned i = 0; i < 4; i++) {
+      GSHSCENE_Glyph_Fixed g = {i, (int32_t)(i * 640u), 1280};
+      const GSHSCENE_Resource * run = NULL;
+      check(gshscene_store_intern_glyph_run_fixed(store, face, 1024, 1, 0, 6u, 1, &g, &run), "scene run");
+      GSHSCENE_Node n;
+      gshscene_node_init(GSHSCENE_NODE_SHAPE, &n);
+      n.resource = run;
+      n.paint.kind = (i % 2) ? GSHSCENE_PAINT_PALETTE : GSHSCENE_PAINT_SOLID;
+      n.paint.entry = (i % 2) ? i : 0;
+      add_node(e, GSHSCENE_ROOT_ID, &n, NULL);
+      gshscene_resource_release(run);
+    }
+    check(gshscene_edit_set_palette(e, palettes[0]), "edit palette");
+    const GSHSCENE_Version * a = NULL;
+    check(gshscene_scene_publish(scene, e, NULL, &a), "publish palette");
+    gshscene_edit_destroy(e);
+    check(gshscene_scene_open_edit(scene, NULL, &e), "palette edit 2");
+    check(gshscene_edit_set_palette(e, palettes[1]), "edit palette 2");
+    const GSHSCENE_Version * b = NULL;
+    check(gshscene_scene_publish(scene, e, NULL, &b), "publish palette 2");
+    gshscene_edit_destroy(e);
+    feed_version(a);
+    feed_version(b);
+    GSHGEOM_Map device;
+    gshgeom_map_scale(2, 0.5, 0.5, 1.0, &device);
+    feed_diff(a, b, &device);
+    const GSHSCENE_List * vl = NULL;
+    check(gshscene_version_list(b, &vl), "palette version list");
+    feed_render(vl);
+    gshscene_version_release(a);
+    gshscene_version_release(b);
+    gshscene_scene_destroy(scene);
+  }
+  gshscene_resource_release(face);
+  for (unsigned p = 0; p < 6; p++) {
+    gshscene_resource_release(palettes[p]);
+  }
+  gshscene_store_destroy(store);
+}
+
 int main(void) {
   gshgeom_hash_init(&total);
   GSHSCENE_Store * store = NULL;
@@ -950,6 +1100,7 @@ int main(void) {
 
   scene_section();
   glyph_section();
+  palette_section();
 
   printf("shape-scene.hash %016" PRIx64 "\n", gshgeom_hash_value(&total));
   printf("shape-scene.count %lu\n", count);

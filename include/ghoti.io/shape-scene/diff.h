@@ -42,7 +42,8 @@
  *   damages every occurrence of its whole subtree; a changed key or a changed
  *   parent alone damages nothing by itself;
  * - a changed foreground damages every occurrence of every shape that paints with
- *   it (N10), and nothing else;
+ *   it (N10), and nothing else; a changed palette, every occurrence of every shape
+ *   that paints from it (N14), and nothing else;
  * - an occurrence of a group whose composite operator is unbounded (N4: it changes
  *   the backdrop where it has no content) that lies in a damaged subtree makes the
  *   damage unbounded;
@@ -149,6 +150,13 @@ GSHSCENE_API GSHSCENE_Result gshscene_diff_get(
  * Their nodes may be equal: the shapes that paint with the foreground are then in the damage and not in the changed IDs.
  */
 GSHSCENE_API int gshscene_diff_foreground_changed(const GSHSCENE_Diff * diff);
+
+/**
+ * @brief Whether the two versions' palettes differ (N14: another handle, or one and none); 0 for NULL.
+ *
+ * Their nodes may be equal: the shapes that paint from the palette are then in the damage and not in the changed IDs.
+ */
+GSHSCENE_API int gshscene_diff_palette_changed(const GSHSCENE_Diff * diff);
 
 /** @brief The damage; ::GSHSCENE_ERR_INVALID for NULL. */
 GSHSCENE_API GSHSCENE_Result gshscene_diff_damage(const GSHSCENE_Diff * diff, GSHSCENE_Damage * out);

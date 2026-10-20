@@ -86,7 +86,7 @@ typedef enum GSHSCENE_Problem_Reason {
   GSHSCENE_PROBLEM_KEY_CONFLICT = 2,    ///< The node is bound to a key that another node is bound to.
   GSHSCENE_PROBLEM_DANGLING_TARGET = 3, ///< The instance names a node the result does not have.
   GSHSCENE_PROBLEM_CYCLE = 4,           ///< The instance closes a cycle: its target contains it.
-  /** Two edits (or an edit and a publish since its base) both set a version parameter, the foreground; the root's ID is named. */
+  /** Two edits (or an edit and a publish since its base) both set a version parameter, the foreground or the palette; the root's ID is named. */
   GSHSCENE_PROBLEM_PARAMETER = 5,
   GSHSCENE_PROBLEM_REASON_COUNT         ///< Closes the enum.
 } GSHSCENE_Problem_Reason;

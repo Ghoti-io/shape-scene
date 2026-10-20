@@ -1677,4 +1677,102 @@ TEST_P(SinkConformance, Glyphs_EachGlyphsStatusIsItsOwnEntry) {
   }
 }
 
+// N14 (story 14c): a palette fill draws its entry of the drawing list's palette, as the solid fill of that color
+// does; a fill whose entry is missing (past the palette, or no palette at all), in the list or in a picture it
+// instances, is refused by the plan with PALETTE_ENTRY on every sink, and strict refuses before drawing.
+TEST_P(SinkConformance, N14_APaletteFillIsItsEntryAndAMissingEntryIsRefused) {
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto surface = make_surface(kind);
+    const GSHSCENE_Color entries[2] = {{{1.0, 0.0, 0.0, 1.0}, {}}, {{0.0, 0.25, 1.0, 0.5}, {}}};
+    const GSHSCENE_Resource * palette = nullptr;
+    ASSERT_EQ(gshscene_store_intern_palette(s.store, 2, entries, &palette), GSHSCENE_OK);
+    s.held.push_back(palette);
+    auto entry = [](uint32_t index, double alpha) {
+      GSHSCENE_Paint p{};
+      p.kind = GSHSCENE_PAINT_PALETTE;
+      p.entry = index;
+      p.rgba[3] = alpha;
+      return p;
+    };
+    // The picture: entry 1 and the missing entry 7, resolved against the list that draws it.
+    GSHSCENE_List * inner = s.open();
+    GSHSCENE_Paint e1 = entry(1, 1.0);
+    GSHSCENE_Paint e7 = entry(7, 1.0);
+    ASSERT_EQ(gshscene_list_fill(inner, s.sq(20, 20, 8), nullptr, GSHGEOM_FILL_NONZERO, &e1, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_fill(inner, s.sq(30, 20, 8), nullptr, GSHGEOM_FILL_NONZERO, &e7, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_close(inner), GSHSCENE_OK);
+    const GSHSCENE_Resource * picture = nullptr;
+    ASSERT_EQ(gshscene_store_intern_picture(s.store, inner, &picture), GSHSCENE_OK);
+    s.held.push_back(picture);
+    GSHSCENE_List * list = s.open();
+    ASSERT_EQ(gshscene_list_set_palette(list, palette), GSHSCENE_OK);
+    GSHSCENE_Paint e0 = entry(0, 0.5);
+    GSHSCENE_Paint e5 = entry(5, 1.0);
+    ASSERT_EQ(gshscene_list_fill(list, s.sq(4, 4, 8), nullptr, GSHGEOM_FILL_NONZERO, &e0, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_fill(list, s.sq(14, 4, 8), nullptr, GSHGEOM_FILL_NONZERO, &e5, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_instance(list, picture, nullptr, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_close(list), GSHSCENE_OK);
+    ReportRef report;
+    EXPECT_EQ(run(f(), sink.sink, request_for(list, *surface, report.report)).result, GSHSCENE_OK);
+    auto refused = of_class(report.report, GSHSCENE_ENTRY_REFUSED);
+    ASSERT_EQ(refused.size(), 2u);
+    EXPECT_EQ(refused[0].reason, GSHSCENE_REASON_PALETTE_ENTRY);
+    ASSERT_EQ(refused[0].chain_count, 1u);
+    EXPECT_EQ(refused[0].chain[0], 1u);
+    EXPECT_EQ(refused[1].reason, GSHSCENE_REASON_PALETTE_ENTRY);
+    ASSERT_EQ(refused[1].chain_count, 2u);
+    EXPECT_EQ(refused[1].chain[0], 2u);
+    EXPECT_EQ(refused[1].chain[1], 1u);
+    // Strict refuses before drawing; the target is untouched.
+    auto strict_surface = make_surface(kind);
+    uint64_t before = strict_surface->snapshot();
+    ReportRef strict;
+    GSHSCENE_Render_Request req = request_for(list, *strict_surface, strict.report);
+    req.flags = GSHSCENE_RENDER_STRICT;
+    EXPECT_EQ(run(f(), sink.sink, req).result, GSHSCENE_ERR_REFUSED);
+    EXPECT_EQ(strict_surface->snapshot(), before);
+    EXPECT_EQ(summary(strict.report).by_class[GSHSCENE_ENTRY_REFUSED], 2u);
+    // Without a palette every palette fill is missing.
+    GSHSCENE_List * bare = s.open();
+    ASSERT_EQ(gshscene_list_fill(bare, s.sq(4, 4, 8), nullptr, GSHGEOM_FILL_NONZERO, &e0, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_close(bare), GSHSCENE_OK);
+    ReportRef none;
+    auto bare_surface = make_surface(kind);
+    EXPECT_EQ(run(f(), sink.sink, request_for(bare, *bare_surface, none.report)).result, GSHSCENE_OK);
+    auto gone = of_class(none.report, GSHSCENE_ENTRY_REFUSED);
+    ASSERT_EQ(gone.size(), 1u);
+    EXPECT_EQ(gone[0].reason, GSHSCENE_REASON_PALETTE_ENTRY);
+    if (gshscene_target_kind_has_pixels((GSHSCENE_Target_Kind)kind)) {
+      // The entries' pixels are the solid fills' of their colors, in the list and in a picture: one resolution,
+      // whoever draws.  The two lists have one shape, so a sink that stamps units draws them alike too.
+      auto draw = [&](const GSHSCENE_Paint & outer, const GSHSCENE_Paint & in_picture, bool palette_set) {
+        GSHSCENE_List * pic_list = s.open();
+        EXPECT_EQ(gshscene_list_fill(pic_list, s.sq(20, 20, 8), nullptr, GSHGEOM_FILL_NONZERO, &in_picture, 0, 0.0),
+            GSHSCENE_OK);
+        EXPECT_EQ(gshscene_list_close(pic_list), GSHSCENE_OK);
+        const GSHSCENE_Resource * pic = nullptr;
+        EXPECT_EQ(gshscene_store_intern_picture(s.store, pic_list, &pic), GSHSCENE_OK);
+        s.held.push_back(pic);
+        GSHSCENE_List * l = s.open();
+        if (palette_set) {
+          EXPECT_EQ(gshscene_list_set_palette(l, palette), GSHSCENE_OK);
+        }
+        EXPECT_EQ(gshscene_list_fill(l, s.sq(4, 4, 8), nullptr, GSHGEOM_FILL_NONZERO, &outer, 0, 0.0), GSHSCENE_OK);
+        EXPECT_EQ(gshscene_list_instance(l, pic, nullptr, 0, 0.0), GSHSCENE_OK);
+        EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+        auto out = make_surface(kind);
+        ReportRef r;
+        EXPECT_EQ(run(f(), sink.sink, request_for(l, *out, r.report)).result, GSHSCENE_OK);
+        EXPECT_EQ(gshscene_report_count(r.report), 0u);
+        return out->snapshot();
+      };
+      uint64_t from_palette = draw(e0, e1, true);
+      uint64_t from_solids = draw(solid(1.0, 0.0, 0.0, 0.5), solid(0.0, 0.25, 1.0, 0.5), false);
+      EXPECT_EQ(from_palette, from_solids) << "a palette fill draws as the solid fill of its entry";
+    }
+  }
+}
+
 #endif /* GHOTI_IO_GSHSCENE_TEST_SINK_CONFORMANCE_H */

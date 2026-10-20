@@ -58,6 +58,19 @@ void build(const cv::VCase & c, GSHSCENE_Store * store, const GSHSCENE_Resource 
   }
   fg.space = space_from(c.fg_space);
   ASSERT_EQ(gshscene_list_set_foreground(l->list, &fg), GSHSCENE_OK) << c.name;
+  if (c.palette_count >= 0) {
+    std::vector<GSHSCENE_Color> entries((size_t)c.palette_count);
+    for (int e = 0; e < c.palette_count; e++) {
+      for (int k = 0; k < 4; k++) {
+        entries[(size_t)e].rgba[k] = c.palette[e].rgba[k];
+      }
+      entries[(size_t)e].space = space_from(c.palette[e].space);
+    }
+    const GSHSCENE_Resource * palette = nullptr;
+    ASSERT_EQ(gshscene_store_intern_palette(store, entries.size(), entries.data(), &palette), GSHSCENE_OK) << c.name;
+    ASSERT_EQ(gshscene_list_set_palette(l->list, palette), GSHSCENE_OK) << c.name;
+    gshscene_resource_release(palette); /* the list holds its own */
+  }
   for (int i = 0; i < c.item_count; i++) {
     const cv::VItem & it = c.items[i];
     coverage->push_back(it.coverage);
@@ -70,6 +83,7 @@ void build(const cv::VCase & c, GSHSCENE_Store * store, const GSHSCENE_Resource 
           p.rgba[k] = it.rgba[k];
         }
         p.space = space_from(it.space);
+        p.entry = (uint32_t)it.entry;
         ASSERT_EQ(gshscene_list_fill(l->list, square, nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK) << c.name;
         break;
       }
@@ -91,7 +105,6 @@ void build(const cv::VCase & c, GSHSCENE_Store * store, const GSHSCENE_Resource 
     }
   }
   ASSERT_EQ(gshscene_list_close(l->list), GSHSCENE_OK) << c.name;
-  (void)store;
 }
 
 }  // namespace

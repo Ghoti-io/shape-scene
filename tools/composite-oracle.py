@@ -8,12 +8,13 @@
 # Ghoti.io Shape Scene is free software: you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public License version 3
 # as published by the Free Software Foundation.
-"""The reference of the scene's compositing definition (N1 to N11 of documentation/design.md), in exact rationals.
+"""The reference of the scene's compositing definition (N1 to N11 and N14 of documentation/design.md), in exact rationals.
 
 This is a slow, independent statement of what a closed list *means*: the color
 spaces and their conversion (N1 to N3), the Porter-Duff operators (N4), the one
 primitive `apply` (N5), layers and groups (N6, N8), fills (N7), clips (N9), the
-foreground (N10) and the order of a sequence (N11).  It shares no code with the
+foreground (N10), the order of a sequence (N11) and the palette (N14: an entry's color with
+its alpha scaled; a missing entry is refused, so its fill draws nothing).  It shares no code with the
 library or with the other generators.  Arithmetic is `fractions.Fraction`
 throughout; the only inexact step is the power function of a transfer, which is
 evaluated with `decimal` at 80 digits and turned back into the exact rational of
@@ -29,12 +30,13 @@ the transfer round trips, the primitive's limits, and the order of a sequence
 against tools/gen-scene-vectors.py's own statement of it.  tools/gen-composite-vectors.py
 imports this file for the answers it commits.
 
-A case is evaluated by `evaluate(items, cov, fg, target, backdrop)`: `items` are
+A case is evaluated by `evaluate(items, cov, fg, target, backdrop, palette)`: `items` are
 the closed list's items as dictionaries (see the constructors below, the same
 shape as gen-scene-vectors.py's), `cov` the coverage in [0, 1] of each fill and
 each clip push (by item index; other entries ignored), `fg` the list's foreground,
 `target` the space of the root layer (a concrete space) and `backdrop` the
-premultiplied value the root layer starts with.
+premultiplied value the root layer starts with, and `palette` the list's palette (a list of
+(straight rgba, space), or None for none).
 """
 import sys
 from decimal import Decimal, getcontext
@@ -242,7 +244,7 @@ def is_unbounded(op):
 
 # --- N6 to N10: evaluating a closed list ---------------------------------------------------------------------
 FILL, CLIP_PUSH, CLIP_POP, GROUP_PUSH, GROUP_POP, INSTANCE = 1, 2, 3, 4, 5, 6
-PAINT_SOLID, PAINT_FOREGROUND = 0, 2
+PAINT_SOLID, PAINT_FOREGROUND, PAINT_PALETTE = 0, 2, 3
 
 
 class Frame:
@@ -265,7 +267,7 @@ def premultiply(rgb, a):
     return [rgb[0] * a, rgb[1] * a, rgb[2] * a, a]
 
 
-def evaluate(items, cov, fg, target, backdrop):
+def evaluate(items, cov, fg, target, backdrop, palette=None):
     """Return (the root layer's value as four Fractions, inexact) after the closed list's items."""
     ex = Exactness()
     cov = [F(c) for c in cov]
@@ -279,6 +281,13 @@ def evaluate(items, cov, fg, target, backdrop):
                 rgb = [F(v) for v in fg[0][:3]]
                 alpha = F(fg[0][3]) * F(it["rgba"][3])
                 space = target if is_target(fg[1]) else fg[1]
+            elif it["paint"] == PAINT_PALETTE:
+                if palette is None or it["entry"] >= len(palette):
+                    continue  # N14: a missing entry is refused; the fill draws nothing
+                entry = palette[it["entry"]]
+                rgb = [F(v) for v in entry[0][:3]]
+                alpha = F(entry[0][3]) * F(it["rgba"][3])
+                space = target if is_target(entry[1]) else entry[1]
             else:
                 rgb = [F(v) for v in it["rgba"][:3]]
                 alpha = F(it["rgba"][3])
@@ -466,6 +475,15 @@ def selftest():
     fgfill = dict(k=FILL, paint=PAINT_FOREGROUND, rgba=(0.0, 0.0, 0.0, 0.5), space=TARGET)
     got, _ = evaluate([fgfill], [1], ((0.5, 0.25, 0.0, 0.5), TARGET), SPACE_SRGB, (0.0, 0.0, 0.0, 0.0))
     check(got == [F(1, 8), F(1, 16), ZERO, F(1, 4)], "foreground: %s" % got)
+    # A palette fill (N14): the entry's color with its alpha times the paint's; a missing entry draws nothing.
+    pal = [((1.0, 0.0, 0.5, 1.0), TARGET), ((0.5, 0.25, 0.0, 0.5), TARGET)]
+    palfill = dict(k=FILL, paint=PAINT_PALETTE, entry=1, rgba=(0.0, 0.0, 0.0, 0.5), space=TARGET)
+    got, _ = evaluate([palfill], [1], (None, TARGET), SPACE_SRGB, (0.0, 0.0, 0.0, 0.0), pal)
+    check(got == [F(1, 8), F(1, 16), ZERO, F(1, 4)], "palette: %s" % got)
+    for missing, table in ((2, pal), (0, None), (0, [])):
+        gone = dict(palfill, entry=missing)
+        got, _ = evaluate([gone], [1], (None, TARGET), SPACE_SRGB, (0.0, 0.0, 1.0, 1.0), table)
+        check(got == [ZERO, ZERO, ONE, ONE], "a missing entry draws nothing: %s" % got)
     # A group with opacity 1/2 and an unbounded operator over a covered backdrop: SRC replaces it.
     push = dict(k=GROUP_PUSH, opacity=0.5, blend=TARGET, composite=OP_INDEX["src"])
     pop = dict(k=GROUP_POP)

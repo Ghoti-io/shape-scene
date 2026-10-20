@@ -299,7 +299,8 @@ int gshscene_props_equal(const GSHSCENE_Node * a, const GSHSCENE_Node * b) {
       return a->clip == NULL || (a->clip_rule == b->clip_rule && map_equal(&a->clip_map, &b->clip_map));
     case GSHSCENE_NODE_SHAPE:
       if (a->resource != b->resource || a->fill_rule != b->fill_rule || a->paint.kind != b->paint.kind ||
-          !gshscene_space_equal(&a->paint.space, &b->paint.space) || a->paint.gradient != b->paint.gradient) {
+          !gshscene_space_equal(&a->paint.space, &b->paint.space) || a->paint.gradient != b->paint.gradient ||
+          a->paint.entry != b->paint.entry) {
         return 0;
       }
       for (int i = 0; i < 4; i++) {
@@ -484,6 +485,7 @@ void gshscene_node_hash(GSHGEOM_Hash * h, const GSHSCENE_Node_Rec * node) {
         gshgeom_hash_f64(h, p->paint.rgba[k]);
       }
       gshscene_space_hash(h, &p->paint.space);
+      gshgeom_hash_u32(h, p->paint.entry);
       gshgeom_hash_i32(h, p->layer);
       gshgeom_hash_f64(h, p->depth);
       break;
