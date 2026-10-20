@@ -829,9 +829,16 @@ static void palette_section(void) {
     }
     unsigned n = between(1, 8);
     for (unsigned i = 0; i < n; i++) {
-      GSHSCENE_Glyph_Fixed g = {between(0, 9), (int32_t)between(0, 4096) - 2048, (int32_t)between(0, 4096) - 2048};
+      /* One draw per statement: the order an initializer's or a call's operands are evaluated in is unspecified, and
+       * targets differ in it, so two draws in one expression would differ by target, not by arithmetic. */
+      GSHSCENE_Glyph_Fixed g;
+      g.id = between(0, 9);
+      g.x = (int32_t)between(0, 4096) - 2048;
+      g.y = (int32_t)between(0, 4096) - 2048;
+      const int32_t size = (int32_t)between(64, 2048);
+      const uint32_t hint_mode = between(0, 1);
       const GSHSCENE_Resource * run = NULL;
-      check(gshscene_store_intern_glyph_run_fixed(store, face, (int32_t)between(64, 2048), between(0, 1), 0, 6u, 1, &g,
+      check(gshscene_store_intern_glyph_run_fixed(store, face, size, hint_mode, 0, 6u, 1, &g,
                 &run), "fixed run");
       GSHSCENE_Fixed_Op ops[4];
       size_t op_count = between(0, 4);
@@ -849,7 +856,11 @@ static void palette_section(void) {
           ops[k].v[1] /= 4;
         }
       }
-      GSHSCENE_Paint_Fixed paint = {between(2, 3), between(0, 13), (int32_t)between(0, 16384), 14u};
+      GSHSCENE_Paint_Fixed paint;
+      paint.kind = between(2, 3);
+      paint.entry = between(0, 13);
+      paint.alpha = (int32_t)between(0, 16384);
+      paint.bits = 14u;
       if (paint.kind == GSHSCENE_FIXED_PAINT_FOREGROUND) {
         paint.entry = 0;
       } else if (paint.entry == 13) {
