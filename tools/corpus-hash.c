@@ -814,7 +814,10 @@ int main(void) {
     memset(&run, 0, sizeof run);
     const GSHSCENE_Resource * face = NULL;
     if (i % 2 == 0) {
-      face = test_face(store, between(0, 2), (i % 4 == 0) ? 0 : (int16_t)((int)between(0, 32768) - 16384));
+      /* One draw per statement: the order in which a call's arguments are evaluated is the target's. */
+      unsigned which = between(0, 2);
+      int16_t axis = (i % 4 == 0) ? 0 : (int16_t)((int)between(0, 32768) - 16384);
+      face = test_face(store, which, axis);
       run.source = GSHSCENE_GLYPHS_FROM_FONT;
       run.face = face;
       run.size = sizes[between(0, 4)];
