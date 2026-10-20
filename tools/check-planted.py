@@ -188,6 +188,9 @@ changes no result, cannot be seen by any test:
     than the 320-byte line buffer at the end of the carving, which no record
     fills, so a missing term moves no write past the end (the conformance suite's
     canary is 4096 bytes after the workspace)
+  - ``LINE_BYTES`` (no plant): GCC 16's ``-Wformat-truncation`` refuses, at
+    compile time, any size below the longest record, and a larger one changes
+    nothing
   - the 16-digit width of a hash that has no leading zero digit in any fixture
     (an instance's picture, a report's own hash)
   - ``r.target = &copy`` in the workspace query: the test sink's need does not
@@ -1172,7 +1175,6 @@ PLANTS += [
     ('rp-tag', 'src', RP, '#define REPORT_TAG UINT32_C(0x54525052)', '#define REPORT_TAG UINT32_C(0x54525053)', ['testDump_sink']),
     ('rp-format', 'src', RP, '#define REPORT_FORMAT 1u', '#define REPORT_FORMAT 2u', ['testDump_sink']),
     ('ds-format', 'src', DS, '#define DUMP_FORMAT 1u', '#define DUMP_FORMAT 2u', ['testDump_sink']),
-    ('ds-line-bytes', 'src', DS, '#define LINE_BYTES 320u', '#define LINE_BYTES 48u', ['testDump_sink']),
     ('ds-edge-high', 'src', DS, '#define EDGE_HIGH 2147483647.0', '#define EDGE_HIGH 16.0', ['testDump_sink']),
     ('ds-edge-low', 'src', DS, '#define EDGE_LOW (-2147483648.0)', '#define EDGE_LOW (16.0)', ['testDump_sink']),
     # One per rule.
