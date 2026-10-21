@@ -86,7 +86,7 @@ enum {
   OP_PUBLISH, OP_MERGE, OP_HOLD, OP_RELEASE_VERSION, OP_DIFF, OP_EMIT, OP_VISIT, OP_DUMP, OP_SCENE_INTERN,
   OP_FILL_EX, OP_CLIP_PUSH_EX, OP_GROUP_PUSH_EX, OP_LIST_FOREGROUND, OP_NODE_PROPS, OP_EDIT_FOREGROUND, OP_LIST_PALETTE,
   OP_FILL_FIXED, OP_TRUNCATE, OP_EDIT_PALETTE, OP_INTERN_GRADIENT, OP_FILL_GRADIENT, OP_SCENE_GRADIENT,
-  OP_GRADIENT_NODE, OP_COLOR_BOUND, OP_GROUP_PDF, OP_NODE_PDF, OP_COUNT
+  OP_GRADIENT_NODE, OP_COLOR_BOUND, OP_GROUP_PDF, OP_NODE_PDF, OP_INTERN_STYLE, OP_STROKE, OP_STROKE_NODE, OP_COUNT
 };
 
 /* --- the outcomes the corpus must reach ------------------------------------------------------------ */
@@ -96,7 +96,9 @@ enum {
   OUT_PUBLISH_OK, OUT_MERGE_OK, OUT_EMIT_OK, OUT_DIFF_OK, OUT_INSTANCE_PICTURE, OUT_LIST_TIES, OUT_FOREGROUND_VERSION,
   OUT_PARAMETER_REFUSED, OUT_EMIT_TIES, OUT_PALETTE_FILL, OUT_TRUNCATED, OUT_GRADIENT_FILL, OUT_GRADIENT_DEGENERATE,
   OUT_GRADIENT_REFUSED, OUT_GRADIENT_LIMIT, OUT_GRADIENT_NODE, OUT_GRADIENT_EMITTED, OUT_COLOR_LIMIT, OUT_COLOR_AT_BOUND,
-  OUT_BLEND_GROUP, OUT_PDF_GROUP, OUT_PDF_INVALID, OUT_PDF_EMITTED, OUT_COUNT
+  OUT_BLEND_GROUP, OUT_PDF_GROUP, OUT_PDF_INVALID, OUT_PDF_EMITTED, OUT_STYLE_INTERNED, OUT_STYLE_INVALID,
+  OUT_STYLE_LIMIT, OUT_STYLE_DOUBLED, OUT_STYLE_SOLID, OUT_STYLE_UNSUPPORTED, OUT_STROKE_RECORDED,
+  OUT_STROKE_UNSUPPORTED, OUT_STROKE_NODE, OUT_STROKE_EMITTED, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limit", "edit limit", "publish limit",
@@ -106,7 +108,10 @@ static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limi
     "a degenerate gradient interned", "a gradient refused at intern",
     "a gradient past G14's bounds refused", "a shape node painted with a gradient", "an emitted list with a gradient fill",
     "a color past N1's bound refused", "a color at N1's bound recorded", "a blend-mode group recorded",
-    "a group of PDF's fields recorded", "a group of PDF's fields refused as invalid", "a node of PDF's fields emitted"};
+    "a group of PDF's fields recorded", "a group of PDF's fields refused as invalid", "a node of PDF's fields emitted",
+    "a stroke style interned", "a stroke style refused as invalid", "a stroke style past SK2's bounds refused",
+    "an odd dash array doubled", "a dash array made solid", "a width profile refused (reserved)",
+    "a stroke recorded", "a 3D stroke refused as unsupported", "a stroke node", "an emitted list with a stroke"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -184,6 +189,8 @@ typedef struct S {
   const GSHSCENE_Resource * sres[POOL];    /* in the scene's store */
   const GSHSCENE_Resource * grads[4];      /* gradients, in the standalone store (color-paint story P1) */
   const GSHSCENE_Resource * sgrads[2];     /* gradients, in the scene's store (story P2) */
+  const GSHSCENE_Resource * styles[4];     /* stroke styles, in the standalone store (strokes story S1) */
+  const GSHSCENE_Resource * sstyles[2];    /* stroke styles, in the scene's store */
   GSHSCENE_Edit * edits[EDITS];
   unsigned edit_generation[EDITS];
   const GSHSCENE_Version * versions[VERSIONS];
@@ -540,6 +547,35 @@ static int hold(S * s, const GSHSCENE_Version * v) {
 
 static int has_edit(S * s, unsigned k) {
   return s->edits[k % EDITS] != NULL;
+}
+
+/* --- stroke styles from the input (strokes story S1: SK2's classes, SK3's canonical form) ----------------------------- */
+
+/** A value of a style: zero of both signs, ordinary values, SK2's band edges and one step past each, and non-finite. */
+static const double style_values[12] = {0.0, 1.0, 2.5, -0.0, 0x1p-64, 0x1p-65, 0x1p64, 0x1.0000000000001p64, -1.0,
+    NAN, INFINITY, 3.0};
+
+/** SK2's band, restated: zero, or a magnitude in [2^-64, 2^64]. */
+static int style_within(double x) {
+  double m = fabs(x);
+  return m == 0.0 || (m >= 0x1p-64 && m <= 0x1p64);
+}
+
+/** SK3 (a), restated: the canonical dash count. */
+static size_t style_dash_count(const double * dashes, size_t n) {
+  int any = 0;
+  for (size_t i = 0; i < n; i++) {
+    if (dashes[i] < 0.0) {
+      return 0;
+    }
+    any = any || dashes[i] != 0.0;
+  }
+  return !any ? 0 : (n % 2 ? 2 * n : n);
+}
+
+/** Whether @p x and @p y are the same double, bit for bit (so -0 is not 0). */
+static int same_bits(double x, double y) {
+  return memcmp(&x, &y, sizeof x) == 0;
 }
 
 /* --- one op ----------------------------------------------------------------------------------------------------------- */
@@ -911,6 +947,8 @@ static void op(S * s, unsigned code) {
         for (int i = 0; i < 2; i++) {
           gshscene_resource_release(s->sgrads[i]);
           s->sgrads[i] = NULL;
+          gshscene_resource_release(s->sstyles[i]);
+          s->sstyles[i] = NULL;
         }
         gshscene_scene_destroy(s->scene);
         s->scene = NULL;
@@ -1185,6 +1223,18 @@ static void op(S * s, unsigned code) {
             GSHSCENE_Reason why = gshscene_gradient_notice(item, NULL, 0, NULL);
             CHECK(why == 0 || why == GSHSCENE_REASON_GRADIENT_DEGENERATE || why == GSHSCENE_REASON_MAP_NOT_INVERTIBLE);
             outcomes[OUT_GRADIENT_EMITTED]++;
+          }
+          if (item->kind == GSHSCENE_ITEM_STROKE) {
+            /* S1: a stroke node's item carries its centerline, style and paint as they are; the notice and the
+             * features it requires are SK8's and SK11's. */
+            CHECK(info.node.kind == GSHSCENE_NODE_STROKE && item->style == info.node.style &&
+                  item->resource == info.node.resource);
+            CHECK(gshscene_resource_kind(item->style) == GSHSCENE_RESOURCE_STROKE_STYLE);
+            GSHSCENE_Reason why = gshscene_stroke_notice(item, NULL, 0, NULL);
+            CHECK(why == 0 || why == GSHSCENE_REASON_STROKE_ZERO_WIDTH || why == GSHSCENE_REASON_MAP_NOT_INVERTIBLE);
+            uint32_t need = gshscene_stroke_required(item, NULL, 0, NULL);
+            CHECK((need & ~GSHSCENE_STROKE_NATIVE_ALL) == 0 && (why == 0 || need == 0));
+            outcomes[OUT_STROKE_EMITTED]++;
           }
           if (item->kind == GSHSCENE_ITEM_INSTANCE) {
             const GSHSCENE_Resource * pic = NULL;
@@ -1887,6 +1937,174 @@ static void op(S * s, unsigned code) {
       gshscene_resource_release(mask); /* the node holds its own */
       break;
     }
+    case OP_INTERN_STYLE: {
+      /* SK2, SK3: a style from the input, in either store; its result class predicted from the fields as given, and
+       * the canonical form read back, restated here; the canonical form interned again is the same handle. */
+      int in_scene = s->scene && pick(s, 2);
+      GSHSCENE_Store * store = in_scene ? gshscene_scene_store(s->scene) : s->store;
+      unsigned slot = pick(s, in_scene ? 2 : 4);
+      static const double miters[5] = {1.0, 4.0, 0.5, 0x1p16, 0x1.0000000000001p16};
+      GSHSCENE_Stroke_Style st;
+      gshscene_stroke_style_init(&st);
+      st.width = style_values[pick(s, 12)];
+      st.width_space = pick(s, 3);
+      st.join = pick(s, 6);
+      st.miter_limit = miters[pick(s, 5)];
+      st.cap = pick(s, 4);
+      st.degenerate = pick(s, 3);
+      st.dash_scope = pick(s, 3);
+      st.alignment = pick(s, 4);
+      st.alignment_rule = (GSHGEOM_Fill_Rule)pick(s, 3);
+      double dashes[5];
+      size_t n = pick(s, 6);
+      for (size_t i = 0; i < n; i++) {
+        dashes[i] = style_values[pick(s, 12)];
+      }
+      st.dash_count = n;
+      st.dashes = (n && pick(s, 8) == 0) ? NULL : dashes;
+      st.dash_offset = style_values[pick(s, 12)];
+      st.width_profile = pick(s, 12) == 0 ? s->res[0] : NULL;
+      int invalid = (n && !st.dashes) || !isfinite(st.width) || !isfinite(st.miter_limit) || !isfinite(st.dash_offset) ||
+          st.width_space > 1 || st.join > 4 || st.cap > 2 || st.degenerate > 1 || st.dash_scope > 1 ||
+          st.alignment > 2 || st.alignment_rule > 1 || st.width < 0.0;
+      for (size_t i = 0; st.dashes && i < n; i++) {
+        invalid = invalid || !isfinite(dashes[i]);
+      }
+      int unsupported = !invalid && st.width_profile != NULL;
+      size_t count = st.dashes ? style_dash_count(dashes, n) : 0;
+      size_t most = lim->max_resource_elements < 65535 ? lim->max_resource_elements : 65535;
+      int beyond = !style_within(st.width) || !style_within(st.dash_offset) || !(st.miter_limit >= 1.0) ||
+          !(st.miter_limit <= 0x1p16) || count > most;
+      for (size_t i = 0; st.dashes && i < n; i++) {
+        beyond = beyond || !style_within(dashes[i]);
+      }
+      const GSHSCENE_Resource * g = NULL;
+      r = gshscene_store_intern_stroke_style(store, &st, &g);
+      if (invalid) {
+        CHECK(r == GSHSCENE_ERR_INVALID);
+        outcomes[OUT_STYLE_INVALID]++;
+      } else if (unsupported) {
+        CHECK(r == GSHSCENE_ERR_UNSUPPORTED);
+        outcomes[OUT_STYLE_UNSUPPORTED]++;
+      } else if (beyond) {
+        CHECK(r == GSHSCENE_ERR_LIMIT);
+        outcomes[OUT_STYLE_LIMIT]++;
+      } else {
+        CHECK(r == GSHSCENE_OK || r == GSHSCENE_ERR_LIMIT); /* the store's own limits */
+      }
+      if (r != GSHSCENE_OK) {
+        CHECK(g == NULL);
+        outcomes[OUT_INTERN_LIMIT] += r == GSHSCENE_ERR_LIMIT;
+        break;
+      }
+      outcomes[OUT_STYLE_INTERNED]++;
+      outcomes[OUT_STYLE_DOUBLED] += n % 2 && count == 2 * n;
+      outcomes[OUT_STYLE_SOLID] += n && count == 0;
+      GSHSCENE_Stroke_Style back;
+      CHECK(gshscene_resource_kind(g) == GSHSCENE_RESOURCE_STROKE_STYLE);
+      CHECK(gshscene_resource_stroke_style(g, &back) == GSHSCENE_OK);
+      int reads_miter = st.join == GSHSCENE_STROKE_JOIN_MITER || st.join == GSHSCENE_STROKE_JOIN_MITER_CLIP ||
+          st.join == GSHSCENE_STROKE_JOIN_ARCS;
+      CHECK(same_bits(back.width, st.width == 0.0 ? 0.0 : st.width));
+      CHECK(back.width_space == st.width_space && back.join == st.join && back.cap == st.cap &&
+            back.degenerate == st.degenerate && back.alignment == st.alignment);
+      CHECK(same_bits(back.miter_limit, reads_miter ? st.miter_limit : 4.0));
+      CHECK(back.alignment_rule == (st.alignment == GSHSCENE_STROKE_ALIGN_CENTER ? GSHGEOM_FILL_NONZERO : st.alignment_rule));
+      CHECK(back.dash_count == count && (count == 0) == (back.dashes == NULL));
+      for (size_t i = 0; i < count; i++) {
+        double want = dashes[i % n];
+        CHECK(same_bits(back.dashes[i], want == 0.0 ? 0.0 : want));
+      }
+      if (count) {
+        CHECK(same_bits(back.dash_offset, st.dash_offset == 0.0 ? 0.0 : st.dash_offset) && back.dash_scope == st.dash_scope);
+      } else {
+        CHECK(same_bits(back.dash_offset, 0.0) && back.dash_scope == GSHSCENE_STROKE_DASH_PER_SUBPATH);
+      }
+      CHECK(back.width_profile == NULL);
+      CHECK(gshscene_resource_dump(g, s->null) == GSHSCENE_OK);
+      const GSHSCENE_Resource * again = NULL;
+      if (gshscene_store_intern_stroke_style(store, &back, &again) == GSHSCENE_OK) {
+        CHECK(again == g);
+        gshscene_resource_release(again);
+      }
+      const GSHSCENE_Resource ** pool = in_scene ? s->sstyles : s->styles;
+      gshscene_resource_release(pool[slot]);
+      pool[slot] = g;
+      break;
+    }
+    case OP_STROKE: {
+      /* A stroke in the list (S1): a fresh centerline (recipe 5 is 3D), a style of the pool, of the other store or a
+       * path (both invalid) or none, a planar map or a 3D one. */
+      if (!s->list) {
+        break;
+      }
+      unsigned recipe = pick(s, 6);
+      GSHSCENE_Result made;
+      const GSHSCENE_Resource * line = intern_recipe(s, s->store, recipe, &made);
+      unsigned k = pick(s, 7);
+      const GSHSCENE_Resource * style = k < 4 ? s->styles[k] : k == 4 ? s->sstyles[0] : k == 5 ? s->res[0] : NULL;
+      int use;
+      GSHGEOM_Map m = pool_map(arg(s), &use);
+      int three = pick(s, 8) == 0;
+      if (three) {
+        gshgeom_map_identity(3, &m);
+        use = 1;
+      }
+      GSHSCENE_Paint paint = pool_paint(arg(s));
+      ListSnap b = snap(s->list);
+      r = gshscene_list_stroke(s->list, line, style, use ? &m : NULL, &paint, 0, 0.0);
+      list_after(s, b, r, 0, 0);
+      int good_style = k < 4 && style != NULL;
+      CHECK(r != GSHSCENE_ERR_UNSUPPORTED || three || recipe == 5);
+      if (!good_style || !line) {
+        CHECK(r != GSHSCENE_OK);
+      }
+      outcomes[OUT_STROKE_UNSUPPORTED] += r == GSHSCENE_ERR_UNSUPPORTED;
+      if (r == GSHSCENE_OK) {
+        CHECK(!three && recipe != 5);
+        const GSHSCENE_Item * item;
+        CHECK(gshscene_list_item(s->list, b.count, &item) == GSHSCENE_OK);
+        CHECK(item->kind == GSHSCENE_ITEM_STROKE && item->style == style && item->resource == line);
+        outcomes[OUT_STROKE_RECORDED]++;
+      }
+      gshscene_resource_release(line); /* the list holds its own */
+      break;
+    }
+    case OP_STROKE_NODE: {
+      /* A stroke node (S1): a centerline of the scene's store, a style of it, of the other store, or none. */
+      unsigned k = pick(s, EDITS);
+      if (!has_edit(s, k)) {
+        break;
+      }
+      GSHSCENE_Edit * e = s->edits[k];
+      GSHSCENE_Node n;
+      gshscene_node_init(GSHSCENE_NODE_STROKE, &n);
+      int use;
+      n.map = pool_map(arg(s), &use);
+      n.resource = s->sres[pick(s, POOL)];
+      unsigned which = pick(s, 4);
+      n.style = which < 2 ? s->sstyles[which] : which == 2 ? s->styles[0] : NULL;
+      n.paint = pool_paint(arg(s));
+      size_t before = gshscene_edit_node_count(e);
+      uint64_t id = 0;
+      if (pick(s, 3) == 0) {
+        r = gshscene_edit_set(e, some_id(s), &n);
+      } else {
+        r = gshscene_edit_add(e, some_id(s), GSHSCENE_APPEND, &n, NULL, &id);
+      }
+      CHECK(r != GSHSCENE_ERR_INTERNAL && r != GSHSCENE_ERR_OOM);
+      if (r == GSHSCENE_OK) {
+        remember(s, id);
+        CHECK(which < 2 && n.style && n.resource);
+        outcomes[OUT_STROKE_NODE]++;
+      } else {
+        CHECK(gshscene_edit_node_count(e) == before);
+        if (r == GSHSCENE_ERR_LIMIT) {
+          CHECK(before >= lim->max_nodes);
+        }
+      }
+      break;
+    }
     default:
       break;
   }
@@ -1970,6 +2188,10 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
   }
   for (int i = 0; i < 2; i++) {
     gshscene_resource_release(s->sgrads[i]);
+    gshscene_resource_release(s->sstyles[i]);
+  }
+  for (int i = 0; i < 4; i++) {
+    gshscene_resource_release(s->styles[i]);
   }
   gshscene_scene_destroy(s->scene);
   GSHSCENE_Store_Stats stats;

@@ -75,7 +75,11 @@ count that bounds a picture of instances of pictures.
 The spellings are in `resource.h` and `list.h`, field by field, in `shape-geometry`'s hash
 (FNV-1a 64, little-endian fields). `tools/gen-scene-vectors.py` states them a second time with Python's
 `struct`, and `tests/known_answers.h` is what it writes. `tools/corpus-hash.c` is the cross-target probe:
-`suite/tools/xarch/shape.sh` and `xwin/shape.sh` check its hash on every target.
+`suite/tools/xarch/shape.sh` and `xwin/shape.sh` check its hash on every target. Its stroke section (strokes story
+S1: styles read back canonical, SK10's bounds under composed maps in every unit, the notices and features of strokes,
+their renders by sinks that draw, expand and refuse them, a retained scene's diff of stroke nodes) folds into a
+second hash and count, `stroke-hash` and `stroke-count` in `tests/corpus/scene.hash`, so that adding it left the
+first unchanged; both pairs are checked.
 
 ## Recording without floats (fixed.h; story 14c)
 
@@ -927,7 +931,11 @@ SVG 1.1's set) and a **toolpath-like** one (no expansion; native: a round join, 
 under a similarity and a device width, dashes), and `tools/gen-sink-vectors.py` restates all three renders of one
 stroke list, SK10's box (the outward rounding in exact rationals) and SK11's features included.
 `tools/gen-sink-vectors.py` restates the report's
-and the test sink's spellings, and `tests/fuzz/fuzz_render.c` drives requests through it.
+and the test sink's spellings, and `tests/fuzz/fuzz_render.c` drives requests through it: since strokes story S1 with
+strokes of eight styles (width 0, a device hairline, odd dashes, miter-clip, arcs with dashes across subpaths, inside
+and outside alignment) of squares and runs under anisotropic and singular maps, and sinks that expand, emit a writer's
+or a toolpath's set or none, or lack the stroke kind; `tests/fuzz/fuzz_record.c` interns styles of every field, its
+result class predicted from SK2 and its canonical form restated from SK3, and records strokes and stroke nodes.
 
 
 ## Glyphs through the waist (normative; story 14a, AD-5)

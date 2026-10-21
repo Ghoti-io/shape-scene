@@ -50,6 +50,12 @@
  * target must round alike), what the notice predicate says of each under composed maps, the float-free constructor's
  * gradients (a run's scale is a division), and lists of gradient fills rendered by the test sinks (whose dumps carry
  * the resolved stops and the notices).
+ * Since strokes story S1 a stroke section folds, into a hash and count of their own (printed as
+ * `shape-scene.stroke-hash` and `shape-scene.stroke-count`, so that the hash above is unchanged), stroke styles of every
+ * field (widths, miter limits, dashes and offsets not exact in binary, odd arrays doubled, negative ones made solid)
+ * read back in SK3's canonical form, SK10's bounds of random boxes under composed maps in every unit, the notices and
+ * required features of strokes under target maps, lists of strokes rendered by test sinks that draw every feature,
+ * expand what they lack, or refuse it, and a retained scene of stroke nodes, a change of style and the diff's damage.
  * It is built by `make check-corpus-hash` on the host and by
  * suite/tools/xarch/shape.sh and suite/tools/xwin/shape.sh for the others.
  *
@@ -82,6 +88,10 @@
 
 static GSHGEOM_Hash total;
 static unsigned long count;
+static GSHGEOM_Hash stroke_total; /* strokes story S1: its own hash, so the one above is unchanged */
+static unsigned long stroke_count;
+static GSHGEOM_Hash * acc = &total; /* where feed folds */
+static unsigned long * acc_count = &count;
 
 static uint64_t rng_state = UINT64_C(0x9E3779B97F4A7C15);
 
@@ -120,12 +130,12 @@ static void fail(const char * what) {
 
 static void feed(uint64_t value) {
 #ifdef SHAPE_SCENE_PLANT_BIT
-  if (count == 17) {
+  if (*acc_count == 17) {
     value ^= 1u;
   }
 #endif
-  gshgeom_hash_u64(&total, value);
-  count++;
+  gshgeom_hash_u64(acc, value);
+  (*acc_count)++;
 }
 
 static void check(GSHSCENE_Result r, const char * what) {
@@ -1290,6 +1300,303 @@ static void blend_section(void) {
   gshscene_store_destroy(store);
 }
 
+/* --- strokes (strokes story S1): folded into a hash of their own ------------------------------------------------- */
+
+#define STROKE_STYLES 24
+#define STROKE_PATHS 16
+
+/* A value not exact in binary: an integer over 1000 in [lo, hi] thousandths. */
+static double thousandths(int lo, int hi) {
+  return (double)((int)between(0, (unsigned)(hi - lo)) + lo) / 1000.0;
+}
+
+static GSHSCENE_Stroke_Style random_style(double * dashes) {
+  GSHSCENE_Stroke_Style st;
+  gshscene_stroke_style_init(&st);
+  st.width = between(0, 7) == 0 ? 0.0 : thousandths(1, 4000);
+  st.width_space = between(0, 1);
+  st.join = between(0, 4);
+  st.miter_limit = thousandths(1000, 6000);
+  st.cap = between(0, 2);
+  st.degenerate = between(0, 1);
+  st.dash_count = between(0, 5);
+  for (size_t k = 0; k < st.dash_count; k++) {
+    dashes[k] = thousandths(-100, 3000); /* a negative one now and then: solid (SK3) */
+  }
+  st.dashes = st.dash_count ? dashes : NULL;
+  st.dash_offset = thousandths(-1000, 1000);
+  st.dash_scope = between(0, 1);
+  st.alignment = between(0, 2);
+  st.alignment_rule = (next() & 1) ? GSHGEOM_FILL_EVEN_ODD : GSHGEOM_FILL_NONZERO;
+  return st;
+}
+
+static void feed_style(const GSHSCENE_Resource * style) {
+  feed(gshscene_resource_hash(style));
+  GSHSCENE_Stroke_Style back;
+  check(gshscene_resource_stroke_style(style, &back), "style read back");
+  feed(gshgeom_f64_bits(back.width));
+  feed(gshgeom_f64_bits(back.miter_limit));
+  feed(gshgeom_f64_bits(back.dash_offset));
+  feed((uint64_t)back.dash_scope);
+  feed((uint64_t)back.alignment_rule);
+  feed((uint64_t)back.dash_count);
+  for (size_t k = 0; k < back.dash_count; k++) {
+    feed(gshgeom_f64_bits(back.dashes[k]));
+  }
+}
+
+static void feed_bounds(GSHSCENE_Result r, const GSHGEOM_Bounds * b) {
+  feed((uint64_t)r);
+  if (r == GSHSCENE_OK) {
+    feed((uint64_t)b->empty);
+    feed(gshgeom_f64_bits(b->min.x));
+    feed(gshgeom_f64_bits(b->min.y));
+    feed(gshgeom_f64_bits(b->max.x));
+    feed(gshgeom_f64_bits(b->max.y));
+  }
+}
+
+/* Every list through four test sinks: every feature as a stroke; a writer's set that expands the rest; a toolpath's
+ * that refuses it (best effort and strict); each on a stream in points under a scale and on a raster. */
+static void feed_stroke_render(const GSHSCENE_List * list) {
+  GSHSCENE_Dump_Sink_Config configs[3];
+  gshscene_dump_sink_config_default(&configs[0]);
+  configs[1] = configs[0];
+  configs[2] = configs[0];
+  const uint32_t writer = GSHSCENE_STROKE_NATIVE_JOIN_MITER | GSHSCENE_STROKE_NATIVE_JOIN_ROUND |
+      GSHSCENE_STROKE_NATIVE_JOIN_BEVEL | GSHSCENE_STROKE_NATIVE_CAP_BUTT | GSHSCENE_STROKE_NATIVE_CAP_ROUND |
+      GSHSCENE_STROKE_NATIVE_CAP_SQUARE | GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL | GSHSCENE_STROKE_NATIVE_DASH;
+  const uint32_t toolpath = GSHSCENE_STROKE_NATIVE_JOIN_ROUND | GSHSCENE_STROKE_NATIVE_CAP_ROUND |
+      GSHSCENE_STROKE_NATIVE_CAP_BUTT | GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL | GSHSCENE_STROKE_NATIVE_WIDTH_DEVICE;
+  GSHSCENE_Sink_Caps * caps[2][2] = {{&configs[1].raster_caps, &configs[1].stream_caps},
+      {&configs[2].raster_caps, &configs[2].stream_caps}};
+  for (int i = 0; i < 2; i++) {
+    caps[0][i]->stroke_native = writer;
+    caps[0][i]->flags |= GSHSCENE_CAP_STROKE_EXPAND;
+    caps[1][i]->stroke_native = toolpath;
+  }
+  GSHSCENE_Report * report = NULL;
+  check(gshscene_report_create(NULL, NULL, &report), "stroke report");
+  for (int c = 0; c < 4; c++) {
+    GSHSCENE_Sink * sink = NULL;
+    check(gshscene_dump_sink_create(NULL, NULL, &configs[c < 3 ? c : 2], &sink), "stroke test sink");
+    uint64_t written = 0;
+    GSHSCENE_Writer out = {count_write, &written};
+    GSHSCENE_Target stream;
+    memset(&stream, 0, sizeof stream);
+    stream.kind = GSHSCENE_TARGET_STREAM;
+    stream.surface = &out;
+    stream.unit = GSHSCENE_UNIT_POINT;
+    if (gshgeom_map_scale(2, 0.625, 0.375, 1.0, &stream.map) != GSHGEOM_OK) {
+      fail("stroke scale");
+    }
+    GSHSCENE_Render_Request request;
+    memset(&request, 0, sizeof request);
+    request.list = list;
+    request.target = &stream;
+    request.report = report;
+    request.flags = c == 3 ? GSHSCENE_RENDER_STRICT : 0;
+    feed_job(sink, &request);
+    feed(written);
+    GIMG_Raster * raster = NULL;
+    if (gimg_raster_create(32, 32, &GIMG_PIXEL_RGBA8, GIMG_RASTER_OWNED, NULL, 0, &raster) != GIMG_OK) {
+      fail("stroke raster");
+    }
+    GSHSCENE_Target pixels;
+    memset(&pixels, 0, sizeof pixels);
+    pixels.kind = GSHSCENE_TARGET_RASTER;
+    pixels.surface = raster;
+    if (gshgeom_map_scale(2, 0.0625, 0.0625, 1.0, &pixels.map) != GSHGEOM_OK) {
+      fail("stroke raster scale");
+    }
+    request.target = &pixels;
+    feed_job(sink, &request);
+    GSHGEOM_Hash h;
+    gshgeom_hash_init(&h);
+    const unsigned char * px = gimg_raster_pixels_const(raster);
+    for (uint32_t y = 0; y < 32; y++) {
+      gshgeom_hash_bytes(&h, px + y * gimg_raster_stride_bytes(raster), 32u * 4u);
+    }
+    feed(gshgeom_hash_value(&h));
+    gimg_raster_destroy(raster);
+    check(gshscene_sink_destroy(sink), "stroke sink destroy");
+  }
+  gshscene_report_destroy(report);
+}
+
+static void stroke_section(void) {
+  acc = &stroke_total;
+  acc_count = &stroke_count;
+  gshgeom_hash_init(&stroke_total);
+
+  /* The pixel sizes (SK5): divisions every target must round alike. */
+  for (uint32_t unit = 0; unit <= GSHSCENE_UNIT_INCH + 1u; unit++) {
+    feed(gshgeom_f64_bits(gshscene_stroke_pixel_size(unit)));
+  }
+
+  /* Styles of every field, read back canonical (SK3); each interned twice, the second a hit. */
+  GSHSCENE_Store * store = NULL;
+  check(gshscene_store_create(NULL, NULL, &store), "stroke store");
+  const GSHSCENE_Resource * styles[STROKE_STYLES];
+  for (size_t i = 0; i < STROKE_STYLES; i++) {
+    double dashes[5];
+    GSHSCENE_Stroke_Style st = random_style(dashes);
+    check(gshscene_store_intern_stroke_style(store, &st, &styles[i]), "stroke style");
+    const GSHSCENE_Resource * again = NULL;
+    check(gshscene_store_intern_stroke_style(store, &st, &again), "stroke style again");
+    if (again != styles[i]) {
+      fail("a stroke style interned twice is two handles");
+    }
+    gshscene_resource_release(again);
+    feed_style(styles[i]);
+  }
+
+  /* SK10: random boxes under composed maps, in every unit. */
+  for (size_t i = 0; i < 64; i++) {
+    GSHGEOM_Bounds box;
+    memset(&box, 0, sizeof box);
+    box.min.x = coord();
+    box.min.y = coord();
+    box.max.x = box.min.x + (double)between(0, 800) / 16.0;
+    box.max.y = box.min.y + (double)between(0, 800) / 16.0;
+    box.empty = between(0, 15) == 0;
+    GSHGEOM_Map map = random_map();
+    unsigned pick = between(0, STROKE_STYLES - 1);
+    uint32_t unit = between(0, GSHSCENE_UNIT_INCH);
+    GSHGEOM_Bounds out;
+    memset(&out, 0, sizeof out);
+    feed_bounds(gshscene_stroke_bounds(styles[pick], &box, &map, unit, &out), &out);
+  }
+
+  /* Lists of strokes among fills: SK8's notices and SK11's features under a target map, and the renders. */
+  const GSHSCENE_Resource * paths[STROKE_PATHS];
+  for (size_t i = 0; i < STROKE_PATHS; i++) {
+    GSHGEOM_Path * path = random_path(2);
+    check(gshscene_store_intern_path(store, path, &paths[i]), "stroke path");
+    gshgeom_path_destroy(path);
+  }
+  for (unsigned l = 0; l < 12; l++) {
+    GSHSCENE_List * list = NULL;
+    check(gshscene_list_create(NULL, NULL, store, &list), "stroke list");
+    unsigned n = between(4, 16);
+    for (unsigned i = 0; i < n; i++) {
+      unsigned pick_path = between(0, STROKE_PATHS - 1);
+      unsigned pick_style = between(0, STROKE_STYLES - 1);
+      GSHGEOM_Map map = random_map();
+      int use_map = (next() & 3) != 0;
+      GSHSCENE_Paint paint = random_paint();
+      int32_t layer = (int32_t)between(0, 4) - 2;
+      double depth = random_depth();
+      if (between(0, 4) != 0) {
+        check(gshscene_list_stroke(list, paths[pick_path], styles[pick_style], use_map ? &map : NULL, &paint, layer,
+            depth), "stroke");
+      } else {
+        check(gshscene_list_fill(list, paths[pick_path], use_map ? &map : NULL, GSHGEOM_FILL_NONZERO, &paint, layer,
+            depth), "stroke list fill");
+      }
+    }
+    check(gshscene_list_close(list), "stroke list close");
+    feed(gshscene_list_hash(list));
+    feed((uint64_t)gshscene_list_count(list));
+    feed_ties(list);
+    GSHGEOM_Map target = random_map();
+    for (size_t i = 0; i < gshscene_list_count(list); i++) {
+      const GSHSCENE_Item * item = NULL;
+      check(gshscene_list_item(list, i, &item), "stroke item");
+      feed((uint64_t)gshscene_stroke_notice(item, NULL, 0, &target));
+      feed((uint64_t)gshscene_stroke_required(item, NULL, 0, &target));
+      feed((uint64_t)gshscene_stroke_required(item, &target, 1, NULL));
+    }
+    feed_stroke_render(list);
+    gshscene_list_destroy(list);
+  }
+
+  /* A retained scene of stroke nodes; a change of style and of map, and the diff's damage (SK10). */
+  GSHSCENE_Scene * scene = NULL;
+  check(gshscene_scene_create(NULL, NULL, NULL, &scene), "stroke scene");
+  GSHSCENE_Store * sstore = gshscene_scene_store(scene);
+  const GSHSCENE_Resource * sstyles[4];
+  const GSHSCENE_Resource * spaths[6];
+  for (size_t i = 0; i < 4; i++) {
+    double dashes[5];
+    GSHSCENE_Stroke_Style st = random_style(dashes);
+    check(gshscene_store_intern_stroke_style(sstore, &st, &sstyles[i]), "scene stroke style");
+  }
+  for (size_t i = 0; i < 6; i++) {
+    GSHGEOM_Path * path = random_path(2);
+    check(gshscene_store_intern_path(sstore, path, &spaths[i]), "scene stroke path");
+    gshgeom_path_destroy(path);
+  }
+  GSHSCENE_Edit * edit = NULL;
+  check(gshscene_scene_open_edit(scene, NULL, &edit), "stroke edit");
+  uint64_t ids[10];
+  for (size_t i = 0; i < 10; i++) {
+    GSHSCENE_Node node;
+    gshscene_node_init(GSHSCENE_NODE_STROKE, &node);
+    node.resource = spaths[between(0, 5)];
+    node.style = sstyles[between(0, 3)];
+    node.map = random_map();
+    node.paint = random_paint();
+    node.layer = (int32_t)between(0, 4) - 2;
+    node.depth = random_depth();
+    ids[i] = add_node(edit, GSHSCENE_ROOT_ID, &node, NULL);
+  }
+  const GSHSCENE_Version * v1 = NULL;
+  check(gshscene_scene_publish(scene, edit, NULL, &v1), "stroke publish 1");
+  gshscene_edit_destroy(edit);
+  feed_version(v1);
+  check(gshscene_scene_open_edit(scene, v1, &edit), "stroke edit 2");
+  for (size_t i = 0; i < 3; i++) {
+    GSHSCENE_Node_Info info;
+    uint64_t id = ids[between(0, 9)];
+    check(gshscene_edit_node(edit, id, &info), "stroke node");
+    GSHSCENE_Node node = info.node;
+    node.style = sstyles[between(0, 3)];
+    if (next() & 1) {
+      node.map = random_map();
+    }
+    check(gshscene_edit_set(edit, id, &node), "stroke set");
+  }
+  const GSHSCENE_Version * v2 = NULL;
+  check(gshscene_scene_publish(scene, edit, NULL, &v2), "stroke publish 2");
+  gshscene_edit_destroy(edit);
+  feed_version(v2);
+  GSHGEOM_Map device;
+  if (gshgeom_map_scale(2, 0.5, 0.75, 1.0, &device) != GSHGEOM_OK) {
+    fail("stroke device map");
+  }
+  feed_diff(v1, v2, &device);
+  gshscene_version_release(v1);
+  gshscene_version_release(v2);
+  for (size_t i = 0; i < 4; i++) {
+    gshscene_resource_release(sstyles[i]);
+  }
+  for (size_t i = 0; i < 6; i++) {
+    gshscene_resource_release(spaths[i]);
+  }
+  gshscene_scene_destroy(scene);
+
+  GSHSCENE_Store_Stats stats;
+  check(gshscene_store_stats(store, &stats), "stroke stats");
+  feed(stats.live);
+  feed(stats.created);
+  feed(stats.hits);
+  for (size_t i = 0; i < STROKE_PATHS; i++) {
+    gshscene_resource_release(paths[i]);
+  }
+  for (size_t i = 0; i < STROKE_STYLES; i++) {
+    gshscene_resource_release(styles[i]);
+  }
+  check(gshscene_store_stats(store, &stats), "stroke stats");
+  if (stats.live != 0) {
+    fail("a stroke resource is still live after every handle was released");
+  }
+  gshscene_store_destroy(store);
+  acc = &total;
+  acc_count = &count;
+}
+
 int main(void) {
   gshgeom_hash_init(&total);
   GSHSCENE_Store * store = NULL;
@@ -1464,5 +1771,8 @@ int main(void) {
 
   printf("shape-scene.hash %016" PRIx64 "\n", gshgeom_hash_value(&total));
   printf("shape-scene.count %lu\n", count);
+  stroke_section();
+  printf("shape-scene.stroke-hash %016" PRIx64 "\n", gshgeom_hash_value(&stroke_total));
+  printf("shape-scene.stroke-count %lu\n", stroke_count);
   return 0;
 }

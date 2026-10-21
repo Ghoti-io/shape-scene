@@ -13,10 +13,10 @@
     python3 tools/gen-render-corpus.py            # write tests/fuzz/corpus/render/
     python3 tools/gen-render-corpus.py --check    # fail if the committed files differ
 
-Every file is an input of tests/fuzz/fuzz_render.c: seven header bytes (the test
+Every file is an input of tests/fuzz/fuzz_render.c: eight header bytes (the test
 sink's caps, the request, where the token is set, the extent limit and the
 report's cap, the write and the allocation that fail, the units of a deferred
-step), then an op count and ops of four bytes each (op, a, b, c).  The **random**
+step, the stroke caps), then an op count and ops of four bytes each (op, a, b, c).  The **random**
 files are bytes from a seeded generator, read as valid input by construction;
 the **scripted** ones each reach one outcome the replay requires (`make
 fuzz-replay` fails if the corpus as a whole misses one), and say which in their
@@ -25,7 +25,7 @@ names.  Keep the op numbers in step with the C file.
 import os
 import sys
 
-FILL, CLIP, CLIP_POP, GROUP, GROUP_POP, INSTANCE, FONT_RUN, OUTLINE_RUN, FREEZE, FOREGROUND = range(10)
+FILL, CLIP, CLIP_POP, GROUP, GROUP_POP, INSTANCE, FONT_RUN, OUTLINE_RUN, FREEZE, FOREGROUND, STROKE = range(11)
 RANDOM_FILES = 96
 
 
@@ -45,8 +45,8 @@ class Rng:
         return self.next() >> 56
 
 
-def header(caps=0, request=0, cancel=0, limits=0, write=0, alloc=0, step=0):
-    return bytes([caps, request, cancel, limits, write, alloc, step])
+def header(caps=0, request=0, cancel=0, limits=0, write=0, alloc=0, step=0, stroke=0):
+    return bytes([caps, request, cancel, limits, write, alloc, step, stroke])
 
 
 def ops(*items):
@@ -62,7 +62,7 @@ def fill(x=2, y=2, c=3):
 
 def random_file(i):
     r = Rng(i)
-    head = [r.byte() for _ in range(7)]
+    head = [r.byte() for _ in range(8)]
     # Most random inputs cancel nowhere, fail nothing and name a list, so that they reach the end of a render.
     if r.byte() < 160:
         head[2] = 0 if r.byte() < 200 else r.byte() % 24
@@ -71,7 +71,7 @@ def random_file(i):
     n = 8 + r.byte() % 60
     body = bytearray([n])
     for _ in range(n):
-        body += bytes([r.byte() % 10, r.byte(), r.byte(), r.byte()])
+        body += bytes([r.byte() % 11, r.byte(), r.byte(), r.byte()])
     return bytes(head) + bytes(body)
 
 
@@ -141,6 +141,21 @@ def scripted():
     pdf = ops(fill(1, 1, 5), (GROUP, 0, 0xA0, 0), fill(), (GROUP_POP, 0, 0, 0))
     out["scripted-pdf-refused.bin"] = header() + pdf
     out["scripted-pdf-recorded.bin"] = header(request=4, limits=0x80) + pdf
+    # Strokes story S1 (S20).  Op STROKE strokes a square, or a glyph run when c & 0x10 (from a font when c & 0x08),
+    # with style c >> 5 (0 SK1's defaults, 1 width 0, 2 a device hairline, 3 odd dashes with square caps, 4 miter-clip,
+    # 5 arcs with dashes across subpaths, 6 inside alignment, 7 outside by even-odd), under an anisotropic map when
+    # a & 0x80 and a singular one when a & 0x40 alone, with a gradient when b's two high bits are set.  The stroke
+    # header byte: bit 0 expands what the caps lack, bits 1 and 2 pick the features they emit (every one, a writer's,
+    # a toolpath's, none), bit 3 drops the stroke kind.
+    strokes = ops((STROKE, 2, 2, 0x03), (STROKE, 4, 4, 0x23), (STROKE, 6, 6, 0x45), (STROKE, 0x88, 8, 0x63),
+                  (STROKE, 10, 10, 0x84), (STROKE, 12, 0xC0, 0xA5), (STROKE, 0x4E, 14, 0xC6), (STROKE, 16, 16, 0xE7),
+                  (STROKE, 1, 0, 0x18), (STROKE, 2, 0, 0x10), fill())
+    out["scripted-strokes-every.bin"] = header(request=4) + strokes
+    out["scripted-strokes-writer.bin"] = header(request=4, stroke=1 | 2) + strokes
+    out["scripted-strokes-toolpath.bin"] = header(request=4, stroke=4) + strokes
+    out["scripted-strokes-none-strict.bin"] = header(request=1, stroke=6) + strokes
+    out["scripted-strokes-no-kind.bin"] = header(stroke=8) + strokes
+    out["scripted-strokes-raster.bin"] = header(stroke=1 | 4) + strokes
     return out
 
 

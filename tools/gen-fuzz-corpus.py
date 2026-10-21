@@ -35,7 +35,7 @@ OPS = ["LIST_CREATE", "FILL", "CLIP_PUSH", "CLIP_POP", "GROUP_PUSH", "GROUP_POP"
        "PUBLISH", "MERGE", "HOLD", "RELEASE_VERSION", "DIFF", "EMIT", "VISIT", "DUMP", "SCENE_INTERN",
        "FILL_EX", "CLIP_PUSH_EX", "GROUP_PUSH_EX", "LIST_FOREGROUND", "NODE_PROPS", "EDIT_FOREGROUND", "LIST_PALETTE",
        "FILL_FIXED", "TRUNCATE", "EDIT_PALETTE", "INTERN_GRADIENT", "FILL_GRADIENT", "SCENE_GRADIENT", "GRADIENT_NODE",
-       "COLOR_BOUND", "GROUP_PDF", "NODE_PDF"]
+       "COLOR_BOUND", "GROUP_PDF", "NODE_PDF", "INTERN_STYLE", "STROKE", "STROKE_NODE"]
 OP = {name: i for i, name in enumerate(OPS)}
 
 BIASED = {
@@ -45,7 +45,7 @@ BIASED = {
     "VISIT": 1, "DUMP": 1, "SCENE_INTERN": 2, "RESET": 1, "DESTROY_EDIT": 1, "SCENE_DESTROY": 1, "SCENE_CREATE": 1,
     "FILL_EX": 5, "CLIP_PUSH_EX": 2, "GROUP_PUSH_EX": 4, "LIST_FOREGROUND": 1, "NODE_PROPS": 5, "EDIT_FOREGROUND": 2,
     "LIST_PALETTE": 2, "FILL_FIXED": 4, "TRUNCATE": 2, "EDIT_PALETTE": 2, "INTERN_GRADIENT": 4, "FILL_GRADIENT": 4,
-    "SCENE_GRADIENT": 4, "GRADIENT_NODE": 5,
+    "SCENE_GRADIENT": 4, "GRADIENT_NODE": 5, "INTERN_STYLE": 5, "STROKE": 4, "STROKE_NODE": 4,
 }
 
 BIASED_FILES = 160
@@ -195,6 +195,33 @@ def scripted():
     seq = (bytearray([0xFF, 0xFF]) + open_edit() + add_group(0) + bytes([OP["NODE_PDF"], 0, 2, 1, 1, 1]) + publish()
            + bytes([OP["EMIT"], 0]))
     out["scripted-node-pdf.bin"] = bytes(seq)
+    # Strokes story S1.  INTERN_STYLE reads: the store pick (1: the scene's), the slot, the width, the width space, the
+    # join, the miter limit, the cap, the degenerate rule, the dash scope, the alignment and its rule, the dash count
+    # and each dash, the null-array pick when there are dashes (0: dashes counted but not given), the offset and the
+    # profile pick (0: a path as a width profile, reserved).  Values index the fuzzer's table (0 zero, 1 one, 2 2.5,
+    # 3 -0, 4 2^-64, 5 2^-65, 6 2^64, 7 one step past, 8 -1, 9 NaN, 10 infinity, 11 three).  An odd array doubled; a
+    # negative dash (solid) in the scene's store; a NaN width (invalid); a width past SK2's band (limit); a profile
+    # (unsupported); a width of 0.  STROKE reads: the centerline's recipe (5 is 3D), the style pick, the map, the 3D map
+    # pick (0: 3D) and the paint.  STROKE_NODE reads: the edit slot, the map, the centerline, the style pick, the
+    # paint, the set-or-add pick and the parent.
+    st = OP["INTERN_STYLE"]
+    styles = (bytes([st, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 3, 11, 1, 2, 1, 1, 1])
+              + bytes([st, 1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 2, 8, 1, 1, 3, 1])
+              + bytes([st, 0, 1, 9, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1])
+              + bytes([st, 0, 1, 5, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1])
+              + bytes([st, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0])
+              + bytes([st, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1]))
+    sk = OP["STROKE"]
+    strokes = bytes([sk, 2, 0, 0, 1, 0]) + bytes([sk, 5, 0, 0, 1, 0]) + bytes([sk, 2, 2, 3, 0, 0]) + bytes([sk, 3, 2, 2, 1, 1])
+    node = bytes([OP["STROKE_NODE"], 0, 0, 0, 0, 0, 1, 0])
+    seq = bytearray([0xFF, 0xFF]) + styles + strokes + open_edit() + node + publish() + bytes([OP["EMIT"], 0])
+    out["scripted-strokes.bin"] = bytes(seq)
+    # An instance of a picture: a closed empty list frozen into pool slot 0, a new list, and an instance of it under
+    # the identity (INSTANCE reads the map and the picture's slot).  Random inputs reached it by luck until the op
+    # table grew (strokes story S1).
+    seq = bytearray([0xFF, 0xFF]) + bytes([OP["LIST_CREATE"], OP["CLOSE"], OP["FREEZE"], 0, OP["LIST_CREATE"],
+                                           OP["INSTANCE"], 0, 0])
+    out["scripted-instance-picture.bin"] = bytes(seq)
     # Found by story 16's libFuzzer soak: an instance of its own parent group, entered first as another instance's
     # target, which publish answered with ERR_INTERNAL instead of a cycle problem.
     out["regression-cycle-entered-through-an-instance.bin"] = base64.b64decode(

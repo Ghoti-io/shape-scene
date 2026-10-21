@@ -96,7 +96,8 @@ enum {
   OUT_LIMIT_WORKSPACE, OUT_LIMIT_REPORT, OUT_IO, OUT_OOM, OUT_SEAMLESS, OUT_CALLER_MEMORY_REFUSED, OUT_APPROXIMATED,
   OUT_TIES, OUT_DEFERRED, OUT_INVALID, OUT_UNSUPPORTED, OUT_GRADIENT_DRAWN, OUT_GRADIENT_REFUSED, OUT_NOTICE,
   OUT_GRADIENT_BUILT, OUT_GRADIENT_LIMIT, OUT_COLOR_LIMIT, OUT_COLOR_AT_BOUND, OUT_STOP_SATURATED, OUT_BLEND_RECORDED,
-  OUT_BLEND_REFUSED, OUT_PDF_REFUSED, OUT_PDF_RECORDED, OUT_COUNT
+  OUT_BLEND_REFUSED, OUT_PDF_REFUSED, OUT_PDF_RECORDED, OUT_STROKE_DRAWN, OUT_STROKE_EXPANDED, OUT_STROKE_REFUSED,
+  OUT_STROKE_NOTICE, OUT_STROKE_KIND_REFUSED, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"ok", "strict, refused by the plan", "strict, refused while drawing",
@@ -107,7 +108,9 @@ static const char * const outcome_names[OUT_COUNT] = {"ok", "strict, refused by 
     "a notice (a gradient that draws nothing)", "a gradient built from the input",
     "a gradient past G14's bounds refused", "a fill's color past N1's bound refused",
     "a fill's color at N1's bound recorded", "a stop resolved to N1's saturation", "a blend-mode group recorded",
-    "a blend mode refused by the caps", "a group of PDF's fields refused (S19)", "a group of PDF's fields recorded"};
+    "a blend mode refused by the caps", "a group of PDF's fields refused (S19)", "a group of PDF's fields recorded",
+    "a stroke recorded (S20)", "a stroke recorded with features to expand", "a stroke refused for its style",
+    "a stroke that draws nothing (SK8)", "a stroke refused by caps without the kind"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -193,6 +196,9 @@ static uint8_t next(Input * in) {
 
 /* --- the stream target ---------------------------------------------------------------------------------- */
 
+/* S20: the stroke features the sink in this run may be asked to expand (none without GSHSCENE_CAP_STROKE_EXPAND). */
+static uint32_t expandable;
+
 typedef struct Stream {
   long writes;
   long fail_at; /* -1 never */
@@ -209,15 +215,25 @@ static GSHSCENE_Result stream_write(void * ctx, const void * bytes, size_t count
   const unsigned char * b = bytes;
   /* The test sink writes a gradient's record in one write, once per gradient per render (S17). */
   outcomes[OUT_GRADIENT_DRAWN] += count > 2 && b[0] == 'R' && b[1] == ' ';
-  /* B1 and T1: a group record names its composite, and PDF's fields when a configuration claims them. */
+  /* B1 and T1: a group record names its composite, and PDF's fields when a configuration claims them.  Both are
+   * looked for in the whole write: the fields follow the composite, so stopping at a blend mode missed them. */
+  int pdf_fields = 0;
+  int blend_mode = 0;
   for (size_t i = 0; i + 13 <= count; i++) {
-    if (memcmp(b + i, " isolation=", 11) == 0) {
-      outcomes[OUT_PDF_RECORDED]++;
-      break;
-    }
-    if (memcmp(b + i, " composite=", 11) == 0 && b[i + 11] >= '1' && b[i + 11] <= '2' && b[i + 12] >= '0' &&
-        b[i + 12] <= '9' && (b[i + 11] == '2' || b[i + 12] >= '3')) {
-      outcomes[OUT_BLEND_RECORDED]++; /* 13 to 29: a blend mode */
+    pdf_fields = pdf_fields || memcmp(b + i, " isolation=", 11) == 0;
+    blend_mode = blend_mode || (memcmp(b + i, " composite=", 11) == 0 && b[i + 11] >= '1' && b[i + 11] <= '2' &&
+                                   b[i + 12] >= '0' && b[i + 12] <= '9' && (b[i + 11] == '2' || b[i + 12] >= '3'));
+  }
+  outcomes[OUT_PDF_RECORDED] += pdf_fields;
+  outcomes[OUT_BLEND_RECORDED] += blend_mode; /* 13 to 29: a blend mode */
+  /* S20: a stroke's record; the features it names to expand are ones the caps lack, and only a sink that expands has
+   * any (the plan refuses the stroke otherwise). */
+  outcomes[OUT_STROKE_DRAWN] += count > 7 && memcmp(b, " K res=", 7) == 0;
+  for (size_t i = 0; i + 8 <= count; i++) {
+    if (memcmp(b + i, " expand=", 8) == 0) {
+      unsigned long features = strtoul((const char *)b + i + 8, NULL, 10);
+      CHECK((features & ~(unsigned long)expandable) == 0);
+      outcomes[OUT_STROKE_EXPANDED] += features != 0;
       break;
     }
   }
@@ -268,6 +284,7 @@ typedef struct Scene {
   const GSHSCENE_Resource * pictures[PICTURES];
   size_t picture_count;
   const GSHSCENE_Resource * gradients[6]; /* made on first use (S17) */
+  const GSHSCENE_Resource * styles[8];    /* made on first use (SK1) */
 } Scene;
 
 static const GSHSCENE_Resource * keep(Scene * s, const GSHSCENE_Resource * r) {
@@ -363,6 +380,73 @@ static const GSHSCENE_Resource * run_from(Scene * s, int font, uint8_t a) {
   const GSHSCENE_Resource * r = NULL;
   gshscene_store_intern_glyph_run(s->store, &run, &r);
   return keep(s, r);
+}
+
+/**
+ * One of eight stroke styles (strokes story S1, SK1): SK1's defaults; width 0 (SK8, a notice); a device hairline with
+ * round joins and caps; an odd dash array (SK3 doubles it) with bevel joins and square caps; a miter-clip join; an
+ * arcs join with dashes across subpaths; inside alignment with round joins, square caps and degenerate subpaths
+ * omitted; and outside alignment by even-odd at SK2's smallest width.
+ */
+static const GSHSCENE_Resource * style_from(Scene * s, unsigned k) {
+  k %= 8;
+  if (s->styles[k]) {
+    return s->styles[k];
+  }
+  static const double odd[3] = {3.0, 1.0, 2.0};
+  static const double even[2] = {2.0, 2.0};
+  GSHSCENE_Stroke_Style st;
+  gshscene_stroke_style_init(&st);
+  switch (k) {
+    case 1:
+      st.width = 0.0;
+      break;
+    case 2:
+      st.width_space = GSHSCENE_STROKE_WIDTH_DEVICE;
+      st.join = GSHSCENE_STROKE_JOIN_ROUND;
+      st.cap = GSHSCENE_STROKE_CAP_ROUND;
+      break;
+    case 3:
+      st.width = 2.0;
+      st.join = GSHSCENE_STROKE_JOIN_BEVEL;
+      st.cap = GSHSCENE_STROKE_CAP_SQUARE;
+      st.dash_count = 3;
+      st.dashes = odd;
+      st.dash_offset = 1.0;
+      break;
+    case 4:
+      st.width = 3.0;
+      st.join = GSHSCENE_STROKE_JOIN_MITER_CLIP;
+      st.miter_limit = 2.0;
+      break;
+    case 5:
+      st.width = 1.5;
+      st.join = GSHSCENE_STROKE_JOIN_ARCS;
+      st.cap = GSHSCENE_STROKE_CAP_ROUND;
+      st.dash_count = 2;
+      st.dashes = even;
+      st.dash_scope = GSHSCENE_STROKE_DASH_PATH;
+      break;
+    case 6:
+      st.width = 4.0;
+      st.join = GSHSCENE_STROKE_JOIN_ROUND;
+      st.cap = GSHSCENE_STROKE_CAP_SQUARE;
+      st.degenerate = GSHSCENE_STROKE_DEGENERATE_OMIT;
+      st.alignment = GSHSCENE_STROKE_ALIGN_INSIDE;
+      break;
+    case 7:
+      st.width = GSHSCENE_STROKE_VALUE_MIN;
+      st.alignment = GSHSCENE_STROKE_ALIGN_OUTSIDE;
+      st.alignment_rule = GSHGEOM_FILL_EVEN_ODD;
+      break;
+    default:
+      break;
+  }
+  const GSHSCENE_Resource * r = NULL;
+  GSHSCENE_Result result = gshscene_store_intern_stroke_style(s->store, &st, &r);
+  CHECK(result == GSHSCENE_OK || result == GSHSCENE_ERR_OOM);
+  s->styles[k] = keep(s, r);
+  return s->styles[k];
 }
 
 /** Build a list from the ops; balanced and closed; NULL when the input built nothing usable. */
@@ -547,7 +631,7 @@ static GSHSCENE_List * build(Scene * s, Input * in, int * ties) {
     }
   }
   for (size_t i = 0; i < ops && in->at < in->size; i++) {
-    uint8_t op = next(in) % 10;
+    uint8_t op = next(in) % 11;
     uint8_t a = next(in);
     uint8_t b = next(in);
     uint8_t c = next(in);
@@ -692,6 +776,29 @@ static GSHSCENE_List * build(Scene * s, Input * in, int * ties) {
           gshscene_list_set_palette(list, palette);
         }
         break;
+      case 10: {
+        /* A stroke (S1): of a square, or of a glyph run when c & 0x10 (from a font, perhaps unbound, when c & 0x08);
+         * style c >> 5; under an anisotropic map when a & 0x80, a singular one when a & 0x40 alone; a gradient paint
+         * when b's two high bits are set. */
+        const GSHSCENE_Resource * line = (c & 0x10) ? run_from(s, (c & 0x08) != 0, a) : square(s, a % SIDE, b % SIDE, c % 20);
+        const GSHSCENE_Resource * style = style_from(s, (unsigned)(c >> 5));
+        GSHGEOM_Map map;
+        const double m[4] = {(a & 0x80) ? 2.0 : 1.0, 0, 0, (a & 0x80) ? 0.5 : 0.0};
+        const double t[2] = {0, 0};
+        gshgeom_map_from_matrix(2, m, t, &map);
+        const GSHGEOM_Map * placed = (a & 0xC0) ? &map : NULL;
+        if ((b & 0xC0) == 0xC0) {
+          memset(&paint, 0, sizeof paint); /* a gradient paint has an alpha and no color of its own (G1) */
+          paint.kind = GSHSCENE_PAINT_GRADIENT;
+          paint.rgba[3] = 0.75;
+          paint.gradient = gradient_from(s, b);
+        }
+        if (line && style && (paint.kind != GSHSCENE_PAINT_GRADIENT || paint.gradient)) {
+          GSHSCENE_Result sr = gshscene_list_stroke(list, line, style, placed, &paint, layer, d);
+          CHECK(sr == GSHSCENE_OK || sr == GSHSCENE_ERR_OOM);
+        }
+        break;
+      }
     }
   }
   while (depth) {
@@ -751,7 +858,20 @@ static void check_report(const GSHSCENE_Report * report, size_t cap, GSHSCENE_Re
     by[e.entry_class]++;
     /* S17: a notice names what draws nothing, and only a refusal names a gradient's kind. */
     CHECK(e.entry_class != GSHSCENE_ENTRY_NOTICE || e.reason == GSHSCENE_REASON_MAP_NOT_INVERTIBLE ||
-          e.reason == GSHSCENE_REASON_GRADIENT_DEGENERATE);
+          e.reason == GSHSCENE_REASON_GRADIENT_DEGENERATE || e.reason == GSHSCENE_REASON_STROKE_ZERO_WIDTH);
+    /* S20, SK8, SK11: a zero width is a notice, never a refusal; a style is refused only by caps that do not expand,
+     * naming features they lack; and a stroke is refused for its kind only by caps without it. */
+    CHECK(e.reason != GSHSCENE_REASON_STROKE_ZERO_WIDTH || e.entry_class == GSHSCENE_ENTRY_NOTICE);
+    outcomes[OUT_STROKE_NOTICE] += e.reason == GSHSCENE_REASON_STROKE_ZERO_WIDTH;
+    if (e.reason == GSHSCENE_REASON_STROKE_STYLE) {
+      CHECK(e.entry_class == GSHSCENE_ENTRY_REFUSED);
+      CHECK(!(caps->flags & GSHSCENE_CAP_STROKE_EXPAND));
+      CHECK(e.second != 0 && (e.second & ~(size_t)GSHSCENE_STROKE_NATIVE_ALL) == 0);
+      CHECK((e.second & caps->stroke_native) == 0);
+      outcomes[OUT_STROKE_REFUSED]++;
+    }
+    outcomes[OUT_STROKE_KIND_REFUSED] += e.reason == GSHSCENE_REASON_ITEM_KIND &&
+                                         !(caps->item_kinds & (UINT32_C(1) << GSHSCENE_ITEM_STROKE));
     CHECK(e.reason != GSHSCENE_REASON_GRADIENT || e.entry_class == GSHSCENE_ENTRY_REFUSED);
     CHECK(e.reason != GSHSCENE_REASON_INTERPOLATION_SPACE || e.entry_class == GSHSCENE_ENTRY_APPROXIMATED);
     outcomes[OUT_GRADIENT_REFUSED] += e.reason == GSHSCENE_REASON_GRADIENT;
@@ -817,6 +937,7 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
   uint8_t h_write = next(&in);
   uint8_t h_alloc = next(&in);
   uint8_t h_step = next(&in);
+  uint8_t h_stroke = next(&in);
 
   Counter counter = {0, 0, -1};
   GSHSCENE_Allocator alloc = {&counter, c_malloc, c_calloc, c_realloc, c_free};
@@ -880,7 +1001,25 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
     if (h_step & 128) {
       c->flags &= ~GSHSCENE_CAP_GRADIENT_SPACES;
     }
+    /* S20: a sink that expands what it lacks; one that emits a writer's set, a toolpath's or no feature; one without
+     * the stroke kind at all. */
+    static const uint32_t natives[4] = {GSHSCENE_STROKE_NATIVE_ALL,
+        GSHSCENE_STROKE_NATIVE_JOIN_MITER | GSHSCENE_STROKE_NATIVE_JOIN_ROUND | GSHSCENE_STROKE_NATIVE_JOIN_BEVEL |
+            GSHSCENE_STROKE_NATIVE_CAP_BUTT | GSHSCENE_STROKE_NATIVE_CAP_ROUND | GSHSCENE_STROKE_NATIVE_CAP_SQUARE |
+            GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL | GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL_ANISOTROPIC |
+            GSHSCENE_STROKE_NATIVE_DASH,
+        GSHSCENE_STROKE_NATIVE_JOIN_ROUND | GSHSCENE_STROKE_NATIVE_CAP_ROUND | GSHSCENE_STROKE_NATIVE_CAP_BUTT |
+            GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL | GSHSCENE_STROKE_NATIVE_WIDTH_DEVICE,
+        0};
+    c->stroke_native = natives[(h_stroke >> 1) & 3u];
+    if (h_stroke & 1) {
+      c->flags |= GSHSCENE_CAP_STROKE_EXPAND;
+    }
+    if (h_stroke & 8) {
+      c->item_kinds &= ~(UINT32_C(1) << GSHSCENE_ITEM_STROKE);
+    }
   }
+  expandable = (h_stroke & 1) ? GSHSCENE_STROKE_NATIVE_ALL & ~config.stream_caps.stroke_native : 0;
   if (h_caps & 16) {
     config.completion = GSHSCENE_DUMP_SINK_DEFERRED;
   }
