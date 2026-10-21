@@ -2297,8 +2297,8 @@ TEST_P(SinkConformance, B13_EachBlendModeIsCompositedOrRefusedBeforeDrawing) {
   }
 }
 
-// B7, B8, B3 on every sink: pairs of lists of one structure that mean the same exactly (opaque inputs, whole pixels), so
-// a sink that claims the modes draws the same pixels for each pair.
+// B7, B8, B3 on every sink: pairs of lists of one structure that mean the same exactly (opaque inputs over one region,
+// whole pixels), so a sink that claims the modes draws the same pixels for each pair.
 TEST_P(SinkConformance, B7_TheIdentitiesOfTheModesHoldOnEverySink) {
   struct Pair {
     const char * name;
@@ -2347,9 +2347,11 @@ TEST_P(SinkConformance, B7_TheIdentitiesOfTheModesHoldOnEverySink) {
         GSHSCENE_Group g{};
         g.opacity = 1.0;
         g.composite = mode;
-        EXPECT_EQ(gshscene_list_fill(l, s.sq(2, 2, 12), nullptr, GSHGEOM_FILL_NONZERO, &pb, 0, 0.0), GSHSCENE_OK);
+        // The source covers exactly the backdrop's region: the identities hold where both are opaque, and outside it
+        // neither list draws.
+        EXPECT_EQ(gshscene_list_fill(l, s.sq(2, 2, 16), nullptr, GSHGEOM_FILL_NONZERO, &pb, 0, 0.0), GSHSCENE_OK);
         EXPECT_EQ(gshscene_list_group_push(l, &g, 0, 0.0), GSHSCENE_OK);
-        EXPECT_EQ(gshscene_list_fill(l, s.sq(6, 6, 12), nullptr, GSHGEOM_FILL_NONZERO, &ps, 0, 0.0), GSHSCENE_OK);
+        EXPECT_EQ(gshscene_list_fill(l, s.sq(2, 2, 16), nullptr, GSHGEOM_FILL_NONZERO, &ps, 0, 0.0), GSHSCENE_OK);
         EXPECT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);
         EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
         auto out = make_surface(kind);
