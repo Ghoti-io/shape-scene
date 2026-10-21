@@ -24,6 +24,7 @@ replay gate (`make fuzz-replay`) fails if these files, together, never reach a
 limit, a refusal or an invalid publish: that is what keeps the corpus from
 measuring nothing, and what to read if an op number below drifts from the C file.
 """
+import base64
 import os
 import sys
 
@@ -146,6 +147,15 @@ def scripted():
     seq = (bytearray([0xFF, 0xFF]) + open_edit() + add_group(0) + bytes([OP["NODE_PROPS"], 0, 2, 0, 1, 0, 0, 2])
            + add_shape(2) + add_shape(2) + publish() + bytes([OP["EMIT"], 0]))
     out["scripted-emit-ties.bin"] = bytes(seq)
+    # Found by story 16's libFuzzer soak: an instance of its own parent group, entered first as another instance's
+    # target, which publish answered with ERR_INTERNAL instead of a cycle problem.
+    out["regression-cycle-entered-through-an-instance.bin"] = base64.b64decode(
+        "//8RAP+LQTMRAAQTAAAFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA8D8AAAAAAAAAAAAAAAAAAAAAAAAFAQsAAAAB/AEAAAAAAAAA"
+        "EwAEDkEyEQAEEwAmAAUBCwCRAQAAAQIBAAAAAAAAABMAAAUBAQIAAAAAAP//////////BQAABdYBAQIAAAAAAAATAAAFQTMRAAQTAAAFAQsA"
+        "AAAB/AEAAAAAAAAAEwAADkEyEQAEEwAmAAUBCwCRAQAAAQIBAAABAABsAAAAAAATAAAFAQECAAAAAAD//////////wUAAAXWAQECAAAAAAAA"
+        "BPQTAAAFAAECAAgGAQAAACYAAgABAAACEwACBQEBAgAAAAAAAN9aWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpa"
+        "WlpaZ7oTapgUjxzHmnYBsmMDLIx6GcM4icjtFxqPhZTLIxNKEujxMSxKe4IkYV30ehwTBxIkQHkomtPlOjK9MpsYw8yX2kChtOodJEOllc8R"
+        "i8luVzMruI4sLz71UVCE7g70egrOBBNc6G1nmXW7GiAAAQEAAhMAAgUBAQIAAOXl5eXl5eXlAgABAQAC")
     return out
 
 

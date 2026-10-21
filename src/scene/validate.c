@@ -256,10 +256,10 @@ static GSHSCENE_Result visit(Check * c, size_t index, size_t level) {
   if (m->color == DONE) {
     return GSHSCENE_OK;
   }
-  if (m->color == VISITING) { /* a cycle of children: no edit can make one */
-    return GSHSCENE_ERR_INTERNAL;
-  }
-  if (level > c->core->limits.max_node_depth) {
+  if (m->color == VISITING) { /* a cycle through an instance's target, met again as a group's child: name it */
+    gshscene_problems_add(&c->problems, &c->core->alloc, c->nodes[index]->id, GSHSCENE_PROBLEM_CYCLE, &c->oom);
+    return GSHSCENE_OK;
+  } else if (level > c->core->limits.max_node_depth) {
     return GSHSCENE_ERR_LIMIT;
   }
   m->color = VISITING;

@@ -687,6 +687,27 @@ TEST(ScenePublishValidation, ACycleThroughInstancesIsRefused) {
   }
 }
 
+TEST(ScenePublishValidation, ACycleEnteredThroughAnotherInstanceIsRefusedNotInternal) {
+  // An instance of its own parent group, reached first through an instance of it placed before the group: the walk
+  // enters the cycle at the inner instance as a target and meets it again as the group's child. Story 16's soak of
+  // fuzz_record found publish returning ERR_INTERNAL here ("a cycle of children: no edit can make one").
+  Fx f;
+  Edits keep;
+  GSHSCENE_Edit * e = keep.keep(f.open());
+  uint64_t g = f.group(e);
+  uint64_t i = add(e, g, instance_node(g));
+  GSHSCENE_Node outer = instance_node(i);
+  uint64_t j = 0;
+  ASSERT_EQ(gshscene_edit_add(e, GSHSCENE_ROOT_ID, 0, &outer, nullptr, &j), GSHSCENE_OK);
+  ProblemsRef p;
+  EXPECT_EQ(gshscene_scene_publish(f.s.scene, e, &p.problems, nullptr), GSHSCENE_ERR_INVALID);
+  std::vector<uint64_t> named = p.ids(GSHSCENE_PROBLEM_CYCLE);
+  ASSERT_FALSE(named.empty());
+  for (uint64_t id : named) {
+    EXPECT_TRUE(id == i || id == g) << id;
+  }
+}
+
 TEST(ScenePublishValidation, AnInstanceOfANodeThatIsNotAnAncestorIsNotACycle) {
   Fx f;
   Edits keep;
