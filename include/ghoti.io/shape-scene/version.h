@@ -98,12 +98,12 @@
  * that draws the same.  ::gshscene_version_item_node says which node an item
  * came from.
  *
- * ### The hash of a version (version 4)
+ * ### The hash of a version (format 1)
  *
  * FNV-1a 64 in the spelling of shape-geometry's hash.h, over the foreground, the
  * palette and the nodes in ascending ID order and over nothing else: not the
  * version number, the allocator, a handle or the ID counter, so it reproduces run
- * to run and across targets.  The stream is `u32` 4 (this format; 3 had no gradient hash), `u32`
+ * to run and across targets.  The stream is `u32` 1 (this format; 1 until the suite's first release), `u32`
  * `0x4e454353`, the foreground (four `f64` and a space), `u64` the palette's content
  * hash (0 for none), `u64` the node count, then for each node: `u64` id, `u8` kind (::GSHSCENE_Node_Kind,
  * pinned), `u8` flags, `u64` parent (0 for the root), `u8` 1 if the node has a
@@ -123,7 +123,7 @@
  *
  * ### The dump
  *
- * `gshscene.version 4 nodes=N root=1 fg=<r> <g> <b> <a> <space> palette=<16 hex digits> hash=<16 hex digits>`
+ * `gshscene.version 1 nodes=N root=1 fg=<r> <g> <b> <a> <space> palette=<16 hex digits> hash=<16 hex digits>`
  * and one line per node in ascending ID order, tokens separated by one space, every
  * `double` as the 16 hexadecimal digits of its bit pattern, every hash as 16 digits,
  * every ID, layer, flag and rule in decimal, a `<space>` as `P:T:<gamma hex>`:

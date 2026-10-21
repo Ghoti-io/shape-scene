@@ -33,9 +33,9 @@
 
 #include <string.h>
 
-/** The format of a resource's hash and dump, per kind (resource.h): a glyph run's is 2 since story 14a. */
+/** The format of a resource's hash and dump, per kind (resource.h); every kind's is 1 until the suite's first release. */
 #define RESOURCE_FORMAT_VERSION 1u
-#define RUN_FORMAT_VERSION 2u
+#define RUN_FORMAT_VERSION 1u
 
 const char * gshscene_resource_kind_string(GSHSCENE_Resource_Kind kind) {
   switch (kind) {

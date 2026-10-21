@@ -36,8 +36,8 @@ A face (story 14a) is a resource too: a font's key, a face index and normalized 
 F2.14 (trailing zeros dropped, so equal instances are one handle), with the provider's binding as a
 non-content field: the first intern of a content builds the face, asks `face_info` once and retains the
 binding, and the face's last release releases it once. A run from a font names a face handle, which it
-holds. The formats are per kind: a glyph run's hash and dump are format 2 since the face replaced the key; a
-path's, a picture's, a face's, a palette's and a gradient's are 1.
+holds. The formats are per kind, and every kind's is 1 until the suite's first release: a change before it changes
+format 1 in place, so the face replacing the key left a glyph run's format at 1.
 
 A palette (story 14c, N14) is a resource too: a table of at most 65,535 colors, each straight `double`s and a
 space, interned by content. A font's CPAL reaches it through the float-free `gshscene_store_intern_palette_rgba8`

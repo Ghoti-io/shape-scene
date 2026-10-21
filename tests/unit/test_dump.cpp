@@ -325,7 +325,7 @@ TEST(Dump, ParsesBackToTheHashedFields) {
     GSHSCENE_Color fg;
     ASSERT_EQ(gshscene_list_foreground(list, &fg), GSHSCENE_OK);
     const GSHSCENE_Resource * palette = gshscene_list_palette(list);
-    EXPECT_EQ(lines[0], "gshscene.list 4 items=" + std::to_string(n) + " ties=" + std::to_string(ties) + " fg=" +
+    EXPECT_EQ(lines[0], "gshscene.list 1 items=" + std::to_string(n) + " ties=" + std::to_string(ties) + " fg=" +
                             hex16(gshgeom_f64_bits(fg.rgba[0])) + " " + hex16(gshgeom_f64_bits(fg.rgba[1])) + " " +
                             hex16(gshgeom_f64_bits(fg.rgba[2])) + " " + hex16(gshgeom_f64_bits(fg.rgba[3])) + " " +
                             space_text(fg.space) + " palette=" + hex16(palette ? gshscene_resource_hash(palette) : 0) +
@@ -348,7 +348,7 @@ TEST(Dump, ParsesBackToTheHashedFields) {
 TEST(Dump, ADumpOfAnOpenAndAnEmptyListIsWellFormed) {
   StoreHolder s;
   ListHolder l(s.store);
-  EXPECT_EQ(dump_list(l.list), "gshscene.list 4 items=0 ties=0 fg=0000000000000000 0000000000000000 0000000000000000 "
+  EXPECT_EQ(dump_list(l.list), "gshscene.list 1 items=0 ties=0 fg=0000000000000000 0000000000000000 0000000000000000 "
                                    "3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=" +
                                    hex16(gshscene_list_hash(l.list)) + "\n");
   Ref sq(intern_square(s.store));

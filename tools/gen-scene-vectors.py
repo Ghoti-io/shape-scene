@@ -139,8 +139,8 @@ DESIGN = map_hash(2, [2.5, 0, 0, -2.5], [10, 20], 1 | 2 | 8)
 KIND_PATH, KIND_RUN, KIND_PICTURE, KIND_GRADIENT, KIND_FACE, KIND_PALETTE = 1, 2, 3, 4, 6, 7
 KIND_NAME = {KIND_PATH: "path", KIND_RUN: "glyph-run", KIND_PICTURE: "picture", KIND_FACE: "face",
              KIND_PALETTE: "palette", KIND_GRADIENT: "gradient"}
-# The format is per kind (resource.h): a glyph run's is 2 since story 14a, the rest 1.
-RUN_FORMAT = 2
+# The format is per kind (resource.h); every kind's is 1 until the suite's first release.
+RUN_FORMAT = 1
 
 
 def path_resource_hash(path):
@@ -375,7 +375,7 @@ def item_bytes(it):
 
 
 def list_hash(items, fg=DEFAULT_FG, palette=0):
-    out = u32(4) + u32(0x5453494C) + color_bytes(fg[0], fg[1]) + u64(palette) + u64(len(items))
+    out = u32(1) + u32(0x5453494C) + color_bytes(fg[0], fg[1]) + u64(palette) + u64(len(items))
     for it in items:
         out += item_bytes(it)
     return fnv(out)
@@ -401,7 +401,7 @@ def item_line(it):
 
 
 def list_dump(items, fg=DEFAULT_FG, ties=(), palette=0):
-    lines = ["gshscene.list 4 items=%d ties=%d fg=%s palette=%016x hash=%016x" % (
+    lines = ["gshscene.list 1 items=%d ties=%d fg=%s palette=%016x hash=%016x" % (
         len(items), len(ties), color_text(fg[0], fg[1]), palette, list_hash(items, fg, palette))]
     lines += [item_line(it) for it in items]
     for first, second, depth, reason in ties:
@@ -569,7 +569,7 @@ def node_bytes(n):
 
 
 def version_hash(nodes, fg=DEFAULT_FG, palette=0):
-    out = u32(4) + u32(0x4E454353) + color_bytes(fg[0], fg[1]) + u64(palette) + u64(len(nodes))
+    out = u32(1) + u32(0x4E454353) + color_bytes(fg[0], fg[1]) + u64(palette) + u64(len(nodes))
     for n in nodes:
         out += node_bytes(n)
     return fnv(out)
@@ -597,7 +597,7 @@ def node_line(n):
 
 
 def version_dump(nodes, fg=DEFAULT_FG, palette=0):
-    lines = ["gshscene.version 4 nodes=%d root=1 fg=%s palette=%016x hash=%016x" % (
+    lines = ["gshscene.version 1 nodes=%d root=1 fg=%s palette=%016x hash=%016x" % (
         len(nodes), color_text(fg[0], fg[1]), palette, version_hash(nodes, fg, palette))]
     lines += [node_line(n) for n in nodes]
     return "\n".join(lines) + "\n"

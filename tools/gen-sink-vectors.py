@@ -294,7 +294,7 @@ def report(result, units, entries, static=0, work=1, failure_chain=(), reason=""
     by = [0, 0, 0, 0, 0, 0]
     for e in entries:
         by[e[0]] += 1
-    out = u32(2) + u32(0x54525052) + u32(result) + u64(units[0]) + u64(units[1]) + u64(units[2])
+    out = u32(1) + u32(0x54525052) + u32(result) + u64(units[0]) + u64(units[1]) + u64(units[2])
     out += u64(len(entries)) + u8(0)
     for c in range(1, 6):
         out += u64(by[c])
@@ -305,7 +305,7 @@ def report(result, units, entries, static=0, work=1, failure_chain=(), reason=""
     for cls, rsn, ch, second, depth in entries:
         out += u8(cls) + u32(rsn) + u64(len(ch)) + b"".join(u64(i) for i in ch) + u64(second) + f64(depth)
     h = fnv(out)
-    lines = ["gshscene.report 2 result=%d units=%d/%d/%d entries=%d counted=%d overflowed=0 static=%d frame=%s "
+    lines = ["gshscene.report 1 result=%d units=%d/%d/%d entries=%d counted=%d overflowed=0 static=%d frame=%s "
              "workspace=%s work=%d hash=%016x" % (result, units[0], units[1], units[2], len(entries), len(entries), static,
                                                   frame, workspace, work, h)]
     if result != OK:

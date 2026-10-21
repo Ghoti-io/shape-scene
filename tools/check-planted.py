@@ -542,8 +542,9 @@ PLANTS = [
     ('rs-name-unknown-count', 'src', RS, '    case GSHSCENE_RESOURCE_KIND_COUNT:\n      break;\n  }\n  return "unknown resource kind";', '    case GSHSCENE_RESOURCE_KIND_COUNT:\n      return "count";\n  }\n  return "unknown resource kind";', R),
     ('rs-format-version', 'src', RS, '#define RESOURCE_FORMAT_VERSION 1u', '#define RESOURCE_FORMAT_VERSION 2u', D),
     ('rs-hash-version-width', 'src', RS, '  gshgeom_hash_u32(h, kind_format(kind));', '  gshgeom_hash_u16(h, kind_format(kind));', D),
-    ('rs-hash-run-format', 'src', RS, '#define RUN_FORMAT_VERSION 2u', '#define RUN_FORMAT_VERSION 1u', D),
-    ('rs-hash-run-format-unused', 'src', RS, '  return kind == GSHSCENE_RESOURCE_GLYPH_RUN ? RUN_FORMAT_VERSION : RESOURCE_FORMAT_VERSION;', '  return (void)kind, RESOURCE_FORMAT_VERSION;', D),
+    # Every format is 1 until the suite's first release, so a run read with the resource format is the same
+    # stream; raising the run's own constant is what shows the run reads it.
+    ('rs-hash-run-format', 'src', RS, '#define RUN_FORMAT_VERSION 1u', '#define RUN_FORMAT_VERSION 2u', D),
     ('rs-hash-kind-width', 'src', RS, '  gshgeom_hash_u32(h, (uint32_t)kind);', '  gshgeom_hash_u8(h, (uint8_t)kind);', D),
     ('rs-hash-kind-first', 'src', RS, '  gshgeom_hash_u32(h, kind_format(kind));\n  gshgeom_hash_u32(h, (uint32_t)kind);', '  gshgeom_hash_u32(h, (uint32_t)kind);\n  gshgeom_hash_u32(h, kind_format(kind));', D),
     ('rs-hash-path-width', 'src', RS, '  gshgeom_hash_u64(&h, gshgeom_path_hash(path));', '  gshgeom_hash_u32(&h, (uint32_t)gshgeom_path_hash(path));', D),
@@ -975,7 +976,7 @@ LC = ["testList", "testColor"]
 
 PLANTS += [
     # the format and the pinned values
-    ('ls-format-version', 'src', LS, '#define LIST_FORMAT_VERSION 4u', '#define LIST_FORMAT_VERSION 3u', D),
+    ('ls-format-version', 'src', LS, '#define LIST_FORMAT_VERSION 1u', '#define LIST_FORMAT_VERSION 2u', D),
     ('hdr-ordering-flat', 'hdr', HL, '  GSHSCENE_ORDER_FLAT = 0,', '  GSHSCENE_ORDER_FLAT = 3,', L + O),
     ('hdr-ordering-depth', 'hdr', HL, '  GSHSCENE_ORDER_DEPTH = 1,', '  GSHSCENE_ORDER_DEPTH = 4,', O),
     ('hdr-ordering-overlay', 'hdr', HL, '  GSHSCENE_ORDER_OVERLAY = 2,', '  GSHSCENE_ORDER_OVERLAY = 5,', O),
@@ -984,7 +985,7 @@ PLANTS += [
     ('hdr-tie-path', 'hdr', HL, '  GSHSCENE_TIE_PATH = 2,', '  GSHSCENE_TIE_PATH = 22,', O),
     ('hdr-tie-declared', 'hdr', HL, '  GSHSCENE_TIE_DECLARED = 3,', '  GSHSCENE_TIE_DECLARED = 23,', O),
     ('hdr-problem-parameter', 'hdr', "include/ghoti.io/shape-scene/scene.h", '  GSHSCENE_PROBLEM_PARAMETER = 5,', '  GSHSCENE_PROBLEM_PARAMETER = 25,', PS),
-    ('vs-format-version', 'src', IH, '#define VERSION_FORMAT_VERSION 4u', '#define VERSION_FORMAT_VERSION 3u', ["testScene_dump"]),
+    ('vs-format-version', 'src', IH, '#define VERSION_FORMAT_VERSION 1u', '#define VERSION_FORMAT_VERSION 2u', ["testScene_dump"]),
     ('cs-gamma-min', 'src', CS, '#define GAMMA_MIN 0.1', '#define GAMMA_MIN 0.2', CL),
     ('cs-gamma-max', 'src', CS, '#define GAMMA_MAX 10.0', '#define GAMMA_MAX 9.0', CL),
 ]
@@ -1347,7 +1348,7 @@ PLANTS += [
     ('hdr-cap-flags', 'hdr', HS, '#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 9) - 1)', '#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 8) - 1)', SINKT),
     ('hdr-cancel-units', 'hdr', HS, '  GSHSCENE_CANCEL_BEFORE_SUBMIT = 2,', '  GSHSCENE_CANCEL_BEFORE_SUBMIT = 3,', SINKT),
     ('rp-tag', 'src', RP, '#define REPORT_TAG UINT32_C(0x54525052)', '#define REPORT_TAG UINT32_C(0x54525053)', ['testDump_sink']),
-    ('rp-format', 'src', RP, '#define REPORT_FORMAT 2u', '#define REPORT_FORMAT 1u', ['testDump_sink']),
+    ('rp-format', 'src', RP, '#define REPORT_FORMAT 1u', '#define REPORT_FORMAT 2u', ['testDump_sink']),
     ('ds-format', 'src', DS, '#define DUMP_FORMAT 1u', '#define DUMP_FORMAT 2u', ['testDump_sink']),
     ('ds-edge-high', 'src', DS, '#define EDGE_HIGH 2147483647.0', '#define EDGE_HIGH 16.0', ['testDump_sink']),
     ('ds-edge-low', 'src', DS, '#define EDGE_LOW (-2147483648.0)', '#define EDGE_LOW (16.0)', ['testDump_sink']),

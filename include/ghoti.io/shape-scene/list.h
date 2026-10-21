@@ -108,10 +108,10 @@
  * list is used from one thread at a time, and a closed list is immutable and may
  * be read from many.
  *
- * ### The hash of a list (version 4)
+ * ### The hash of a list (format 1)
  *
- * In the spelling of shape-geometry's hash.h: `u32` 4 (this format; 3 had no
- * gradient hash in a paint), `u32`
+ * In the spelling of shape-geometry's hash.h: `u32` 1 (this format; 1 until
+ * the suite's first release), `u32`
  * `0x5453494c`, the foreground (four `f64` and a space), `u64` the palette's
  * content hash (0 for none), `u64` the item count; then for each item a `u8`
  * kind (::GSHSCENE_Item_Kind, pinned) and:
@@ -132,7 +132,7 @@
  *
  * ### The dump
  *
- * `gshscene.list 4 items=N ties=T fg=<r> <g> <b> <a> <space> palette=<hash> hash=<16 hex digits>`
+ * `gshscene.list 1 items=N ties=T fg=<r> <g> <b> <a> <space> palette=<hash> hash=<16 hex digits>`
  * (the palette's content hash, 0 for none) and one line per item:
  * `F res=<kind>:<hash> map=<hash> rule=N paint=N <r> <g> <b> <a> space=<space> entry=E gradient=<hash> layer=N depth=<hex>`,
  * `C res=<kind>:<hash> map=<hash> rule=N layer=N depth=<hex>`, `c`,

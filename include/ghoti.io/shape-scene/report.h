@@ -80,10 +80,10 @@
  * S7); and the failure, if the render did not return ::GSHSCENE_OK: its result,
  * the chain of the unit it stopped at (empty when none) and a static reason.
  *
- * ### The hash of a report (format 2)
+ * ### The hash of a report (format 1)
  *
- * FNV-1a 64 in the spelling of shape-geometry's hash.h: `u32` 2 (this format; 1
- * had no `NOTICE` class), `u32` `0x54525052`, `u32` the result, `u64` units
+ * FNV-1a 64 in the spelling of shape-geometry's hash.h: `u32` 1 (this format;
+ * 1 until the suite's first release), `u32` `0x54525052`, `u32` the result, `u64` units
  * total, processed and done, `u64` counted, `u8` overflowed, `u64` each of
  * `by_class[1]` to `by_class[5]`,
  * `u64` static bytes and work max, `u32` the failure's result, `u64` its chain
@@ -95,7 +95,7 @@
  *
  * ### The dump
  *
- * `gshscene.report 2 result=N units=T/P/D entries=E counted=C overflowed=O static=N frame=N workspace=N work=N hash=<16 hex digits>`,
+ * `gshscene.report 1 result=N units=T/P/D entries=E counted=C overflowed=O static=N frame=N workspace=N work=N hash=<16 hex digits>`,
  * then, if the result is not 0, `failure result=N chain=<chain> reason=<text>`,
  * then one line per entry `E class=N reason=N chain=<chain> second=N depth=<16 hex digits>`;
  * a chain is its indices in decimal joined by `.`, or `-` when empty; numbers

@@ -7,23 +7,23 @@
 
 namespace sink_known {
 
-static const std::uint64_t kListHash = UINT64_C(0x97a56dc0c2681633);
-static const std::uint64_t kPictureHash = UINT64_C(0x940d435ad8f3e5f1);
-static const std::uint64_t kRasterOutputHash = UINT64_C(0x950ef8ed95d64347);
+static const std::uint64_t kListHash = UINT64_C(0x9f362a4217df5fc8);
+static const std::uint64_t kPictureHash = UINT64_C(0x3f3fadca9fe95200);
+static const std::uint64_t kRasterOutputHash = UINT64_C(0x3a56c211a663b100);
 static const std::uint64_t kRasterPixelsHash = UINT64_C(0x2a84270a32e6a93d);
-static const std::uint64_t kStreamOutputHash = UINT64_C(0xfe7849562e2ab3d3);
-static const std::uint64_t kNarrowReportHash = UINT64_C(0x09c4d532154fd17f);
-static const std::uint64_t kStrictReportHash = UINT64_C(0x7573b7d156dea7b3);
-static const std::uint64_t kGlyphListHash = UINT64_C(0x693544774ba69eb4);
-static const std::uint64_t kGlyphRunHash = UINT64_C(0xe1ae12c2545e8898);
-static const std::uint64_t kGlyphRasterOutputHash = UINT64_C(0xcf023539d6dc20af);
+static const std::uint64_t kStreamOutputHash = UINT64_C(0x55f4124b564911aa);
+static const std::uint64_t kNarrowReportHash = UINT64_C(0xda90604034a23340);
+static const std::uint64_t kStrictReportHash = UINT64_C(0x30ac7c1f6b4cfc5a);
+static const std::uint64_t kGlyphListHash = UINT64_C(0x8835cfb4cce0c8d7);
+static const std::uint64_t kGlyphRunHash = UINT64_C(0x001fe3c72dced3cb);
+static const std::uint64_t kGlyphRasterOutputHash = UINT64_C(0x3bf62aa4a7cd9849);
 static const std::uint64_t kGlyphRasterPixelsHash = UINT64_C(0x8beba4fd16fe2665);
-static const std::uint64_t kGlyphStreamOutputHash = UINT64_C(0xc1382df5bdd3cd8d);
-static const std::uint64_t kGlyphRasterReportHash = UINT64_C(0x18785bf5252e9e62);
-static const std::uint64_t kGlyphStreamReportHash = UINT64_C(0x43b738e4d9776809);
+static const std::uint64_t kGlyphStreamOutputHash = UINT64_C(0x5aa17b1a72b58ea7);
+static const std::uint64_t kGlyphRasterReportHash = UINT64_C(0xe2ed986eb8ddf529);
+static const std::uint64_t kGlyphStreamReportHash = UINT64_C(0xd4d13e535d88b048);
 
 static const char * const kRasterDump =
-R"DUMP(gshscene.dump-sink 1 kind=1 unit=0 units=15 list=97a56dc0c2681633
+R"DUMP(gshscene.dump-sink 1 kind=1 unit=0 units=15 list=9f362a4217df5fc8
 U 0 F res=path:9a8490040d04ed76 map=1f5787abb2e02a06 rule=0 box=4000000000000000 4000000000000000 4024000000000000 4024000000000000
 S 2 2 10 10 4dea4c24
 U 1 C res=path:3c3dc2843e1f86de map=1f5787abb2e02a06 rule=0 box=4010000000000000 4010000000000000 4038000000000000 4038000000000000
@@ -35,7 +35,7 @@ U 5 F res=path:b36f1ed326f78600 map=1f5787abb2e02a06 rule=0 box=4024000000000000
 U 6 F res=path:246b57dd9780a0fa map=1f5787abb2e02a06 rule=0 box=4028000000000000 4028000000000000 4032000000000000 4032000000000000
 U 7 g
 S 10 10 18 18 222d23a0
-U 8 I res=picture:940d435ad8f3e5f1
+U 8 I res=picture:3f3fadca9fe95200
 U 8.0 F res=path:d9ebbd0985427870 map=5b7cb5109c603297 rule=0 box=403e000000000000 403e000000000000 4044000000000000 4044000000000000
 S 30 30 40 40 13b8b9cf
 U 8.1 F res=path:f597d48393de5cff map=5b7cb5109c603297 rule=0 box=4040000000000000 4040000000000000 4042000000000000 4042000000000000
@@ -48,7 +48,7 @@ U 12 F res=path:45a6a377532b0d3f map=1f5787abb2e02a06 rule=0 box=c01800000000000
 E result=0 processed=15 done=15
 )DUMP";
 static const char * const kStreamDump =
-R"DUMP(gshscene.dump-sink 1 kind=2 unit=2 units=15 list=97a56dc0c2681633
+R"DUMP(gshscene.dump-sink 1 kind=2 unit=2 units=15 list=9f362a4217df5fc8
 U 0 F res=path:9a8490040d04ed76 map=c530824dc0bebfa4 rule=0 box=3ff0000000000000 3ff0000000000000 4014000000000000 4014000000000000
 U 1 C res=path:3c3dc2843e1f86de map=c530824dc0bebfa4 rule=0 box=4000000000000000 4000000000000000 4028000000000000 4028000000000000
 U 2 F res=path:5a568baa7b8fb5f4 map=c530824dc0bebfa4 rule=0 box=0000000000000000 0000000000000000 402e000000000000 402e000000000000
@@ -57,7 +57,7 @@ U 4 G opacity=3fe0000000000000 composite=0
 U 5 F res=path:b36f1ed326f78600 map=c530824dc0bebfa4 rule=0 box=4014000000000000 4014000000000000 4020000000000000 4020000000000000
 U 6 F res=path:246b57dd9780a0fa map=c530824dc0bebfa4 rule=0 box=4018000000000000 4018000000000000 4022000000000000 4022000000000000
 U 7 g
-U 8 I res=picture:940d435ad8f3e5f1
+U 8 I res=picture:3f3fadca9fe95200
 U 8.0 F res=path:d9ebbd0985427870 map=ca8d01ffe90213f5 rule=0 box=402e000000000000 402e000000000000 4034000000000000 4034000000000000
 U 8.1 F res=path:f597d48393de5cff map=ca8d01ffe90213f5 rule=0 box=4030000000000000 4030000000000000 4032000000000000 4032000000000000
 U 9 F res=path:451cb616d1515ee9 map=c530824dc0bebfa4 rule=0 box=4034000000000000 3ff0000000000000 4037000000000000 4010000000000000
@@ -67,26 +67,26 @@ U 12 F res=path:45a6a377532b0d3f map=c530824dc0bebfa4 rule=0 box=c00800000000000
 E result=0 processed=15 done=15
 )DUMP";
 static const char * const kNarrowReportDump =
-R"DUMP(gshscene.report 2 result=0 units=15/15/15 entries=3 counted=3 overflowed=0 static=0 frame=%FRAME% workspace=%WORKSPACE% work=1 hash=09c4d532154fd17f
+R"DUMP(gshscene.report 1 result=0 units=15/15/15 entries=3 counted=3 overflowed=0 static=0 frame=%FRAME% workspace=%WORKSPACE% work=1 hash=da90604034a23340
 E class=2 reason=5 chain=1 second=0 depth=0000000000000000
 E class=2 reason=4 chain=4 second=0 depth=0000000000000000
 E class=3 reason=11 chain=5 second=6 depth=3ff0000000000000
 )DUMP";
 static const char * const kStrictReportDump =
-R"DUMP(gshscene.report 2 result=9 units=15/0/0 entries=2 counted=2 overflowed=0 static=0 frame=%FRAME% workspace=%WORKSPACE% work=1 hash=7573b7d156dea7b3
+R"DUMP(gshscene.report 1 result=9 units=15/0/0 entries=2 counted=2 overflowed=0 static=0 frame=%FRAME% workspace=%WORKSPACE% work=1 hash=30ac7c1f6b4cfc5a
 failure result=9 chain=0 reason=strict: refused while drawing (the sink's resource limit, or a glyph)
 E class=1 reason=6 chain=0 second=0 depth=0000000000000000
 E class=3 reason=11 chain=5 second=6 depth=3ff0000000000000
 )DUMP";
 static const char * const kGlyphRasterDump =
-R"DUMP(gshscene.dump-sink 1 kind=1 unit=0 units=2 list=693544774ba69eb4
-U 0 F res=glyph-run:e1ae12c2545e8898 map=1f5787abb2e02a06 rule=0 box=4000300000000000 4032460000000000 4044150000000000 4040e00000000000
+R"DUMP(gshscene.dump-sink 1 kind=1 unit=0 units=2 list=8835cfb4cce0c8d7
+U 0 F res=glyph-run:001fe3c72dced3cb map=1f5787abb2e02a06 rule=0 box=4000300000000000 4032460000000000 4044150000000000 4040e00000000000
 Y 0 f 1cab3d781e5b63d5 status=0
 Y 1 f 0dafd9f995c42cdd status=0
 Y 2 x reason=18
 Y 3 f 3089c95b5f54e217 status=0
 S 2 18 41 34 4dea4c24
-U 1 F res=glyph-run:e1ae12c2545e8898 map=2d58970d98c00e79 rule=0 box=403a400000000000 4000300000000000 4044dd0000000000 4044150000000000
+U 1 F res=glyph-run:001fe3c72dced3cb map=2d58970d98c00e79 rule=0 box=403a400000000000 4000300000000000 4044dd0000000000 4044150000000000
 Y 0 g 0f8b407a3b7cfcb9 status=0
 Y 1 g b34cee4abd30bcb6 status=0
 Y 2 x reason=18
@@ -95,13 +95,13 @@ S 26 2 42 41 58d99645
 E result=0 processed=2 done=2
 )DUMP";
 static const char * const kGlyphStreamDump =
-R"DUMP(gshscene.dump-sink 1 kind=2 unit=2 units=2 list=693544774ba69eb4
-U 0 F res=glyph-run:e1ae12c2545e8898 map=c530824dc0bebfa4 rule=0 box=3ff0300000000000 4022460000000000 4034150000000000 4030e00000000000
+R"DUMP(gshscene.dump-sink 1 kind=2 unit=2 units=2 list=8835cfb4cce0c8d7
+U 0 F res=glyph-run:001fe3c72dced3cb map=c530824dc0bebfa4 rule=0 box=3ff0300000000000 4022460000000000 4034150000000000 4030e00000000000
 Y 0 g e6249bb1a11b6528 status=0
 Y 1 g ac9398c46ee3b4cb status=0
 Y 2 x reason=18
 Y 3 g 58cc832b9e8f8d69 status=0
-U 1 F res=glyph-run:e1ae12c2545e8898 map=be64f07c84967aab rule=0 box=402a400000000000 3ff0300000000000 4034dd0000000000 4034150000000000
+U 1 F res=glyph-run:001fe3c72dced3cb map=be64f07c84967aab rule=0 box=402a400000000000 3ff0300000000000 4034dd0000000000 4034150000000000
 Y 0 g 2f5ab3a7b17f4f7a status=0
 Y 1 g 1df2bba4aea6e37f status=0
 Y 2 x reason=18
@@ -109,7 +109,7 @@ Y 3 g 632cd62539e598b0 status=0
 E result=0 processed=2 done=2
 )DUMP";
 static const char * const kGlyphRasterReportDump =
-R"DUMP(gshscene.report 2 result=0 units=2/2/2 entries=3 counted=3 overflowed=0 static=0 frame=%FRAME% workspace=%WORKSPACE% work=1 hash=18785bf5252e9e62
+R"DUMP(gshscene.report 1 result=0 units=2/2/2 entries=3 counted=3 overflowed=0 static=0 frame=%FRAME% workspace=%WORKSPACE% work=1 hash=e2ed986eb8ddf529
 E class=1 reason=18 chain=0 second=2 depth=0000000000000000
 E class=1 reason=18 chain=1 second=2 depth=0000000000000000
 E class=4 reason=12 chain=1 second=0 depth=0000000000000000

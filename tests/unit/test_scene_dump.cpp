@@ -351,12 +351,12 @@ TEST(VersionDump, ParsesBackToTheFieldsTheHashIsOver) {
   std::vector<std::string> lines = lines_of(dump_version(f.v.get()));
   ASSERT_GE(lines.size(), 2u);
   auto header = fields_of(lines[0], 2);
-  ASSERT_EQ(lines[0].substr(0, 18), "gshscene.version 4");
+  ASSERT_EQ(lines[0].substr(0, 18), "gshscene.version 1");
   EXPECT_EQ(std::stoull(header["nodes"]), lines.size() - 1);
   EXPECT_EQ(header["root"], "1");
   GSHGEOM_Hash h;
   gshgeom_hash_init(&h);
-  gshgeom_hash_u32(&h, 4);
+  gshgeom_hash_u32(&h, 1);
   gshgeom_hash_u32(&h, 0x4e454353u);
   {
     // The foreground: four bare doubles and a space after `fg=`.

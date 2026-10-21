@@ -10,20 +10,20 @@ namespace known {
 static const std::uint64_t kSquareResourceHash = UINT64_C(0xb0a83b16e6cec382);
 static const std::uint64_t kFixturePathResourceHash = UINT64_C(0x0a107c56241f4b98);
 static const std::uint64_t kFaceHash = UINT64_C(0x6c1ececace087998);
-static const std::uint64_t kFontRunHash = UINT64_C(0xff3d88fae83f9c32);
-static const std::uint64_t kOutlineRunHash = UINT64_C(0xef78b4b2ed8203d7);
+static const std::uint64_t kFontRunHash = UINT64_C(0xcbd6ac72565a42e1);
+static const std::uint64_t kOutlineRunHash = UINT64_C(0x3228ed152b43de80);
 static const std::uint64_t kPaletteHash = UINT64_C(0x5446a58784bab4ee);
 static const std::uint64_t kPalette8Hash = UINT64_C(0xfdc95d419007851d);
-static const std::uint64_t kPictureListHash = UINT64_C(0x1dda084eecce6240);
-static const std::uint64_t kPictureHash = UINT64_C(0x795fe6bb44f161bc);
-static const std::uint64_t kListHash = UINT64_C(0xb1381a41f984955d);
-static const std::uint64_t kOrderListHash = UINT64_C(0x8aaf9e74e31b6574);
+static const std::uint64_t kPictureListHash = UINT64_C(0x1f4b8c9a8877a483);
+static const std::uint64_t kPictureHash = UINT64_C(0x5949280bf106409b);
+static const std::uint64_t kListHash = UINT64_C(0xba64c0175406d099);
+static const std::uint64_t kOrderListHash = UINT64_C(0x0b5470663aaf2447);
 static const std::uint64_t kMapIdentityHash = UINT64_C(0x1f5787abb2e02a06);
 static const std::uint64_t kMapTranslateHash = UINT64_C(0xd242bc481e41cf7c);
 static const std::uint64_t kMapDesignHash = UINT64_C(0xff01deda28fd860d);
-static const std::uint64_t kSceneHash = UINT64_C(0x55bcbc911b61a2f2);
-static const std::uint64_t kEmptySceneHash = UINT64_C(0xbdca35482832387b);
-static const std::uint64_t kSceneBHash = UINT64_C(0x0949b7d092c51a47);
+static const std::uint64_t kSceneHash = UINT64_C(0xe6d195be16af2694);
+static const std::uint64_t kEmptySceneHash = UINT64_C(0x32743ce7715d3adc);
+static const std::uint64_t kSceneBHash = UINT64_C(0x0d137885c093eece);
 static const std::uint64_t kPathKeyEmpty = UINT64_C(0xa8c7f832281a39c5);
 static const std::uint64_t kPathKeyOne = UINT64_C(0x581cd0fa58d99645);
 static const std::uint64_t kPathKeyTwo = UINT64_C(0xf01990494f897526);
@@ -31,9 +31,9 @@ static const std::uint64_t kPathKeyThree = UINT64_C(0xbc901b1391e9d165);
 static const std::uint64_t kGradientLinearHash = UINT64_C(0xfd39522fa10381d9);
 static const std::uint64_t kGradientRadialHash = UINT64_C(0x45a40341b6741076);
 static const std::uint64_t kGradientSweepHash = UINT64_C(0x91e9d5ee628077be);
-static const std::uint64_t kGradientListHash = UINT64_C(0xc39010755b148fc2);
-static const std::uint64_t kGradientSceneHash = UINT64_C(0x5ff71b468f1d795f);
-static const int kSceneBLayer = 2;
+static const std::uint64_t kGradientListHash = UINT64_C(0x40244174011182f3);
+static const std::uint64_t kGradientSceneHash = UINT64_C(0x3abc5c4837c1b04e);
+static const int kSceneBLayer = 20;
 static const double kSceneBTranslate[4][2] = {{4.75, -4.75}, {9.0, -9.0}, {20.5, -20.5}, {23.25, -23.25}};
 
 static const char * const kSquareResourceDump =
@@ -62,14 +62,14 @@ face font=1122334455667788 index=2 coords=2 8192 -4096
 bound=0 upem=0 flags=0
 )DUMP";
 static const char * const kFontRunDump =
-R"DUMP(gshscene.resource 2 kind=glyph-run hash=ff3d88fae83f9c32
+R"DUMP(gshscene.resource 1 kind=glyph-run hash=cbd6ac72565a42e1
 run source=0 face=6c1ececace087998 size=4029000000000000 hint=1 version=40 glyphs=3
 g id=36 x=0000000000000000 y=0000000000000000 outline=0000000000000000
 g id=37 x=401e000000000000 y=3fd0000000000000 outline=0000000000000000
 g id=4294967295 x=bff0000000000000 y=4000000000000000 outline=0000000000000000
 )DUMP";
 static const char * const kOutlineRunDump =
-R"DUMP(gshscene.resource 2 kind=glyph-run hash=ef78b4b2ed8203d7
+R"DUMP(gshscene.resource 1 kind=glyph-run hash=3228ed152b43de80
 run source=1 face=0000000000000000 size=0000000000000000 hint=0 version=0 glyphs=2
 g id=1 x=0000000000000000 y=0000000000000000 outline=b0a83b16e6cec382
 g id=2 x=4014000000000000 y=c008000000000000 outline=0a107c56241f4b98
@@ -89,28 +89,28 @@ p 0000000000000000 3fe0101010101010 3ff0000000000000 3fc999999999999a 1:2:000000
 p 3f70101010101010 3f80101010101010 3fefdfdfdfdfdfe0 0000000000000000 1:2:0000000000000000
 )DUMP";
 static const char * const kPictureDump =
-R"DUMP(gshscene.resource 1 kind=picture hash=795fe6bb44f161bc
-gshscene.list 4 items=4 ties=0 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=1dda084eecce6240
+R"DUMP(gshscene.resource 1 kind=picture hash=5949280bf106409b
+gshscene.list 1 items=4 ties=0 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=1f4b8c9a8877a483
 F res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=0 0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=0 depth=0000000000000000
 G opacity=3fe0000000000000 blend=0:0:0000000000000000 composite=0 order=0 layer=0 depth=0000000000000000
 F res=path:0a107c56241f4b98 map=d242bc481e41cf7c rule=1 paint=0 3ff0000000000000 3fe0000000000000 3fd0000000000000 3fe8000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=2 depth=0000000000000000
 g
 )DUMP";
 static const char * const kListDump =
-R"DUMP(gshscene.list 4 items=10 ties=0 fg=3fb999999999999a 3fc999999999999a 3fd3333333333333 3fe0000000000000 1:1:0000000000000000 palette=5446a58784bab4ee hash=b1381a41f984955d
+R"DUMP(gshscene.list 1 items=10 ties=0 fg=3fb999999999999a 3fc999999999999a 3fd3333333333333 3fe0000000000000 1:1:0000000000000000 palette=5446a58784bab4ee hash=ba64c0175406d099
 F res=path:b0a83b16e6cec382 map=ff01deda28fd860d rule=0 paint=0 3fd0000000000000 3fe0000000000000 3fe8000000000000 3ff0000000000000 space=2:3:4001980000000000 entry=0 gradient=0000000000000000 layer=-3 depth=3fe0000000000000
-F res=glyph-run:ff3d88fae83f9c32 map=1f5787abb2e02a06 rule=1 paint=0 0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=0 depth=0000000000000000
+F res=glyph-run:cbd6ac72565a42e1 map=1f5787abb2e02a06 rule=1 paint=0 0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=0 depth=0000000000000000
 C res=path:0a107c56241f4b98 map=d242bc481e41cf7c rule=1 layer=4 depth=c000000000000000
 G opacity=3fe0000000000000 blend=1:1:0000000000000000 composite=5 order=0 layer=7 depth=3ff8000000000000
-I res=picture:795fe6bb44f161bc map=d242bc481e41cf7c layer=1 depth=400a000000000000
-F res=glyph-run:ef78b4b2ed8203d7 map=1f5787abb2e02a06 rule=0 paint=0 4000000000000000 bfe0000000000000 0000000000000000 3fe0000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=5 depth=0000000000000000
+I res=picture:5949280bf106409b map=d242bc481e41cf7c layer=1 depth=400a000000000000
+F res=glyph-run:3228ed152b43de80 map=1f5787abb2e02a06 rule=0 paint=0 4000000000000000 bfe0000000000000 0000000000000000 3fe0000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=5 depth=0000000000000000
 F res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=2 0000000000000000 0000000000000000 0000000000000000 3fe8000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=6 depth=0000000000000000
 F res=path:0a107c56241f4b98 map=1f5787abb2e02a06 rule=1 paint=3 0000000000000000 0000000000000000 0000000000000000 3fe0000000000000 space=0:0:0000000000000000 entry=2 gradient=0000000000000000 layer=8 depth=0000000000000000
 g
 c
 )DUMP";
 static const char * const kOrderListDump =
-R"DUMP(gshscene.list 4 items=26 ties=5 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=8aaf9e74e31b6574
+R"DUMP(gshscene.list 1 items=26 ties=5 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=0b5470663aaf2447
 F res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=0 3fb0000000000000 0000000000000000 0000000000000000 3ff0000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=0 depth=0000000000000000
 G opacity=3ff0000000000000 blend=0:0:0000000000000000 composite=0 order=1 layer=0 depth=0000000000000000
 F res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=0 3fd8000000000000 0000000000000000 0000000000000000 3ff0000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=0 depth=4008000000000000
@@ -144,26 +144,26 @@ T first=8 second=9 depth=4000000000000000 reason=1
 T first=23 second=24 depth=0000000000000000 reason=3
 )DUMP";
 static const char * const kSceneDump =
-R"DUMP(gshscene.version 4 nodes=8 root=1 fg=3ff0000000000000 3fe0000000000000 3fd0000000000000 3fe8000000000000 3:3:400199999999999a palette=5446a58784bab4ee hash=55bcbc911b61a2f2
+R"DUMP(gshscene.version 1 nodes=8 root=1 fg=3ff0000000000000 3fe0000000000000 3fd0000000000000 3fe8000000000000 3:3:400199999999999a palette=5446a58784bab4ee hash=e6d195be16af2694
 G id=1 parent=0 flags=0 key=- map=1f5787abb2e02a06 opacity=3ff0000000000000 blend=0:0:0000000000000000 composite=0 order=0 layer=0 depth=0000000000000000 clip=- children=2,4,7,8
 G id=2 parent=1 flags=0 key=5356470000000001:000000000000002a map=d242bc481e41cf7c opacity=3fe0000000000000 blend=1:1:0000000000000000 composite=11 order=1 layer=3 depth=bff4000000000000 clip=path:0a107c56241f4b98:ff01deda28fd860d:1 children=3
 S id=3 parent=2 flags=0 key=- res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=0 3fd0000000000000 3fe0000000000000 3fe8000000000000 3ff0000000000000 space=2:3:4001980000000000 entry=0 gradient=0000000000000000 layer=-1 depth=4004000000000000
 G id=4 parent=1 flags=1 key=- map=1f5787abb2e02a06 opacity=3ff0000000000000 blend=0:0:0000000000000000 composite=0 order=0 layer=0 depth=0000000000000000 clip=- children=5,6
-S id=5 parent=4 flags=0 key=0000000000000001:0000000000000002 res=glyph-run:ef78b4b2ed8203d7 map=d242bc481e41cf7c rule=1 paint=0 4000000000000000 bfe0000000000000 0000000000000000 3fe0000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=5 depth=0000000000000000
-S id=6 parent=4 flags=0 key=- res=glyph-run:ff3d88fae83f9c32 map=1f5787abb2e02a06 rule=0 paint=2 0000000000000000 0000000000000000 0000000000000000 3fd0000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=0 depth=0000000000000000
+S id=5 parent=4 flags=0 key=0000000000000001:0000000000000002 res=glyph-run:3228ed152b43de80 map=d242bc481e41cf7c rule=1 paint=0 4000000000000000 bfe0000000000000 0000000000000000 3fe0000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=5 depth=0000000000000000
+S id=6 parent=4 flags=0 key=- res=glyph-run:cbd6ac72565a42e1 map=1f5787abb2e02a06 rule=0 paint=2 0000000000000000 0000000000000000 0000000000000000 3fd0000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=0 depth=0000000000000000
 I id=7 parent=1 flags=0 key=- target=4 map=ff01deda28fd860d layer=9 depth=c012000000000000
 S id=8 parent=1 flags=0 key=- res=path:0a107c56241f4b98 map=1f5787abb2e02a06 rule=0 paint=3 0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 space=0:0:0000000000000000 entry=65534 gradient=0000000000000000 layer=2 depth=0000000000000000
 )DUMP";
 static const char * const kEmptySceneDump =
-R"DUMP(gshscene.version 4 nodes=1 root=1 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=bdca35482832387b
+R"DUMP(gshscene.version 1 nodes=1 root=1 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=32743ce7715d3adc
 G id=1 parent=0 flags=0 key=- map=1f5787abb2e02a06 opacity=3ff0000000000000 blend=0:0:0000000000000000 composite=0 order=0 layer=0 depth=0000000000000000 clip=- children=-
 )DUMP";
 static const char * const kSceneBDump =
-R"DUMP(gshscene.version 4 nodes=4 root=1 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=0949b7d092c51a47
+R"DUMP(gshscene.version 1 nodes=4 root=1 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=0d137885c093eece
 G id=1 parent=0 flags=0 key=- map=1f5787abb2e02a06 opacity=3ff0000000000000 blend=0:0:0000000000000000 composite=0 order=0 layer=0 depth=0000000000000000 clip=- children=2,3,4
 G id=2 parent=1 flags=0 key=- map=0a898c9123cc4437 opacity=0000000000000000 blend=0:0:0000000000000000 composite=0 order=0 layer=0 depth=0000000000000000 clip=path:0a107c56241f4b98:0d2da972f8d3f397:0 children=-
 S id=3 parent=1 flags=0 key=- res=path:0a107c56241f4b98 map=033c7f46c68504d7 rule=0 paint=0 0000000000000000 0000000000000000 0000000000000000 0000000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=0 depth=0000000000000000
-I id=4 parent=1 flags=0 key=- target=2 map=0b0910304354fa37 layer=2 depth=0000000000000000
+I id=4 parent=1 flags=0 key=- target=2 map=0b0910304354fa37 layer=20 depth=0000000000000000
 )DUMP";
 static const char * const kGradientLinearDump =
 R"DUMP(gshscene.resource 1 kind=gradient hash=fd39522fa10381d9
@@ -188,14 +188,14 @@ sweep c=4008000000000000 c010000000000000 unit=1 a0=4056800000000000 a1=407c2000
 s 3fd0000000000000 paint=0 3fe0000000000000 3fd0000000000000 3ff0000000000000 3ff0000000000000 space=2:3:4001980000000000 entry=0
 )DUMP";
 static const char * const kGradientListDump =
-R"DUMP(gshscene.list 4 items=4 ties=0 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=c39010755b148fc2
+R"DUMP(gshscene.list 1 items=4 ties=0 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=40244174011182f3
 F res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=1 0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 space=0:0:0000000000000000 entry=0 gradient=fd39522fa10381d9 layer=0 depth=0000000000000000
 F res=path:0a107c56241f4b98 map=d242bc481e41cf7c rule=1 paint=1 0000000000000000 0000000000000000 0000000000000000 3fe0000000000000 space=0:0:0000000000000000 entry=0 gradient=45a40341b6741076 layer=2 depth=0000000000000000
 F res=path:b0a83b16e6cec382 map=ff01deda28fd860d rule=0 paint=1 0000000000000000 0000000000000000 0000000000000000 3fd0000000000000 space=0:0:0000000000000000 entry=0 gradient=91e9d5ee628077be layer=0 depth=0000000000000000
 F res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=1 0000000000000000 0000000000000000 0000000000000000 0000000000000000 space=0:0:0000000000000000 entry=0 gradient=fd39522fa10381d9 layer=0 depth=3ff0000000000000
 )DUMP";
 static const char * const kGradientSceneDump =
-R"DUMP(gshscene.version 4 nodes=2 root=1 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=5ff71b468f1d795f
+R"DUMP(gshscene.version 1 nodes=2 root=1 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=3abc5c4837c1b04e
 G id=1 parent=0 flags=0 key=- map=1f5787abb2e02a06 opacity=3ff0000000000000 blend=0:0:0000000000000000 composite=0 order=0 layer=0 depth=0000000000000000 clip=- children=2
 S id=2 parent=1 flags=0 key=- res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=1 0000000000000000 0000000000000000 0000000000000000 3fe0000000000000 space=0:0:0000000000000000 entry=0 gradient=45a40341b6741076 layer=0 depth=0000000000000000
 )DUMP";

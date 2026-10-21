@@ -43,7 +43,7 @@
 struct GSHSCENE_Version;
 
 /** The format of a version's hash and dump. */
-#define VERSION_FORMAT_VERSION 4u
+#define VERSION_FORMAT_VERSION 1u
 
 /** The kind field of a version's hash: "SCEN" in little-endian ASCII. */
 #define VERSION_HASH_KIND UINT32_C(0x4e454353)

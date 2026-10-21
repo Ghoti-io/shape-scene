@@ -38,7 +38,7 @@
 #include <string.h>
 
 /** The format of a list's hash and dump. */
-#define LIST_FORMAT_VERSION 4u
+#define LIST_FORMAT_VERSION 1u
 
 /** The kind field of a list's hash: "LIST" in little-endian ASCII. */
 #define LIST_HASH_KIND UINT32_C(0x5453494c)

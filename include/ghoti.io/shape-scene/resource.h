@@ -60,12 +60,11 @@
  * the id, nor the pointer, nor the allocator, nor the limits, nor a face's
  * binding are part of it.  Each stream starts with `u32` the format of its
  * kind and `u32` the resource's kind (::GSHSCENE_Resource_Kind, pinned).  The
- * format is per kind: a path's, a picture's, a face's, a palette's and a
- * gradient's are 1; a glyph run's is 2 (story 14a: the run names a face where
- * format 1 named a key).  It goes on:
+ * format is per kind, and every kind's is 1 until the suite's first release
+ * (a change before it changes format 1 in place).  It goes on:
  *
  * - **path** (1): `u64` the path's own hash (`gshgeom_path_hash`).
- * - **glyph run** (2): `u32` the source, `u64` the content hash of the face
+ * - **glyph run** (1): `u32` the source, `u64` the content hash of the face
  *   (0 for a run from outlines), `f64` size, `u32` hint mode, `u32` hint
  *   version, `u64` glyph count; then for each glyph `u32` id, `f64` x, `f64` y
  *   and `u64` the content hash of the outline resource (0 for a glyph with

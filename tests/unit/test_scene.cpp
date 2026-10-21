@@ -152,7 +152,7 @@ TEST(SceneCreate, TheSceneOwnsAStoreItMakesAndAVersionOutlivesTheScene) {
   const GSHSCENE_List * list = nullptr;
   ASSERT_EQ(gshscene_version_list(v.get(), &list), GSHSCENE_OK);
   EXPECT_EQ(gshscene_list_count(list), 1u);
-  EXPECT_NE(dump_version(v.get()).find("gshscene.version 4 nodes=2"), std::string::npos);
+  EXPECT_NE(dump_version(v.get()).find("gshscene.version 1 nodes=2"), std::string::npos);
 }
 
 TEST(SceneEdit, OpenOnANamedVersionOrTheCurrentOne) {

@@ -41,7 +41,7 @@
 #define REPORT_TAG UINT32_C(0x54525052)
 
 /** The report's format, in its hash and its dump. */
-#define REPORT_FORMAT 2u
+#define REPORT_FORMAT 1u
 
 const char * gshscene_entry_class_string(GSHSCENE_Entry_Class entry_class) {
   switch (entry_class) {
