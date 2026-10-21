@@ -319,6 +319,24 @@ inline const GSHSCENE_List * refusable(Scene & s, const GSHSCENE_Sink_Caps & cap
       gshscene_list_fill(l, s.sq(20, 20, 5), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0);
       gshscene_list_clip_pop(l);
       *reason = GSHSCENE_REASON_ITEM_KIND;
+    } else if (!(caps.gradient_kinds & (1u << GSHSCENE_GRADIENT_LINEAR))) {
+      // S17: a sink that draws no linear gradient (one written before gradients) refuses the fill.
+      GSHSCENE_Gradient_Stop stops[2] = {{0.0, red}, {1.0, solid(0, 0, 1)}};
+      GSHSCENE_Gradient g{};
+      g.kind = GSHSCENE_GRADIENT_LINEAR;
+      g.p1[0] = 10.0;
+      gshgeom_map_identity(2, &g.map);
+      g.stop_count = 2;
+      g.stops = stops;
+      const GSHSCENE_Resource * r = nullptr;
+      gshscene_store_intern_gradient(s.store, &g, &r);
+      s.held.push_back(r);
+      GSHSCENE_Paint p{};
+      p.kind = GSHSCENE_PAINT_GRADIENT;
+      p.gradient = r;
+      p.rgba[3] = 1.0;
+      gshscene_list_fill(l, s.sq(20, 20, 5), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0);
+      *reason = GSHSCENE_REASON_GRADIENT;
     } else {
       return nullptr;
     }
