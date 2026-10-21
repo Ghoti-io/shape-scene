@@ -41,6 +41,9 @@
  * target must round alike), lists and versions with a palette parameter and palette fills (some entries missing,
  * which every sink refuses), the item maps of the float-free design maps (rotations and skews through shape-geometry's
  * rotation, composed by the one composer), their renders and a diff of a palette change.
+ * Since color-paint story P3 a blend section folds in lists of groups of every blend mode and of PDF's group fields
+ * (the fields spelled after the composite byte), their renders by test sinks that refuse and that record the fields,
+ * and a version of such group nodes, its hash and its emitted list.  Every section before it folds what it did.
  * Since color-paint story P1 a gradient section folds in gradients of every kind, extend and flag (geometry and
  * offsets that are not exact in binary, stops of every paint kind in random spaces), their hashes, the stops the one
  * conversion gives at draw time (gshscene_gradient_resolve: `math`'s `gmath_pow` and the gamut matrices, which every
@@ -1169,6 +1172,124 @@ static void gradient_section(void) {
   gshscene_store_destroy(store);
 }
 
+/*
+ * Color-paint story P3: blend modes and PDF's group fields.  Lists of groups of every blend mode, some non-isolated,
+ * knockout or masked by a picture (the fields spelled in the hash after the composite byte), their hashes and counts,
+ * renders by the test sinks of feed_render (which refuse the fields) and by one that claims them (which records them);
+ * a version of group nodes with the fields, its hash and its emitted list.
+ */
+static void feed_render_claiming(const GSHSCENE_List * list) {
+  GSHSCENE_Dump_Sink_Config claims;
+  gshscene_dump_sink_config_default(&claims);
+  claims.raster_caps.flags |= GSHSCENE_CAP_GROUP_NON_ISOLATED | GSHSCENE_CAP_GROUP_KNOCKOUT | GSHSCENE_CAP_GROUP_SOFT_MASK;
+  claims.stream_caps.flags = claims.raster_caps.flags & ~GSHSCENE_CAP_READBACK;
+  GSHSCENE_Sink * sink = NULL;
+  check(gshscene_dump_sink_create(NULL, NULL, &claims, &sink), "claiming test sink");
+  GSHSCENE_Report * report = NULL;
+  check(gshscene_report_create(NULL, NULL, &report), "report");
+  uint64_t written = 0;
+  GSHSCENE_Writer writer = {count_write, &written};
+  GSHSCENE_Target stream;
+  memset(&stream, 0, sizeof stream);
+  stream.kind = GSHSCENE_TARGET_STREAM;
+  stream.surface = &writer;
+  stream.unit = GSHSCENE_UNIT_MILLIMETER;
+  GSHSCENE_Render_Request request;
+  memset(&request, 0, sizeof request);
+  request.list = list;
+  request.target = &stream;
+  request.report = report;
+  feed_job(sink, &request);
+  feed(written);
+  gshscene_report_destroy(report);
+  check(gshscene_sink_destroy(sink), "destroy");
+}
+
+static void blend_section(void) {
+  GSHSCENE_Store * store = NULL;
+  check(gshscene_store_create(NULL, NULL, &store), "blend store");
+  const GSHSCENE_Resource * paths[6];
+  for (unsigned i = 0; i < 6; i++) {
+    GSHGEOM_Path * path = random_path(2);
+    check(gshscene_store_intern_path(store, path, &paths[i]), "blend path");
+    gshgeom_path_destroy(path);
+  }
+  GSHSCENE_List * mask_list = NULL;
+  check(gshscene_list_create(NULL, NULL, store, &mask_list), "mask list");
+  GSHSCENE_Paint white = random_paint();
+  check(gshscene_list_fill(mask_list, paths[0], NULL, GSHGEOM_FILL_NONZERO, &white, 0, 0.0), "mask fill");
+  check(gshscene_list_close(mask_list), "mask close");
+  const GSHSCENE_Resource * mask = NULL;
+  check(gshscene_store_intern_picture(store, mask_list, &mask), "mask picture");
+  gshscene_list_destroy(mask_list);
+  feed(gshscene_resource_hash(mask));
+  for (unsigned l = 0; l < 12; l++) {
+    GSHSCENE_List * list = NULL;
+    check(gshscene_list_create(NULL, NULL, store, &list), "blend list");
+    GSHSCENE_Paint back = random_paint();
+    check(gshscene_list_fill(list, paths[between(0, 5)], NULL, GSHGEOM_FILL_NONZERO, &back, 0, 0.0), "backdrop");
+    for (unsigned g = 0; g < 6; g++) {
+      GSHSCENE_Group group;
+      memset(&group, 0, sizeof group);
+      group.opacity = between(0, 4) / 4.0;
+      group.composite = GSHSCENE_COMPOSITE_SCREEN + between(0, 14);
+      group.blend_space = random_space();
+      if (l % 3 == 1) {
+        group.isolation = between(0, 1);
+        group.knockout = between(0, 1);
+      }
+      if (l % 3 == 2 && between(0, 1)) {
+        group.soft_mask = mask;
+      }
+      check(gshscene_list_group_push(list, &group, (int32_t)g, 0.0), "blend group");
+      GSHSCENE_Paint paint = random_paint();
+      check(gshscene_list_fill(list, paths[between(0, 5)], NULL, GSHGEOM_FILL_NONZERO, &paint, 0, 0.0), "blend fill");
+      check(gshscene_list_group_pop(list), "blend pop");
+    }
+    check(gshscene_list_close(list), "blend close");
+    feed(gshscene_list_hash(list));
+    feed((uint64_t)gshscene_list_count(list));
+    feed_render(list);
+    feed_render_claiming(list);
+    gshscene_list_destroy(list);
+  }
+  /* A version: group nodes of blend modes and the fields, emitted. */
+  GSHSCENE_Scene * scene = NULL;
+  check(gshscene_scene_create(NULL, NULL, store, &scene), "blend scene");
+  GSHSCENE_Edit * edit = NULL;
+  check(gshscene_scene_open_edit(scene, NULL, &edit), "blend edit");
+  for (unsigned i = 0; i < 4; i++) {
+    GSHSCENE_Node n;
+    gshscene_node_init(GSHSCENE_NODE_GROUP, &n);
+    n.composite = GSHSCENE_COMPOSITE_SCREEN + between(0, 14);
+    n.isolation = i & 1u;
+    n.knockout = (i >> 1) & 1u;
+    n.soft_mask = i == 3 ? mask : NULL;
+    uint64_t id = 0;
+    check(gshscene_edit_add(edit, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, &n, NULL, &id), "blend node");
+    GSHSCENE_Node shape;
+    gshscene_node_init(GSHSCENE_NODE_SHAPE, &shape);
+    shape.resource = paths[i];
+    shape.paint = random_paint();
+    check(gshscene_edit_add(edit, id, GSHSCENE_APPEND, &shape, NULL, NULL), "blend shape");
+  }
+  const GSHSCENE_Version * version = NULL;
+  check(gshscene_scene_publish(scene, edit, NULL, &version), "blend publish");
+  feed(gshscene_version_hash(version));
+  const GSHSCENE_List * emitted = NULL;
+  check(gshscene_version_list(version, &emitted), "blend emit");
+  feed(gshscene_list_hash(emitted));
+  feed_render(emitted);
+  gshscene_version_release(version);
+  gshscene_edit_destroy(edit);
+  gshscene_scene_destroy(scene);
+  gshscene_resource_release(mask);
+  for (unsigned i = 0; i < 6; i++) {
+    gshscene_resource_release(paths[i]);
+  }
+  gshscene_store_destroy(store);
+}
+
 int main(void) {
   gshgeom_hash_init(&total);
   GSHSCENE_Store * store = NULL;
@@ -1339,6 +1460,7 @@ int main(void) {
   glyph_section();
   palette_section();
   gradient_section();
+  blend_section();
 
   printf("shape-scene.hash %016" PRIx64 "\n", gshgeom_hash_value(&total));
   printf("shape-scene.count %lu\n", count);

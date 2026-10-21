@@ -130,6 +130,17 @@ def scripted():
     out["scripted-color-bound.bin"] = header(request=4) + ops(
         (GROUP, 3, 0, 0x80), (FILL, 2, 0x00, 0xC3), (FILL, 0, 0x20, 0xC4), (GROUP_POP, 0, 0, 0), (FILL, 3, 0x40, 0xC5),
         (FILL, 1, 0x60, 0xC6), tuple(sat[:4])) + sat[4:]
+    # Color-paint story P3.  A group's b byte picks its operator (b % 28: 23 multiply, 24 hue) and, by its top three
+    # bits, PDF's fields (101 non-isolated, 110 knockout, 111 both); the limits byte's bit 6 makes a sink of the
+    # separable blend modes only, and bit 7 one that claims PDF's fields.  A multiply group recorded on a stream; a hue
+    # group that sink refuses; a non-isolated soft-light group (b = 0xA0) that the default caps refuse, and recorded
+    # with its fields by the sink that claims them.
+    blend = ops((GROUP, 0, 23, 0), fill(), (GROUP_POP, 0, 0, 0))
+    out["scripted-blend-recorded.bin"] = header(request=4) + blend
+    out["scripted-blend-refused.bin"] = header(limits=0x40) + ops((GROUP, 0, 24, 0), fill(), (GROUP_POP, 0, 0, 0))
+    pdf = ops(fill(1, 1, 5), (GROUP, 0, 0xA0, 0), fill(), (GROUP_POP, 0, 0, 0))
+    out["scripted-pdf-refused.bin"] = header() + pdf
+    out["scripted-pdf-recorded.bin"] = header(request=4, limits=0x80) + pdf
     return out
 
 

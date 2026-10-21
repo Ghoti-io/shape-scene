@@ -35,7 +35,7 @@ OPS = ["LIST_CREATE", "FILL", "CLIP_PUSH", "CLIP_POP", "GROUP_PUSH", "GROUP_POP"
        "PUBLISH", "MERGE", "HOLD", "RELEASE_VERSION", "DIFF", "EMIT", "VISIT", "DUMP", "SCENE_INTERN",
        "FILL_EX", "CLIP_PUSH_EX", "GROUP_PUSH_EX", "LIST_FOREGROUND", "NODE_PROPS", "EDIT_FOREGROUND", "LIST_PALETTE",
        "FILL_FIXED", "TRUNCATE", "EDIT_PALETTE", "INTERN_GRADIENT", "FILL_GRADIENT", "SCENE_GRADIENT", "GRADIENT_NODE",
-       "COLOR_BOUND"]
+       "COLOR_BOUND", "GROUP_PDF", "NODE_PDF"]
 OP = {name: i for i, name in enumerate(OPS)}
 
 BIASED = {
@@ -183,6 +183,18 @@ def scripted():
     drawn = bytes([OP["INTERN_GRADIENT"], 1]) + stops + bytes([1, 1, 4, 4, 12, 4, 4, 4, 1, 0, 0, 0, 2, 0])
     fillg = bytes([OP["FILL_GRADIENT"], 1, 4, 0, 0])
     out["scripted-gradient-fill.bin"] = bytes(bytearray([0xFF, 0xFF]) + degenerate + drawn + fillg)
+    # Color-paint story P3.  GROUP_PDF reads the opacity (4: 1), the composite (23: multiply), the isolation, the
+    # knockout, the mask pick (1: a picture of the pool, then its slot).  A closed empty list frozen into pool slot 0,
+    # then a non-isolated knockout multiply group masked by it, and one with an isolation past the enum (invalid).
+    gp = OP["GROUP_PDF"]
+    seq = (bytearray([0xFF, 0xFF]) + bytes([OP["LIST_CREATE"], OP["CLOSE"], OP["FREEZE"], 0, OP["LIST_CREATE"]])
+           + bytes([gp, 4, 23, 1, 1, 1, 0]) + bytes([gp, 4, 24, 2, 0, 0]))
+    out["scripted-group-pdf.bin"] = bytes(seq)
+    # NODE_PDF reads the edit slot, the id pick (2: the group just added), the isolation, the knockout and the mask
+    # pick (1: a picture made in the scene's store).  Published and emitted, the group's push carries them.
+    seq = (bytearray([0xFF, 0xFF]) + open_edit() + add_group(0) + bytes([OP["NODE_PDF"], 0, 2, 1, 1, 1]) + publish()
+           + bytes([OP["EMIT"], 0]))
+    out["scripted-node-pdf.bin"] = bytes(seq)
     # Found by story 16's libFuzzer soak: an instance of its own parent group, entered first as another instance's
     # target, which publish answered with ERR_INTERNAL instead of a cycle problem.
     out["regression-cycle-entered-through-an-instance.bin"] = base64.b64decode(

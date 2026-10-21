@@ -95,7 +95,8 @@ enum {
   OUT_OK = 0, OUT_STRICT_PLANNED, OUT_STRICT_DRAWING, OUT_CANCEL_START, OUT_CANCEL_MID, OUT_SUBMITTED_PAST_CANCEL,
   OUT_LIMIT_WORKSPACE, OUT_LIMIT_REPORT, OUT_IO, OUT_OOM, OUT_SEAMLESS, OUT_CALLER_MEMORY_REFUSED, OUT_APPROXIMATED,
   OUT_TIES, OUT_DEFERRED, OUT_INVALID, OUT_UNSUPPORTED, OUT_GRADIENT_DRAWN, OUT_GRADIENT_REFUSED, OUT_NOTICE,
-  OUT_GRADIENT_BUILT, OUT_GRADIENT_LIMIT, OUT_COLOR_LIMIT, OUT_COLOR_AT_BOUND, OUT_STOP_SATURATED, OUT_COUNT
+  OUT_GRADIENT_BUILT, OUT_GRADIENT_LIMIT, OUT_COLOR_LIMIT, OUT_COLOR_AT_BOUND, OUT_STOP_SATURATED, OUT_BLEND_RECORDED,
+  OUT_BLEND_REFUSED, OUT_PDF_REFUSED, OUT_PDF_RECORDED, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"ok", "strict, refused by the plan", "strict, refused while drawing",
@@ -105,7 +106,8 @@ static const char * const outcome_names[OUT_COUNT] = {"ok", "strict, refused by 
     "an unsupported target", "a gradient resolved by the test sink", "a gradient kind refused",
     "a notice (a gradient that draws nothing)", "a gradient built from the input",
     "a gradient past G14's bounds refused", "a fill's color past N1's bound refused",
-    "a fill's color at N1's bound recorded", "a stop resolved to N1's saturation"};
+    "a fill's color at N1's bound recorded", "a stop resolved to N1's saturation", "a blend-mode group recorded",
+    "a blend mode refused by the caps", "a group of PDF's fields refused (S19)", "a group of PDF's fields recorded"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -207,6 +209,18 @@ static GSHSCENE_Result stream_write(void * ctx, const void * bytes, size_t count
   const unsigned char * b = bytes;
   /* The test sink writes a gradient's record in one write, once per gradient per render (S17). */
   outcomes[OUT_GRADIENT_DRAWN] += count > 2 && b[0] == 'R' && b[1] == ' ';
+  /* B1 and T1: a group record names its composite, and PDF's fields when a configuration claims them. */
+  for (size_t i = 0; i + 13 <= count; i++) {
+    if (memcmp(b + i, " isolation=", 11) == 0) {
+      outcomes[OUT_PDF_RECORDED]++;
+      break;
+    }
+    if (memcmp(b + i, " composite=", 11) == 0 && b[i + 11] >= '1' && b[i + 11] <= '2' && b[i + 12] >= '0' &&
+        b[i + 12] <= '9' && (b[i + 11] == '2' || b[i + 12] >= '3')) {
+      outcomes[OUT_BLEND_RECORDED]++; /* 13 to 29: a blend mode */
+      break;
+    }
+  }
   for (size_t i = 0; i < count; i++) {
     s->hash = (s->hash ^ b[i]) * UINT64_C(0x100000001b3);
   }
@@ -620,6 +634,16 @@ static GSHSCENE_List * build(Scene * s, Input * in, int * ties) {
           g.blend_space.transfer = GCOL_TRANSFER_GAMMA;
           g.blend_space.gamma = 0.1;
         }
+        /* T1, S19: PDF's group fields on a group whose b has its top bits 101 (non-isolated), 110 (knockout) or 111
+         * (both), and a soft mask (a picture) when c's bits 4 to 6 are all set. */
+        unsigned pdf = (unsigned)(b >> 5);
+        if (pdf >= 5) {
+          g.isolation = pdf != 6 ? GSHSCENE_ISOLATION_NON_ISOLATED : GSHSCENE_ISOLATION_ISOLATED;
+          g.knockout = pdf != 5;
+        }
+        if ((c & 0x70) == 0x70 && s->picture_count) {
+          g.soft_mask = s->pictures[a % s->picture_count];
+        }
         if (depth < sizeof stack && gshscene_list_group_push(list, &g, layer, d) == GSHSCENE_OK) {
           stack[depth++] = 2;
         }
@@ -703,7 +727,8 @@ static int chain_less_eq(const GSHSCENE_Report_Entry * a, const GSHSCENE_Report_
   return a->reason <= b->reason;
 }
 
-static void check_report(const GSHSCENE_Report * report, size_t cap, GSHSCENE_Result result) {
+static void check_report(const GSHSCENE_Report * report, size_t cap, GSHSCENE_Result result,
+    const GSHSCENE_Sink_Caps * caps) {
   GSHSCENE_Report_Summary sum;
   CHECK(gshscene_report_summary(report, &sum) == GSHSCENE_OK);
   CHECK(sum.result == result);
@@ -730,6 +755,17 @@ static void check_report(const GSHSCENE_Report * report, size_t cap, GSHSCENE_Re
     CHECK(e.reason != GSHSCENE_REASON_GRADIENT || e.entry_class == GSHSCENE_ENTRY_REFUSED);
     CHECK(e.reason != GSHSCENE_REASON_INTERPOLATION_SPACE || e.entry_class == GSHSCENE_ENTRY_APPROXIMATED);
     outcomes[OUT_GRADIENT_REFUSED] += e.reason == GSHSCENE_REASON_GRADIENT;
+    /* S19: PDF's group fields are refused, never approximated, and only by caps that lack them. */
+    if (e.reason == GSHSCENE_REASON_GROUP_ISOLATION || e.reason == GSHSCENE_REASON_GROUP_KNOCKOUT ||
+        e.reason == GSHSCENE_REASON_SOFT_MASK) {
+      CHECK(e.entry_class == GSHSCENE_ENTRY_REFUSED);
+      CHECK(!(caps->flags & (e.reason == GSHSCENE_REASON_GROUP_ISOLATION ? GSHSCENE_CAP_GROUP_NON_ISOLATED
+                             : e.reason == GSHSCENE_REASON_GROUP_KNOCKOUT ? GSHSCENE_CAP_GROUP_KNOCKOUT
+                                                                          : GSHSCENE_CAP_GROUP_SOFT_MASK)));
+      outcomes[OUT_PDF_REFUSED]++;
+    }
+    outcomes[OUT_BLEND_REFUSED] += e.reason == GSHSCENE_REASON_COMPOSITE && caps->composites != 0x0fffffffu &&
+                                   (caps->composites >> GSHSCENE_COMPOSITE_HUE) == 0;
     if (i) {
       CHECK(chain_less_eq(&prev, &e));
     }
@@ -826,6 +862,13 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
     }
     if (h_caps & 128) {
       c->flags |= GSHSCENE_CAP_THREAD_AFFINE;
+    }
+    /* B13, S19: a sink of the separable blend modes only, and one that claims PDF's group fields (and records them). */
+    if (h_limits & 0x40) {
+      c->composites &= (UINT32_C(1) << GSHSCENE_COMPOSITE_HUE) - 1u;
+    }
+    if (h_limits & 0x80) {
+      c->flags |= GSHSCENE_CAP_GROUP_NON_ISOLATED | GSHSCENE_CAP_GROUP_KNOCKOUT | GSHSCENE_CAP_GROUP_SOFT_MASK;
     }
     /* S17: a sink without radial gradients, without any, or interpolating only in the target's space. */
     if (h_step & 32) {
@@ -949,7 +992,7 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
     GSHSCENE_Sink_Caps caps;
     CHECK(gshscene_sink_caps(sink, &target, &caps) == GSHSCENE_OK);
     counter.fail_at = -1;
-    check_report(report, cap, result);
+    check_report(report, cap, result, &caps);
     GSHSCENE_Report_Summary sum;
     gshscene_report_summary(report, &sum);
     CHECK(sum.work_max <= caps.cancel_work_bound);

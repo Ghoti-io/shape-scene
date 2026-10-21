@@ -86,7 +86,7 @@ enum {
   OP_PUBLISH, OP_MERGE, OP_HOLD, OP_RELEASE_VERSION, OP_DIFF, OP_EMIT, OP_VISIT, OP_DUMP, OP_SCENE_INTERN,
   OP_FILL_EX, OP_CLIP_PUSH_EX, OP_GROUP_PUSH_EX, OP_LIST_FOREGROUND, OP_NODE_PROPS, OP_EDIT_FOREGROUND, OP_LIST_PALETTE,
   OP_FILL_FIXED, OP_TRUNCATE, OP_EDIT_PALETTE, OP_INTERN_GRADIENT, OP_FILL_GRADIENT, OP_SCENE_GRADIENT,
-  OP_GRADIENT_NODE, OP_COLOR_BOUND, OP_COUNT
+  OP_GRADIENT_NODE, OP_COLOR_BOUND, OP_GROUP_PDF, OP_NODE_PDF, OP_COUNT
 };
 
 /* --- the outcomes the corpus must reach ------------------------------------------------------------ */
@@ -96,7 +96,7 @@ enum {
   OUT_PUBLISH_OK, OUT_MERGE_OK, OUT_EMIT_OK, OUT_DIFF_OK, OUT_INSTANCE_PICTURE, OUT_LIST_TIES, OUT_FOREGROUND_VERSION,
   OUT_PARAMETER_REFUSED, OUT_EMIT_TIES, OUT_PALETTE_FILL, OUT_TRUNCATED, OUT_GRADIENT_FILL, OUT_GRADIENT_DEGENERATE,
   OUT_GRADIENT_REFUSED, OUT_GRADIENT_LIMIT, OUT_GRADIENT_NODE, OUT_GRADIENT_EMITTED, OUT_COLOR_LIMIT, OUT_COLOR_AT_BOUND,
-  OUT_COUNT
+  OUT_BLEND_GROUP, OUT_PDF_GROUP, OUT_PDF_INVALID, OUT_PDF_EMITTED, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limit", "edit limit", "publish limit",
@@ -105,7 +105,8 @@ static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limi
     "an emitted list with ties", "a palette fill recorded", "a list truncated", "a gradient fill recorded",
     "a degenerate gradient interned", "a gradient refused at intern",
     "a gradient past G14's bounds refused", "a shape node painted with a gradient", "an emitted list with a gradient fill",
-    "a color past N1's bound refused", "a color at N1's bound recorded"};
+    "a color past N1's bound refused", "a color at N1's bound recorded", "a blend-mode group recorded",
+    "a group of PDF's fields recorded", "a group of PDF's fields refused as invalid", "a node of PDF's fields emitted"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -1172,6 +1173,12 @@ static void op(S * s, unsigned code) {
           CHECK(gshscene_version_node(v, node, &info) == GSHSCENE_OK);
           const GSHSCENE_Item * item;
           CHECK(gshscene_list_item(list, i, &item) == GSHSCENE_OK);
+          if (item->kind == GSHSCENE_ITEM_GROUP_PUSH && info.node.kind == GSHSCENE_NODE_GROUP) {
+            /* T1: a group node's push carries its composite and PDF's fields as they are. */
+            CHECK(item->group.composite == info.node.composite && item->group.isolation == info.node.isolation &&
+                  item->group.knockout == info.node.knockout && item->group.soft_mask == info.node.soft_mask);
+            outcomes[OUT_PDF_EMITTED] += item->group.isolation || item->group.knockout || item->group.soft_mask;
+          }
           if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
             /* A gradient node's fill (story P2): its paint names the node's gradient, and the notice predicate runs. */
             CHECK(info.node.paint.kind == GSHSCENE_PAINT_GRADIENT && item->paint.gradient == info.node.paint.gradient);
@@ -1793,6 +1800,91 @@ static void op(S * s, unsigned code) {
         }
         outcomes[OUT_COLOR_LIMIT] += past && r == GSHSCENE_ERR_LIMIT;
       }
+      break;
+    }
+    case OP_GROUP_PDF: {
+      /* B1, T1: a group push of any composite (one past the enum), any isolation and knockout (one past each), and a
+       * soft mask that is none, a picture of the list's store, or a path (invalid). */
+      if (!s->list) {
+        break;
+      }
+      ListSnap b = snap(s->list);
+      GSHSCENE_Group g;
+      memset(&g, 0, sizeof g);
+      g.opacity = pick(s, 5) / 4.0;
+      g.composite = pick(s, (unsigned)GSHSCENE_COMPOSITE_COUNT + 1);
+      g.isolation = pick(s, 3);
+      g.knockout = pick(s, 3);
+      unsigned mask = pick(s, 3);
+      g.soft_mask = mask == 1 ? s->pictures[pick(s, POOL)] : mask == 2 ? s->res[pick(s, POOL)] : NULL;
+      int path_mask = g.soft_mask && gshscene_resource_kind(g.soft_mask) != GSHSCENE_RESOURCE_PICTURE;
+      int invalid = g.composite >= GSHSCENE_COMPOSITE_COUNT || g.isolation > 1 || g.knockout > 1 || path_mask;
+      r = gshscene_list_group_push(s->list, &g, 0, 0.0);
+      if (invalid) {
+        CHECK(r == GSHSCENE_ERR_INVALID);
+        outcomes[OUT_PDF_INVALID] += g.isolation > 1 || g.knockout > 1 || path_mask;
+      }
+      list_after(s, b, r, 1, 0);
+      if (r == GSHSCENE_OK) {
+        const GSHSCENE_Item * item = NULL;
+        CHECK(gshscene_list_item(s->list, gshscene_list_count(s->list) - 1, &item) == GSHSCENE_OK);
+        CHECK(item->group.composite == g.composite && item->group.isolation == g.isolation &&
+              item->group.knockout == g.knockout && item->group.soft_mask == g.soft_mask);
+        outcomes[OUT_BLEND_GROUP] += g.composite >= GSHSCENE_COMPOSITE_SCREEN;
+        outcomes[OUT_PDF_GROUP] += g.isolation || g.knockout || g.soft_mask;
+      }
+      break;
+    }
+    case OP_NODE_PDF: {
+      /* T1 on a group node: isolation and knockout (one past each), and a soft mask made in the scene's store (a
+       * picture of one fill) or none. */
+      unsigned k = pick(s, EDITS);
+      if (!has_edit(s, k) || !s->scene) {
+        break;
+      }
+      GSHSCENE_Edit * e = s->edits[k];
+      uint64_t id = some_id(s);
+      unsigned isolation = pick(s, 3);
+      unsigned knockout = pick(s, 3);
+      int masked = pick(s, 2);
+      GSHSCENE_Node_Info info;
+      if (gshscene_edit_node(e, id, &info) != GSHSCENE_OK || info.node.kind != GSHSCENE_NODE_GROUP) {
+        break;
+      }
+      const GSHSCENE_Resource * mask = NULL;
+      if (masked) {
+        GSHSCENE_Store * store = gshscene_scene_store(s->scene);
+        GSHGEOM_Path * path = make_path(s, 0);
+        const GSHSCENE_Resource * shape = NULL;
+        GSHSCENE_List * l = NULL;
+        if (path && gshscene_store_intern_path(store, path, &shape) == GSHSCENE_OK &&
+            gshscene_list_create(&s->alloc, &s->limits, store, &l) == GSHSCENE_OK &&
+            gshscene_list_fill(l, shape, NULL, GSHGEOM_FILL_NONZERO, NULL, 0, 0.0) == GSHSCENE_OK &&
+            gshscene_list_close(l) == GSHSCENE_OK) {
+          gshscene_store_intern_picture(store, l, &mask);
+        }
+        gshscene_list_destroy(l);
+        gshscene_resource_release(shape);
+        gshgeom_path_destroy(path);
+        if (!mask) {
+          break; /* a limit or an allocation: nothing to set */
+        }
+      }
+      GSHSCENE_Node n = info.node;
+      n.isolation = isolation;
+      n.knockout = knockout;
+      n.soft_mask = mask;
+      r = gshscene_edit_set(e, id, &n);
+      CHECK(r != GSHSCENE_ERR_INTERNAL);
+      if (isolation > 1 || knockout > 1) {
+        CHECK(r == GSHSCENE_ERR_INVALID);
+      }
+      if (r == GSHSCENE_OK) {
+        GSHSCENE_Node_Info now;
+        CHECK(gshscene_edit_node(e, id, &now) == GSHSCENE_OK);
+        CHECK(now.node.isolation == isolation && now.node.knockout == knockout && now.node.soft_mask == mask);
+      }
+      gshscene_resource_release(mask); /* the node holds its own */
       break;
     }
     default:
