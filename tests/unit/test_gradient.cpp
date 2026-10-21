@@ -1199,6 +1199,51 @@ TEST(GradientPlan, WhatDrawsNothingIsANoticeThatNeverFailsAndIsNotDrawn) {
   EXPECT_EQ(notes[0].reason, GSHSCENE_REASON_MAP_NOT_INVERTIBLE);
 }
 
+TEST(GradientPlan, AGroupMapOfZeroScaleInAVersionIsANoticeOnItsEmittedFills) {
+  // G11 reads the chain of the list a sink is given; a retained scene composes a group's map into the item maps it
+  // emits, and a zero scale stays an exact zero there.
+  SceneHolder sc;
+  Ref sq(intern_square(sc.store()));
+  Desc d = linear(0, 0, 8, 0);
+  d.stop(0, solid(0, 0, 0, 1)).stop(1, solid(1, 1, 1, 1));
+  Ref g(intern_g(sc.store(), d));
+  VersionRef v;
+  {
+    EditHolder e(sc);
+    GSHSCENE_Node group = group_node();
+    group.map = matrix(0, 0, 0, 1, 3, 4);
+    uint64_t gid = add(e.edit, GSHSCENE_ROOT_ID, group);
+    GSHSCENE_Node shape = shape_node(sq.get());
+    shape.paint = gradient_paint(g.get(), 1.0);
+    shape.map = matrix(2, 1, 1, 3);
+    add(e.edit, gid, shape);
+    GSHSCENE_Node plain = shape_node(sq.get());
+    plain.paint = gradient_paint(g.get(), 1.0);
+    add(e.edit, GSHSCENE_ROOT_ID, plain);
+    publish(sc, e, &v);
+  }
+  const GSHSCENE_List * list = nullptr;
+  ASSERT_EQ(gshscene_version_list(v.get(), &list), GSHSCENE_OK);
+  Render r(full_config());
+  EXPECT_EQ(r.run(list, GSHSCENE_RENDER_STRICT), GSHSCENE_OK);
+  auto notes = r.entries(GSHSCENE_ENTRY_NOTICE);
+  ASSERT_EQ(notes.size(), 1u);
+  EXPECT_EQ(notes[0].reason, GSHSCENE_REASON_MAP_NOT_INVERTIBLE);
+  uint64_t node = 0;
+  uint64_t path[4];
+  size_t count = 0;
+  size_t index = 0;
+  for (size_t i = 0; i < gshscene_report_count(r.report); i++) {
+    GSHSCENE_Report_Entry e{};
+    gshscene_report_entry(r.report, i, &e);
+    if (e.entry_class == GSHSCENE_ENTRY_NOTICE) {
+      index = i;
+    }
+  }
+  ASSERT_EQ(gshscene_report_resolve(r.report, v.get(), index, &node, path, 4, &count), GSHSCENE_OK);
+  EXPECT_EQ(node, 3u) << "the shape inside the flattened group";
+}
+
 TEST(GradientPlan, TheTestSinkWritesEachGradientOnceWithItsResolvedStops) {
   StoreHolder s;
   Ref sq(intern_square(s.store));
