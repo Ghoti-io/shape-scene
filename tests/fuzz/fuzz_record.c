@@ -46,6 +46,9 @@
  * with the new fields, a list's foreground, a node's new properties, an edit's
  * foreground), so the older ops and the scripted inputs that use them are unchanged.
  * Every closed list is checked to be in paint order (N11) and its ties to be real.
+ * Color-paint story P2 adds two ops at the end: a gradient interned in the scene's store from the input (every kind,
+ * extend and stop shape, maps singular and not, values at and past G14's bounds, G14 asserted by its bound), and a
+ * shape node painted with one, whose emitted fills are checked.
  *
  * The op numbers below are mirrored by tools/gen-fuzz-corpus.py; the replay
  * also fails if the corpus never reaches an outcome (a limit, a refusal, an
@@ -78,7 +81,8 @@ enum {
   OP_SCENE_DESTROY, OP_OPEN_EDIT, OP_DESTROY_EDIT, OP_ADD, OP_SET, OP_REMOVE, OP_MOVE, OP_UPSERT, OP_REMOVE_KEY,
   OP_PUBLISH, OP_MERGE, OP_HOLD, OP_RELEASE_VERSION, OP_DIFF, OP_EMIT, OP_VISIT, OP_DUMP, OP_SCENE_INTERN,
   OP_FILL_EX, OP_CLIP_PUSH_EX, OP_GROUP_PUSH_EX, OP_LIST_FOREGROUND, OP_NODE_PROPS, OP_EDIT_FOREGROUND, OP_LIST_PALETTE,
-  OP_FILL_FIXED, OP_TRUNCATE, OP_EDIT_PALETTE, OP_INTERN_GRADIENT, OP_FILL_GRADIENT, OP_COUNT
+  OP_FILL_FIXED, OP_TRUNCATE, OP_EDIT_PALETTE, OP_INTERN_GRADIENT, OP_FILL_GRADIENT, OP_SCENE_GRADIENT,
+  OP_GRADIENT_NODE, OP_COUNT
 };
 
 /* --- the outcomes the corpus must reach ------------------------------------------------------------ */
@@ -87,14 +91,15 @@ enum {
   OUT_LIST_LIMIT = 0, OUT_INTERN_LIMIT, OUT_EDIT_LIMIT, OUT_PUBLISH_LIMIT, OUT_PUBLISH_REFUSED, OUT_PUBLISH_INVALID,
   OUT_PUBLISH_OK, OUT_MERGE_OK, OUT_EMIT_OK, OUT_DIFF_OK, OUT_INSTANCE_PICTURE, OUT_LIST_TIES, OUT_FOREGROUND_VERSION,
   OUT_PARAMETER_REFUSED, OUT_EMIT_TIES, OUT_PALETTE_FILL, OUT_TRUNCATED, OUT_GRADIENT_FILL, OUT_GRADIENT_DEGENERATE,
-  OUT_GRADIENT_REFUSED, OUT_COUNT
+  OUT_GRADIENT_REFUSED, OUT_GRADIENT_LIMIT, OUT_GRADIENT_NODE, OUT_GRADIENT_EMITTED, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limit", "edit limit", "publish limit",
     "publish refused", "publish invalid", "publish ok", "merge ok", "emit ok", "diff ok", "instance of a picture",
     "a closed list with ties", "a version whose foreground changed", "a merge refused over the foreground",
     "an emitted list with ties", "a palette fill recorded", "a list truncated", "a gradient fill recorded",
-    "a degenerate gradient interned", "a gradient refused at intern"};
+    "a degenerate gradient interned", "a gradient refused at intern",
+    "a gradient past G14's bounds refused", "a shape node painted with a gradient", "an emitted list with a gradient fill"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -171,6 +176,7 @@ typedef struct S {
   unsigned scene_generation;
   const GSHSCENE_Resource * sres[POOL];    /* in the scene's store */
   const GSHSCENE_Resource * grads[4];      /* gradients, in the standalone store (color-paint story P1) */
+  const GSHSCENE_Resource * sgrads[2];     /* gradients, in the scene's store (story P2) */
   GSHSCENE_Edit * edits[EDITS];
   unsigned edit_generation[EDITS];
   const GSHSCENE_Version * versions[VERSIONS];
@@ -557,6 +563,124 @@ static void edit_props(S * s, GSHSCENE_Node * n) {
   }
 }
 
+/* --- gradients built from the input (story P2: every kind, extend and stop shape, maps singular and not, values at
+ * and past G14's bounds) -------------------------------------------------------------------------------------------- */
+
+/** A value of a gradient: small integers and fractions, G14's bounds and one step past each. */
+static double gradient_value(unsigned b, int * beyond) {
+  static const double table[16] = {0.0, 1.0, -1.0, 0.5, 3.0, -2.5, 7.0, 0.1, 0x1p64, -0x1p64, 0x1p-64, -0x1p-64,
+      0x1.0000000000001p64, 0x1.fffffffffffffp-65, 1e-300, 12.0};
+  double v = table[b % 16];
+  double m = v < 0 ? -v : v;
+  if (m != 0.0 && (m > 0x1p64 || m < 0x1p-64)) {
+    *beyond = 1;
+  }
+  return v;
+}
+
+/**
+ * Intern a gradient from the input into @p store.  G14 is asserted by its bound: a gradient none of whose values is past
+ * the bounds is never refused with ERR_LIMIT for them (the store's own limits aside), and one with such a value never
+ * interns.
+ */
+static GSHSCENE_Result fuzz_gradient(S * s, GSHSCENE_Store * store, const GSHSCENE_Resource ** out) {
+  int beyond = 0;
+  GSHSCENE_Gradient d;
+  memset(&d, 0, sizeof d);
+  d.kind = 1u + pick(s, 3);
+  /* sparse values: most draw a small number, one byte in four draws from the whole table */
+  double v[6];
+  for (int k = 0; k < 6; k++) {
+    unsigned b = arg(s);
+    v[k] = b % 4 == 0 ? gradient_value(b / 4, &beyond) : (double)((int)(b % 13) - 6) / (b % 3 == 0 ? 1.0 : 2.0);
+  }
+  if (d.kind == GSHSCENE_GRADIENT_LINEAR) {
+    d.p0[0] = v[0], d.p0[1] = v[1], d.p1[0] = v[2], d.p1[1] = v[3];
+    if (pick(s, 3) == 0) {
+      d.d[0] = v[4], d.d[1] = v[5];
+    }
+  } else if (d.kind == GSHSCENE_GRADIENT_RADIAL) {
+    d.c0[0] = v[0], d.c0[1] = v[1], d.r0 = v[2], d.c1[0] = v[3], d.c1[1] = v[4], d.r1 = v[5];
+  } else {
+    d.center[0] = v[0], d.center[1] = v[1];
+    d.angle_unit = pick(s, 4);
+    double turn = d.angle_unit == GSHGEOM_ANGLE_DEGREES ? 45.0 : d.angle_unit == GSHGEOM_ANGLE_GRADIANS ? 50.0
+                : d.angle_unit == GSHGEOM_ANGLE_TURNS ? 0.125 : 0.75;
+    d.a0 = v[2] * turn, d.a1 = v[3] * turn;
+  }
+  d.extend = pick(s, 3);
+  d.premultiplied = pick(s, 2);
+  d.space = pool_space(arg(s) % 6); /* the target's, or a space every sink can carry */
+  unsigned mk = pick(s, 8);
+  if (mk == 6) {
+    const double m[4] = {1.0, 2.0, 2.0, 4.0}; /* rank one: G11 */
+    const double t[2] = {0.0, 0.0};
+    gshgeom_map_from_matrix(2, m, t, &d.map);
+  } else if (mk == 7) {
+    const double m[4] = {gradient_value(arg(s), &beyond), 0.25, 0.0, 1.5};
+    const double t[2] = {gradient_value(arg(s), &beyond), 1.0};
+    if (gshgeom_map_from_matrix(2, m, t, &d.map) != GSHGEOM_OK) {
+      gshgeom_map_identity(2, &d.map);
+    }
+  } else {
+    int use;
+    d.map = pool_map(mk, &use);
+  }
+  /* The stops: none, one, several (unsorted, equal offsets), parameter stops, or past the count. */
+  static GSHSCENE_Gradient_Stop stops[6];
+  memset(stops, 0, sizeof stops);
+  unsigned n = pick(s, 7);
+  for (unsigned i = 0; i < n; i++) {
+    unsigned ob = arg(s);
+    stops[i].offset = ob % 8 == 0 ? gradient_value(ob / 8, &beyond) : (double)(ob % 9) / 8.0 - 0.25;
+    unsigned k = pick(s, 4);
+    stops[i].color.kind = k < 2 ? GSHSCENE_PAINT_SOLID : k == 2 ? GSHSCENE_PAINT_FOREGROUND : GSHSCENE_PAINT_PALETTE;
+    stops[i].color.rgba[3] = (double)pick(s, 5) / 4.0;
+    if (stops[i].color.kind == GSHSCENE_PAINT_SOLID) {
+      stops[i].color.rgba[0] = (double)pick(s, 3) / 2.0;
+      stops[i].color.rgba[1] = (double)pick(s, 3) / 2.0;
+      /* a solid stop in the target's space only where the gradient interpolates in it (G3) */
+      stops[i].color.space = gshscene_color_space_is_target(&d.space) ? pool_space(arg(s) % 6) : pool_space(1 + arg(s) % 5);
+    } else if (stops[i].color.kind == GSHSCENE_PAINT_PALETTE) {
+      stops[i].color.entry = pick(s, 3);
+    }
+  }
+  d.stops = n ? stops : NULL;
+  d.stop_count = n;
+  GSHSCENE_Gradient_Stop * many = NULL;
+  if (pick(s, 64) == 0) {
+    /* G14's stop count: the bound, or one past it */
+    size_t count = GSHSCENE_GRADIENT_STOPS_MAX + pick(s, 2);
+    many = calloc(count, sizeof *many);
+    CHECK(many != NULL);
+    for (size_t i = 0; i < count; i++) {
+      many[i].offset = (double)(i % 5);
+      many[i].color.kind = GSHSCENE_PAINT_FOREGROUND;
+      many[i].color.rgba[3] = 1.0;
+    }
+    d.stops = many;
+    d.stop_count = count;
+  }
+  /* G14's bound, from the values the gradient holds (the table's draws above may have gone unused or been scaled). */
+  beyond = d.stop_count > GSHSCENE_GRADIENT_STOPS_MAX;
+  const double held[22] = {d.p0[0], d.p0[1], d.p1[0], d.p1[1], d.d[0], d.d[1], d.c0[0], d.c0[1], d.r0, d.c1[0], d.c1[1],
+      d.r1, d.center[0], d.center[1], d.a0, d.a1, d.map.m[0][0], d.map.m[0][1], d.map.m[1][0], d.map.m[1][1], d.map.t[0],
+      d.map.t[1]};
+  for (size_t i = 0; i < 22 + d.stop_count; i++) {
+    double x = i < 22 ? held[i] : d.stops[i - 22].offset;
+    double m = x < 0 ? -x : x;
+    beyond |= m != 0.0 && (m > 0x1p64 || m < 0x1p-64);
+  }
+  GSHSCENE_Result r = gshscene_store_intern_gradient(store, &d, out);
+  CHECK(r == GSHSCENE_OK || r == GSHSCENE_ERR_LIMIT || r == GSHSCENE_ERR_OOM);
+  if (beyond) {
+    CHECK(r != GSHSCENE_OK); /* G14: past a bound never interns */
+    outcomes[OUT_GRADIENT_LIMIT] += r == GSHSCENE_ERR_LIMIT;
+  }
+  free(many);
+  return r;
+}
+
 static void op(S * s, unsigned code) {
   const GSHSCENE_Limits * lim = &s->limits;
   GSHSCENE_Result r;
@@ -776,6 +900,10 @@ static void op(S * s, unsigned code) {
         for (int i = 0; i < POOL; i++) {
           gshscene_resource_release(s->sres[i]);
           s->sres[i] = NULL;
+        }
+        for (int i = 0; i < 2; i++) {
+          gshscene_resource_release(s->sgrads[i]);
+          s->sgrads[i] = NULL;
         }
         gshscene_scene_destroy(s->scene);
         s->scene = NULL;
@@ -1038,6 +1166,13 @@ static void op(S * s, unsigned code) {
           CHECK(gshscene_version_node(v, node, &info) == GSHSCENE_OK);
           const GSHSCENE_Item * item;
           CHECK(gshscene_list_item(list, i, &item) == GSHSCENE_OK);
+          if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
+            /* A gradient node's fill (story P2): its paint names the node's gradient, and the notice predicate runs. */
+            CHECK(info.node.paint.kind == GSHSCENE_PAINT_GRADIENT && item->paint.gradient == info.node.paint.gradient);
+            GSHSCENE_Reason why = gshscene_gradient_notice(item, NULL, 0, NULL);
+            CHECK(why == 0 || why == GSHSCENE_REASON_GRADIENT_DEGENERATE || why == GSHSCENE_REASON_MAP_NOT_INVERTIBLE);
+            outcomes[OUT_GRADIENT_EMITTED]++;
+          }
           if (item->kind == GSHSCENE_ITEM_INSTANCE) {
             const GSHSCENE_Resource * pic = NULL;
             CHECK(gshscene_version_picture(v, info.node.target, &pic) == GSHSCENE_OK && pic == item->resource);
@@ -1458,6 +1593,57 @@ static void op(S * s, unsigned code) {
       }
       break;
     }
+    case OP_SCENE_GRADIENT: {
+      /* A gradient in the scene's store, for shape nodes (story P2). */
+      if (!s->scene) {
+        break;
+      }
+      unsigned slot = pick(s, 2);
+      const GSHSCENE_Resource * g = NULL;
+      if (fuzz_gradient(s, gshscene_scene_store(s->scene), &g) == GSHSCENE_OK) {
+        gshscene_resource_release(s->sgrads[slot]);
+        s->sgrads[slot] = g;
+      } else {
+        CHECK(g == NULL);
+      }
+      break;
+    }
+    case OP_GRADIENT_NODE: {
+      /* A shape node painted with a gradient of the scene's store (or of the other store, or none: invalid). */
+      unsigned k = pick(s, EDITS);
+      if (!has_edit(s, k)) {
+        break;
+      }
+      GSHSCENE_Edit * e = s->edits[k];
+      GSHSCENE_Node n;
+      gshscene_node_init(GSHSCENE_NODE_SHAPE, &n);
+      int use;
+      n.map = pool_map(arg(s), &use);
+      n.resource = s->sres[pick(s, POOL)];
+      n.paint.kind = GSHSCENE_PAINT_GRADIENT;
+      unsigned which = pick(s, 4);
+      n.paint.gradient = which < 2 ? s->sgrads[which] : which == 2 ? s->grads[0] : NULL;
+      n.paint.rgba[3] = (double)pick(s, 5) / 4.0;
+      size_t before = gshscene_edit_node_count(e);
+      uint64_t id = 0;
+      if (pick(s, 3) == 0) {
+        r = gshscene_edit_set(e, some_id(s), &n);
+      } else {
+        r = gshscene_edit_add(e, some_id(s), GSHSCENE_APPEND, &n, NULL, &id);
+      }
+      CHECK(r != GSHSCENE_ERR_INTERNAL && r != GSHSCENE_ERR_OOM);
+      if (r == GSHSCENE_OK) {
+        remember(s, id);
+        CHECK(n.paint.gradient && gshscene_resource_kind(n.paint.gradient) == GSHSCENE_RESOURCE_GRADIENT);
+        outcomes[OUT_GRADIENT_NODE]++;
+      } else {
+        CHECK(gshscene_edit_node_count(e) == before);
+        if (r == GSHSCENE_ERR_LIMIT) {
+          CHECK(before >= lim->max_nodes);
+        }
+      }
+      break;
+    }
     default:
       break;
   }
@@ -1538,6 +1724,9 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
   }
   for (int i = 0; i < 4; i++) {
     gshscene_resource_release(s->grads[i]);
+  }
+  for (int i = 0; i < 2; i++) {
+    gshscene_resource_release(s->sgrads[i]);
   }
   gshscene_scene_destroy(s->scene);
   GSHSCENE_Store_Stats stats;

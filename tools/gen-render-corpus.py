@@ -109,6 +109,19 @@ def scripted():
     out["scripted-gradients-stream.bin"] = header(request=4) + gradients
     out["scripted-gradients-strict.bin"] = header(request=1, step=32 | 128) + gradients
     out["scripted-gradients-none.bin"] = header(request=4, step=64) + gradients
+    # Story P2: b >= 200 builds the gradient from the bytes after the op: six values (b % 64 - 16, halved when b & 64;
+    # 252 to 255 G14's bounds and one step past each), the kind byte (k % 3: linear, radial, sweep; k & 4 an isoline;
+    # (k >> 3) % 4 the unit), the flags (extend, premultiplied, linear sRGB, a turned or flat map), the stop count and
+    # (offset, color) per stop.  A linear repeat under a turned map with a solid, a foreground and a palette stop; a
+    # radial cone, premultiplied in linear sRGB; a sweep in degrees; and p0's x one step past 2^64 (refused).
+    built = [bytes([FOREGROUND, 12, 200, 3]) + bytes([18, 18, 46, 20, 16, 16, 0, 0x11, 3, 0, 0xF0, 4, 4, 8, 5]),
+             bytes([FOREGROUND, 13, 201, 4]) + bytes([20, 20, 17, 40, 30, 28, 1, 0x0C, 2, 0, 0x10, 8, 0xE1]),
+             bytes([FOREGROUND, 12, 202, 5]) + bytes([24, 24, 16, 106, 16, 16, 11, 0x02, 2, 0, 0x30, 8, 0xC4]),
+             bytes([FOREGROUND, 12, 203, 6]) + bytes([253, 16, 30, 16, 16, 16, 0, 0, 2, 0, 0x30, 8, 0xC4])]
+    body = bytearray([len(built) - 1])
+    for b in built:
+        body += b
+    out["scripted-gradients-built.bin"] = header(request=4) + bytes(body)
     return out
 
 

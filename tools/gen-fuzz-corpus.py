@@ -34,7 +34,7 @@ OPS = ["LIST_CREATE", "FILL", "CLIP_PUSH", "CLIP_POP", "GROUP_PUSH", "GROUP_POP"
        "SCENE_DESTROY", "OPEN_EDIT", "DESTROY_EDIT", "ADD", "SET", "REMOVE", "MOVE", "UPSERT", "REMOVE_KEY",
        "PUBLISH", "MERGE", "HOLD", "RELEASE_VERSION", "DIFF", "EMIT", "VISIT", "DUMP", "SCENE_INTERN",
        "FILL_EX", "CLIP_PUSH_EX", "GROUP_PUSH_EX", "LIST_FOREGROUND", "NODE_PROPS", "EDIT_FOREGROUND", "LIST_PALETTE",
-       "FILL_FIXED", "TRUNCATE", "EDIT_PALETTE", "INTERN_GRADIENT", "FILL_GRADIENT"]
+       "FILL_FIXED", "TRUNCATE", "EDIT_PALETTE", "INTERN_GRADIENT", "FILL_GRADIENT", "SCENE_GRADIENT", "GRADIENT_NODE"]
 OP = {name: i for i, name in enumerate(OPS)}
 
 BIASED = {
@@ -44,6 +44,7 @@ BIASED = {
     "VISIT": 1, "DUMP": 1, "SCENE_INTERN": 2, "RESET": 1, "DESTROY_EDIT": 1, "SCENE_DESTROY": 1, "SCENE_CREATE": 1,
     "FILL_EX": 5, "CLIP_PUSH_EX": 2, "GROUP_PUSH_EX": 4, "LIST_FOREGROUND": 1, "NODE_PROPS": 5, "EDIT_FOREGROUND": 2,
     "LIST_PALETTE": 2, "FILL_FIXED": 4, "TRUNCATE": 2, "EDIT_PALETTE": 2, "INTERN_GRADIENT": 4, "FILL_GRADIENT": 4,
+    "SCENE_GRADIENT": 4, "GRADIENT_NODE": 5,
 }
 
 BIASED_FILES = 160
@@ -147,6 +148,20 @@ def scripted():
     seq = (bytearray([0xFF, 0xFF]) + open_edit() + add_group(0) + bytes([OP["NODE_PROPS"], 0, 2, 0, 1, 0, 0, 2])
            + add_shape(2) + add_shape(2) + publish() + bytes([OP["EMIT"], 0]))
     out["scripted-emit-ties.bin"] = bytes(seq)
+    # Color-paint story P2: a linear gradient in the scene's store (p0 (1, 1), p1 (10, 1); a solid stop and a
+    # foreground stop), a shape node painted with it, published and emitted.  SCENE_GRADIENT reads the slot, then
+    # fuzz_gradient's bytes: kind, six values, the isoline pick, extend, premultiplied, space, map, the stop count and
+    # each stop (offset, kind, alpha, and for a solid red, green, space), then the many-stops pick.
+    linear = bytes([0, 9, 9, 18, 9, 9, 9, 1, 0, 0, 0, 0, 2, 1, 0, 4, 2, 1, 0, 7, 2, 4, 1])
+    node = bytes([OP["GRADIENT_NODE"], 0, 0, 0, 0, 4, 1, 0])
+    seq = (bytearray([0xFF, 0xFF]) + open_edit() + bytes([OP["SCENE_GRADIENT"], 0]) + linear + node + publish()
+           + bytes([OP["EMIT"], 0]))
+    out["scripted-gradient-node.bin"] = bytes(seq)
+    # The same gradient with p0's x one step past G14's bound (a value byte of 48: the table's entry 12): refused.
+    past = bytearray(linear)
+    past[1] = 48
+    seq = bytearray([0xFF, 0xFF]) + bytes([OP["SCENE_GRADIENT"], 0]) + past
+    out["scripted-gradient-past-bound.bin"] = bytes(seq)
     # Found by story 16's libFuzzer soak: an instance of its own parent group, entered first as another instance's
     # target, which publish answered with ERR_INTERNAL instead of a cycle problem.
     out["regression-cycle-entered-through-an-instance.bin"] = base64.b64decode(
