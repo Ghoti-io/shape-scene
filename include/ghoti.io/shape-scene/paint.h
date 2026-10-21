@@ -112,7 +112,7 @@
  * **interpolation space** (zero: the target's); `premultiplied` is 0 or 1.  Every
  * double is finite.  Equal content is one handle; a hash never decides equality.
  *
- * **G2 The color line.**  `n` stops, `0 <= n <= max_resource_elements`, each an
+ * **G2 The color line.**  `n` stops, `0 <= n <=` G14's bound, each an
  * `offset` (any finite double) and a stop color.  The store sorts them by offset,
  * **stably**, when it interns; hash, dump and equality see the sorted line.
  * `o_first` and `o_last` are the first and last offsets, `P = o_last - o_first`.
@@ -198,6 +198,30 @@
  * strict), reasons `MAP_NOT_INVERTIBLE` and `GRADIENT_DEGENERATE`, through the
  * one predicate ::gshscene_gradient_notice.  A writer dedupes gradients by
  * resource id; a GPU sink caches its upload by id and evicts on release (AD-27).
+ *
+ * **G14 Limits (color-paint story P2).**  Every double of the geometry of the
+ * gradient's kind, every entry of its map (the 2x2 linear part and the
+ * translation) and every offset is zero or of magnitude in
+ * `[GSHSCENE_GRADIENT_VALUE_MIN, GSHSCENE_GRADIENT_VALUE_MAX]` = `[2^-64, 2^64]`,
+ * and the stops number at most `min(max_resource_elements,
+ * GSHSCENE_GRADIENT_STOPS_MAX)` (65535, COLRv1's count).  Past either, intern is
+ * ::GSHSCENE_ERR_LIMIT; a non-finite value or another invalid field is
+ * ::GSHSCENE_ERR_INVALID, decided first.  The bounds keep a double evaluation of
+ * G4 to G9 finite over the **sampling domain**, the gradient-space points whose
+ * coordinates lie in `[-GSHSCENE_GRADIENT_DOMAIN, GSHSCENE_GRADIENT_DOMAIN]` =
+ * `[-2^128, 2^128]`.  Every value allowed is a multiple of `2^-116`, so a nonzero
+ * difference of two is in `[2^-116, 2^65]` and a nonzero sum of products of two
+ * such differences is at least `2^-232`.  Over the domain: G7's denominator is at
+ * most `2^131` (nonzero: at least `2^-232`) and its numerator at most `2^195`, so
+ * `|t| <= 2^427`; G8's `a = |c1 - c0|^2 - (r1 - r0)^2` is at most `2^132`
+ * (nonzero: at least `2^-232`), `b = (p - c0) . (c1 - c0) + r0 (r1 - r0)` at most
+ * `2^196`, `c = |p - c0|^2 - r0^2` at most `2^260`, `b^2 - a c` at most `2^393`,
+ * and with `a != 0` each root `w = (b +- sqrt(b^2 - a c)) / a` at most `2^430`
+ * (with `a = 0`, `w = c / 2b` grows without bound only as `b` goes to zero, at
+ * the edge of the cone); G9's `t` is at most `2^181`; G5's `t - o_first` is at
+ * most `2^431`, `P` and `2P` at most `2^66` (nonzero: at least `2^-116`), so
+ * `(t - o_first) / P` is at most `2^547`; G4's fraction is in `[0, 1]`.  A sink
+ * evaluates inside the domain, or refuses the fill as its own limit (sink.h, S6).
  */
 
 #ifndef GHOTI_IO_GSHSCENE_PAINT_H
@@ -354,7 +378,7 @@ typedef struct GSHSCENE_Gradient {
   uint32_t extend;            ///< A ::GSHSCENE_Extend.
   GSHSCENE_Color_Space space; ///< The interpolation space; zero is the target's.
   uint32_t premultiplied;     ///< 1: interpolate premultiplied (G4); 0: straight.
-  size_t stop_count;          ///< The stops, at most the store's `max_resource_elements`.
+  size_t stop_count;          ///< The stops, at most the store's `max_resource_elements` and 65535 (G14).
   /** The stops: given in any order to intern (sorted stably by offset), and sorted when read back.  NULL only with no stops. */
   const GSHSCENE_Gradient_Stop * stops;
 } GSHSCENE_Gradient;
@@ -393,6 +417,15 @@ GSHSCENE_API GSHSCENE_Result gshscene_gradient_resolve(const GSHSCENE_Resource *
 
 /** The bound of ::gshscene_gradient_resolve's error, relative to `max(1, |c|)` for each component (G3). */
 #define GSHSCENE_RESOLVE_TOLERANCE 1e-13
+
+/** G14: the largest magnitude of a gradient's geometry, map entries and offsets, `2^64`. */
+#define GSHSCENE_GRADIENT_VALUE_MAX 0x1p64
+/** G14: the smallest magnitude of a nonzero one, `2^-64`. */
+#define GSHSCENE_GRADIENT_VALUE_MIN 0x1p-64
+/** G14: the most stops a gradient holds (also at most the store's `max_resource_elements`). */
+#define GSHSCENE_GRADIENT_STOPS_MAX ((size_t)65535)
+/** G14: the sampling domain, gradient-space coordinates in `[-2^128, 2^128]`, over which G4 to G9 stay finite. */
+#define GSHSCENE_GRADIENT_DOMAIN 0x1p128
 
 #ifdef __cplusplus
 }

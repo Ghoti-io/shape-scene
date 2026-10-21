@@ -244,7 +244,7 @@ a valid 2D map from gradient space to the local space of the item that paints wi
 `space` an N1 space, the interpolation space (zero: the target's); `premultiplied` 0 or 1. Every double is finite.
 Equal content is one handle; a hash never decides equality.
 
-**G2 The color line.** `n` stops, `0 <= n <= max_resource_elements`, each an offset (any finite double) and a stop
+**G2 The color line.** `n` stops, `0 <= n <=` G14's bound, each an offset (any finite double) and a stop
 color, sorted stably by offset when interned; hash, dump and equality see the sorted line. `o_first`, `o_last` and
 `P = o_last - o_first` are of the sorted line.
 
@@ -304,6 +304,30 @@ approximated (`INTERPOLATION_SPACE`). The planning pass reports G11, then G10, a
 (`MAP_NOT_INVERTIBLE`, `GRADIENT_DEGENERATE`) by the one predicate `gshscene_gradient_notice`, which a sink also skips
 by; a notice never fails a render. N13 extends to gradients: a changed foreground damages the shapes whose gradient has
 a foreground stop, and a changed palette those with a palette stop.
+
+**G14 Limits (color-paint story P2, Corey 2026-10-21).** Every double of the geometry of the gradient's kind, every
+entry of its map (the 2x2 linear part and the translation) and every offset is zero or of magnitude in `[2^-64, 2^64]`
+(`GSHSCENE_GRADIENT_VALUE_MIN`, `_MAX`), and there are at most `min(max_resource_elements, 65535)` stops
+(`GSHSCENE_GRADIENT_STOPS_MAX`, COLRv1's `uint16` count). Past either, intern is `ERR_LIMIT`; a non-finite value or
+another invalid field is `ERR_INVALID`, decided first. The bounds are derived from G4 to G9 so that a double evaluation
+stays finite over the **sampling domain**, gradient-space points with both coordinates in `[-2^128, 2^128]`
+(`GSHSCENE_GRADIENT_DOMAIN`):
+
+| Quantity | Bound |
+| --- | --- |
+| an allowed value | a multiple of `2^-116`; a nonzero difference of two in `[2^-116, 2^65]` |
+| G7's denominator `(p1 - p0) . n_d` | at most `2^131`; nonzero, at least `2^-232` (a sum of products of multiples of `2^-116`) |
+| G7's numerator `(p - p0) . n_d` | at most `2^195`, so `|t| <= 2^427` |
+| G8's `a = |c1 - c0|^2 - (r1 - r0)^2` | at most `2^132`; nonzero, at least `2^-232` |
+| G8's `b = (p - c0) . (c1 - c0) + r0 (r1 - r0)`, `c = |p - c0|^2 - r0^2` | at most `2^196` and `2^260` |
+| G8's `b^2 - a c` and, with `a != 0`, the roots `(b +- sqrt(b^2 - a c)) / a` | at most `2^393` and `2^430` |
+| G9's `t = (theta - a0) / (a1 - a0)` | at most `2^181` |
+| G5's `t - o_first`, `P`, `2P`, `(t - o_first) / P` | at most `2^431`, `2^66`, `2^66` (nonzero `P` at least `2^-116`), `2^547` |
+| G4's fraction `(t - o_i) / (o_j - o_i)` | in `[0, 1]` |
+
+With `a = 0`, G8's one root `w = c / 2b` grows without bound only as `b` goes to zero, at the edge of the cone, where a
+sink states what it does. A sink evaluates inside the domain, or refuses the fill as its own limit (S6). The magnitude of
+a color (a solid stop's, the foreground's, a palette entry's) is not bounded here, as N1 bounds no fill's color.
 
 **Recording without floats.** `gshscene_store_intern_gradient_fixed` (fixed.h) takes COLRv1's numbers for a run from a
 font: integer geometry over `2^bits` (linear's rotation point becomes `d = p2 - p0`, a sweep's half turns become `v *

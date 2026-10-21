@@ -217,6 +217,10 @@ TEST(GradientValues, ThePinnedValuesArePinned) {
   EXPECT_EQ(GSHSCENE_FIXED_GRADIENT_SWEEP, (unsigned)GSHSCENE_GRADIENT_SWEEP);
   EXPECT_EQ(sizeof(GSHSCENE_Sink_Caps) % 8u, 0u);
   EXPECT_EQ(GSHSCENE_RESOLVE_TOLERANCE, 1e-13);
+  EXPECT_EQ(GSHSCENE_GRADIENT_VALUE_MAX, 0x1p64);
+  EXPECT_EQ(GSHSCENE_GRADIENT_VALUE_MIN, 0x1p-64);
+  EXPECT_EQ(GSHSCENE_GRADIENT_STOPS_MAX, 65535u);
+  EXPECT_EQ(GSHSCENE_GRADIENT_DOMAIN, 0x1p128);
   EXPECT_STREQ(gshscene_resource_kind_string(GSHSCENE_RESOURCE_GRADIENT), "gradient");
 }
 
@@ -543,6 +547,101 @@ TEST(GradientResource, TheStopCountIsLimitedAndTheBytesAreAccounted) {
   Desc three = two;
   three.stop(2, solid(1, 0, 0, 1));
   EXPECT_EQ(try_intern(small.store, three), GSHSCENE_ERR_LIMIT) << "the store's bytes";
+}
+
+// G14: every geometry double, map entry and offset is zero or of magnitude in [2^-64, 2^64]; each bound interns and
+// one step past it is ERR_LIMIT, in either sign, and a non-finite value is still ERR_INVALID.
+TEST(GradientResource, G14TheValuesAreLimitedAtEachBoundAndOneStepPast) {
+  StoreHolder s;
+  const double big = GSHSCENE_GRADIENT_VALUE_MAX;
+  const double small = GSHSCENE_GRADIENT_VALUE_MIN;
+  const double past_big = std::nextafter(big, INFINITY);
+  const double past_small = std::nextafter(small, 0.0);
+  // Each geometry field of each kind, set alone (the others a legal gradient's).
+  struct Field {
+    Desc base;
+    double * (*at)(Desc &);
+  };
+  std::vector<Field> fields = {
+      {linear(0, 0, 1, 0), [](Desc & d) { return &d.g.p0[0]; }},
+      {linear(0, 0, 1, 0), [](Desc & d) { return &d.g.p0[1]; }},
+      {linear(0, 0, 1, 0), [](Desc & d) { return &d.g.p1[0]; }},
+      {linear(0, 0, 1, 0), [](Desc & d) { return &d.g.p1[1]; }},
+      {linear(0, 0, 1, 0), [](Desc & d) { return &d.g.d[0]; }},
+      {linear(0, 0, 1, 0), [](Desc & d) { return &d.g.d[1]; }},
+      {radial(0, 0, 1, 0, 0, 2), [](Desc & d) { return &d.g.c0[0]; }},
+      {radial(0, 0, 1, 0, 0, 2), [](Desc & d) { return &d.g.c0[1]; }},
+      {radial(0, 0, 1, 0, 0, 2), [](Desc & d) { return &d.g.r0; }},
+      {radial(0, 0, 1, 0, 0, 2), [](Desc & d) { return &d.g.c1[0]; }},
+      {radial(0, 0, 1, 0, 0, 2), [](Desc & d) { return &d.g.c1[1]; }},
+      {radial(0, 0, 1, 0, 0, 2), [](Desc & d) { return &d.g.r1; }},
+      {sweep(0, 0, GSHGEOM_ANGLE_DEGREES, 0, 90), [](Desc & d) { return &d.g.center[0]; }},
+      {sweep(0, 0, GSHGEOM_ANGLE_DEGREES, 0, 90), [](Desc & d) { return &d.g.center[1]; }},
+      {sweep(0, 0, GSHGEOM_ANGLE_DEGREES, 0, 90), [](Desc & d) { return &d.g.a0; }},
+      {sweep(0, 0, GSHGEOM_ANGLE_DEGREES, 0, 90), [](Desc & d) { return &d.g.a1; }},
+  };
+  for (size_t i = 0; i < fields.size(); i++) {
+    for (double sign : {1.0, -1.0}) {
+      for (double v : {big, small, 0.0}) {
+        Desc d = fields[i].base;
+        d.stop(0, solid(0, 0, 0, 1)).stop(1, solid(1, 1, 1, 1));
+        *fields[i].at(d) = sign * v;
+        EXPECT_EQ(try_intern(s.store, d), GSHSCENE_OK) << "field " << i << " at " << sign * v;
+      }
+      for (double v : {past_big, past_small, 0x1p-1074}) {
+        Desc d = fields[i].base;
+        d.stop(0, solid(0, 0, 0, 1)).stop(1, solid(1, 1, 1, 1));
+        *fields[i].at(d) = sign * v;
+        EXPECT_EQ(try_intern(s.store, d), GSHSCENE_ERR_LIMIT) << "field " << i << " at " << sign * v;
+      }
+    }
+    Desc d = fields[i].base;
+    *fields[i].at(d) = kNaN;
+    d.g.p0[1] = d.g.kind == GSHSCENE_GRADIENT_LINEAR && fields[i].at(d) != &d.g.p0[1] ? past_big : d.g.p0[1];
+    EXPECT_EQ(try_intern(s.store, d), GSHSCENE_ERR_INVALID) << "field " << i << ": a NaN is invalid, decided first";
+  }
+  // Each entry of the gradient's map: the linear part and the translation.
+  for (int e = 0; e < 6; e++) {
+    for (double v : {big, -big, small, -small, past_big, -past_small}) {
+      double m[6] = {1, 0, 0, 1, 0, 0};
+      m[e] = v;
+      Desc d = linear(0, 0, 1, 0);
+      d.stop(0, solid(0, 0, 0, 1)).stop(1, solid(1, 1, 1, 1));
+      d.g.map = matrix(m[0], m[1], m[2], m[3], m[4], m[5]);
+      bool ok = v == big || v == -big || v == small || v == -small;
+      EXPECT_EQ(try_intern(s.store, d), ok ? GSHSCENE_OK : GSHSCENE_ERR_LIMIT) << "map entry " << e << " at " << v;
+    }
+  }
+  // Each offset, wherever it sorts.
+  for (double v : {big, -big, small, -small, past_big, -past_big, past_small, -past_small}) {
+    for (int where = 0; where < 3; where++) {
+      Desc d = linear(0, 0, 1, 0);
+      d.stop(where == 0 ? v : 0.5, solid(0, 0, 0, 1)).stop(where == 1 ? v : 0.5, solid(1, 0, 0, 1));
+      d.stop(where == 2 ? v : 0.5, solid(1, 1, 1, 1));
+      bool ok = v == big || v == -big || v == small || v == -small;
+      EXPECT_EQ(try_intern(s.store, d), ok ? GSHSCENE_OK : GSHSCENE_ERR_LIMIT) << "offset " << where << " at " << v;
+    }
+  }
+  GSHSCENE_Store_Stats st;
+  ASSERT_EQ(gshscene_store_stats(s.store, &st), GSHSCENE_OK);
+  EXPECT_EQ(st.live, 0u) << "a refused intern keeps nothing";
+}
+
+// G14: at most 65535 stops whatever the store allows; the bound interns and one more is ERR_LIMIT.
+TEST(GradientResource, G14TheStopsNumberAtMost65535) {
+  StoreHolder s;
+  Desc d = linear(0, 0, 1, 0);
+  for (size_t i = 0; i < GSHSCENE_GRADIENT_STOPS_MAX; i++) {
+    d.stop((double)(i % 7), solid(0, 0, 0, 1));
+  }
+  const GSHSCENE_Resource * r = nullptr;
+  ASSERT_EQ(gshscene_store_intern_gradient(s.store, d.get(), &r), GSHSCENE_OK) << "the bound passes";
+  GSHSCENE_Gradient back;
+  ASSERT_EQ(gshscene_resource_gradient(r, &back), GSHSCENE_OK);
+  EXPECT_EQ(back.stop_count, 65535u);
+  gshscene_resource_release(r);
+  d.stop(3, solid(0, 0, 0, 1));
+  EXPECT_EQ(try_intern(s.store, d), GSHSCENE_ERR_LIMIT) << "one more is refused";
 }
 
 // --- hash and dump against the independent generator ---------------------------------------------------------------
@@ -902,7 +1001,7 @@ TEST(GradientNotice, EachDegenerateCaseAndEachSingularMapIsNamed) {
   EXPECT_EQ(notice(linear(0, 0, 2, 1, -4, -2)), DEG);
   EXPECT_EQ(notice(linear(0, 0, 2, 1, 4, 2.0000000000000004)), NONE) << "an exact test, not a tolerance";
   EXPECT_EQ(notice(linear(0.1, 0.2, 0.30000000000000004, 0.5, 0.2, 0.3)), NONE) << "the doubles, not their decimals";
-  EXPECT_EQ(notice(linear(0, 0, 1e-300, 0)), NONE) << "a tiny line is a line";
+  EXPECT_EQ(notice(linear(0, 0, GSHSCENE_GRADIENT_VALUE_MIN, 0)), NONE) << "the shortest line G14 allows is a line";
   EXPECT_EQ(notice(linear(0, 0, 0, 1, 0, 3)), DEG) << "a vertical line with a vertical isoline";
   EXPECT_EQ(notice(linear(0, 0, 0, 4)), NONE) << "a vertical line is a line";
   EXPECT_EQ(notice(linear(0, 0, 4, 0)), NONE) << "and so is a horizontal one";

@@ -63,6 +63,39 @@ static int all_finite(const double * v, size_t count) {
   return 1;
 }
 
+/* --- G14: the limits ------------------------------------------------------------- */
+
+/** G14: zero, or a magnitude in [GSHSCENE_GRADIENT_VALUE_MIN, GSHSCENE_GRADIENT_VALUE_MAX] (@p x finite). */
+static int within(double x) {
+  double m = x < 0.0 ? -x : x;
+  return m == 0.0 || (m >= GSHSCENE_GRADIENT_VALUE_MIN && m <= GSHSCENE_GRADIENT_VALUE_MAX);
+}
+
+static int all_within(const double * v, size_t count) {
+  for (size_t i = 0; i < count; i++) {
+    if (!within(v[i])) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
+/** G14: whether every double of @p g (canonical: the other kinds' fields are zero) is within the bounds. */
+static int limited(const GSHSCENE_Gradient * g) {
+  const double values[16] = {g->p0[0], g->p0[1], g->p1[0], g->p1[1], g->d[0], g->d[1], g->c0[0], g->c0[1], g->r0,
+      g->c1[0], g->c1[1], g->r1, g->center[0], g->center[1], g->a0, g->a1};
+  const double map[6] = {g->map.m[0][0], g->map.m[0][1], g->map.m[1][0], g->map.m[1][1], g->map.t[0], g->map.t[1]};
+  if (!all_within(values, 16) || !all_within(map, 6)) {
+    return 0;
+  }
+  for (size_t i = 0; i < g->stop_count; i++) {
+    if (!within(g->stops[i].offset)) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
 /* --- the canonical content ------------------------------------------------------- */
 
 /**
@@ -323,8 +356,8 @@ GSHSCENE_Result gshscene_store_intern_gradient(
     return GSHSCENE_ERR_INVALID;
   }
   size_t count = gradient->stop_count;
-  if (count > store->limits.max_resource_elements || count > SIZE_MAX / (2 * sizeof(GSHSCENE_Gradient_Stop))) {
-    return GSHSCENE_ERR_LIMIT;
+  if (count > store->limits.max_resource_elements || count > GSHSCENE_GRADIENT_STOPS_MAX) {
+    return GSHSCENE_ERR_LIMIT; /* G2, G14 */
   }
   GSHSCENE_Gradient_Stop * stops = NULL;
   if (count) {
@@ -336,6 +369,9 @@ GSHSCENE_Result gshscene_store_intern_gradient(
   }
   GSHSCENE_Gradient g;
   GSHSCENE_Result result = canonical(store, gradient, &g, stops);
+  if (result == GSHSCENE_OK && !limited(&g)) {
+    result = GSHSCENE_ERR_LIMIT; /* G14, after every validity check */
+  }
   if (result == GSHSCENE_OK) {
     sort_stops(stops, count ? stops + count : NULL, count);
     GSHSCENE_Probe probe = {GSHSCENE_RESOURCE_GRADIENT, content_hash(&g),
