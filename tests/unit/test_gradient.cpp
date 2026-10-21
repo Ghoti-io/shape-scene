@@ -600,6 +600,12 @@ TEST(GradientResource, G14TheValuesAreLimitedAtEachBoundAndOneStepPast) {
     d.g.p0[1] = d.g.kind == GSHSCENE_GRADIENT_LINEAR && fields[i].at(d) != &d.g.p0[1] ? past_big : d.g.p0[1];
     EXPECT_EQ(try_intern(s.store, d), GSHSCENE_ERR_INVALID) << "field " << i << ": a NaN is invalid, decided first";
   }
+  // A value past a bound in a gradient that is invalid otherwise (a bad extend, read after the geometry) is invalid.
+  {
+    Desc d = linear(past_big, 0, 1, 0);
+    d.g.extend = 7;
+    EXPECT_EQ(try_intern(s.store, d), GSHSCENE_ERR_INVALID) << "invalid is decided before G14";
+  }
   // Each entry of the gradient's map: the linear part and the translation.
   for (int e = 0; e < 6; e++) {
     for (double v : {big, -big, small, -small, past_big, -past_small}) {

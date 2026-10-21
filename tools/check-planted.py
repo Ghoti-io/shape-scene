@@ -193,6 +193,21 @@ changes no result, cannot be seen by any test:
                refuses the same values) and the vectors' rejection margin (no
                sample lies between 1e-300 and 1e-30 of a discontinuity)
 
+  g14-         G14 (color-paint story P2): each bound's comparison (inclusive,
+               missing, either side), the zero exemption, the absolute value,
+               each place a bound is read (the geometry, the map's linear part
+               and its translation, the offsets, the stop count) and the order
+               after the validity checks, and the three constants the library
+               reads.  The sampling domain's constant has no plant here: the
+               library does not read it (shape-cpu does, and plants it).
+               gradient.c was swept again (``bg-``, 365 candidates on the P2
+               tree in ghoti-build:gcc16): 279 caught (they replace the file's
+               entries in scene-plants.json), 58 that do not compile, 28
+               survivors, all of P1's kinds above but two on G14's lines: the
+               limit loop's bound one past the array (ASan's, not a result's) and
+               ``x < 0`` against ``x <= 0`` in the absolute value (zero is
+               exempt either way)
+
   sk-, rp-, ds-, cn-, rule-, and the sink's hdr- and core- plants (story 13a)
                the sink contract: one named plant per S-rule (``rule-S1`` to
                ``rule-S15``, each failing the conformance suite or the contract's
@@ -1699,13 +1714,12 @@ PLANTS += [
     ('g14-zero-refused', 'src', GR, '  return m == 0.0 || (m >= GSHSCENE_GRADIENT_VALUE_MIN', '  return (m >= GSHSCENE_GRADIENT_VALUE_MIN', GT),
     ('g14-negative', 'src', GR, '  double m = x < 0.0 ? -x : x;', '  double m = x;', GT),
     ('g14-geometry-short', 'src', GR, '  if (!all_within(values, 16) || !all_within(map, 6)) {', '  if (!all_within(values, 15) || !all_within(map, 6)) {', GT),
-    ('g14-map-unchecked', 'src', GR, '  if (!all_within(values, 16) || !all_within(map, 6)) {', '  if (!all_within(values, 16)) {', GT),
+    ('g14-map-unchecked', 'src', GR, '  if (!all_within(values, 16) || !all_within(map, 6)) {', '  if (!all_within(values, 16) || !all_within(map, 0)) {', GT),
     ('g14-map-translation', 'src', GR, '  if (!all_within(values, 16) || !all_within(map, 6)) {', '  if (!all_within(values, 16) || !all_within(map, 4)) {', GT),
     ('g14-offsets-unchecked', 'src', GR, '    if (!within(g->stops[i].offset)) {\n      return 0;\n    }\n', '', GT),
     ('g14-h-max', 'hdr', HP, '#define GSHSCENE_GRADIENT_VALUE_MAX 0x1p64', '#define GSHSCENE_GRADIENT_VALUE_MAX 0x1p65', GT),
     ('g14-h-min', 'hdr', HP, '#define GSHSCENE_GRADIENT_VALUE_MIN 0x1p-64', '#define GSHSCENE_GRADIENT_VALUE_MIN 0x1p-63', GT),
     ('g14-h-stops', 'hdr', HP, '#define GSHSCENE_GRADIENT_STOPS_MAX ((size_t)65535)', '#define GSHSCENE_GRADIENT_STOPS_MAX ((size_t)65536)', GT),
-    ('g14-h-domain', 'hdr', HP, '#define GSHSCENE_GRADIENT_DOMAIN 0x1p128', '#define GSHSCENE_GRADIENT_DOMAIN 0x1p127', GT),
     ('gr-bytes', 'src', GR, 'gshscene_sat_mul(count, GSHSCENE_BYTES_PER_STOP)', 'gshscene_sat_mul(count, GSHSCENE_BYTES_PER_COLOR)', GT),
     ('gr-null-stops', 'src', GR, '  if (!store || !gradient || !out || (gradient->stop_count && !gradient->stops)) {', '  if (!store || !gradient || !out) {', GT),
     # the hash, field by field, and equality
