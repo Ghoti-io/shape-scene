@@ -22,7 +22,8 @@
  * @file
  *
  * The kinds of resource: copy, equality, hash and dump of a path, a glyph run,
- * a picture, a face and a palette (resource.h; a gradient's are gradient.c's).
+ * a picture, a face and a palette (resource.h; a gradient's are gradient.c's, a
+ * stroke style's stroke.c's).
  */
 
 #include <ghoti.io/shape-scene/macros.h>
@@ -53,6 +54,8 @@ const char * gshscene_resource_kind_string(GSHSCENE_Resource_Kind kind) {
       return "face";
     case GSHSCENE_RESOURCE_PALETTE:
       return "palette";
+    case GSHSCENE_RESOURCE_STROKE_STYLE:
+      return "stroke-style";
     case GSHSCENE_RESOURCE_KIND_COUNT:
       break;
   }
@@ -259,6 +262,8 @@ int gshscene_resource_matches(const GSHSCENE_Resource * resource, const GSHSCENE
     }
     case GSHSCENE_RESOURCE_GRADIENT:
       return gshscene_gradient_matches(resource, probe->source);
+    case GSHSCENE_RESOURCE_STROKE_STYLE:
+      return gshscene_stroke_matches(resource, probe->source);
     default:
       return 0;
   }
@@ -294,6 +299,9 @@ void gshscene_resource_free_content(GSHSCENE_Resource * resource) {
       break;
     case GSHSCENE_RESOURCE_GRADIENT:
       gshscene_gradient_free(resource);
+      break;
+    case GSHSCENE_RESOURCE_STROKE_STYLE:
+      gshscene_stroke_free(resource);
       break;
     default:
       break;
@@ -841,6 +849,11 @@ GSHSCENE_Result gshscene_resource_dump(const GSHSCENE_Resource * resource, FILE 
     }
     case GSHSCENE_RESOURCE_GRADIENT:
       if (gshscene_gradient_dump(resource, out) < 0) {
+        return GSHSCENE_ERR_IO;
+      }
+      break;
+    case GSHSCENE_RESOURCE_STROKE_STYLE:
+      if (gshscene_stroke_dump(resource, out) < 0) {
         return GSHSCENE_ERR_IO;
       }
       break;

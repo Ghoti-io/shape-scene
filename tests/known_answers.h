@@ -36,6 +36,10 @@ static const std::uint64_t kGradientSceneHash = UINT64_C(0x3abc5c4837c1b04e);
 static const std::uint64_t kBlendListHash = UINT64_C(0xcf6c9a2d69db9773);
 static const std::uint64_t kPdfGroupListHash = UINT64_C(0x90a2275ae4d9c0d1);
 static const std::uint64_t kPdfGroupSceneHash = UINT64_C(0x155057e8d234391d);
+static const std::uint64_t kStrokeDefaultHash = UINT64_C(0xec1048adcb87f83b);
+static const std::uint64_t kStrokeDeviceHash = UINT64_C(0xf6f6bf8e08c31778);
+static const std::uint64_t kStrokeClipHash = UINT64_C(0x299f54062a3730a0);
+static const std::uint64_t kStrokeArcsHash = UINT64_C(0xff4af46904e1496e);
 static const int kSceneBLayer = 20;
 static const double kSceneBTranslate[4][2] = {{4.75, -4.75}, {9.0, -9.0}, {20.5, -20.5}, {23.25, -23.25}};
 
@@ -237,6 +241,28 @@ G id=1 parent=0 flags=0 key=- map=1f5787abb2e02a06 opacity=3ff0000000000000 blen
 G id=2 parent=1 flags=0 key=- map=1f5787abb2e02a06 opacity=3fe0000000000000 blend=0:0:0000000000000000 composite=0 order=0 isolation=1 knockout=1 mask=5949280bf106409b layer=1 depth=4000000000000000 clip=- children=3
 S id=3 parent=2 flags=0 key=- res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=0 3fd0000000000000 3fe0000000000000 3fe8000000000000 3ff0000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=0 depth=0000000000000000
 G id=4 parent=1 flags=0 key=- map=1f5787abb2e02a06 opacity=3ff0000000000000 blend=0:0:0000000000000000 composite=24 order=0 isolation=0 knockout=1 mask=0000000000000000 layer=0 depth=0000000000000000 clip=- children=-
+)DUMP";
+static const char * const kStrokeDefaultDump =
+R"DUMP(gshscene.resource 1 kind=stroke-style hash=ec1048adcb87f83b
+stroke width=3ff0000000000000 space=0 join=0 miter=4010000000000000 cap=0 degenerate=0 align=0 rule=0 scope=0 offset=0000000000000000 dashes=0 profile=0000000000000000
+)DUMP";
+static const char * const kStrokeDeviceDump =
+R"DUMP(gshscene.resource 1 kind=stroke-style hash=f6f6bf8e08c31778
+stroke width=3fe8000000000000 space=1 join=1 miter=4010000000000000 cap=2 degenerate=1 align=1 rule=1 scope=1 offset=bfe0000000000000 dashes=6 profile=0000000000000000
+d 3ff0000000000000
+d 4000000000000000
+d 400c000000000000
+d 3ff0000000000000
+d 4000000000000000
+d 400c000000000000
+)DUMP";
+static const char * const kStrokeClipDump =
+R"DUMP(gshscene.resource 1 kind=stroke-style hash=299f54062a3730a0
+stroke width=0000000000000000 space=0 join=3 miter=4004000000000000 cap=1 degenerate=0 align=0 rule=0 scope=0 offset=0000000000000000 dashes=0 profile=0000000000000000
+)DUMP";
+static const char * const kStrokeArcsDump =
+R"DUMP(gshscene.resource 1 kind=stroke-style hash=ff4af46904e1496e
+stroke width=4008000000000000 space=0 join=4 miter=40f0000000000000 cap=0 degenerate=0 align=2 rule=0 scope=0 offset=0000000000000000 dashes=0 profile=0000000000000000
 )DUMP";
 
 }  // namespace known

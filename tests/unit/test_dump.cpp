@@ -612,6 +612,16 @@ TEST(Dump, EveryWriteOfEveryDumpIsChecked) {
     expect_every_write_checked(gshscene_resource_dump, r, "gradient");
     gshscene_resource_release(r);
   }
+  // A stroke style with dashes (strokes story S1): its line and each dash's.
+  const double dashes[2] = {1.0, 2.5};
+  GSHSCENE_Stroke_Style st;
+  gshscene_stroke_style_init(&st);
+  st.dash_count = 2;
+  st.dashes = dashes;
+  const GSHSCENE_Resource * style = nullptr;
+  ASSERT_EQ(gshscene_store_intern_stroke_style(s.store, &st, &style), GSHSCENE_OK);
+  expect_every_write_checked(gshscene_resource_dump, style, "stroke style");
+  gshscene_resource_release(style);
 }
 #endif
 

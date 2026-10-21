@@ -110,6 +110,10 @@ struct GSHSCENE_Resource {
       uint32_t palette_need;          /* the largest palette entry a stop names, plus one; 0 for none */
       int foreground;                 /* a stop is a foreground paint */
     } gradient;
+    struct {
+      GSHSCENE_Stroke_Style s; /* canonical (SK3); dashes points at the copy below */
+      double * dashes;         /* dash_count of them, NULL for none */
+    } stroke;
   } u;
 };
 
@@ -249,6 +253,17 @@ void gshscene_gradient_free(GSHSCENE_Resource * resource);
 
 /** The payload of a gradient's dump (resource.h); the result of the writes, negative on failure. */
 int gshscene_gradient_dump(const GSHSCENE_Resource * resource, FILE * out);
+
+/* --- stroke.c ---------------------------------------------------------------- */
+
+/** Whether a stroke style resource has the canonical content @p source (a GSHSCENE_Stroke_Style). */
+int gshscene_stroke_matches(const GSHSCENE_Resource * resource, const void * source);
+
+/** Free a stroke style's dashes. */
+void gshscene_stroke_free(GSHSCENE_Resource * resource);
+
+/** The payload of a stroke style's dump (resource.h, SK12); negative on failure. */
+int gshscene_stroke_dump(const GSHSCENE_Resource * resource, FILE * out);
 
 /* --- convert.c -------------------------------------------------------------- */
 

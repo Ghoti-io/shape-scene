@@ -9,7 +9,8 @@ implements the provider in story 14b. Gradients (color-paint story P1: the resou
 conversion of their stops at draw time, the notices of what draws nothing) are implemented scene-side; shape-cpu draws
 them in story P2. Blend modes (color-paint story P3: the fifteen modes of W3C Compositing and Blending Level 1 as
 composite operators 13 to 27, B1 to B14) are implemented scene-side: the scene names, validates, hashes and plans them,
-and a sink composites them.
+and a sink composites them. Strokes (strokes story S1: a centerline plus an interned style, SK1 to SK14, below) are being
+added to the waist; the style resource is implemented.
 
 The shape family waist: resources and lists, and the versioned scene above them.
 
@@ -52,6 +53,11 @@ space, a 2D map into the item's local space, a color line of stops (an offset an
 an extend, an interpolation space and a premultiplied flag, interned by content with its stops sorted stably by offset
 and `-0` stored as `+0`, so equal gradients are one handle and a writer or a GPU sink dedupes them by id. Nothing in it
 is converted: the stops are kept as given and hashed as given, so a better `gmath_pow` changes pixels and never handles.
+
+A stroke style (strokes story S1, SK1 to SK3) is a resource too: a width and its space, a join and its miter limit, a
+cap, what a subpath of zero length draws, a dash array with its offset and scope, an alignment and its fill rule, and a
+reserved width profile, interned in a canonical form (an all-zero or negative dash array is solid, an odd one is
+doubled, a field that does not apply takes its default, `-0` is `+0`), so one drawing is one handle and one hash.
 
 ## Lists
 
@@ -97,7 +103,8 @@ The image resource kind is named and has no constructor; its value is pinned bec
 it a meaning adds a constructor. (The palette paint, refused until story 14c, is N14 below; the gradient paint and
 resource, reserved until color-paint story P1, are G1 to G13.) Also refused with `ERR_UNSUPPORTED` are ProPhoto
 (D50: converting to it needs a chromatic adaptation), the parametric, BT.1886, PQ and HLG transfers and ICC
-profiles.
+profiles, and a stroke style's **width profile** (variable width, D8 of the strokes spec): the slot is a resource
+handle, hashed as `u64` 0 while it is empty, so that defining a profile fills a spelling that already exists.
 
 ## What a scene means: paint, color and composition (normative)
 
@@ -279,6 +286,53 @@ each be a color the author did not state). The one resolution is `gshscene_paint
 palette change is a new parameter, never a re-lowering (AD-23): a theme picks another handle.
 
 **Not decided here.** The other color spaces, the depth predicate for 3D maps, and the merge of adds to one parent.
+
+## Strokes (normative; strokes story S1)
+
+A stroke is a **centerline** (a path or a glyph run) plus an explicit **style**, an interned resource, and a paint
+(Corey, 2026-10-21: no mode flag; the waist carries the centerline and the style, and `shape-geometry` holds the one
+normative expansion into the region a stroke covers). Every difference between the formats that stroke is a field of
+the style with a stated default; a front end sets each field to match its format. In real arithmetic, as N1 to N14.
+`stroke.h` has the same text; tests, plants and `tools/gen-scene-vectors.py` cite the rules by number.
+
+**SK1 The style.** `{width, width_space, join, miter_limit, cap, degenerate, dashes, dash_offset, dash_scope,
+alignment, alignment_rule, width_profile}`, with pinned values (they are hashed): width space `LOCAL 0`, `DEVICE 1`;
+join `MITER 0`, `ROUND 1`, `BEVEL 2` (PDF's `j`, so its lowering is the identity), `MITER_CLIP 3`, `ARCS 4`; cap `BUTT
+0`, `ROUND 1`, `SQUARE 2` (PDF's `J`); degenerate subpath `DRAW 0` (SVG 2's shape, along local `+x`), `OMIT 1`; dash
+scope `PER_SUBPATH 0` (SVG 2), `PATH 1`; alignment `CENTER 0`, `INSIDE 1`, `OUTSIDE 2`; the alignment rule a
+`GSHGEOM_Fill_Rule` (nonzero by default, D10). `gshscene_stroke_style_init` writes the defaults: width 1, local, miter,
+miter limit 4 (SVG's), butt, draw, no dashes, offset 0, per subpath, center, nonzero, no width profile. A zero-filled
+style is not valid (its miter limit 0 is out of range). The miter limit is the ratio of the miter's length to the
+width, `1 / sin(θ / 2)`; past it (strictly greater) a miter becomes a bevel, and a miter-clip or arcs join is clipped at
+`miter_limit * width / 2` from the vertex (SVG 2; `shape-geometry` states it in full). The enumerations' names
+(`GSHSCENE_STROKE_JOIN_MITER`, ...) keep the `STROKE_` infix so that a cap is never read as a capability flag.
+
+**SK2 Validity and bounds.** On the style as given: a non-finite double, an enumeration out of range, a negative
+width or dashes counted but not given are `ERR_INVALID`; a non-NULL width profile is `ERR_UNSUPPORTED` (reserved, D8);
+then `ERR_LIMIT`, decided after every other check: the width 0 or of magnitude in `[2^-64, 2^64]` (G14's band); the
+miter limit in `[1, 2^16]`; each dash (by magnitude, so a negative one too) and the offset 0 or of magnitude in
+`[2^-64, 2^64]`; at most `min(max_resource_elements, 65535)` dashes after an odd array is doubled. The bounds are met
+on the style as given, before SK3 resets a field. Model units range too widely for a `2^16` bound (a scene in microns),
+the band is the one gradients already keep finite, and `2^16 * 2^64` keeps a miter's tip far below `shape-geometry`'s
+`2^100` coordinate limit; a source miter limit above `2^16` is lowered with a stated loss (joins sharper than about
+`2^-15` rad bevel).
+
+**SK3 Canonical form.** The store interns the canonical form, and the hash, the dump, equality and the accessor see
+only it, so equal drawings are one handle and one hash. (a) Dashes (D5): an array with a negative length, or whose
+lengths are all zero, is no dashes (solid); an odd array is repeated once. (b) A field that does not apply takes its
+default: with no dashes the offset 0 and the scope per subpath; with a join other than miter, miter-clip and arcs the
+miter limit 4; with center alignment the rule nonzero. (c) Nothing else is rewritten: the offset is kept as given (not
+reduced modulo the period, which is the dash arithmetic's) and width 0 is kept (SK8). The canonical form is where D5's
+meaning becomes one spelling: if the store kept the arrays as given, a writer, a cache keyed by hash and the diff would
+all see two strokes where the drawing has one.
+
+**SK12 Hash and dump (the style).** Every format stays 1, and no existing hash or dump changes: no resource from before
+strokes is a style. Resource kind 8, format 1: `u32` 1, `u32` 8, `f64` width, `u8` width space, `u8` join, `f64` miter
+limit, `u8` cap, `u8` degenerate, `u8` alignment, `u8` alignment rule, `u8` dash scope, `f64` dash offset, `u64` the
+dash count, `f64` each dash (canonical), `u64` the width profile's content hash (0 for none). The dump's payload is
+`stroke width=<hex> space=N join=N miter=<hex> cap=N degenerate=N align=N rule=N scope=N offset=<hex> dashes=N
+profile=<hash>` and a line `d <hex>` per dash. A style costs `GSHSCENE_BYTES_PER_DASH` (16) accounted bytes a dash.
+`tools/gen-scene-vectors.py` restates the canonical form, the hash and the dump from this text alone.
 
 ## Blend modes (normative; color-paint story P3)
 

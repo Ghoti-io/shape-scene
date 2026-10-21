@@ -23,7 +23,8 @@ test_dump.cpp builds with the API).
 
 The fixtures: a square path, shape-geometry's own fixture path (every verb), a
 face, a glyph run from that face and one from outlines, a palette (story 14c; one
-made from doubles and the same entries from RGBA8), three gradients (color-paint story
+made from doubles and the same entries from RGBA8), four stroke styles (strokes story S1: each put in SK3's
+canonical form by this script's own reading of the text), three gradients (color-paint story
 P1: linear, radial and sweep, with a list of their fills and a scene with a gradient
 shape), a picture, and a list holding every
 kind of item and every paint, with a foreground and a palette, each also in its dump text; and a scene (version.h) holding every kind
@@ -136,9 +137,9 @@ TRANSLATE = map_hash(2, [1, 0, 0, 1], [1.5, -2.25], 1)
 DESIGN = map_hash(2, [2.5, 0, 0, -2.5], [10, 20], 1 | 2 | 8)
 
 # --- resources (resource.h) ----------------------------------------------------
-KIND_PATH, KIND_RUN, KIND_PICTURE, KIND_GRADIENT, KIND_FACE, KIND_PALETTE = 1, 2, 3, 4, 6, 7
+KIND_PATH, KIND_RUN, KIND_PICTURE, KIND_GRADIENT, KIND_FACE, KIND_PALETTE, KIND_STROKE = 1, 2, 3, 4, 6, 7, 8
 KIND_NAME = {KIND_PATH: "path", KIND_RUN: "glyph-run", KIND_PICTURE: "picture", KIND_FACE: "face",
-             KIND_PALETTE: "palette", KIND_GRADIENT: "gradient"}
+             KIND_PALETTE: "palette", KIND_GRADIENT: "gradient", KIND_STROKE: "stroke-style"}
 # The format is per kind (resource.h); every kind's is 1 until the suite's first release.
 RUN_FORMAT = 1
 
@@ -325,6 +326,71 @@ GRAD_SWEEP = gradient(SWEEP, (3.0, -4.0, 90.0, 450.0), IDENTITY,
 GRAD_LINEAR_HASH = gradient_hash(GRAD_LINEAR)
 GRAD_RADIAL_HASH = gradient_hash(GRAD_RADIAL)
 GRAD_SWEEP_HASH = gradient_hash(GRAD_SWEEP)
+
+
+# --- stroke styles (stroke.h, SK1 to SK3, SK12; strokes story S1) ---------------------------------------
+WIDTH_LOCAL, WIDTH_DEVICE = 0, 1
+JOIN_MITER, JOIN_ROUND, JOIN_BEVEL, JOIN_MITER_CLIP, JOIN_ARCS = 0, 1, 2, 3, 4
+CAP_BUTT, CAP_ROUND, CAP_SQUARE = 0, 1, 2
+DEGENERATE_DRAW, DEGENERATE_OMIT = 0, 1
+DASH_PER_SUBPATH, DASH_PATH = 0, 1
+ALIGN_CENTER, ALIGN_INSIDE, ALIGN_OUTSIDE = 0, 1, 2
+RULE_NONZERO, RULE_EVEN_ODD = 0, 1
+
+
+def style(width=1.0, space=WIDTH_LOCAL, join=JOIN_MITER, miter=4.0, cap=CAP_BUTT, degenerate=DEGENERATE_DRAW,
+          dashes=(), offset=0.0, scope=DASH_PER_SUBPATH, align=ALIGN_CENTER, rule=RULE_NONZERO):
+    """A style as given (SK1's defaults), put in SK3's canonical form here, from the text alone."""
+    z = lambda v: 0.0 if v == 0 else v
+    dashes = list(dashes)
+    if any(d < 0 for d in dashes) or all(d == 0 for d in dashes):
+        dashes = []                       # SK3 (a): a negative length, or all zero (or none), is solid
+    elif len(dashes) % 2:
+        dashes = dashes + dashes          # an odd array repeated once
+    dashes = [z(d) for d in dashes]
+    if not dashes:
+        offset, scope = 0.0, DASH_PER_SUBPATH  # (b) the dash fields do not apply
+    if join not in (JOIN_MITER, JOIN_MITER_CLIP, JOIN_ARCS):
+        miter = 4.0                       # (b) the miter limit does not apply
+    if align == ALIGN_CENTER:
+        rule = RULE_NONZERO               # (b) the alignment rule does not apply
+    return dict(width=z(width), space=space, join=join, miter=miter, cap=cap, degenerate=degenerate, dashes=dashes,
+                offset=z(offset), scope=scope, align=align, rule=rule)
+
+
+def style_hash(st):
+    out = u32(1) + u32(KIND_STROKE) + f64(st["width"]) + u8(st["space"]) + u8(st["join"]) + f64(st["miter"])
+    out += u8(st["cap"]) + u8(st["degenerate"]) + u8(st["align"]) + u8(st["rule"]) + u8(st["scope"])
+    out += f64(st["offset"]) + u64(len(st["dashes"])) + b"".join(f64(d) for d in st["dashes"]) + u64(0)
+    return fnv(out)
+
+
+def style_dump(st):
+    hx = lambda v: "%016x" % bits(v)
+    lines = ["gshscene.resource 1 kind=stroke-style hash=%016x" % style_hash(st),
+             "stroke width=%s space=%d join=%d miter=%s cap=%d degenerate=%d align=%d rule=%d scope=%d offset=%s "
+             "dashes=%d profile=%016x" % (hx(st["width"]), st["space"], st["join"], hx(st["miter"]), st["cap"],
+                                         st["degenerate"], st["align"], st["rule"], st["scope"], hx(st["offset"]),
+                                         len(st["dashes"]), 0)]
+    lines += ["d %s" % hx(d) for d in st["dashes"]]
+    return "\n".join(lines) + "\n"
+
+
+# Four styles (test_stroke.cpp builds the same): SK1's defaults; a device width with a round join (its miter limit
+# reset), a square cap, omitted degenerate subpaths, an odd dash array (doubled) with a negative offset (kept) and the
+# path's scope, inside alignment by even-odd; a miter-clip join with an all-zero dash array (solid: offset and scope
+# reset), centered by even-odd (reset), width 0 (kept); an arcs join with a negative dash (solid), outside by nonzero.
+STYLE_DEFAULT = style()
+STYLE_DEVICE = style(width=0.75, space=WIDTH_DEVICE, join=JOIN_ROUND, miter=10.0, cap=CAP_SQUARE,
+                     degenerate=DEGENERATE_OMIT, dashes=(1.0, 2.0, 3.5), offset=-0.5, scope=DASH_PATH,
+                     align=ALIGN_INSIDE, rule=RULE_EVEN_ODD)
+STYLE_CLIP = style(width=-0.0, join=JOIN_MITER_CLIP, miter=2.5, cap=CAP_ROUND, dashes=(0.0, -0.0), offset=5.0,
+                   scope=DASH_PATH, rule=RULE_EVEN_ODD)
+STYLE_ARCS = style(width=3.0, join=JOIN_ARCS, miter=65536.0, dashes=(4.0, -1.0), align=ALIGN_OUTSIDE)
+STYLE_DEFAULT_HASH = style_hash(STYLE_DEFAULT)
+STYLE_DEVICE_HASH = style_hash(STYLE_DEVICE)
+STYLE_CLIP_HASH = style_hash(STYLE_CLIP)
+STYLE_ARCS_HASH = style_hash(STYLE_ARCS)
 
 
 # --- lists (list.h) ---------------------------------------------------------------
@@ -767,7 +833,9 @@ def render():
                     ("kGradientLinearHash", GRAD_LINEAR_HASH), ("kGradientRadialHash", GRAD_RADIAL_HASH),
                     ("kGradientSweepHash", GRAD_SWEEP_HASH), ("kGradientListHash", GRAD_LIST_HASH),
                     ("kGradientSceneHash", GRAD_SCENE_HASH), ("kBlendListHash", BLEND_LIST_HASH),
-                    ("kPdfGroupListHash", PDF_LIST_HASH), ("kPdfGroupSceneHash", PDF_SCENE_HASH)):
+                    ("kPdfGroupListHash", PDF_LIST_HASH), ("kPdfGroupSceneHash", PDF_SCENE_HASH),
+                    ("kStrokeDefaultHash", STYLE_DEFAULT_HASH), ("kStrokeDeviceHash", STYLE_DEVICE_HASH),
+                    ("kStrokeClipHash", STYLE_CLIP_HASH), ("kStrokeArcsHash", STYLE_ARCS_HASH)):
         o.append("static const std::uint64_t %s = UINT64_C(0x%016x);\n" % (name, v))
     o.append("static const int kSceneBLayer = %d;\n" % B_LAYER)
     o.append("static const double kSceneBTranslate[4][2] = {%s};\n" % ", ".join("{%r, %r}" % (t[0], t[1]) for t in B_T))
@@ -793,6 +861,10 @@ def render():
     o.append(cxx_string("kBlendListDump", list_dump(BLEND_LIST_ITEMS)))
     o.append(cxx_string("kPdfGroupListDump", list_dump(PDF_LIST_ITEMS)))
     o.append(cxx_string("kPdfGroupSceneDump", version_dump(PDF_SCENE_NODES)))
+    o.append(cxx_string("kStrokeDefaultDump", style_dump(STYLE_DEFAULT)))
+    o.append(cxx_string("kStrokeDeviceDump", style_dump(STYLE_DEVICE)))
+    o.append(cxx_string("kStrokeClipDump", style_dump(STYLE_CLIP)))
+    o.append(cxx_string("kStrokeArcsDump", style_dump(STYLE_ARCS)))
     o.append("\n}  // namespace known\n\n#endif\n")
     return "".join(o)
 

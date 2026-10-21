@@ -29,9 +29,10 @@
  * A **resource** is a path, a glyph run, a picture (a closed list, frozen),
  * a face (glyph_provider.h: a font's face and variation instance, which a run
  * from a font names), a palette (a table of colors, which a palette paint's
- * entry indexes; paint.h, N14) or a gradient (a color line over a geometry,
- * which a gradient paint names; paint.h, G1 to G13); one further kind, an
- * image, is named and reserved.  A
+ * entry indexes; paint.h, N14), a gradient (a color line over a geometry,
+ * which a gradient paint names; paint.h, G1 to G13) or a stroke style (how a
+ * centerline is stroked: its width, joins, caps, dashes; stroke.h); one further
+ * kind, an image, is named and reserved.  A
  * **store** interns resources: asking it for content it already holds, while a
  * handle to that content is held, returns that handle, so equality of content
  * is equality of pointers within one store.  The store decides by the index
@@ -82,6 +83,11 @@
  *   `u64` the stop count; then per stop, in sorted order, `f64` offset and its
  *   paint as list.h spells a fill's (`u8` kind, four `f64`, a space, `u32`
  *   entry).  The stops are hashed as given: nothing converted is.
+ * - **stroke style** (1): its canonical form (stroke.h, SK3) as SK12 spells it:
+ *   `f64` width, `u8` width space, `u8` join, `f64` miter limit, `u8` cap, `u8`
+ *   degenerate, `u8` alignment, `u8` alignment rule, `u8` dash scope, `f64` dash
+ *   offset, `u64` the dash count, `f64` each dash, `u64` the width profile's
+ *   content hash (0 for none).
  *
  * The hash is of the content, not of the reference to it: a glyph run hashes
  * its face's and its outlines' content hashes, so two stores that were given
@@ -103,7 +109,10 @@
  * extend=E space=<space> premul=N map=<hash> stops=N`, a line of its geometry
  * (`linear p0=<x> <y> p1=<x> <y> d=<x> <y>`, `radial c0=<x> <y> r0=<r> c1=<x> <y>
  * r1=<r>` or `sweep c=<x> <y> unit=U a0=<a> a1=<a>`) and a line `s <offset>
- * paint=K <r> <g> <b> <a> space=<space> entry=E` per stop.
+ * paint=K <r> <g> <b> <a> space=<space> entry=E` per stop; a stroke style is a
+ * line `stroke width=<hex> space=N join=N miter=<hex> cap=N degenerate=N align=N
+ * rule=N scope=N offset=<hex> dashes=N profile=<hash>` and a line `d <hex>` per
+ * dash.
  */
 
 #ifndef GHOTI_IO_GSHSCENE_RESOURCE_H
@@ -135,6 +144,7 @@ typedef enum GSHSCENE_Resource_Kind {
   GSHSCENE_RESOURCE_IMAGE = 5,     ///< Reserved for the raster stories: no constructor yet.
   GSHSCENE_RESOURCE_FACE = 6,      ///< A font's face and variation instance, bound to a glyph path provider (glyph_provider.h).
   GSHSCENE_RESOURCE_PALETTE = 7,   ///< A table of colors, which a palette paint's entry indexes (paint.h, N14).
+  GSHSCENE_RESOURCE_STROKE_STYLE = 8, ///< How a centerline is stroked (stroke.h, SK1 to SK3).
   GSHSCENE_RESOURCE_KIND_COUNT     ///< Closes the enum.
 } GSHSCENE_Resource_Kind;
 
@@ -143,7 +153,7 @@ typedef enum GSHSCENE_Resource_Kind {
  *
  * @param kind The kind, including a value outside the enum.
  * @return A static string, never NULL: "path", "glyph-run", "picture",
- *   "gradient", "image", "face", "palette", or "unknown resource kind".
+ *   "gradient", "image", "face", "palette", "stroke-style", or "unknown resource kind".
  */
 GSHSCENE_API const char * gshscene_resource_kind_string(GSHSCENE_Resource_Kind kind);
 
@@ -197,7 +207,8 @@ typedef struct GSHSCENE_Glyph_Run {
  * for a glyph run the per-glyph figure for each glyph, and for a picture the
  * per-item figure for each item of its list, for a face the per-axis
  * figure for each coordinate, for a palette the per-color figure for each
- * entry, and for a gradient the per-stop figure for each stop.  What a resource holds by handle (a run's face,
+ * entry, for a gradient the per-stop figure for each stop, and for a stroke style the per-dash figure for each dash
+ * of its canonical array.  What a resource holds by handle (a run's face,
  * a glyph's outline, an instanced picture) is a resource of its own and is
  * counted there.  An intern that would pass the limit is
  * ::GSHSCENE_ERR_LIMIT and builds and keeps nothing; a hit costs nothing; the
@@ -211,6 +222,7 @@ typedef struct GSHSCENE_Glyph_Run {
 #define GSHSCENE_BYTES_PER_AXIS ((size_t)8)      ///< Added for each variation coordinate of a face.
 #define GSHSCENE_BYTES_PER_COLOR ((size_t)48)    ///< Added for each entry of a palette.
 #define GSHSCENE_BYTES_PER_STOP ((size_t)96)     ///< Added for each stop of a gradient.
+#define GSHSCENE_BYTES_PER_DASH ((size_t)16)     ///< Added for each dash of a stroke style's canonical array (SK12).
 /** @} */
 
 /** @brief Counters of a store, for tests and diagnostics. */

@@ -43,6 +43,7 @@
 #include <ghoti.io/shape-scene/resource.h>
 #include <ghoti.io/shape-scene/scene.h>
 #include <ghoti.io/shape-scene/sink.h>
+#include <ghoti.io/shape-scene/stroke.h>
 #include <ghoti.io/shape-scene/types.h>
 #include <ghoti.io/shape-scene/version.h>
 
