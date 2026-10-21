@@ -1748,7 +1748,9 @@ static void op(S * s, unsigned code) {
         if (past) {
           CHECK(r != GSHSCENE_OK);
         } else {
-          CHECK(r != GSHSCENE_ERR_LIMIT || gshscene_list_count(s->list) >= lim->max_list_items);
+          /* Not past N1's bound: a limit is the list's own, its items or its expansion (as list_after says). */
+          CHECK(r != GSHSCENE_ERR_LIMIT || gshscene_list_count(s->list) >= lim->max_list_items ||
+                gshscene_list_expansion(s->list) + 1 > lim->max_expansion);
         }
         if (r != GSHSCENE_OK) {
           CHECK(gshscene_list_count(s->list) == b.count && gshscene_list_expansion(s->list) == b.expansion);

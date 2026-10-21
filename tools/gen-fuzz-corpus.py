@@ -222,6 +222,18 @@ def scripted():
     seq = bytearray([0xFF, 0xFF]) + bytes([OP["LIST_CREATE"], OP["CLOSE"], OP["FREEZE"], 0, OP["LIST_CREATE"],
                                            OP["INSTANCE"], 0, 0])
     out["scripted-instance-picture.bin"] = bytes(seq)
+    # Found by strokes story S1's libFuzzer run: a fill at N1's bound in a list whose expansion was at its limit, which
+    # the color-bound op's check took for a past value (the limit was the list's own).
+    out["regression-fill-at-the-expansion-limit.bin"] = base64.b64decode(
+        "DoEB6sekMh674RIT4sKMJ6F6h3LIVP9NGQzMjfHFAVqKzSYS6ywzWshc8eGAShPF3ZrhE2jTq+xZZqikG8KioBrzKzqshSF27Y9UDk5NSionddkd"
+        "78lOLWCck9UTBDsbQcLke+0HMtqwD3qSNicjvXJCmasGiyZNrKL4+Pj4+Pj4+Pj4//9QkAASPDWMvbyVsbMENWisGft2eWBrZiQjP4dsT8wD6ATg"
+        "gYKphMosEmFRFZt8ERopJ1MQ8ckpDkNYXf//EQAEEQEEJwACAQAEAScB////////////////////////////////////////////////////////"
+        "/////////////////////////////////////////////////////////////////////////////////////////////////////////wQAAQQC"
+        "GgD6KrHaqqKEUMS1zBrhqLAci9QyRJq0polEE7/qCDTxvy63dBP9r5bQmQLZVV3SPRIBb3CssId5+sDpzikXNNg4fEV/n72zUFSkAQWsIF8GTspf"
+        "Qy7ZoEoTq1FD13hJcVscjhqMbZSb9UfzOGd0TQHSIiiPChISSAWEOdqqooRQxLXMGuGosByL1DJEmrSmiUQTv+oINPG/Lrd0E/2vltCZAtlVXdI9"
+        "EgFvcKywh3n6wOnOKRc02Dh8RX+fvbNQVKQBBawgXwZOyl9DLtmgShOrUUPXeElxWxyOGoxtlJv1R/M4Z3RNAdIiKI8KEhJIBYQ5AXFwhGkUKb3Y"
+        "cCxx14eJGfBlhZyAFHE0OyKqBhPjLcD5PSc/odkiOGChsDE+PdAW17XyuUM9gIQBe0ftPMdVRyrgcmScvAFxcIRpFCm92HAscdeHiRnwZYWcgBRx"
+        "NDsiqgYT4y3A+T0nP6HZIjhgobAxPj3QFte18rlDPYCEAXtH7TzHVUcq4HJknLw0kBJvXyZniNJVwBprjRDQLNjyudE=")
     # Found by story 16's libFuzzer soak: an instance of its own parent group, entered first as another instance's
     # target, which publish answered with ERR_INTERNAL instead of a cycle problem.
     out["regression-cycle-entered-through-an-instance.bin"] = base64.b64decode(
