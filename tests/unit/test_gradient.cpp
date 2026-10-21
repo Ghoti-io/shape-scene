@@ -17,7 +17,7 @@
 #include "../glyph_test_provider.h"
 #include "../gradient_vectors.h"
 #include "../known_answers.h"
-#include "../ref_composite.h"
+#include "ref_composite.h"
 #include "../scene_fixtures.h"
 #include "../scene_helpers.h"
 
@@ -384,7 +384,7 @@ TEST(GradientResource, APlantedCollisionNeverMergesUnequalGradients) {
   // Equality alone tells each field apart, the geometry of every kind and the unit included.
   std::vector<Ref> held;
   std::vector<const GSHSCENE_Resource *> seen = {a.get(), b.get(), c.get(), d.get()};
-  for (int field = 0; field < 22; field++) {
+  for (int field = 0; field < 23; field++) {
     Desc v = field < 6 ? gen_linear() : field < 12 ? gen_radial() : field < 17 ? gen_sweep() : gen_linear();
     switch (field) {
       case 0: v.g.p0[0] += 1; break;
@@ -409,6 +409,7 @@ TEST(GradientResource, APlantedCollisionNeverMergesUnequalGradients) {
       case 19: v.g.space = srgb(); break;
       case 20: v.g.map = translate(1.5, 2.25); break;
       case 21: v.stops[3].offset = 0.875; break;
+      case 22: v.stops[3].color.space = linear_srgb_space(); break;
     }
     held.emplace_back(intern_g(s.store, v));
     for (const GSHSCENE_Resource * other : seen) {
@@ -487,6 +488,13 @@ TEST(GradientResource, EveryRuleIsCheckedAndAFailureKeepsNothing) {
   bad([](Desc & d) { d.stops[1].offset = kNaN; }, INV, "a NaN offset");
   bad([](Desc & d) { d.stops[1].offset = kInf; }, INV, "an infinite offset");
   bad([](Desc & d) { d.stops[1].color.kind = GSHSCENE_PAINT_GRADIENT; }, INV, "a gradient stop");
+  {
+    // A stop is never a gradient, not even one of this store that a fill could paint with.
+    Ref other(intern_g(s.store, gen_radial()));
+    Desc d = gen_linear();
+    d.stops[1].color = gradient_paint(other.get(), 1.0);
+    EXPECT_EQ(try_intern(s.store, d), INV) << "a stop naming a gradient";
+  }
   bad([](Desc & d) { d.stops[1].color.kind = (GSHSCENE_Paint_Kind)9; }, INV, "a stop of no kind");
   bad([](Desc & d) { d.stops[1].color.rgba[0] = 0.5; }, INV, "a foreground stop's color is the foreground's");
   bad([](Desc & d) { d.stops[2].color.entry = 0xFFFFu; }, INV, "0xFFFF is never an entry");
@@ -896,6 +904,8 @@ TEST(GradientNotice, EachDegenerateCaseAndEachSingularMapIsNamed) {
   EXPECT_EQ(notice(linear(0.1, 0.2, 0.30000000000000004, 0.5, 0.2, 0.3)), NONE) << "the doubles, not their decimals";
   EXPECT_EQ(notice(linear(0, 0, 1e-300, 0)), NONE) << "a tiny line is a line";
   EXPECT_EQ(notice(linear(0, 0, 0, 1, 0, 3)), DEG) << "a vertical line with a vertical isoline";
+  EXPECT_EQ(notice(linear(0, 0, 0, 4)), NONE) << "a vertical line is a line";
+  EXPECT_EQ(notice(linear(0, 0, 4, 0)), NONE) << "and so is a horizontal one";
   // G8: equal circles, whatever the radius; a strip (equal radii, distinct centers) and a point circle are not.
   EXPECT_EQ(notice(radial(1, 1, 2, 1, 1, 2)), DEG);
   EXPECT_EQ(notice(radial(1, 1, 0, 1, 1, 0)), DEG);
@@ -1242,6 +1252,47 @@ TEST(GradientPlan, AGroupMapOfZeroScaleInAVersionIsANoticeOnItsEmittedFills) {
   }
   ASSERT_EQ(gshscene_report_resolve(r.report, v.get(), index, &node, path, 4, &count), GSHSCENE_OK);
   EXPECT_EQ(node, 3u) << "the shape inside the flattened group";
+}
+
+TEST(GradientPlan, APaletteStopOfEntryZeroIsMissingWithoutAPalette) {
+  StoreHolder s;
+  Ref sq(intern_square(s.store));
+  Desc d = linear(0, 0, 8, 0);
+  d.stop(0, entry_paint(0, 1.0)).stop(1, solid(1, 1, 1, 1));
+  Ref g(intern_g(s.store, d));
+  ListHolder l(s.store);
+  GSHSCENE_Paint p = gradient_paint(g.get(), 1.0);
+  ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
+  Render r(full_config());
+  EXPECT_EQ(r.run(l.list), GSHSCENE_OK);
+  auto refused = r.entries(GSHSCENE_ENTRY_REFUSED);
+  ASSERT_EQ(refused.size(), 1u);
+  EXPECT_EQ(refused[0].reason, GSHSCENE_REASON_PALETTE_ENTRY);
+}
+
+TEST(GradientPlan, AGradientOnlyInAPictureIsResolved) {
+  // The test sink sizes its room for gradients over the pictures too: a list whose only gradient fill is inside an
+  // instanced picture.
+  StoreHolder s;
+  Ref sq(intern_square(s.store));
+  Desc d = linear(0, 0, 8, 0);
+  d.stop(0, solid(0, 0, 0, 1)).stop(0.5, solid(0, 1, 0, 1)).stop(1, solid(1, 1, 1, 1));
+  Ref g(intern_g(s.store, d));
+  ListHolder inner(s.store);
+  GSHSCENE_Paint p = gradient_paint(g.get(), 1.0);
+  ASSERT_EQ(gshscene_list_fill(inner.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(inner.list), GSHSCENE_OK);
+  const GSHSCENE_Resource * pic = nullptr;
+  ASSERT_EQ(gshscene_store_intern_picture(s.store, inner.list, &pic), GSHSCENE_OK);
+  Ref picture(pic);
+  ListHolder l(s.store);
+  ASSERT_EQ(gshscene_list_instance(l.list, picture.get(), nullptr, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
+  Render r(full_config());
+  ASSERT_EQ(r.run(l.list), GSHSCENE_OK);
+  EXPECT_EQ(count_of(r.dump, "\nR "), 1u);
+  EXPECT_EQ(count_of(r.dump, "\nr "), 3u);
 }
 
 TEST(GradientPlan, TheTestSinkWritesEachGradientOnceWithItsResolvedStops) {

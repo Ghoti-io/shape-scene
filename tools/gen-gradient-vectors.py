@@ -84,6 +84,7 @@ GRADIENTS = [
     ("rad_strip", RADIAL, (0, 0, 2, 8, 0, 2), 0, S3),            # equal radii: a strip
     ("rad_negative", RADIAL, (0, 0, -1, 4, 0, 1), 0, S2),        # a negative radius (COLRv1, variations)
     ("rad_focal", RADIAL, (3, 1, 0, 0, 0, 6), 0, STRANS),        # a zero start radius: SVG's focal point
+    ("rad_concentric", RADIAL, (2, 1, 1, 2, 1, 7), 0, SEQ),      # one center: SVG's and CSS's common case
     ("sw_deg", SWEEP, (1, 1, 0, 360), DEGREES, S3),
     ("sw_rad", SWEEP, (0, 0, 0.5, 2.5), RADIANS, SEQ),
     ("sw_turn", SWEEP, (-2, 3, 0.125, 0.625), TURNS, S2),
@@ -180,7 +181,7 @@ def cases():
 
 SPACES = [(1, 2, 0.0), (1, 1, 0.0), (3, 2, 0.0), (3, 3, 2.2), (2, 3, 2.19921875), (4, 1, 0.0)]
 COLORS = [(0.0, 0.0, 0.0), (1.0, 1.0, 1.0), (0.25, 0.5, 0.75), (0.03125, 0.001, 0.9), (1.25, -0.125, 0.5),
-          (0.5, 0.5, 0.5), (0.0402, 0.00312, 0.0031)]  # the last between each knee and a nearby constant
+          (0.5, 0.5, 0.5), (0.04043, 0.003125, 0.0031)]  # the last just below each sRGB knee
 
 
 def resolve_cases():

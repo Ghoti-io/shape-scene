@@ -640,6 +640,11 @@ def selftest():
     for (qx, qy), t in (((5, 1), F(0)), ((1, 5), F(1, 4)), ((-3, 1), F(1, 2)), ((1, -2), F(3, 4))):
         res = evaluate(dict(sweep, q=(qx, qy)))
         check(res["t"] == t and res["exact"], "the quarter turn at (%s, %s)" % (qx, qy))
+    # a0 = a1 under pad is a step: the first stop below a0, the last at and above it (exactly at a0 on an axis).
+    step = dict(sweep, geom=(F(0), F(0), F(90), F(90)), stops=[(0.0, (1, 0, 0, 1)), (1.0, (0, 0, 1, 1))])
+    check(evaluate(dict(step, q=(0, 3)))["rgba"] == [0, 0, 1, 1], "a0 = a1: the last stop at a0")
+    check(evaluate(dict(step, q=(3, 1)))["rgba"] == [1, 0, 0, 1], "a0 = a1: the first stop below a0")
+    check(evaluate(dict(step, q=(-3, 1)))["rgba"] == [0, 0, 1, 1], "a0 = a1: the last stop above a0")
     for unit, per in ((GRADIANS, 400), (TURNS, 1)):
         res = evaluate(dict(sweep, unit=unit, geom=(F(1), F(1), F(0), F(per)), q=(1, 5)))
         check(res["t"] == F(1, 4), "a quarter turn in unit %d" % unit)
