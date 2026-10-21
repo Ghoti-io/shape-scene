@@ -785,6 +785,36 @@ const char * gshscene_composite_string(GSHSCENE_Composite op) {
       return "xor";
     case GSHSCENE_COMPOSITE_PLUS:
       return "plus";
+    case GSHSCENE_COMPOSITE_SCREEN:
+      return "screen";
+    case GSHSCENE_COMPOSITE_OVERLAY:
+      return "overlay";
+    case GSHSCENE_COMPOSITE_DARKEN:
+      return "darken";
+    case GSHSCENE_COMPOSITE_LIGHTEN:
+      return "lighten";
+    case GSHSCENE_COMPOSITE_COLOR_DODGE:
+      return "color-dodge";
+    case GSHSCENE_COMPOSITE_COLOR_BURN:
+      return "color-burn";
+    case GSHSCENE_COMPOSITE_HARD_LIGHT:
+      return "hard-light";
+    case GSHSCENE_COMPOSITE_SOFT_LIGHT:
+      return "soft-light";
+    case GSHSCENE_COMPOSITE_DIFFERENCE:
+      return "difference";
+    case GSHSCENE_COMPOSITE_EXCLUSION:
+      return "exclusion";
+    case GSHSCENE_COMPOSITE_MULTIPLY:
+      return "multiply";
+    case GSHSCENE_COMPOSITE_HUE:
+      return "hue";
+    case GSHSCENE_COMPOSITE_SATURATION:
+      return "saturation";
+    case GSHSCENE_COMPOSITE_COLOR:
+      return "color";
+    case GSHSCENE_COMPOSITE_LUMINOSITY:
+      return "luminosity";
     case GSHSCENE_COMPOSITE_COUNT:
       break;
   }

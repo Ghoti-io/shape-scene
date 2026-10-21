@@ -107,6 +107,13 @@ int main(void) {
     failed |= check(gshscene_list_group_push(list, &half, 1, 0), "group");
     failed |= check(gshscene_list_instance(list, badge_picture, &place, 1, 2.0), "instance");
     failed |= check(gshscene_list_fill(list, text, &place, GSHGEOM_FILL_NONZERO, &ink, 2, 3.0), "text");
+    /* A per-draw blend mode (CSS mix-blend-mode, Canvas globalCompositeOperation) is a group of one (D4, B4): the
+     * multiply is evaluated in the enclosing layer's space, then composited source-over. */
+    GSHSCENE_Group multiply = {.opacity = 1.0, .composite = GSHSCENE_COMPOSITE_MULTIPLY};
+    failed |= check(gshscene_list_group_push(list, &multiply, 4, 1.0), "blend group");
+    failed |= check(gshscene_list_fill(list, square, &place, GSHGEOM_FILL_NONZERO, &blue, 0, 0), "blended fill");
+    failed |= check(gshscene_list_group_pop(list), "blend group pop");
+    printf("a group of one blends by %s\n", gshscene_composite_string(GSHSCENE_COMPOSITE_MULTIPLY));
     failed |= check(gshscene_list_group_pop(list), "group pop");
     failed |= check(gshscene_list_clip_pop(list), "clip pop");
     failed |= check(gshscene_list_close(list), "close");

@@ -33,6 +33,7 @@ static const std::uint64_t kGradientRadialHash = UINT64_C(0x45a40341b6741076);
 static const std::uint64_t kGradientSweepHash = UINT64_C(0x91e9d5ee628077be);
 static const std::uint64_t kGradientListHash = UINT64_C(0x40244174011182f3);
 static const std::uint64_t kGradientSceneHash = UINT64_C(0x3abc5c4837c1b04e);
+static const std::uint64_t kBlendListHash = UINT64_C(0xcf6c9a2d69db9773);
 static const int kSceneBLayer = 20;
 static const double kSceneBTranslate[4][2] = {{4.75, -4.75}, {9.0, -9.0}, {20.5, -20.5}, {23.25, -23.25}};
 
@@ -198,6 +199,20 @@ static const char * const kGradientSceneDump =
 R"DUMP(gshscene.version 1 nodes=2 root=1 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=3abc5c4837c1b04e
 G id=1 parent=0 flags=0 key=- map=1f5787abb2e02a06 opacity=3ff0000000000000 blend=0:0:0000000000000000 composite=0 order=0 layer=0 depth=0000000000000000 clip=- children=2
 S id=2 parent=1 flags=0 key=- res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=1 0000000000000000 0000000000000000 0000000000000000 3fe0000000000000 space=0:0:0000000000000000 entry=0 gradient=45a40341b6741076 layer=0 depth=0000000000000000
+)DUMP";
+static const char * const kBlendListDump =
+R"DUMP(gshscene.list 1 items=11 ties=0 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=cf6c9a2d69db9773
+F res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=0 3fd0000000000000 3fe0000000000000 3fe8000000000000 3ff0000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=0 depth=0000000000000000
+G opacity=3fe0000000000000 blend=0:0:0000000000000000 composite=13 order=0 layer=0 depth=0000000000000000
+F res=path:0a107c56241f4b98 map=d242bc481e41cf7c rule=1 paint=0 3ff0000000000000 0000000000000000 3fe0000000000000 3fe8000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=0 depth=0000000000000000
+g
+G opacity=3ff0000000000000 blend=1:1:0000000000000000 composite=27 order=0 layer=3 depth=bff0000000000000
+G opacity=3fd0000000000000 blend=0:0:0000000000000000 composite=20 order=0 layer=2 depth=3ff0000000000000
+F res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=0 bfe0000000000000 3ff8000000000000 3fe0000000000000 3fe0000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=0 depth=0000000000000000
+g
+g
+G opacity=3ff0000000000000 blend=0:0:0000000000000000 composite=23 order=0 layer=0 depth=0000000000000000
+g
 )DUMP";
 
 }  // namespace known

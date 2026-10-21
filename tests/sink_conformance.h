@@ -2241,4 +2241,136 @@ TEST_P(SinkConformance, N1_ValuesPastTheSaturationMeanTheSameOnEverySink) {
   }
 }
 
+// B13 (color-paint story P3): a blend mode the caps claim is composited with no entry; one they do not is refused by the
+// planning pass (COMPOSITE), and strict leaves the target untouched.  Never drawn as another mode.
+TEST_P(SinkConformance, B13_EachBlendModeIsCompositedOrRefusedBeforeDrawing) {
+  int claimed = 0, refused = 0;
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    if (!(caps.item_kinds & (1u << GSHSCENE_ITEM_GROUP_PUSH))) {
+      continue;
+    }
+    for (uint32_t mode = GSHSCENE_COMPOSITE_SCREEN; mode <= GSHSCENE_COMPOSITE_LUMINOSITY; mode++) {
+      GSHSCENE_List * l = s.open();
+      GSHSCENE_Paint back = solid(0.25, 0.5, 0.75, 1.0);
+      GSHSCENE_Paint src = solid(1.0, 0.25, 0.5, 0.75);
+      GSHSCENE_Group g{};
+      g.opacity = 1.0;
+      g.composite = mode;
+      EXPECT_EQ(gshscene_list_fill(l, s.sq(2, 2, 12), nullptr, GSHGEOM_FILL_NONZERO, &back, 0, 0.0), GSHSCENE_OK);
+      EXPECT_EQ(gshscene_list_group_push(l, &g, 0, 0.0), GSHSCENE_OK);
+      EXPECT_EQ(gshscene_list_fill(l, s.sq(6, 6, 12), nullptr, GSHGEOM_FILL_NONZERO, &src, 0, 0.0), GSHSCENE_OK);
+      EXPECT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);
+      EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+      bool claims = (caps.composites >> mode) & 1u;
+      auto out = make_surface(kind);
+      ReportRef r;
+      EXPECT_EQ(run(f(), sink.sink, request_for(l, *out, r.report)).result, GSHSCENE_OK) << mode;
+      int composite_refusals = 0;
+      for (const auto & x : entries(r.report)) {
+        if (x.entry_class == GSHSCENE_ENTRY_REFUSED && x.reason == GSHSCENE_REASON_COMPOSITE) {
+          composite_refusals++;
+          ASSERT_EQ(x.chain_count, 1u);
+          EXPECT_EQ(x.chain[0], 1u) << "the group push is refused";
+        }
+      }
+      EXPECT_EQ(composite_refusals, claims ? 0 : 1) << gshscene_composite_string((GSHSCENE_Composite)mode);
+      if (claims) {
+        claimed++;
+        continue;
+      }
+      refused++;
+      auto strict = make_surface(kind);
+      uint64_t before = strict->snapshot();
+      ReportRef sr;
+      GSHSCENE_Render_Request req = request_for(l, *strict, sr.report);
+      req.flags = GSHSCENE_RENDER_STRICT;
+      EXPECT_EQ(run(f(), sink.sink, req).result, GSHSCENE_ERR_REFUSED) << mode;
+      EXPECT_EQ(strict->snapshot(), before) << "strict with an unclaimed blend mode touched the target";
+    }
+  }
+  if (claimed + refused == 0) {
+    GTEST_SKIP() << "the sink draws no group";
+  }
+}
+
+// B7, B8, B3 on every sink: pairs of lists of one structure that mean the same exactly (opaque inputs, whole pixels), so
+// a sink that claims the modes draws the same pixels for each pair.
+TEST_P(SinkConformance, B7_TheIdentitiesOfTheModesHoldOnEverySink) {
+  struct Pair {
+    const char * name;
+    uint32_t mode_a;
+    double back_a[3], src_a[4];
+    uint32_t mode_b;
+    double back_b[3], src_b[4];
+  };
+  const double A[3] = {0.25, 0.5, 0.75}, B[3] = {0.875, 0.125, 0.5};
+  const Pair pairs[] = {
+      {"multiply by white is the backdrop", GSHSCENE_COMPOSITE_MULTIPLY, {A[0], A[1], A[2]}, {1, 1, 1, 1},
+       GSHSCENE_COMPOSITE_SRC_OVER, {A[0], A[1], A[2]}, {0, 0, 0, 0}},
+      {"screen by black is the backdrop", GSHSCENE_COMPOSITE_SCREEN, {A[0], A[1], A[2]}, {0, 0, 0, 1},
+       GSHSCENE_COMPOSITE_SRC_OVER, {A[0], A[1], A[2]}, {0, 0, 0, 0}},
+      {"darken by white is the backdrop", GSHSCENE_COMPOSITE_DARKEN, {A[0], A[1], A[2]}, {1, 1, 1, 1},
+       GSHSCENE_COMPOSITE_SRC_OVER, {A[0], A[1], A[2]}, {0, 0, 0, 0}},
+      {"lighten by black is the backdrop", GSHSCENE_COMPOSITE_LIGHTEN, {A[0], A[1], A[2]}, {0, 0, 0, 1},
+       GSHSCENE_COMPOSITE_SRC_OVER, {A[0], A[1], A[2]}, {0, 0, 0, 0}},
+      {"difference with black is the backdrop", GSHSCENE_COMPOSITE_DIFFERENCE, {A[0], A[1], A[2]}, {0, 0, 0, 1},
+       GSHSCENE_COMPOSITE_SRC_OVER, {A[0], A[1], A[2]}, {0, 0, 0, 0}},
+      {"exclusion with black is the backdrop", GSHSCENE_COMPOSITE_EXCLUSION, {A[0], A[1], A[2]}, {0, 0, 0, 1},
+       GSHSCENE_COMPOSITE_SRC_OVER, {A[0], A[1], A[2]}, {0, 0, 0, 0}},
+      {"overlay is hard-light exchanged", GSHSCENE_COMPOSITE_OVERLAY, {A[0], A[1], A[2]}, {B[0], B[1], B[2], 1},
+       GSHSCENE_COMPOSITE_HARD_LIGHT, {B[0], B[1], B[2]}, {A[0], A[1], A[2], 1}},
+      {"luminosity is color exchanged", GSHSCENE_COMPOSITE_LUMINOSITY, {A[0], A[1], A[2]}, {B[0], B[1], B[2], 1},
+       GSHSCENE_COMPOSITE_COLOR, {B[0], B[1], B[2]}, {A[0], A[1], A[2], 1}},
+      {"an empty source leaves the backdrop (B3)", GSHSCENE_COMPOSITE_COLOR_BURN, {A[0], A[1], A[2]}, {B[0], B[1], B[2], 0},
+       GSHSCENE_COMPOSITE_SRC_OVER, {A[0], A[1], A[2]}, {0, 0, 0, 0}},
+  };
+  int compared = 0;
+  for (uint32_t kind : f()->kinds) {
+    if (!gshscene_target_kind_has_pixels((GSHSCENE_Target_Kind)kind)) {
+      continue;
+    }
+    SinkRef sink(make());
+    Scene s;
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *make_surface(kind));
+    for (const Pair & p : pairs) {
+      if (!((caps.composites >> p.mode_a) & (caps.composites >> p.mode_b) & 1u)) {
+        continue;
+      }
+      auto draw = [&](uint32_t mode, const double * back, const double * src, bool * clean) {
+        GSHSCENE_List * l = s.open();
+        GSHSCENE_Paint pb = solid(back[0], back[1], back[2], 1.0);
+        GSHSCENE_Paint ps = solid(src[0], src[1], src[2], src[3]);
+        GSHSCENE_Group g{};
+        g.opacity = 1.0;
+        g.composite = mode;
+        EXPECT_EQ(gshscene_list_fill(l, s.sq(2, 2, 12), nullptr, GSHGEOM_FILL_NONZERO, &pb, 0, 0.0), GSHSCENE_OK);
+        EXPECT_EQ(gshscene_list_group_push(l, &g, 0, 0.0), GSHSCENE_OK);
+        EXPECT_EQ(gshscene_list_fill(l, s.sq(6, 6, 12), nullptr, GSHGEOM_FILL_NONZERO, &ps, 0, 0.0), GSHSCENE_OK);
+        EXPECT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);
+        EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+        auto out = make_surface(kind);
+        ReportRef r;
+        EXPECT_EQ(run(f(), sink.sink, request_for(l, *out, r.report)).result, GSHSCENE_OK) << p.name;
+        *clean = gshscene_report_count(r.report) == 0;
+        return out->snapshot();
+      };
+      bool ca = false, cb = false;
+      uint64_t a = draw(p.mode_a, p.back_a, p.src_a, &ca);
+      uint64_t b = draw(p.mode_b, p.back_b, p.src_b, &cb);
+      if (!ca || !cb) {
+        continue;
+      }
+      EXPECT_EQ(a, b) << p.name;
+      compared++;
+    }
+  }
+  if (compared == 0) {
+    GTEST_SKIP() << "no pixel target, or no blend mode claimed";
+  }
+}
+
 #endif /* GHOTI_IO_GSHSCENE_TEST_SINK_CONFORMANCE_H */

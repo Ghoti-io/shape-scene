@@ -43,13 +43,16 @@ GSHSCENE_Sink * make_full_limited(const GSHSCENE_Allocator * alloc, unsigned lev
   return make_with(c, alloc, nullptr);
 }
 
-/** A sink that refuses glyphs from a font, XOR and radial gradients, clips without antialiasing, blends and
- *  interpolates only in the target's space, has no readback, no caller memory and no prepare. */
+/** A sink that refuses glyphs from a font, XOR, the non-separable blend modes and radial gradients, clips without
+ *  antialiasing, blends and interpolates only in the target's space, has no readback, no caller memory and no prepare. */
 GSHSCENE_Dump_Sink_Config config_narrow() {
   GSHSCENE_Dump_Sink_Config c = config_default();
   for (GSHSCENE_Sink_Caps * caps : {&c.raster_caps, &c.stream_caps}) {
     caps->flags = GSHSCENE_CAP_CAN_BLOCK;
     caps->composites &= ~(1u << GSHSCENE_COMPOSITE_XOR);
+    for (uint32_t mode = GSHSCENE_COMPOSITE_HUE; mode <= GSHSCENE_COMPOSITE_LUMINOSITY; mode++) {
+      caps->composites &= ~(1u << mode); /* B13: a sink of the separable modes only refuses the other four */
+    }
     caps->gradient_kinds &= ~(1u << GSHSCENE_GRADIENT_RADIAL);
   }
   return c;
@@ -749,7 +752,7 @@ TEST(DumpSink, TheConfigurationIsValidated) {
   }
   for (const GSHSCENE_Sink_Caps * caps : {&d.raster_caps, &d.stream_caps}) {
     EXPECT_EQ(caps->item_kinds, 0x7eu);
-    EXPECT_EQ(caps->composites, 0x1fffu);
+    EXPECT_EQ(caps->composites, 0x0fffffffu) << "every operator and blend mode: it records the number (B13)";
     EXPECT_EQ(caps->cancel_unit, (uint32_t)GSHSCENE_CANCEL_BETWEEN_UNITS);
     EXPECT_EQ(caps->cancel_work_bound, 1u);
     EXPECT_STREQ(caps->work_measure, "units");

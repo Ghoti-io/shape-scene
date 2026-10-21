@@ -8,20 +8,24 @@
 # Ghoti.io Shape Scene is free software: you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public License version 3
 # as published by the Free Software Foundation.
-"""The reference of the scene's compositing definition (N1 to N11 and N14 of documentation/design.md), in exact rationals.
+"""The reference of the scene's compositing definition (N1 to N11, N14 and B1 to B12 of documentation/design.md), in exact rationals.
 
 This is a slow, independent statement of what a closed list *means*: the color
 spaces and their conversion (N1 to N3), the Porter-Duff operators (N4), the one
 primitive `apply` (N5), layers and groups (N6, N8), fills (N7), clips (N9), the
-foreground (N10), the order of a sequence (N11) and the palette (N14: an entry's color with
-its alpha scaled; a missing entry is refused, so its fill draws nothing).  It shares no code with the
-library or with the other generators.  Arithmetic is `fractions.Fraction`
-throughout; the only inexact step is the power function of a transfer, which is
-evaluated with `decimal` at 80 digits and turned back into the exact rational of
-that decimal (an error below 1e-70), and a result that went through one is flagged
-inexact.  Everything else is exact: a case whose values are dyadic rationals and
-whose spaces are all the same has an exact answer a double evaluator can match bit
-for bit.
+foreground (N10), the order of a sequence (N11), the palette (N14: an entry's color with
+its alpha scaled; a missing entry is refused, so its fill draws nothing), the blend modes
+(B1 to B12: W3C Compositing and Blending Level 1's mixing functions applied literally to
+every real input, then source-over) and the general group of PDF's transparency model (T1
+to T7: isolated or not, knockout or not, shape and opacity kept apart), of which N5 to N9 are
+the isolated, non-knockout case.  It shares no code with the library or with the other
+generators.  Arithmetic is `fractions.Fraction` throughout; the inexact steps are the power
+function of a transfer and soft-light's square root of a value that is not the square of a
+rational, each evaluated with `decimal` at 80 digits and turned back into the exact rational
+of that decimal (an error below 1e-70), and a result that went through one is flagged
+inexact.  Everything else is exact: a case whose values are dyadic rationals and whose spaces
+are all the same has an exact answer (whether a double evaluator meets it bit for bit is the
+generator's question, tools/gen-composite-vectors.py).
 
     python3 tools/composite-oracle.py --selftest
 
@@ -40,6 +44,7 @@ premultiplied value the root layer starts with, and `palette` the list's palette
 """
 import sys
 from decimal import Decimal, getcontext
+from math import isqrt
 from fractions import Fraction as F
 
 getcontext().prec = 80
@@ -201,6 +206,8 @@ def convert_premultiplied(px, a, b, ex):
 # --- N4, N5: operators and the primitive ----------------------------------------------------------------
 OPS = ["src-over", "clear", "src", "dest", "dest-over", "src-in", "dest-in", "src-out", "dest-out", "src-atop",
        "dest-atop", "xor", "plus"]
+BLEND_INDEX = {"screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light",
+               "difference", "exclusion", "multiply", "hue", "saturation", "color", "luminosity"}
 OP_INDEX = {name: i for i, name in enumerate(OPS)}
 
 
@@ -232,17 +239,195 @@ def factors(op, sa, da):
     raise ValueError(op)
 
 
-def operator(op, s, d):
+def operator(op, s, d, ex=None):
     """op(S, D) on premultiplied (R, G, B, A) values."""
+    if op in BLEND_INDEX:
+        return blend_operator(op, s, d, ex if ex is not None else Exactness())
     if op == "plus":
         return [min(ONE, s[i] + d[i]) for i in range(4)]
     fa, fb = factors(op, s[3], d[3])
     return [fa * s[i] + fb * d[i] for i in range(4)]
 
 
-def apply(d, s, m, op):
+# --- B1 to B12: the blend modes (W3C Compositing and Blending Level 1, literally, on every real input) ------------------
+# B1: the values 13 to 27 are COLRv1's CompositeMode numbers; the eleven separable modes, then the four non-separable.
+BLEND_MODES = ["screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light",
+               "difference", "exclusion", "multiply", "hue", "saturation", "color", "luminosity"]
+OPS = OPS + BLEND_MODES
+OP_INDEX = {name: i for i, name in enumerate(OPS)}
+SEPARABLE = BLEND_MODES[:11]
+NON_SEPARABLE = BLEND_MODES[11:]
+HALF = F(1, 2)
+QUARTER = F(1, 4)
+# B8 (P3-4): Lum's coefficients, W3C's 0.3, 0.59 and 0.11 as the exact rationals; they sum to 1.
+LUM = (F(3, 10), F(59, 100), F(11, 100))
+# B9: the cap of dodge's and burn's quotients, which an implementation uses so as never to form them past the bound.
+QUOTIENT_CAP = F(2) ** 66
+
+
+def is_square(x):
+    """Whether a non-negative Fraction is the square of a rational (so its root is exact)."""
+    return isqrt(x.numerator) ** 2 == x.numerator and isqrt(x.denominator) ** 2 == x.denominator
+
+
+def root(x, ex):
+    """The square root of a positive Fraction: exact when x is the square of a rational, else at 80 digits (inexact)."""
+    if is_square(x):
+        return F(isqrt(x.numerator), isqrt(x.denominator))
+    ex.inexact = True
+    return F(to_dec(x).sqrt())
+
+
+def mix_multiply(b, s):
+    return b * s
+
+
+def mix_screen(b, s):
+    return b + s - b * s
+
+
+def mix_hard_light(b, s):
+    return mix_multiply(b, 2 * s) if s <= HALF else mix_screen(b, 2 * s - 1)
+
+
+def mix_color_dodge(b, s):
+    if b == 0:
+        return ZERO
+    if s == 1:
+        return ONE
+    return min(ONE, b / (ONE - s))  # B10: a negative quotient is kept
+
+
+def mix_color_burn(b, s):
+    if b == 1:
+        return ONE
+    if s == 0:
+        return ZERO
+    return ONE - min(ONE, (ONE - b) / s)  # B10: above 1 when the quotient is negative
+
+
+def mix_soft_light(b, s, ex):
+    if s <= HALF:
+        return b - (1 - 2 * s) * b * (1 - b)
+    if b <= QUARTER:
+        dee = ((16 * b - 12) * b + 4) * b  # B10: every b <= 1/4, negatives included
+    else:
+        dee = root(b, ex)  # b > 1/4: the root's argument is always positive
+    return b + (2 * s - 1) * (dee - b)
+
+
+SEPARABLE_MIX = {
+    "multiply": lambda b, s, ex: mix_multiply(b, s),
+    "screen": lambda b, s, ex: mix_screen(b, s),
+    "overlay": lambda b, s, ex: mix_hard_light(s, b),  # hard-light with backdrop and source exchanged
+    "darken": lambda b, s, ex: min(b, s),
+    "lighten": lambda b, s, ex: max(b, s),
+    "color-dodge": lambda b, s, ex: mix_color_dodge(b, s),
+    "color-burn": lambda b, s, ex: mix_color_burn(b, s),
+    "hard-light": lambda b, s, ex: mix_hard_light(b, s),
+    "soft-light": mix_soft_light,
+    "difference": lambda b, s, ex: abs(b - s),
+    "exclusion": lambda b, s, ex: b + s - 2 * b * s,
+}
+
+
+def lum(c):
+    return LUM[0] * c[0] + LUM[1] * c[1] + LUM[2] * c[2]
+
+
+def clip_color(c):
+    """B8, P3-5, P3-11: L, n and x taken once, on entry; the 0/0 form (every component equal, so n = L = x) leaves C
+    alone.  n = L, x = L and n = x are one condition in the reals (Lum is a convex combination with positive weights);
+    B10 states it as n = x, which a double evaluation decides exactly."""
+    el = lum(c)
+    n = min(c)
+    x = max(c)
+    out = list(c)
+    if n < 0 and n != x:
+        out = [el + (v - el) * el / (el - n) for v in out]
+    if x > 1 and n != x:
+        out = [el + (v - el) * (1 - el) / (x - el) for v in out]
+    return out
+
+
+def set_lum(c, el):
+    d = el - lum(c)
+    return clip_color([v + d for v in c])
+
+
+def saturation(c):
+    return max(c) - min(c)
+
+
+def set_sat(c, s, order=None):
+    """B8: the components holding the largest, middle and smallest values on entry; @p order picks among ties."""
+    imin, imid, imax = order if order is not None else sorted(range(3), key=lambda i: c[i])
+    out = [ZERO, ZERO, ZERO]
+    if c[imax] > c[imin]:
+        out[imid] = (c[imid] - c[imin]) * s / (c[imax] - c[imin])
+        out[imax] = s
+    return out
+
+
+def mix(mode, cb, cs, ex):
+    """B7, B8: the mixing function B(Cb, Cs) on straight triples, before B9's saturation."""
+    if mode in SEPARABLE_MIX:
+        return [SEPARABLE_MIX[mode](cb[i], cs[i], ex) for i in range(3)]
+    if mode == "hue":
+        return set_lum(set_sat(cs, saturation(cb)), lum(cb))
+    if mode == "saturation":
+        return set_lum(set_sat(cb, saturation(cs)), lum(cb))
+    if mode == "color":
+        return set_lum(cs, lum(cb))
+    if mode == "luminosity":
+        return set_lum(cb, lum(cs))
+    raise ValueError(mode)
+
+
+def capped_mix(mode, b, s):
+    """B9 as an implementation evaluates dodge or burn: the quotient taken as sign * 2^66 once |n| >= 2^66 |d|."""
+    def capped(n, d):
+        if abs(n) >= QUOTIENT_CAP * abs(d):
+            return QUOTIENT_CAP if (n < 0) == (d < 0) else -QUOTIENT_CAP
+        return n / d
+    if mode == "color-dodge":
+        if b == 0:
+            return ZERO
+        if s == 1:
+            return ONE
+        return min(ONE, capped(b, ONE - s))
+    if b == 1:
+        return ONE
+    if s == 0:
+        return ZERO
+    return ONE - min(ONE, capped(ONE - b, s))
+
+
+def straight(px):
+    """N3's un-premultiply with N1's saturation; an alpha of 0 gives the color 0."""
+    a = px[3]
+    return [sat(px[i] / a) if a != 0 else ZERO for i in range(3)]
+
+
+BLEND_OBSERVER = None  # gen-composite-vectors.py's exactness tracer: called as (mode, s, d, m) at every blend's apply
+
+
+def blend_operator(mode, s, d, ex):
+    """B2: op_X(S, D) = (cs (1 - ab) + cb (1 - as) + as ab sat(B(Cb, Cs)), as + ab (1 - as))."""
+    sa, da = s[3], d[3]
+    if sa * da == 0:
+        b = [ZERO, ZERO, ZERO]  # the third term is 0, and B is not evaluated
+    else:
+        b = [sat(v) for v in mix(mode, straight(d), straight(s), ex)]  # B9
+    color = [s[i] * (ONE - da) + d[i] * (ONE - sa) + sa * da * b[i] for i in range(3)]
+    return color + [sa + da * (ONE - sa)]
+
+
+def apply(d, s, m, op, ex=None):
     """N5: (1 - m) D + m op(S, D)."""
-    o = operator(op, s, d)
+    if BLEND_OBSERVER is not None and op in BLEND_INDEX:
+        BLEND_OBSERVER(op, s, d, m)
+    o = operator(op, s, d, ex if ex is not None else Exactness())
     return [sat((ONE - m) * d[i] + m * o[i]) for i in range(4)]
 
 
@@ -304,7 +489,7 @@ def evaluate(items, cov, fg, target, backdrop, palette=None):
                 space = target if is_target(it["space"]) else it["space"]
             source = premultiply(convert(rgb, space, top.space, ex), alpha)
             m = cov[i] * product(top.clips)
-            top.layer = apply(top.layer, source, m, "src-over")
+            top.layer = apply(top.layer, source, m, "src-over", ex)
         elif k == CLIP_PUSH:
             top.clips.append(cov[i])
         elif k == CLIP_POP:
@@ -319,7 +504,7 @@ def evaluate(items, cov, fg, target, backdrop, palette=None):
             opacity = F(done.group["opacity"])
             source = [opacity * v for v in moved]
             op = OPS[done.group["composite"]]
-            parent.layer = apply(parent.layer, source, done.outer, op)
+            parent.layer = apply(parent.layer, source, done.outer, op, ex)
         else:
             raise ValueError("an instance is not evaluated here: a picture is expanded by the caller")
     assert len(stack) == 1
@@ -539,6 +724,68 @@ def selftest():
     mid = dict(k=FILL, paint=PAINT_SOLID, rgba=(0.5, 0.5, 0.5, 1.0), space=TARGET)
     got, inexact = evaluate([lin, mid, pop], [0, 1, 0], (None, TARGET), SPACE_SRGB, (0.0, 0.0, 0.0, 0.0))
     check(inexact and all(abs(got[i] - F(1, 2)) < F(1, 10 ** 60) for i in range(3)), "a mid gray survives a linear group (inexact)")
+
+    # B1: the modes are COLRv1's numbers 13 to 27.
+    check(OP_INDEX["screen"] == 13 and OP_INDEX["multiply"] == 23 and OP_INDEX["hue"] == 24 and
+          OP_INDEX["luminosity"] == 27 and len(OPS) == 28, "B1: COLRv1's CompositeMode numbers")
+    # B7, B8, B10: the identities W3C's definitions imply, on in-range, out-of-range, threshold and pole inputs.
+    import random
+    rng = random.Random(1203)
+    reals = [F(0), F(1), F(1, 2), F(1, 4), F(3, 4), F(-1, 3), F(5, 2), F(-7, 4), F(2) ** 16, -F(2) ** 16,
+             F(1) + F(1, 2 ** 48), F(1) - F(1, 2 ** 48), F(1, 2 ** 48), -F(1, 2 ** 48), F(1, 2) + F(1, 2 ** 40)]
+    reals += [F(rng.randint(-3000, 3000), rng.randint(1, 1000)) for _ in range(40)]
+    ex = Exactness()
+    for b, s_ in itertools.product(reals, reals):
+        sm = SEPARABLE_MIX
+        check(sm["screen"](b, s_, ex) == 1 - sm["multiply"](1 - b, 1 - s_, ex), "screen is multiply's dual")
+        check(sm["color-burn"](b, s_, ex) == 1 - sm["color-dodge"](1 - b, 1 - s_, ex), "burn is dodge's dual")
+        check(sm["overlay"](b, s_, ex) == sm["hard-light"](s_, b, ex), "overlay is hard-light exchanged")
+        check(sm["darken"](b, s_, ex) + sm["lighten"](b, s_, ex) == b + s_, "darken plus lighten")
+        check(sm["difference"](b, s_, ex) == sm["difference"](s_, b, ex), "difference is symmetric")
+        check(sm["exclusion"](b, s_, ex) == sm["exclusion"](s_, b, ex), "exclusion is symmetric")
+        # B9: the capped quotient gives what the real quotient gives, after min(1, .), 1 - . and sat.
+        for mode in ("color-dodge", "color-burn"):
+            real = sat(sm[mode](b, s_, ex))
+            check(real == sat(capped_mix(mode, b, s_)), "B9: the capped quotient of %s at %s, %s" % (mode, b, s_))
+    for b in reals:
+        check(mix_soft_light(b, HALF, ex) == b, "soft-light at Cs = 1/2 is Cb")
+    check(((16 * QUARTER - 12) * QUARTER + 4) * QUARTER == root(QUARTER, ex), "D is continuous at 1/4")
+    triples = [[F(1, 4), F(1, 2), F(3, 4)], [F(1, 2)] * 3, [F(-1, 2)] * 3, [F(3, 2)] * 3, [F(-1), F(2), F(1, 2)],
+               [F(1, 2), F(1, 2), F(1)], [F(0), F(1), F(1)], [F(-3), F(-3), F(5)], [F(2) ** 64, -F(2) ** 64, F(0)]]
+    triples += [[F(rng.randint(-4000, 4000), rng.randint(1, 997)) for _ in range(3)] for _ in range(60)]
+    for c in triples:
+        for el in (F(0), F(1, 3), F(1), F(-2), F(7, 3)):
+            check(lum(set_lum(c, el)) == el, "SetLum gives Lum l exactly: %s %s" % (c, el))
+        check(lum(clip_color(c)) == lum(c), "ClipColor keeps Lum: %s" % c)
+        check((min(c) == lum(c)) == (min(c) == max(c)) and (max(c) == lum(c)) == (min(c) == max(c)),
+              "n = L, x = L and n = x are one condition: %s" % c)
+        for sv in (F(0), F(1, 2), F(3)):
+            if max(c) > min(c):
+                check(saturation(set_sat(c, sv)) == sv, "Sat(SetSat(C, s)) = s")
+            outs = set()
+            for order in itertools.permutations(range(3)):
+                if c[order[0]] <= c[order[1]] <= c[order[2]]:
+                    outs.add(tuple(set_sat(c, sv, order)))
+            check(len(outs) == 1, "SetSat does not depend on which tied component is called min, mid or max: %s" % c)
+        for d in triples[:12]:
+            check(mix("luminosity", c, d, ex) == mix("color", d, c, ex), "luminosity(b, s) = color(s, b)")
+    pixels_b = [[F(0), F(0), F(0), F(0)], [F(1, 4), F(1, 8), F(1, 2), F(1, 2)], [F(3, 5), F(1, 5), F(2, 5), F(3, 5)],
+                [F(-1, 2), F(3, 2), F(1, 4), F(1)], [F(2) ** 16, -F(2) ** 16, F(1, 3), F(1)]]
+    for mode in BLEND_MODES:
+        for d in pixels_b:
+            check(operator(mode, [ZERO] * 4, d) == d, "B3: %s is bounded" % mode)
+            for s_ in pixels_b:
+                for m in (ZERO, F(1, 3), F(1, 2), ONE):
+                    for o in (F(1, 2), F(2, 7), ONE):
+                        scaled = [o * v for v in s_]
+                        check(apply(d, scaled, m, mode) == [sat(v) for v in operator(mode, [m * v for v in scaled], d)],
+                              "B4: coverage and opacity commute with %s" % mode)
+    # B12: W3C's normal (B = Cs) is SRC_OVER exactly.
+    for d, s_ in itertools.product(pixels_b, pixels_b):
+        sa, da = s_[3], d[3]
+        normal = [s_[i] * (ONE - da) + d[i] * (ONE - sa) + sa * da * (straight(s_)[i] if sa * da else 0) for i in range(3)]
+        normal += [sa + da * (ONE - sa)]
+        check(normal == operator("src-over", s_, d), "B12: normal is source-over")
 
     # N11 against tools/gen-scene-vectors.py's own statement of the order.
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gen-scene-vectors.py")

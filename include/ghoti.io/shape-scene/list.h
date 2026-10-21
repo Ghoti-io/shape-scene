@@ -63,7 +63,10 @@
  * `DEST_OVER (1-Ad, 1)`, `SRC_IN (Ad, 0)`, `DEST_IN (0, As)`, `SRC_OUT (1-Ad, 0)`,
  * `DEST_OUT (0, 1-As)`, `SRC_ATOP (Ad, 1-As)`, `DEST_ATOP (1-Ad, As)`,
  * `XOR (1-Ad, 1-As)`, and `PLUS`: `min(1, Cs + Cd)` per channel and
- * `min(1, As + Ad)`.  **N5**: `apply(D, S, m, op) = sat((1 - m) D + m op(S, D))`
+ * `min(1, As + Ad)`.  **B1 to B14**: a blend mode `X` (values 13 to 27) is
+ * `op_X(S, D) = (cs (1 - Ad) + cd (1 - As) + As Ad sat(B_X(Cb, Cs)), As + Ad (1 - As))`
+ * with `Cs`, `Cb` the un-premultiplied colors and `B_X` W3C's mixing function applied literally to every real value
+ * (documentation/design.md has B1 to B14).  **N5**: `apply(D, S, m, op) = sat((1 - m) D + m op(S, D))`
  * for a coverage `m`, saturated at `2^64` (N1).  **N6**: the list's root layer is the target (its blend space is
  * the target's); a group's layer starts at `(0, 0, 0, 0)` in its own blend space
  * (its `blend_space`, or its enclosing group's if zero).  **N7**: a fill is
@@ -186,10 +189,14 @@ typedef enum GSHSCENE_Ordering {
 } GSHSCENE_Ordering;
 
 /**
- * @brief How a group's result is composited onto what it is drawn over (N4).  The values are pinned (they are hashed).
+ * @brief How a group's result is composited onto what it is drawn over (N4, B1).  The values are pinned (they are
+ *   hashed).
  *
- * The twelve Porter-Duff operators and `PLUS`.  Blend modes (multiply, screen, ...) are not here: they are a later
- * addition and the values past the end are ::GSHSCENE_ERR_INVALID until then.
+ * The twelve Porter-Duff operators and `PLUS` (N4), then the fifteen blend modes of W3C Compositing and Blending
+ * Level 1 (B1 to B14), numbered as COLRv1's `CompositeMode` so that a COLRv1 lowering is the identity: the eleven
+ * separable modes, then the four non-separable ones.  A blend mode is the mixing function `B(Cb, Cs)` on the
+ * un-premultiplied colors, then source-over (B2); it is bounded (B3).  W3C's `normal` is ::GSHSCENE_COMPOSITE_SRC_OVER
+ * exactly (B12) and has no value of its own.  A value at or past ::GSHSCENE_COMPOSITE_COUNT is ::GSHSCENE_ERR_INVALID.
  */
 typedef enum GSHSCENE_Composite {
   GSHSCENE_COMPOSITE_SRC_OVER = 0,  ///< `(Fa, Fb) = (1, 1-As)`: the default, and what a fill is.
@@ -205,15 +212,36 @@ typedef enum GSHSCENE_Composite {
   GSHSCENE_COMPOSITE_DEST_ATOP = 10,///< `(1-Ad, As)`.
   GSHSCENE_COMPOSITE_XOR = 11,      ///< `(1-Ad, 1-As)`.
   GSHSCENE_COMPOSITE_PLUS = 12,     ///< `min(1, Cs + Cd)` per channel, `min(1, As + Ad)`.
-  GSHSCENE_COMPOSITE_COUNT          ///< Closes the enum.
+  GSHSCENE_COMPOSITE_SCREEN = 13,      ///< B7: `Cb + Cs - Cb Cs`.
+  GSHSCENE_COMPOSITE_OVERLAY = 14,     ///< B7: hard-light with backdrop and source exchanged.
+  GSHSCENE_COMPOSITE_DARKEN = 15,      ///< B7: `min(Cb, Cs)`.
+  GSHSCENE_COMPOSITE_LIGHTEN = 16,     ///< B7: `max(Cb, Cs)`.
+  GSHSCENE_COMPOSITE_COLOR_DODGE = 17, ///< B7: `0` if `Cb = 0`, else `1` if `Cs = 1`, else `min(1, Cb / (1 - Cs))`.
+  GSHSCENE_COMPOSITE_COLOR_BURN = 18,  ///< B7: `1` if `Cb = 1`, else `0` if `Cs = 0`, else `1 - min(1, (1 - Cb) / Cs)`.
+  GSHSCENE_COMPOSITE_HARD_LIGHT = 19,  ///< B7: multiply by `2 Cs` up to `Cs = 1/2`, else screen by `2 Cs - 1`.
+  GSHSCENE_COMPOSITE_SOFT_LIGHT = 20,  ///< B7: W3C's soft-light, its root taken only where `Cb > 1/4`.
+  GSHSCENE_COMPOSITE_DIFFERENCE = 21,  ///< B7: `|Cb - Cs|`.
+  GSHSCENE_COMPOSITE_EXCLUSION = 22,   ///< B7: `Cb + Cs - 2 Cb Cs`.
+  GSHSCENE_COMPOSITE_MULTIPLY = 23,    ///< B7: `Cb Cs` (COLRv1 numbers it last of the separable modes).
+  GSHSCENE_COMPOSITE_HUE = 24,         ///< B8: `SetLum(SetSat(Cs, Sat(Cb)), Lum(Cb))`.
+  GSHSCENE_COMPOSITE_SATURATION = 25,  ///< B8: `SetLum(SetSat(Cb, Sat(Cs)), Lum(Cb))`.
+  GSHSCENE_COMPOSITE_COLOR = 26,       ///< B8: `SetLum(Cs, Lum(Cb))`.
+  GSHSCENE_COMPOSITE_LUMINOSITY = 27,  ///< B8: `SetLum(Cb, Lum(Cs))`.
+  GSHSCENE_COMPOSITE_COUNT             ///< Closes the enum.
 } GSHSCENE_Composite;
 
-/** @brief Name an operator ("src-over", "clear", "src", "dest", "dest-over", "src-in", "dest-in", "src-out", "dest-out", "src-atop", "dest-atop", "xor", "plus"), or "unknown composite". */
+/**
+ * @brief Name an operator ("src-over", "clear", "src", "dest", "dest-over", "src-in", "dest-in", "src-out", "dest-out",
+ *   "src-atop", "dest-atop", "xor", "plus"; a blend mode by W3C's name: "screen", "overlay", "darken", "lighten",
+ *   "color-dodge", "color-burn", "hard-light", "soft-light", "difference", "exclusion", "multiply", "hue", "saturation",
+ *   "color", "luminosity"), or "unknown composite".
+ */
 GSHSCENE_API const char * gshscene_composite_string(GSHSCENE_Composite op);
 
 /**
  * @brief Whether the operator changes the backdrop where the source is empty (N4): `CLEAR`, `SRC`, `SRC_IN`,
- *   `DEST_IN`, `SRC_OUT` and `DEST_ATOP`.  0 for the rest and for a value outside the enum.
+ *   `DEST_IN`, `SRC_OUT` and `DEST_ATOP`.  0 for the rest (every blend mode is bounded, B3) and for a value outside
+ *   the enum.
  */
 GSHSCENE_API int gshscene_composite_is_unbounded(GSHSCENE_Composite op);
 

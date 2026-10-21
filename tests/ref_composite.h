@@ -200,8 +200,153 @@ inline Px convert_premultiplied(const Px & p, const Space & a, const Space & b) 
   return Px{{c[0] * p.v[3], c[1] * p.v[3], c[2] * p.v[3], p.v[3]}};
 }
 
-/** N4. */
+/* --- B1 to B12: the blend modes, in S11's order of operations (shape-cpu's render.h) ---------------------------------- */
+
+inline bool is_blend(int composite) {
+  return composite >= GSHSCENE_COMPOSITE_SCREEN && composite <= GSHSCENE_COMPOSITE_LUMINOSITY;
+}
+
+/** B9: n / d, taken as sign * 2^66 once |n| >= 2^66 |d| (d != 0), so it is never formed past the bound. */
+inline double quotient(double n, double d) {
+  const double cap = 0x1p66;
+  double mn = n < 0 ? -n : n, md = d < 0 ? -d : d;
+  if (mn >= cap * md) {
+    return (n < 0) != (d < 0) ? -cap : cap;
+  }
+  return n / d;
+}
+
+inline double mix_screen(double b, double s) {
+  return b + s - b * s;
+}
+
+inline double mix_hard_light(double b, double s) {
+  return s <= 0.5 ? b * (2.0 * s) : mix_screen(b, 2.0 * s - 1.0);
+}
+
+/** B7: one channel of a separable mode. */
+inline double mix_separable(int mode, double b, double s) {
+  switch (mode) {
+    case GSHSCENE_COMPOSITE_MULTIPLY: return b * s;
+    case GSHSCENE_COMPOSITE_SCREEN: return mix_screen(b, s);
+    case GSHSCENE_COMPOSITE_OVERLAY: return mix_hard_light(s, b);
+    case GSHSCENE_COMPOSITE_DARKEN: return b < s ? b : s;
+    case GSHSCENE_COMPOSITE_LIGHTEN: return b > s ? b : s;
+    case GSHSCENE_COMPOSITE_COLOR_DODGE: {
+      if (b == 0.0) return 0.0;
+      if (s == 1.0) return 1.0;
+      double q = quotient(b, 1.0 - s);
+      return q < 1.0 ? q : 1.0;
+    }
+    case GSHSCENE_COMPOSITE_COLOR_BURN: {
+      if (b == 1.0) return 1.0;
+      if (s == 0.0) return 0.0;
+      double q = quotient(1.0 - b, s);
+      return 1.0 - (q < 1.0 ? q : 1.0);
+    }
+    case GSHSCENE_COMPOSITE_HARD_LIGHT: return mix_hard_light(b, s);
+    case GSHSCENE_COMPOSITE_SOFT_LIGHT: {
+      if (s <= 0.5) return b - (1.0 - 2.0 * s) * b * (1.0 - b);
+      double d = b <= 0.25 ? ((16.0 * b - 12.0) * b + 4.0) * b : gmath_sqrt(b);
+      return b + (2.0 * s - 1.0) * (d - b);
+    }
+    case GSHSCENE_COMPOSITE_DIFFERENCE: return b - s < 0 ? s - b : b - s;
+    default: return b + s - 2.0 * b * s; /* exclusion */
+  }
+}
+
+inline double lum(const double c[3]) {
+  return 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
+}
+
+/** B8: ClipColor, with L, n and x read once on entry; the all-equal (0/0) form, n = x, leaves C alone (B10). */
+inline void clip_color(double c[3]) {
+  double l = lum(c);
+  double n = std::min(c[0], std::min(c[1], c[2]));
+  double x = std::max(c[0], std::max(c[1], c[2]));
+  if (n < 0.0 && n != x) {
+    for (int i = 0; i < 3; i++) c[i] = l + (c[i] - l) * l / (l - n);
+  }
+  if (x > 1.0 && n != x) {
+    for (int i = 0; i < 3; i++) c[i] = l + (c[i] - l) * (1.0 - l) / (x - l);
+  }
+}
+
+inline void set_lum(double c[3], double l) {
+  double d = l - lum(c);
+  for (int i = 0; i < 3; i++) c[i] += d;
+  clip_color(c);
+}
+
+inline double sat_of(const double c[3]) {
+  return std::max(c[0], std::max(c[1], c[2])) - std::min(c[0], std::min(c[1], c[2]));
+}
+
+inline void set_sat(double c[3], double s) {
+  int i[3] = {0, 1, 2};
+  if (c[i[0]] > c[i[1]]) std::swap(i[0], i[1]);
+  if (c[i[1]] > c[i[2]]) std::swap(i[1], i[2]);
+  if (c[i[0]] > c[i[1]]) std::swap(i[0], i[1]);
+  double out[3] = {0, 0, 0};
+  if (c[i[2]] > c[i[0]]) {
+    out[i[1]] = (c[i[1]] - c[i[0]]) * s / (c[i[2]] - c[i[0]]);
+    out[i[2]] = s;
+  }
+  for (int k = 0; k < 3; k++) c[k] = out[k];
+}
+
+/** B7 to B9: B(Cb, Cs) of a blend mode, saturated. */
+inline void mix(int mode, const double cb[3], const double cs[3], double out[3]) {
+  double c[3];
+  switch (mode) {
+    case GSHSCENE_COMPOSITE_HUE:
+      std::memcpy(c, cs, sizeof c);
+      set_sat(c, sat_of(cb));
+      set_lum(c, lum(cb));
+      break;
+    case GSHSCENE_COMPOSITE_SATURATION:
+      std::memcpy(c, cb, sizeof c);
+      set_sat(c, sat_of(cs));
+      set_lum(c, lum(cb));
+      break;
+    case GSHSCENE_COMPOSITE_COLOR:
+      std::memcpy(c, cs, sizeof c);
+      set_lum(c, lum(cb));
+      break;
+    case GSHSCENE_COMPOSITE_LUMINOSITY:
+      std::memcpy(c, cb, sizeof c);
+      set_lum(c, lum(cs));
+      break;
+    default:
+      for (int k = 0; k < 3; k++) c[k] = mix_separable(mode, cb[k], cs[k]);
+      break;
+  }
+  for (int k = 0; k < 3; k++) out[k] = sat(c[k]);
+}
+
+/** B2: op_X(S, D), premultiplied. */
+inline Px blend(int mode, const Px & s, const Px & d) {
+  double sa = s.v[3], da = d.v[3];
+  double b[3] = {0, 0, 0};
+  if (sa * da != 0.0) {
+    double cs[3], cb[3];
+    for (int k = 0; k < 3; k++) {
+      cs[k] = unpremultiply(s.v[k], sa);
+      cb[k] = unpremultiply(d.v[k], da);
+    }
+    mix(mode, cb, cs, b);
+  }
+  Px out;
+  for (int k = 0; k < 3; k++) out.v[k] = s.v[k] * (1.0 - da) + d.v[k] * (1.0 - sa) + sa * da * b[k];
+  out.v[3] = sa + da * (1.0 - sa);
+  return out;
+}
+
+/** N4, and B2 for a blend mode. */
 inline Px op(int composite, const Px & s, const Px & d) {
+  if (is_blend(composite)) {
+    return blend(composite, s, d);
+  }
   double sa = s.v[3], da = d.v[3];
   double fa = 0, fb = 0;
   switch (composite) {

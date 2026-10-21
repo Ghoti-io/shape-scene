@@ -201,7 +201,7 @@ typedef struct GSHSCENE_Node {
   double depth;                      ///< The declared depth (AD-10): finite; `-0` is stored as `+0`.  Group, shape and instance.
   double opacity;                    ///< Group: finite, in `[0, 1]`; below 1 the group is composited as a unit.  Else 1.
   GSHSCENE_Color_Space blend_space;  ///< Group: the space it composites in; zero inherits the enclosing group's.  Else zero.
-  uint32_t composite;                ///< Group: a ::GSHSCENE_Composite (N4).  Else ::GSHSCENE_COMPOSITE_SRC_OVER.
+  uint32_t composite;                ///< Group: a ::GSHSCENE_Composite (N4, B1).  Else ::GSHSCENE_COMPOSITE_SRC_OVER.
   uint32_t ordering;                 ///< Group: a ::GSHSCENE_Ordering, the context of its children.  Else ::GSHSCENE_ORDER_FLAT.
   const GSHSCENE_Resource * clip;    ///< Group: a path or glyph run clipping the group, or NULL.  Else NULL.
   GSHGEOM_Map clip_map;              ///< Group with a clip: the clip's placement in the group's own space.  Else the identity.

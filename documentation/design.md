@@ -7,7 +7,9 @@ with its report and the test sink (story 13a). The first real sink, shape-cpu's,
 font reach the waist through a face resource and the glyph path provider seam (story 14a, below); `font`
 implements the provider in story 14b. Gradients (color-paint story P1: the resource, the paint, G1 to G13, the one
 conversion of their stops at draw time, the notices of what draws nothing) are implemented scene-side; shape-cpu draws
-them in story P2 and until then refuses them in its planning pass.
+them in story P2. Blend modes (color-paint story P3: the fifteen modes of W3C Compositing and Blending Level 1 as
+composite operators 13 to 27, B1 to B14) are implemented scene-side: the scene names, validates, hashes and plans them,
+and a sink composites them.
 
 The shape family waist: resources and lists, and the versioned scene above them.
 
@@ -95,7 +97,7 @@ The image resource kind is named and has no constructor; its value is pinned bec
 it a meaning adds a constructor. (The palette paint, refused until story 14c, is N14 below; the gradient paint and
 resource, reserved until color-paint story P1, are G1 to G13.) Also refused with `ERR_UNSUPPORTED` are ProPhoto
 (D50: converting to it needs a chromatic adaptation), the parametric, BT.1886, PQ and HLG transfers and ICC
-profiles, and every blend mode (multiply, screen, ...): the composite operator has room for them.
+profiles.
 
 ## What a scene means: paint, color and composition (normative)
 
@@ -134,8 +136,10 @@ palette entry; an alpha is in `[0, 1]` already. Past it the record call is `ERR_
 that makes the call `ERR_INVALID` or `ERR_UNSUPPORTED`, as G14's are. Every value computed from them is **saturated**,
 `sat(x) = min(max(x, -2^64), 2^64)` (`GSHSCENE_COLOR_SATURATION`), at exactly these points, each component on its own:
 N2's decode and encode results within a conversion; N3's matrix result `M_B^-1 M_A v` (the product as one, however an
-implementation forms it); every **un-premultiply** `C / A` (N3's premultiplied conversion, G4's flag 1, and a sink's
-store to a straight target); and N5's result, so every fill, every group composite (`PLUS` included) at every depth.
+implementation forms it); every **un-premultiply** `C / A` (N3's premultiplied conversion, G4's flag 1, B2's `Cs` and
+`Cb`, and a sink's store to a straight target); each component of a blend mode's mixing function `B(Cb, Cs)` before it
+is weighted (B9); and N5's result, so every fill, every group composite (`PLUS` and the blend modes included) at every
+depth.
 The saturation is part of the definition, not a sink's choice: the oracles, the scene's conversion (G3) and every sink
 apply it at the same points, so a value past `2^64` has one meaning on every sink. Content near `[0, 1]` does not reach
 it: one conversion of a component of magnitude at most 1 is at most `2.33^10 < 2^13` (a matrix, then a gamma-0.1
@@ -156,6 +160,10 @@ root's) to a finite result, which the next saturation makes bounded again:
 | premultiply, alpha times alpha, opacity, coverage: a factor in `[0, 1]` | bounded stays bounded |
 | N4 `Fa Cs + Fb Cd`, `PLUS`'s `Cs + Cd`, N5 `(1 - m) D + m op`: factors in `[0, 1]`, `D` at most the root's | `2^130` |
 | G4: an interpolation of bounded interpolants by a fraction in `[0, 1]` | bounded (a convex combination) |
+| B7: a separable mode's polynomial on bounded `Cb`, `Cs` (soft-light's `16 Cb^3` is the largest) | `2^196` |
+| B7: dodge's `Cb / (1 - Cs)`, burn's `(1 - Cb) / Cs` | unbounded in the reals: taken as `sign 2^66` past it (B9) |
+| B8: `Lum`, `Sat`, `SetSat`, `SetLum`'s shift, ClipColor's two steps | `2^64`, `2^65`, `2^65`, `2^67`, below `2^140` |
+| B2: `cs (1 - Ab) + cb (1 - As) + As Ab sat(B)`, every factor in `[0, 1]` | `3 * 2^64` |
 
 So the worst step is a power, `2^640`, far below the largest double (just under `2^1024`). What made a bound on the
 recorded values alone useless is that conversions chain: a gamma-10 decode followed by a gamma-0.1 encode is the
@@ -190,7 +198,8 @@ straight color, and premultiplying again.
 `min(1, Cs + Cd)` for each color channel and `min(1, As + Ad)` (nothing below is clamped, and `PLUS` clamps
 from above only). An operator is **bounded** if `op(0, D) = D` for every `D` (`DEST`, `SRC_OVER`,
 `DEST_OVER`, `DEST_OUT`, `SRC_ATOP`, `XOR`, `PLUS`) and **unbounded** otherwise (`CLEAR`, `SRC`, `SRC_IN`,
-`DEST_IN`, `SRC_OUT`, `DEST_ATOP`: they change the backdrop where the source is empty).
+`DEST_IN`, `SRC_OUT`, `DEST_ATOP`: they change the backdrop where the source is empty). The values 13 to 27 are the
+blend modes, B1 to B14 below; each is bounded.
 
 **N5 The primitive.** `apply(D, S, m, op) = sat((1 - m) D + m op(S, D))`, componentwise on premultiplied values, for a
 coverage `m` in `[0, 1]`, saturated (N1). Everything composited is one `apply`, so every layer value is bounded.
@@ -269,9 +278,147 @@ each be a color the author did not state). The one resolution is `gshscene_paint
 (`gshscene_caps_disposition`) takes the palette, so a writer, a GPU sink and shape-cpu refuse the same fills. A
 palette change is a new parameter, never a re-lowering (AD-23): a theme picks another handle.
 
-**Not decided here, and where it is recorded.** Blend modes (multiply, screen, ...; color-paint story P3), the other
-color spaces, the depth predicate for 3D maps, and the merge of adds to one parent are Deferred rows in the spine;
-`notes/shape/merge-adds-to-one-parent.md` assesses the last.
+**Not decided here.** The other color spaces, the depth predicate for 3D maps, and the merge of adds to one parent.
+
+## Blend modes (normative; color-paint story P3)
+
+In real arithmetic, as N1 to N14. `Cb`, `Cs` are straight colors, `cb`, `cs` premultiplied, `Ab`, `As` alphas; per
+channel unless the mode is non-separable. Each rule is cited by tests, plants, the oracle and the vectors.
+`tools/composite-oracle.py` states them a second time in exact rationals, sharing no code with the library; its one
+new irrational is soft-light's root, exact when its argument is the square of a rational and otherwise evaluated at 80
+decimal digits (an error below 1e-70) and flagged inexact, as a transfer is. `tools/gen-composite-vectors.py` commits
+a table of the mixing function alone (`kMix`: every branch of B7 and B8 on both sides of each threshold and at it,
+out-of-range values, B9's poles and the corners at `+-2^64`) and cases of blending groups (every mode in four blend
+spaces, at alphas 0, 1/2, 1 and a non-dyadic one, under coverage, opacity and clips, nested, at the root over a
+non-opaque target, out of range and at B9's saturation) to `tests/composite_vectors.h`. A blend vector is **exact**
+only where every step of the double evaluation is exact (STOP-2, Corey 2026-10-21): the generator walks S11's order of
+operations (shape-cpu's `render.h`) on the exact values, carrying a bound on how far each double can be from them in
+the standard model of rounding, so a non-separable mode (`Lum`'s constants are not doubles) and a root that is not of a
+square are never exact. It refuses a sample whose bound passes an eighth of the tolerance (a cancellation at large
+magnitude, such as screen's `2^64 + 1 - 2^64`, which no double evaluation in this order meets) or reaches a
+discontinuity of B10 (dodge's and burn's poles, ClipColor's and SetSat's equal components), and says how many; the
+corners at `+-2^64` are then asserted finite and saturated for every mode rather than equal. `tests/ref_composite.h`'s evaluator agrees: bit for bit where marked exact, within `1e-12` of
+`max(1, |v|)` otherwise.
+
+**B1 The operators.** `GSHSCENE_Composite` keeps 0 to 12 (N4) and gains, numbered as COLRv1's `CompositeMode`,
+`SCREEN 13`, `OVERLAY 14`, `DARKEN 15`, `LIGHTEN 16`, `COLOR_DODGE 17`, `COLOR_BURN 18`, `HARD_LIGHT 19`,
+`SOFT_LIGHT 20`, `DIFFERENCE 21`, `EXCLUSION 22`, `MULTIPLY 23` (the **separable** modes), and `HUE 24`,
+`SATURATION 25`, `COLOR 26`, `LUMINOSITY 27` (the **non-separable** modes); `COUNT` is 28. A group push (`list.h`,
+`fixed.h`'s `gshscene_list_group_push_fixed`) and a group node take any of the 28; 28 and above are `ERR_INVALID`.
+`gshscene_composite_string` names them as W3C does (`"multiply"`, `"color-dodge"`, `"hue"`, ...). COLRv1's modes 13 to
+27 are W3C's one to one (COLRv1 states that its modes are taken from W3C's, and restates no formula), so a COLRv1
+lowering of them is the identity; COLRv1's `HSL_` prefix names W3C's non-separable functions, which are defined on RGB
+triples through `Lum`, `Sat` and ClipColor, not through an HSL conversion.
+
+**B2 The blend operator.** For a blend mode `X` with mixing function `B_X`, on premultiplied `S = (cs, As)` and
+`D = (cb, Ab)`: `Cs = sat(cs / As)` and `Cb = sat(cb / Ab)` (N3's un-premultiply with N1's saturation; an alpha of 0
+gives the color 0), and
+`op_X(S, D) = (cs (1 - Ab) + cb (1 - As) + As Ab sat(B_X(Cb, Cs)),  As + Ab (1 - As))`.
+Where `As Ab = 0` the third term is 0 and `B_X` is not evaluated. This is W3C's two steps multiplied out: its blending
+step `Cs' = (1 - Ab) Cs + Ab B(Cb, Cs)` followed by its source-over `co = As Cs' + Ab Cb (1 - As)`, `Ao = As + Ab (1 -
+As)`; with `cs = As Cs` and `cb = Ab Cb`, `co = As (1 - Ab) Cs + As Ab B + Ab Cb (1 - As) = cs (1 - Ab) + cb (1 - As) +
+As Ab B`. `op_X` is used in N5's `apply(D, S, m, op_X) = sat((1 - m) D + m op_X(S, D))` unchanged, so a fill (never a
+blend: N7's operator is `SRC_OVER`) and N8's group composite need no new rule.
+
+**B3 Bounded.** Every blend mode is bounded (N4): `op_X(0, D) = D`, because `As = 0` leaves `cb`. N13's damage and
+`gshscene_composite_is_unbounded` are unchanged for them (0). COLRv1 agrees.
+
+**B4 Coverage and opacity.** For `k > 0`, `kS` has the same `Cs` as `S`, so `op_X(kS, D) = k op_X(S, D) + (1 - k) D`
+(each term of B2 is linear in `(cs, As)` for a fixed `Cs`, and the `cb` term gives `(1 - k) cb`). So `apply(D, S, m,
+op_X) = sat(op_X(m S, D))` for `m` in `[0, 1]`, and N8's opacity `o` scales `S` and leaves `Cs` alone: coverage and
+opacity commute with blending, and a coverage-weighted blend of one item (Canvas's per-draw
+`globalCompositeOperation`, CSS `mix-blend-mode` on one element) is exactly a group of one (D4). The oracle's
+self-test checks it for every mode.
+
+**B5 Where (STOP-1, Corey 2026-10-21).** At the pop of a group with a blend mode, `S = o convert(G, Bg -> Bp)` and
+`P' = apply(P, S, m, op_X)`, all in `Bp`, the enclosing layer's blend space, as N8 does for every operator; the group's
+own `blend_space` governs how its children composite with each other. This is PDF's model (an object blends in the
+blending space of the group it is composited into) and CSS's (a stacking context blends into its parent). The formulas
+apply to the RGB components of that space as they are (encoded or linear-light, any gamut); no conversion to HSL or
+another representation is made. COLRv1 blends in linear light and CSS in sRGB-encoded values; each is a blend space
+(AD-23) the front end chooses.
+
+**B6 Isolation.** Every group is an isolated group in W3C's sense: its layer starts at `(0, 0, 0, 0)` (N6), its content
+composites within it, and the group as a whole is blended with its backdrop at its pop. COLRv1's `PaintComposite` lowers
+to an outer group holding the backdrop's items, then an inner group with the mode holding the source's (COLRv1 renders
+source and backdrop "into bitmaps" and composites them, which is that). Every CSS stacking context, and SVG 2's
+`isolation`, lower to a group; an element that does not isolate gets no group, so its blending group composites onto
+the layer holding everything painted before it.
+
+**B7 Separable modes.** Exactly W3C's, each color channel on its own: `MULTIPLY` `Cb Cs`; `SCREEN` `Cb + Cs - Cb Cs`;
+`OVERLAY` `HardLight(Cs, Cb)` (backdrop and source exchanged); `DARKEN` `min(Cb, Cs)`; `LIGHTEN` `max(Cb, Cs)`;
+`COLOR_DODGE` `0` if `Cb = 0`, else `1` if `Cs = 1`, else `min(1, Cb / (1 - Cs))`; `COLOR_BURN` `1` if `Cb = 1`, else
+`0` if `Cs = 0`, else `1 - min(1, (1 - Cb) / Cs)`; `HARD_LIGHT` `Multiply(Cb, 2 Cs)` if `Cs <= 1/2`, else `Screen(Cb, 2
+Cs - 1)`; `SOFT_LIGHT` `Cb - (1 - 2 Cs) Cb (1 - Cb)` if `Cs <= 1/2`, else `Cb + (2 Cs - 1) (D(Cb) - Cb)`, with `D(Cb) =
+((16 Cb - 12) Cb + 4) Cb` if `Cb <= 1/4`, else `sqrt(Cb)`; `DIFFERENCE` `|Cb - Cs|`; `EXCLUSION` `Cb + Cs - 2 Cb Cs`.
+Every test (`=`, `<=`) is on the exact real values.
+
+**B8 Non-separable modes.** Exactly W3C's, on the triple `C = (r, g, b)`: `Lum(C) = 3/10 r + 59/100 g + 11/100 b` (W3C's
+`0.3, 0.59, 0.11` as the exact rationals; they sum to 1); `ClipColor(C)`: `L = Lum(C)`, `n = min(C)`, `x = max(C)`, all
+three taken **on entry**; if `n < 0`, `C = L + (C - L) L / (L - n)`; then, with the same entry `x` and `L`, if `x > 1`,
+`C = L + (C - L)(1 - L) / (x - L)` (W3C's pseudo-code read literally), each step only when the components are not all
+equal (B10); `SetLum(C, l)`: `C + (l - Lum(C))`, then
+ClipColor; `Sat(C) = max(C) - min(C)`; `SetSat(C, s)`: with `Cmax`, `Cmid`, `Cmin` the components holding the largest,
+middle and smallest values on entry: if `Cmax > Cmin`, `Cmid = (Cmid - Cmin) s / (Cmax - Cmin)` and `Cmax = s`, else
+`Cmid = Cmax = 0`; then `Cmin = 0`. `HUE` `SetLum(SetSat(Cs, Sat(Cb)), Lum(Cb))`; `SATURATION` `SetLum(SetSat(Cb,
+Sat(Cs)), Lum(Cb))`; `COLOR` `SetLum(Cs, Lum(Cb))`; `LUMINOSITY` `SetLum(Cb, Lum(Cs))`.
+
+*SetSat does not depend on how ties are named.* If two components are equal and called `Cmid` and `Cmax`, the formula
+gives `Cmid = (Cmax - Cmin) s / (Cmax - Cmin) = s = Cmax`; if they are `Cmin` and `Cmid`, it gives `Cmid = 0 = Cmin`; if
+all three are equal, every component is 0 either way. So both names get the same value, and any order that sorts the
+components gives one answer; the oracle checks every order.
+
+*ClipColor keeps `Lum`.* Each step maps `C` to `L + (C - L) k` for one real `k`, and `Lum` is linear with coefficients
+summing to 1, so `Lum` of the result is `L + (L - L) k = L`: `Lum(SetLum(C, l)) = l` exactly, for every real input.
+
+**B9 The saturation after `B`.** `sat` is applied to each component of `B_X(Cb, Cs)` before it is weighted (B2); it is
+one point added to N1's list. With N1's other points every value of B2 is finite: its inputs are bounded by `2^64`, and
+every intermediate of B7 and B8 is below `2^200` in magnitude (the table in N1; the worst is soft-light's `16 Cb^3 <=
+2^196`). On the entry triple, ClipColor's quotient `(C - L) / (L - n)` lies in `[-1, 100/11]` and `(C - L) / (x - L)` in
+`[-100/11, 1]`, because `L - n` and `x - L` are each at least `11/100 (x - n)`; when both steps apply (out of range
+only), the second step's numerator is the first step's result, still below `2^70`, over `x - L >= 11/100`, so the result
+is below `2^140`. The two quotients that are unbounded in the reals, dodge's `Cb / (1 - Cs)` and burn's `(1 - Cb) / Cs`,
+are evaluated without forming them past the bound: when `|numerator| >= 2^66 |denominator|` the quotient is taken as
+`sign 2^66`, and every later step (`min(1, .)`, `1 - .`, `sat`) then gives exactly what the real value gives (`2^66 |d|`
+is a power-of-two scaling, so the comparison is exact). No infinity and no NaN can arise. The table's corners are
+committed: every mode at `Cb, Cs` in `{-2^64, 0, 1, 2^64}`.
+
+**B10 Out of range.** Components may be negative or above 1 (N1 bounds them by `2^16` at record and `2^64` after). B7
+and B8 apply **literally to every real input**, and nothing is clamped to `[0, 1]` that W3C does not clamp.
+Multiply, screen, overlay, hard-light, darken, lighten, difference and exclusion are polynomials, `min`, `max` or
+`|.|`, defined everywhere. Color-dodge: with `Cb != 0` and `Cs != 1`, `q = Cb / (1 - Cs)` is a finite real of either
+sign, and `min(1, q)` keeps a negative `q` (`Cs > 1` with `Cb > 0`, or `Cs < 1` with `Cb < 0`). Color-burn: with `Cb !=
+1` and `Cs != 0`, `q = (1 - Cb) / Cs`, and `1 - min(1, q)` exceeds 1 when `q < 0`. Soft-light: the root is taken only
+where `Cb > 1/4`, so its argument is always positive; no root of a negative arises anywhere, and `D`'s polynomial
+covers every `Cb <= 1/4`, negatives included. ClipColor: `n <= L <= x` always (`Lum` is a convex combination), so `L - n
+> 0` whenever `n < L`; in the one remaining case, `n < 0` with `n = L` (all three components equal `L`), `C - L = 0` and
+the step leaves `C` unchanged, as it does for `x > 1` with `x = L`. This defines W3C's `0 / 0` form by the value of its
+numerator's factor, the limit along the ray `C = L`. In the reals `n = L`, `x = L` and `n = x` are one condition, and it
+is stated as `n = x` (all components equal), which a double evaluation decides exactly: `L` computed in doubles from
+`0.3, 0.59, 0.11` can differ from an all-equal triple's components by a rounding, and a test of `n = L` would then take
+the quotient of two roundings. Off the ray the step does apply, so ClipColor is discontinuous there (out of range only):
+the step takes `n` to 0 however near the triple is to grey. SetSat divides only when `Cmax > Cmin`. The modes'
+discontinuities in the reals are where W3C puts them: dodge at `Cs = 1` approached from above with `Cb > 0` (out of
+range), burn at `Cs = 0` approached from below with `Cb > 1` (out of range), and ClipColor's and SetSat's quotients
+where components meet. They are kept, and the vectors test the exact point and each side.
+
+**B11 Alpha.** The result's alpha is source-over's for every mode (B2), so the modes differ only in color. `PLUS`'s
+clamp (N4) is not extended to them; nothing in B2 is clamped but by `sat`.
+
+**B12 Normal.** There is no `NORMAL` value. W3C's `normal` (`B = Cs`) makes B2 `cs (1 - Ab) + cb (1 - As) + As Ab Cs =
+cs + cb (1 - As)`, `SRC_OVER` exactly, so a front end lowers `normal` to `SRC_OVER`, or to no group (one spelling, one
+hash). The oracle's self-test checks the identity.
+
+**B13 Sinks.** A sink claims each mode it composites in `caps.composites` (bit `1 << op`; 28 values fit in 32 bits). One
+it lacks is `REFUSED`, reason `COMPOSITE`, by the planning pass (S6, `gshscene_caps_disposition`), never drawn as
+another mode; a sink claims an operator only once its compositor knows it (shape-cpu named its operators before this
+enum grew, so that it never claimed a mode it would have drawn as `CLEAR`). A group blended in another space without
+`BLEND_SPACES` is `APPROXIMATED` (`BLEND_SPACE`), as any group is. A writer spells the mode by its name. The test sink
+records it (its group record's `composite=N`). No new reason, class or cap flag.
+
+**B14 Hash and dump.** No spelling changes. The list's and version's `u8` composite holds 13 to 27, the dumps print the
+number as before, and every format stays 1. No committed hash changes: no list before the modes could hold a value
+past 12.
 
 ## Gradients (normative; color-paint story P1)
 

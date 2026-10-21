@@ -278,7 +278,7 @@ static GSHSCENE_Group random_group_props(void) {
   g.opacity = opacity[between(0, 3)];
   g.blend_space = random_space();
   g.ordering = between(0, 2);
-  g.composite = between(0, (unsigned)GSHSCENE_COMPOSITE_COUNT - 1);
+  g.composite = between(0, (unsigned)GSHSCENE_COMPOSITE_PLUS); /* the Porter-Duff draws, pinned: the blend section draws the modes */
   return g;
 }
 
@@ -876,7 +876,7 @@ static void palette_section(void) {
                                        : gshscene_list_fill_fixed(list, run, ops, op_count, GSHGEOM_FILL_NONZERO, &paint, 0);
       feed((uint64_t)r);
       if (r == GSHSCENE_OK && i % 3 == 2) {
-        check(gshscene_list_group_push_fixed(list, between(0, GSHSCENE_COMPOSITE_COUNT - 1), 0), "fixed group");
+        check(gshscene_list_group_push_fixed(list, between(0, GSHSCENE_COMPOSITE_PLUS), 0), "fixed group"); /* pinned, as above */
         check(gshscene_list_fill_fixed(list, run, NULL, 0, GSHGEOM_FILL_NONZERO, &paint, 0), "fixed fill");
         check(gshscene_list_group_pop(list), "fixed group pop");
         check(gshscene_list_clip_pop(list), "fixed clip pop");

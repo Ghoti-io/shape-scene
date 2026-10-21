@@ -32,8 +32,9 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
   list's palette, an interned table of colors (a font's CPAL palette, for instance), and a fill
   whose entry is missing is refused, never drawn in another color; a gradient paint names a gradient
   resource, whose stops (solid, foreground or palette) are converted into its interpolation space by
-  one function every sink calls at draw time; a group has a blend space, an opacity, a Porter-Duff
-  operator and an ordering context. Exact references (`tools/composite-oracle.py`,
+  one function every sink calls at draw time; a group has a blend space, an opacity, a composite
+  operator (a Porter-Duff operator, or one of W3C's fifteen blend modes, numbered as COLRv1 numbers
+  them: a per-draw blend is a group of one) and an ordering context. Exact references (`tools/composite-oracle.py`,
   `tools/gradient-oracle.py`) and committed known answers define what two sinks must agree on.
 - **Hash and dump** of every resource and list, in `shape-geometry`'s spelling (FNV-1a 64 over
   little-endian fields), the same on every target.

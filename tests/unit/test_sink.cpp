@@ -670,7 +670,7 @@ TEST(Sink, TheDispositionPredicate) {
   // Composites.
   for (uint32_t op = 0; op < GSHSCENE_COMPOSITE_COUNT; op++) {
     GSHSCENE_Sink_Caps c = caps;
-    c.composites = 0x1fff & ~(1u << op);
+    c.composites = ((1u << GSHSCENE_COMPOSITE_COUNT) - 1u) & ~(1u << op);
     GSHSCENE_Item g = group;
     g.group.composite = op;
     EXPECT_EQ(gshscene_caps_disposition(&c, &g, &srgb, nullptr).reason, GSHSCENE_REASON_COMPOSITE) << op;

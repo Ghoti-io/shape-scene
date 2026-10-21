@@ -227,7 +227,8 @@ GSHSCENE_API GSHSCENE_Result gshscene_list_clip_push_fixed(GSHSCENE_List * list,
 
 /**
  * @brief Begin a group (list.h's `gshscene_list_group_push`) of opacity 1, the enclosing blend space, flat order,
- *   composited by @p composite (a `GSHSCENE_Composite`, N4), at depth 0.
+ *   composited by @p composite (a `GSHSCENE_Composite`: a Porter-Duff operator, N4, or a blend mode 13 to 27, B1), at
+ *   depth 0.
  */
 GSHSCENE_API GSHSCENE_Result gshscene_list_group_push_fixed(GSHSCENE_List * list, uint32_t composite, int32_t layer);
 

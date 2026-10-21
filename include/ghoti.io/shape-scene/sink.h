@@ -190,6 +190,15 @@
  * resource id), and bakes what it needs from them itself; a writer emits a
  * gradient once per id and refers to it after.
  *
+ * **S18 Blend modes (list.h, B1 to B14; color-paint story P3).**  A blend mode is a
+ * group's composite operator (13 to 27).  A sink claims each one it composites
+ * in its caps' `composites` (bit `1 << op`); a group whose mode it lacks is
+ * refused by the planning pass (`COMPOSITE`), so it is never drawn as another
+ * mode, and a sink claims an operator only once its compositor knows it.  A
+ * writer spells a mode by its name (::gshscene_composite_string).  A blending
+ * group in a stated space other than the target's, without
+ * ::GSHSCENE_CAP_BLEND_SPACES, is approximated (`BLEND_SPACE`) as any group is.
+ *
  * ### For sink implementations
  *
  * A sink library fills a ::GSHSCENE_Sink_Ops and calls ::gshscene_sink_create

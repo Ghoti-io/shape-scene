@@ -331,7 +331,11 @@ GRAD_SWEEP_HASH = gradient_hash(GRAD_SWEEP)
 FILL, CLIP_PUSH, CLIP_POP, GROUP_PUSH, GROUP_POP, INSTANCE = 1, 2, 3, 4, 5, 6
 ORDER_FLAT, ORDER_DEPTH, ORDER_OVERLAY = 0, 1, 2
 COMPOSITE = {"src-over": 0, "clear": 1, "src": 2, "dest": 3, "dest-over": 4, "src-in": 5, "dest-in": 6,
-             "src-out": 7, "dest-out": 8, "src-atop": 9, "dest-atop": 10, "xor": 11, "plus": 12}
+             "src-out": 7, "dest-out": 8, "src-atop": 9, "dest-atop": 10, "xor": 11, "plus": 12,
+             # B1: the blend modes, COLRv1's CompositeMode numbers
+             "screen": 13, "overlay": 14, "darken": 15, "lighten": 16, "color-dodge": 17, "color-burn": 18,
+             "hard-light": 19, "soft-light": 20, "difference": 21, "exclusion": 22, "multiply": 23, "hue": 24,
+             "saturation": 25, "color": 26, "luminosity": 27}
 TIE_LAYER, TIE_PATH, TIE_DECLARED = 1, 2, 3
 DEFAULT_FG = ((0.0, 0.0, 0.0, 1.0), TARGET)
 
@@ -500,6 +504,22 @@ GRAD_LIST_ITEMS = [
     fill(KIND_PATH, SQ_RES, IDENTITY, 0, (0.0, 0.0, 0.0, 0.0), paint=PAINT_GRADIENT, grad=GRAD_LINEAR_HASH, depth=1.0),
 ]
 GRAD_LIST_HASH = list_hash(GRAD_LIST_ITEMS)
+
+# Blending groups (B1, B14): the u8 composite holds 13 to 27 in the same spelling (test_list.cpp records it).
+BLEND_LIST_ITEMS = [
+    fill(KIND_PATH, SQ_RES, IDENTITY, 0, (0.25, 0.5, 0.75, 1.0)),
+    group_push(0.5, composite=COMPOSITE["screen"]),
+    fill(KIND_PATH, P2_RES, TRANSLATE, 1, (1.0, 0.0, 0.5, 0.75)),
+    GROUP_POP_ITEM,
+    group_push(1.0, blend=SRGB_LINEAR, composite=COMPOSITE["luminosity"], layer=3, depth=-1.0),
+    group_push(0.25, composite=COMPOSITE["soft-light"], layer=2, depth=1.0),
+    fill(KIND_PATH, SQ_RES, IDENTITY, 0, (-0.5, 1.5, 0.5, 0.5)),
+    GROUP_POP_ITEM,
+    GROUP_POP_ITEM,
+    group_push(1.0, composite=COMPOSITE["multiply"]),
+    GROUP_POP_ITEM,
+]
+BLEND_LIST_HASH = list_hash(BLEND_LIST_ITEMS)
 
 # The order fixture: recorded in declared order (ORDER_ITEMS_DECLARED); the generator puts it in paint order.
 # A depth group holding: a (depth 1), b (depth 2, layer 1), c (depth 2, layer 0), d (depth 2, layer 0: declared
@@ -703,7 +723,7 @@ def render():
                     ("kPathKeyTwo", path_key([4, 5])), ("kPathKeyThree", path_key([7, 7, 3])),
                     ("kGradientLinearHash", GRAD_LINEAR_HASH), ("kGradientRadialHash", GRAD_RADIAL_HASH),
                     ("kGradientSweepHash", GRAD_SWEEP_HASH), ("kGradientListHash", GRAD_LIST_HASH),
-                    ("kGradientSceneHash", GRAD_SCENE_HASH)):
+                    ("kGradientSceneHash", GRAD_SCENE_HASH), ("kBlendListHash", BLEND_LIST_HASH)):
         o.append("static const std::uint64_t %s = UINT64_C(0x%016x);\n" % (name, v))
     o.append("static const int kSceneBLayer = %d;\n" % B_LAYER)
     o.append("static const double kSceneBTranslate[4][2] = {%s};\n" % ", ".join("{%r, %r}" % (t[0], t[1]) for t in B_T))
@@ -726,6 +746,7 @@ def render():
     o.append(cxx_string("kGradientSweepDump", gradient_dump(GRAD_SWEEP)))
     o.append(cxx_string("kGradientListDump", list_dump(GRAD_LIST_ITEMS)))
     o.append(cxx_string("kGradientSceneDump", version_dump(GRAD_SCENE_NODES)))
+    o.append(cxx_string("kBlendListDump", list_dump(BLEND_LIST_ITEMS)))
     o.append("\n}  // namespace known\n\n#endif\n")
     return "".join(o)
 
