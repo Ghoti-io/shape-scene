@@ -2968,10 +2968,10 @@
 ]
 ],
 [
-"va-196-lt",
+"va-198-lt",
 "srcl",
 "src/scene/validate.c",
-"196:<",
+"198:<",
 "<=",
 [
 "testScene",
@@ -2982,10 +2982,10 @@
 ]
 ],
 [
-"va-198-eq",
+"va-200-eq",
 "srcl",
 "src/scene/validate.c",
-"198:==",
+"200:==",
 "!=",
 [
 "testScene",
@@ -2996,10 +2996,10 @@
 ]
 ],
 [
-"va-198-ne",
+"va-200-ne",
 "srcl",
 "src/scene/validate.c",
-"198:!=",
+"200:!=",
 "==",
 [
 "testScene",
@@ -3010,10 +3010,10 @@
 ]
 ],
 [
-"va-198-neg",
+"va-200-neg",
 "srcl",
 "src/scene/validate.c",
-"198:(j == GSHSCENE_NONE || c->nodes[j]->parent != node->id)",
+"200:(j == GSHSCENE_NONE || c->nodes[j]->parent != node->id)",
 "(!(j == GSHSCENE_NONE || c->nodes[j]->parent != node->id))",
 [
 "testScene",
@@ -3024,10 +3024,10 @@
 ]
 ],
 [
-"va-201-del",
+"va-203-del",
 "srcl",
 "src/scene/validate.c",
-"201:c->memo[j].refs++;",
+"203:c->memo[j].refs++;",
 ";",
 [
 "testScene",
@@ -3038,10 +3038,10 @@
 ]
 ],
 [
-"va-203-ne",
+"va-205-ne",
 "srcl",
 "src/scene/validate.c",
-"203:!=",
+"205:!=",
 "==",
 [
 "testScene",
@@ -3052,39 +3052,11 @@
 ]
 ],
 [
-"va-203-neg",
+"va-205-neg",
 "srcl",
 "src/scene/validate.c",
-"203:(result != GSHSCENE_OK)",
+"205:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
-[
-"testScene",
-"testScene_limits",
-"testEdit",
-"testPaint_scene",
-"fuzz-replay"
-]
-],
-[
-"va-207-del",
-"srcl",
-"src/scene/validate.c",
-"207:m->depth = max_of(m->depth, gshscene_sat_add(1, child->depth));",
-";",
-[
-"testScene",
-"testScene_limits",
-"testEdit",
-"testPaint_scene",
-"fuzz-replay"
-]
-],
-[
-"va-208-neg",
-"srcl",
-"src/scene/validate.c",
-"208:(!hidden(c->nodes[j]))",
-"(!(!hidden(c->nodes[j])))",
 [
 "testScene",
 "testScene_limits",
@@ -3097,7 +3069,7 @@
 "va-209-del",
 "srcl",
 "src/scene/validate.c",
-"209:m->items = gshscene_sat_add(m->items, child->items);",
+"209:m->depth = max_of(m->depth, gshscene_sat_add(1, child->depth));",
 ";",
 [
 "testScene",
@@ -3108,11 +3080,11 @@
 ]
 ],
 [
-"va-210-del",
+"va-210-neg",
 "srcl",
 "src/scene/validate.c",
-"210:m->occ = gshscene_sat_add(m->occ, child->occ);",
-";",
+"210:(!hidden(c->nodes[j]))",
+"(!(!hidden(c->nodes[j])))",
 [
 "testScene",
 "testScene_limits",
@@ -3125,7 +3097,7 @@
 "va-211-del",
 "srcl",
 "src/scene/validate.c",
-"211:m->exp = gshscene_sat_add(m->exp, child->exp);",
+"211:m->items = gshscene_sat_add(m->items, child->items);",
 ";",
 [
 "testScene",
@@ -3139,7 +3111,7 @@
 "va-212-del",
 "srcl",
 "src/scene/validate.c",
-"212:m->push = max_of(m->push, child->push);",
+"212:m->occ = gshscene_sat_add(m->occ, child->occ);",
 ";",
 [
 "testScene",
@@ -3153,7 +3125,7 @@
 "va-213-del",
 "srcl",
 "src/scene/validate.c",
-"213:m->pic = max_of(m->pic, child->pic);",
+"213:m->exp = gshscene_sat_add(m->exp, child->exp);",
 ";",
 [
 "testScene",
@@ -3164,10 +3136,10 @@
 ]
 ],
 [
-"va-216-del",
+"va-214-del",
 "srcl",
 "src/scene/validate.c",
-"216:m->push = gshscene_sat_add(m->push, wrappers);",
+"214:m->push = max_of(m->push, child->push);",
 ";",
 [
 "testScene",
@@ -3178,10 +3150,38 @@
 ]
 ],
 [
-"va-228-eq",
+"va-215-del",
 "srcl",
 "src/scene/validate.c",
-"228:==",
+"215:m->pic = max_of(m->pic, child->pic);",
+";",
+[
+"testScene",
+"testScene_limits",
+"testEdit",
+"testPaint_scene",
+"fuzz-replay"
+]
+],
+[
+"va-218-del",
+"srcl",
+"src/scene/validate.c",
+"218:m->push = gshscene_sat_add(m->push, wrappers);",
+";",
+[
+"testScene",
+"testScene_limits",
+"testEdit",
+"testPaint_scene",
+"fuzz-replay"
+]
+],
+[
+"va-230-eq",
+"srcl",
+"src/scene/validate.c",
+"230:==",
 "!=",
 [
 "testScene",
@@ -3192,10 +3192,10 @@
 ]
 ],
 [
-"va-228-neg",
+"va-230-neg",
 "srcl",
 "src/scene/validate.c",
-"228:(t == GSHSCENE_NONE)",
+"230:(t == GSHSCENE_NONE)",
 "(!(t == GSHSCENE_NONE))",
 [
 "testScene",
@@ -3206,10 +3206,10 @@
 ]
 ],
 [
-"va-229-del",
+"va-231-del",
 "srcl",
 "src/scene/validate.c",
-"229:gshscene_problems_add(&c->problems, &c->core->alloc, node->id, GSHSCENE_PROBLEM_DANGLING_TARGET, &c->oom);",
+"231:gshscene_problems_add(&c->problems, &c->core->alloc, node->id, GSHSCENE_PROBLEM_DANGLING_TARGET, &c->oom);",
 ";",
 [
 "testScene",
@@ -3220,10 +3220,10 @@
 ]
 ],
 [
-"va-232-eq",
+"va-234-eq",
 "srcl",
 "src/scene/validate.c",
-"232:==",
+"234:==",
 "!=",
 [
 "testScene",
@@ -3234,10 +3234,10 @@
 ]
 ],
 [
-"va-232-neg",
+"va-234-neg",
 "srcl",
 "src/scene/validate.c",
-"232:(c->memo[t].color == VISITING)",
+"234:(c->memo[t].color == VISITING)",
 "(!(c->memo[t].color == VISITING))",
 [
 "testScene",
@@ -3248,10 +3248,10 @@
 ]
 ],
 [
-"va-233-del",
+"va-235-del",
 "srcl",
 "src/scene/validate.c",
-"233:gshscene_problems_add(&c->problems, &c->core->alloc, node->id, GSHSCENE_PROBLEM_CYCLE, &c->oom);",
+"235:gshscene_problems_add(&c->problems, &c->core->alloc, node->id, GSHSCENE_PROBLEM_CYCLE, &c->oom);",
 ";",
 [
 "testScene",
@@ -3262,10 +3262,10 @@
 ]
 ],
 [
-"va-237-ne",
+"va-239-ne",
 "srcl",
 "src/scene/validate.c",
-"237:!=",
+"239:!=",
 "==",
 [
 "testScene",
@@ -3276,39 +3276,11 @@
 ]
 ],
 [
-"va-237-neg",
+"va-239-neg",
 "srcl",
 "src/scene/validate.c",
-"237:(result != GSHSCENE_OK)",
+"239:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
-[
-"testScene",
-"testScene_limits",
-"testEdit",
-"testPaint_scene",
-"fuzz-replay"
-]
-],
-[
-"va-241-del",
-"srcl",
-"src/scene/validate.c",
-"241:m->depth = gshscene_sat_add(1, target->depth);",
-";",
-[
-"testScene",
-"testScene_limits",
-"testEdit",
-"testPaint_scene",
-"fuzz-replay"
-]
-],
-[
-"va-242-del",
-"srcl",
-"src/scene/validate.c",
-"242:m->occ = gshscene_sat_add(1, target->occ);",
-";",
 [
 "testScene",
 "testScene_limits",
@@ -3321,7 +3293,7 @@
 "va-243-del",
 "srcl",
 "src/scene/validate.c",
-"243:m->exp = gshscene_sat_add(1, target->exp);",
+"243:m->depth = gshscene_sat_add(1, target->depth);",
 ";",
 [
 "testScene",
@@ -3335,7 +3307,7 @@
 "va-244-del",
 "srcl",
 "src/scene/validate.c",
-"244:m->pic = gshscene_sat_add(1, target->pic);",
+"244:m->occ = gshscene_sat_add(1, target->occ);",
 ";",
 [
 "testScene",
@@ -3346,10 +3318,38 @@
 ]
 ],
 [
-"va-246-gt",
+"va-245-del",
 "srcl",
 "src/scene/validate.c",
-"246:ic > li",
+"245:m->exp = gshscene_sat_add(1, target->exp);",
+";",
+[
+"testScene",
+"testScene_limits",
+"testEdit",
+"testPaint_scene",
+"fuzz-replay"
+]
+],
+[
+"va-246-del",
+"srcl",
+"src/scene/validate.c",
+"246:m->pic = gshscene_sat_add(1, target->pic);",
+";",
+[
+"testScene",
+"testScene_limits",
+"testEdit",
+"testPaint_scene",
+"fuzz-replay"
+]
+],
+[
+"va-248-gt",
+"srcl",
+"src/scene/validate.c",
+"248:ic > li",
 "ic >= li",
 [
 "testScene",
@@ -3360,10 +3360,10 @@
 ]
 ],
 [
-"va-246-gt2",
+"va-248-gt2",
 "srcl",
 "src/scene/validate.c",
-"246:ms > li",
+"248:ms > li",
 "ms >= li",
 [
 "testScene",
@@ -3374,10 +3374,10 @@
 ]
 ],
 [
-"va-247-gt",
+"va-249-gt",
 "srcl",
 "src/scene/validate.c",
-"247:ms > li",
+"249:ms > li",
 "ms >= li",
 [
 "testScene",
@@ -3388,10 +3388,10 @@
 ]
 ],
 [
-"va-247-gt2",
+"va-249-gt2",
 "srcl",
 "src/scene/validate.c",
-"247:sh > li",
+"249:sh > li",
 "sh >= li",
 [
 "testScene",
@@ -3402,10 +3402,10 @@
 ]
 ],
 [
-"va-249-ret",
+"va-251-ret",
 "srcl",
 "src/scene/validate.c",
-"249:GSHSCENE_ERR_LIMIT",
+"251:GSHSCENE_ERR_LIMIT",
 "GSHSCENE_ERR_INVALID",
 [
 "testScene",
@@ -3416,10 +3416,10 @@
 ]
 ],
 [
-"va-256-eq",
+"va-258-eq",
 "srcl",
 "src/scene/validate.c",
-"256:==",
+"258:==",
 "!=",
 [
 "testScene",
@@ -3430,10 +3430,10 @@
 ]
 ],
 [
-"va-256-neg",
+"va-258-neg",
 "srcl",
 "src/scene/validate.c",
-"256:(m->color == DONE)",
+"258:(m->color == DONE)",
 "(!(m->color == DONE))",
 [
 "testScene",
@@ -3444,10 +3444,10 @@
 ]
 ],
 [
-"va-259-eq",
+"va-261-eq",
 "srcl",
 "src/scene/validate.c",
-"259:==",
+"261:==",
 "!=",
 [
 "testScene",
@@ -3458,10 +3458,10 @@
 ]
 ],
 [
-"va-259-neg",
+"va-261-neg",
 "srcl",
 "src/scene/validate.c",
-"259:(m->color == VISITING)",
+"261:(m->color == VISITING)",
 "(!(m->color == VISITING))",
 [
 "testScene",
@@ -3472,10 +3472,10 @@
 ]
 ],
 [
-"va-262-gt",
+"va-264-gt",
 "srcl",
 "src/scene/validate.c",
-"262:el > c-",
+"264:el > c-",
 "el >= c-",
 [
 "testScene",
@@ -3486,10 +3486,10 @@
 ]
 ],
 [
-"va-262-neg",
+"va-264-neg",
 "srcl",
 "src/scene/validate.c",
-"262:(level > c->core->limits.max_node_depth)",
+"264:(level > c->core->limits.max_node_depth)",
 "(!(level > c->core->limits.max_node_depth))",
 [
 "testScene",
@@ -3500,10 +3500,10 @@
 ]
 ],
 [
-"va-263-ret",
+"va-265-ret",
 "srcl",
 "src/scene/validate.c",
-"263:GSHSCENE_ERR_LIMIT",
+"265:GSHSCENE_ERR_LIMIT",
 "GSHSCENE_ERR_INVALID",
 [
 "testScene",
@@ -3514,10 +3514,10 @@
 ]
 ],
 [
-"va-265-del",
+"va-267-del",
 "srcl",
 "src/scene/validate.c",
-"265:m->color = VISITING;",
+"267:m->color = VISITING;",
 ";",
 [
 "testScene",
@@ -3528,38 +3528,10 @@
 ]
 ],
 [
-"va-266-del",
+"va-268-del",
 "srcl",
 "src/scene/validate.c",
-"266:c->reached++;",
-";",
-[
-"testScene",
-"testScene_limits",
-"testEdit",
-"testPaint_scene",
-"fuzz-replay"
-]
-],
-[
-"va-273-del",
-"srcl",
-"src/scene/validate.c",
-"273:m->depth = 1;",
-";",
-[
-"testScene",
-"testScene_limits",
-"testEdit",
-"testPaint_scene",
-"fuzz-replay"
-]
-],
-[
-"va-274-del",
-"srcl",
-"src/scene/validate.c",
-"274:m->items = 1;",
+"268:c->reached++;",
 ";",
 [
 "testScene",
@@ -3573,7 +3545,7 @@
 "va-275-del",
 "srcl",
 "src/scene/validate.c",
-"275:m->occ = 1;",
+"275:m->depth = 1;",
 ";",
 [
 "testScene",
@@ -3587,7 +3559,7 @@
 "va-276-del",
 "srcl",
 "src/scene/validate.c",
-"276:m->exp = 1;",
+"276:m->items = 1;",
 ";",
 [
 "testScene",
@@ -3598,10 +3570,38 @@
 ]
 ],
 [
-"va-283-ne",
+"va-277-del",
 "srcl",
 "src/scene/validate.c",
-"283:!=",
+"277:m->occ = 1;",
+";",
+[
+"testScene",
+"testScene_limits",
+"testEdit",
+"testPaint_scene",
+"fuzz-replay"
+]
+],
+[
+"va-278-del",
+"srcl",
+"src/scene/validate.c",
+"278:m->exp = 1;",
+";",
+[
+"testScene",
+"testScene_limits",
+"testEdit",
+"testPaint_scene",
+"fuzz-replay"
+]
+],
+[
+"va-285-ne",
+"srcl",
+"src/scene/validate.c",
+"285:!=",
 "==",
 [
 "testScene",
@@ -3612,10 +3612,10 @@
 ]
 ],
 [
-"va-283-neg",
+"va-285-neg",
 "srcl",
 "src/scene/validate.c",
-"283:(result != GSHSCENE_OK)",
+"285:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testScene",
@@ -3626,10 +3626,10 @@
 ]
 ],
 [
-"va-286-gt",
+"va-288-gt",
 "srcl",
 "src/scene/validate.c",
-"286:th > c-",
+"288:th > c-",
 "th >= c-",
 [
 "testScene",
@@ -3640,10 +3640,10 @@
 ]
 ],
 [
-"va-286-neg",
+"va-288-neg",
 "srcl",
 "src/scene/validate.c",
-"286:(m->depth > c->core->limits.max_node_depth)",
+"288:(m->depth > c->core->limits.max_node_depth)",
 "(!(m->depth > c->core->limits.max_node_depth))",
 [
 "testScene",
@@ -3654,10 +3654,10 @@
 ]
 ],
 [
-"va-287-ret",
+"va-289-ret",
 "srcl",
 "src/scene/validate.c",
-"287:GSHSCENE_ERR_LIMIT",
+"289:GSHSCENE_ERR_LIMIT",
 "GSHSCENE_ERR_INVALID",
 [
 "testScene",
@@ -3668,10 +3668,10 @@
 ]
 ],
 [
-"va-289-del",
+"va-291-del",
 "srcl",
 "src/scene/validate.c",
-"289:m->color = DONE;",
+"291:m->color = DONE;",
 ";",
 [
 "testScene",
@@ -3682,10 +3682,10 @@
 ]
 ],
 [
-"va-296-gt",
+"va-298-gt",
 "srcl",
 "src/scene/validate.c",
-"296:nt > li",
+"298:nt > li",
 "nt >= li",
 [
 "testScene",
@@ -3696,10 +3696,10 @@
 ]
 ],
 [
-"va-296-neg",
+"va-298-neg",
 "srcl",
 "src/scene/validate.c",
-"296:(count > limits->max_nodes)",
+"298:(count > limits->max_nodes)",
 "(!(count > limits->max_nodes))",
 [
 "testScene",
@@ -3710,10 +3710,10 @@
 ]
 ],
 [
-"va-297-ret",
+"va-299-ret",
 "srcl",
 "src/scene/validate.c",
-"297:GSHSCENE_ERR_LIMIT",
+"299:GSHSCENE_ERR_LIMIT",
 "GSHSCENE_ERR_INVALID",
 [
 "testScene",
@@ -3724,10 +3724,10 @@
 ]
 ],
 [
-"va-299-eq",
+"va-301-eq",
 "srcl",
 "src/scene/validate.c",
-"299:==",
+"301:==",
 "!=",
 [
 "testScene",
@@ -3738,10 +3738,10 @@
 ]
 ],
 [
-"va-299-ne",
+"va-301-ne",
 "srcl",
 "src/scene/validate.c",
-"299:id != GS",
+"301:id != GS",
 "id == GS",
 [
 "testScene",
@@ -3752,10 +3752,10 @@
 ]
 ],
 [
-"va-299-ne2",
+"va-301-ne2",
 "srcl",
 "src/scene/validate.c",
-"299:nt != 0 ",
+"301:nt != 0 ",
 "nt == 0 ",
 [
 "testScene",
@@ -3766,39 +3766,11 @@
 ]
 ],
 [
-"va-300-ne",
+"va-302-ne",
 "srcl",
 "src/scene/validate.c",
-"300:!=",
+"302:!=",
 "==",
-[
-"testScene",
-"testScene_limits",
-"testEdit",
-"testPaint_scene",
-"fuzz-replay"
-]
-],
-[
-"va-304-del",
-"srcl",
-"src/scene/validate.c",
-"304:memset(&check, 0, sizeof check);",
-";",
-[
-"testScene",
-"testScene_limits",
-"testEdit",
-"testPaint_scene",
-"fuzz-replay"
-]
-],
-[
-"va-305-del",
-"srcl",
-"src/scene/validate.c",
-"305:check.core = core;",
-";",
 [
 "testScene",
 "testScene_limits",
@@ -3811,7 +3783,7 @@
 "va-306-del",
 "srcl",
 "src/scene/validate.c",
-"306:check.nodes = nodes;",
+"306:memset(&check, 0, sizeof check);",
 ";",
 [
 "testScene",
@@ -3825,7 +3797,7 @@
 "va-307-del",
 "srcl",
 "src/scene/validate.c",
-"307:check.count = count;",
+"307:check.core = core;",
 ";",
 [
 "testScene",
@@ -3839,7 +3811,7 @@
 "va-308-del",
 "srcl",
 "src/scene/validate.c",
-"308:check.memo = gshscene_calloc(&core->alloc, count, sizeof *check.memo);",
+"308:check.nodes = nodes;",
 ";",
 [
 "testScene",
@@ -3850,10 +3822,38 @@
 ]
 ],
 [
-"va-309-neg",
+"va-309-del",
 "srcl",
 "src/scene/validate.c",
-"309:(!check.memo)",
+"309:check.count = count;",
+";",
+[
+"testScene",
+"testScene_limits",
+"testEdit",
+"testPaint_scene",
+"fuzz-replay"
+]
+],
+[
+"va-310-del",
+"srcl",
+"src/scene/validate.c",
+"310:check.memo = gshscene_calloc(&core->alloc, count, sizeof *check.memo);",
+";",
+[
+"testScene",
+"testScene_limits",
+"testEdit",
+"testPaint_scene",
+"fuzz-replay"
+]
+],
+[
+"va-311-neg",
+"srcl",
+"src/scene/validate.c",
+"311:(!check.memo)",
 "(!(!check.memo))",
 [
 "testScene",
@@ -3864,10 +3864,10 @@
 ]
 ],
 [
-"va-313-eq",
+"va-315-eq",
 "srcl",
 "src/scene/validate.c",
-"313:==",
+"315:==",
 "!=",
 [
 "testScene",
@@ -3878,10 +3878,10 @@
 ]
 ],
 [
-"va-313-ne",
+"va-315-ne",
 "srcl",
 "src/scene/validate.c",
-"313:!=",
+"315:!=",
 "==",
 [
 "testScene",
@@ -3892,10 +3892,10 @@
 ]
 ],
 [
-"va-313-neg",
+"va-315-neg",
 "srcl",
 "src/scene/validate.c",
-"313:(result == GSHSCENE_OK && check.oom != GSHSCENE_OK)",
+"315:(result == GSHSCENE_OK && check.oom != GSHSCENE_OK)",
 "(!(result == GSHSCENE_OK && check.oom != GSHSCENE_OK))",
 [
 "testScene",
@@ -3906,10 +3906,10 @@
 ]
 ],
 [
-"va-314-del",
+"va-316-del",
 "srcl",
 "src/scene/validate.c",
-"314:result = check.oom;",
+"316:result = check.oom;",
 ";",
 [
 "testScene",
@@ -3920,10 +3920,10 @@
 ]
 ],
 [
-"va-316-eq",
+"va-318-eq",
 "srcl",
 "src/scene/validate.c",
-"316:lt == GS",
+"318:lt == GS",
 "lt != GS",
 [
 "testScene",
@@ -3934,10 +3934,10 @@
 ]
 ],
 [
-"va-316-and",
+"va-318-and",
 "srcl",
 "src/scene/validate.c",
-"316:&&",
+"318:&&",
 "||",
 [
 "testScene",
@@ -3948,39 +3948,11 @@
 ]
 ],
 [
-"va-316-eq2",
+"va-318-eq2",
 "srcl",
 "src/scene/validate.c",
-"316:nt == 0)",
+"318:nt == 0)",
 "nt != 0)",
-[
-"testScene",
-"testScene_limits",
-"testEdit",
-"testPaint_scene",
-"fuzz-replay"
-]
-],
-[
-"va-316-neg",
-"srcl",
-"src/scene/validate.c",
-"316:(result == GSHSCENE_OK && check.problems.count == 0)",
-"(!(result == GSHSCENE_OK && check.problems.count == 0))",
-[
-"testScene",
-"testScene_limits",
-"testEdit",
-"testPaint_scene",
-"fuzz-replay"
-]
-],
-[
-"va-318-ne",
-"srcl",
-"src/scene/validate.c",
-"318:!=",
-"==",
 [
 "testScene",
 "testScene_limits",
@@ -3993,8 +3965,8 @@
 "va-318-neg",
 "srcl",
 "src/scene/validate.c",
-"318:(check.reached != count)",
-"(!(check.reached != count))",
+"318:(result == GSHSCENE_OK && check.problems.count == 0)",
+"(!(result == GSHSCENE_OK && check.problems.count == 0))",
 [
 "testScene",
 "testScene_limits",
@@ -4004,108 +3976,10 @@
 ]
 ],
 [
-"va-320-gt",
+"va-320-ne",
 "srcl",
 "src/scene/validate.c",
-"320:cc > li",
-"cc >= li",
-[
-"testScene",
-"testScene_limits",
-"testEdit",
-"testPaint_scene",
-"fuzz-replay"
-]
-],
-[
-"va-320-gt2",
-"srcl",
-"src/scene/validate.c",
-"320:xp > li",
-"xp >= li",
-[
-"testScene",
-"testScene_limits",
-"testEdit",
-"testPaint_scene",
-"fuzz-replay"
-]
-],
-[
-"va-321-gt",
-"srcl",
-"src/scene/validate.c",
-"321:ms > li",
-"ms >= li",
-[
-"testScene",
-"testScene_limits",
-"testEdit",
-"testPaint_scene",
-"fuzz-replay"
-]
-],
-[
-"va-321-gt2",
-"srcl",
-"src/scene/validate.c",
-"321:sh > li",
-"sh >= li",
-[
-"testScene",
-"testScene_limits",
-"testEdit",
-"testPaint_scene",
-"fuzz-replay"
-]
-],
-[
-"va-322-del",
-"srcl",
-"src/scene/validate.c",
-"322:result = GSHSCENE_ERR_LIMIT;",
-";",
-[
-"testScene",
-"testScene_limits",
-"testEdit",
-"testPaint_scene",
-"fuzz-replay"
-]
-],
-[
-"va-324-lt",
-"srcl",
-"src/scene/validate.c",
-"324:<",
-"<=",
-[
-"testScene",
-"testScene_limits",
-"testEdit",
-"testPaint_scene",
-"fuzz-replay"
-]
-],
-[
-"va-324-and",
-"srcl",
-"src/scene/validate.c",
-"324:&&",
-"||",
-[
-"testScene",
-"testScene_limits",
-"testEdit",
-"testPaint_scene",
-"fuzz-replay"
-]
-],
-[
-"va-325-ne",
-"srcl",
-"src/scene/validate.c",
-"325:!=",
+"320:!=",
 "==",
 [
 "testScene",
@@ -4116,10 +3990,136 @@
 ]
 ],
 [
-"va-325-neg",
+"va-320-neg",
 "srcl",
 "src/scene/validate.c",
-"325:(check.memo[i].refs != 1)",
+"320:(check.reached != count)",
+"(!(check.reached != count))",
+[
+"testScene",
+"testScene_limits",
+"testEdit",
+"testPaint_scene",
+"fuzz-replay"
+]
+],
+[
+"va-322-gt",
+"srcl",
+"src/scene/validate.c",
+"322:cc > li",
+"cc >= li",
+[
+"testScene",
+"testScene_limits",
+"testEdit",
+"testPaint_scene",
+"fuzz-replay"
+]
+],
+[
+"va-322-gt2",
+"srcl",
+"src/scene/validate.c",
+"322:xp > li",
+"xp >= li",
+[
+"testScene",
+"testScene_limits",
+"testEdit",
+"testPaint_scene",
+"fuzz-replay"
+]
+],
+[
+"va-323-gt",
+"srcl",
+"src/scene/validate.c",
+"323:ms > li",
+"ms >= li",
+[
+"testScene",
+"testScene_limits",
+"testEdit",
+"testPaint_scene",
+"fuzz-replay"
+]
+],
+[
+"va-323-gt2",
+"srcl",
+"src/scene/validate.c",
+"323:sh > li",
+"sh >= li",
+[
+"testScene",
+"testScene_limits",
+"testEdit",
+"testPaint_scene",
+"fuzz-replay"
+]
+],
+[
+"va-324-del",
+"srcl",
+"src/scene/validate.c",
+"324:result = GSHSCENE_ERR_LIMIT;",
+";",
+[
+"testScene",
+"testScene_limits",
+"testEdit",
+"testPaint_scene",
+"fuzz-replay"
+]
+],
+[
+"va-326-lt",
+"srcl",
+"src/scene/validate.c",
+"326:<",
+"<=",
+[
+"testScene",
+"testScene_limits",
+"testEdit",
+"testPaint_scene",
+"fuzz-replay"
+]
+],
+[
+"va-326-and",
+"srcl",
+"src/scene/validate.c",
+"326:&&",
+"||",
+[
+"testScene",
+"testScene_limits",
+"testEdit",
+"testPaint_scene",
+"fuzz-replay"
+]
+],
+[
+"va-327-ne",
+"srcl",
+"src/scene/validate.c",
+"327:!=",
+"==",
+[
+"testScene",
+"testScene_limits",
+"testEdit",
+"testPaint_scene",
+"fuzz-replay"
+]
+],
+[
+"va-327-neg",
+"srcl",
+"src/scene/validate.c",
+"327:(check.memo[i].refs != 1)",
 "(!(check.memo[i].refs != 1))",
 [
 "testScene",
@@ -4130,10 +4130,10 @@
 ]
 ],
 [
-"va-330-eq",
+"va-332-eq",
 "srcl",
 "src/scene/validate.c",
-"330:==",
+"332:==",
 "!=",
 [
 "testScene",
@@ -4144,25 +4144,11 @@
 ]
 ],
 [
-"va-330-neg",
+"va-332-neg",
 "srcl",
 "src/scene/validate.c",
-"330:(result == GSHSCENE_OK)",
+"332:(result == GSHSCENE_OK)",
 "(!(result == GSHSCENE_OK))",
-[
-"testScene",
-"testScene_limits",
-"testEdit",
-"testPaint_scene",
-"fuzz-replay"
-]
-],
-[
-"va-331-del",
-"srcl",
-"src/scene/validate.c",
-"331:result = GSHSCENE_ERR_INVALID;",
-";",
 [
 "testScene",
 "testScene_limits",
@@ -4175,7 +4161,7 @@
 "va-333-del",
 "srcl",
 "src/scene/validate.c",
-"333:gshscene_free(&core->alloc, check.memo);",
+"333:result = GSHSCENE_ERR_INVALID;",
 ";",
 [
 "testScene",
@@ -4186,10 +4172,24 @@
 ]
 ],
 [
-"va-334-eq",
+"va-335-del",
 "srcl",
 "src/scene/validate.c",
-"334:==",
+"335:gshscene_free(&core->alloc, check.memo);",
+";",
+[
+"testScene",
+"testScene_limits",
+"testEdit",
+"testPaint_scene",
+"fuzz-replay"
+]
+],
+[
+"va-336-eq",
+"srcl",
+"src/scene/validate.c",
+"336:==",
 "!=",
 [
 "testScene",
@@ -4200,10 +4200,10 @@
 ]
 ],
 [
-"va-334-neg",
+"va-336-neg",
 "srcl",
 "src/scene/validate.c",
-"334:(result == GSHSCENE_ERR_INVALID)",
+"336:(result == GSHSCENE_ERR_INVALID)",
 "(!(result == GSHSCENE_ERR_INVALID))",
 [
 "testScene",
@@ -4214,10 +4214,10 @@
 ]
 ],
 [
-"va-337-ne",
+"va-339-ne",
 "srcl",
 "src/scene/validate.c",
-"337:!=",
+"339:!=",
 "==",
 [
 "testScene",
@@ -4228,10 +4228,10 @@
 ]
 ],
 [
-"va-337-neg",
+"va-339-neg",
 "srcl",
 "src/scene/validate.c",
-"337:(built != GSHSCENE_OK)",
+"339:(built != GSHSCENE_OK)",
 "(!(built != GSHSCENE_OK))",
 [
 "testScene",
@@ -4242,10 +4242,10 @@
 ]
 ],
 [
-"va-340-neg",
+"va-342-neg",
 "srcl",
 "src/scene/validate.c",
-"340:(problems)",
+"342:(problems)",
 "(!(problems))",
 [
 "testScene",
@@ -4256,10 +4256,10 @@
 ]
 ],
 [
-"va-345-ret",
+"va-347-ret",
 "srcl",
 "src/scene/validate.c",
-"345:GSHSCENE_ERR_INVALID",
+"347:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testScene",
@@ -4270,10 +4270,10 @@
 ]
 ],
 [
-"va-347-del",
+"va-349-del",
 "srcl",
 "src/scene/validate.c",
-"347:gshscene_free(&core->alloc, check.problems.items);",
+"349:gshscene_free(&core->alloc, check.problems.items);",
 ";",
 [
 "testScene",
@@ -16485,10 +16485,10 @@
 ]
 ],
 [
-"nd-157-ne",
+"nd-158-ne",
 "srcl",
 "src/scene/node.c",
-"157:!=",
+"158:!=",
 "==",
 [
 "testNode",
@@ -16504,10 +16504,10 @@
 ]
 ],
 [
-"nd-163-str",
+"nd-164-str",
 "srcl",
 "src/scene/node.c",
-"163:g",
+"164:g",
 "Z",
 [
 "testNode",
@@ -16523,10 +16523,10 @@
 ]
 ],
 [
-"nd-165-str",
+"nd-166-str",
 "srcl",
 "src/scene/node.c",
-"165:s",
+"166:s",
 "Z",
 [
 "testNode",
@@ -16542,10 +16542,10 @@
 ]
 ],
 [
-"nd-167-str",
+"nd-168-str",
 "srcl",
 "src/scene/node.c",
-"167:i",
+"168:i",
 "Z",
 [
 "testNode",
@@ -16561,10 +16561,10 @@
 ]
 ],
 [
-"nd-171-str",
+"nd-172-str",
 "srcl",
 "src/scene/node.c",
-"171:n \"unkn",
+"172:n \"unkn",
 "n \"Znkn",
 [
 "testNode",
@@ -16580,10 +16580,10 @@
 ]
 ],
 [
-"nd-176-or",
+"nd-177-or",
 "srcl",
 "src/scene/node.c",
-"176:||",
+"177:||",
 "&&",
 [
 "testNode",
@@ -16599,10 +16599,10 @@
 ]
 ],
 [
-"nd-176-ne",
+"nd-177-ne",
 "srcl",
 "src/scene/node.c",
-"176:!=",
+"177:!=",
 "==",
 [
 "testNode",
@@ -16618,10 +16618,10 @@
 ]
 ],
 [
-"nd-176-neg",
+"nd-177-neg",
 "srcl",
 "src/scene/node.c",
-"176:(!resource || resource->store != store)",
+"177:(!resource || resource->store != store)",
 "(!(!resource || resource->store != store))",
 [
 "testNode",
@@ -16637,10 +16637,10 @@
 ]
 ],
 [
-"nd-177-ret",
+"nd-178-ret",
 "srcl",
 "src/scene/node.c",
-"177:GSHSCENE_ERR_INVALID",
+"178:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testNode",
@@ -16656,10 +16656,10 @@
 ]
 ],
 [
-"nd-179-ne",
+"nd-180-ne",
 "srcl",
 "src/scene/node.c",
-"179:f (resource->kind != GSHSCENE_RESOURCE",
+"180:f (resource->kind != GSHSCENE_RESOURCE",
 "f (resource->kind == GSHSCENE_RESOURCE",
 [
 "testNode",
@@ -16675,10 +16675,10 @@
 ]
 ],
 [
-"nd-179-and",
+"nd-180-and",
 "srcl",
 "src/scene/node.c",
-"179:&&",
+"180:&&",
 "||",
 [
 "testNode",
@@ -16694,10 +16694,10 @@
 ]
 ],
 [
-"nd-179-ne2",
+"nd-180-ne2",
 "srcl",
 "src/scene/node.c",
-"179:&& resource->kind != GSHSCENE_RESOURCE",
+"180:&& resource->kind != GSHSCENE_RESOURCE",
 "&& resource->kind == GSHSCENE_RESOURCE",
 [
 "testNode",
@@ -16713,10 +16713,10 @@
 ]
 ],
 [
-"nd-179-neg",
+"nd-180-neg",
 "srcl",
 "src/scene/node.c",
-"179:(resource->kind != GSHSCENE_RESOURCE_PATH && resource->kind != GSHSCENE_RESOURCE_GLYPH_RUN)",
+"180:(resource->kind != GSHSCENE_RESOURCE_PATH && resource->kind != GSHSCENE_RESOURCE_GLYPH_RUN)",
 "(!(resource->kind != GSHSCENE_RESOURCE_PATH && resource->kind != GSHSCENE_RESOURCE_GLYPH_RUN))",
 [
 "testNode",
@@ -16732,10 +16732,10 @@
 ]
 ],
 [
-"nd-180-ret",
+"nd-181-ret",
 "srcl",
 "src/scene/node.c",
-"180:GSHSCENE_ERR_INVALID",
+"181:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testNode",
@@ -16751,10 +16751,10 @@
 ]
 ],
 [
-"nd-188-ne",
+"nd-189-ne",
 "srcl",
 "src/scene/node.c",
-"188:!=",
+"189:!=",
 "==",
 [
 "testNode",
@@ -16770,10 +16770,10 @@
 ]
 ],
 [
-"nd-188-neg",
+"nd-189-neg",
 "srcl",
 "src/scene/node.c",
-"188:(result != GSHSCENE_OK)",
+"189:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testNode",
@@ -16789,10 +16789,10 @@
 ]
 ],
 [
-"nd-191-eq",
+"nd-192-eq",
 "srcl",
 "src/scene/node.c",
-"191:==",
+"192:==",
 "!=",
 [
 "testNode",
@@ -16808,10 +16808,10 @@
 ]
 ],
 [
-"nd-195-neg",
+"nd-196-neg",
 "srcl",
 "src/scene/node.c",
-"195:(!in)",
+"196:(!in)",
 "(!(!in))",
 [
 "testNode",
@@ -16827,10 +16827,10 @@
 ]
 ],
 [
-"nd-198-lt",
+"nd-199-lt",
 "srcl",
 "src/scene/node.c",
-"198:<",
+"199:<",
 "<=",
 [
 "testNode",
@@ -16846,10 +16846,10 @@
 ]
 ],
 [
-"nd-198-or",
+"nd-199-or",
 "srcl",
 "src/scene/node.c",
-"198:||",
+"199:||",
 "&&",
 [
 "testNode",
@@ -16865,10 +16865,10 @@
 ]
 ],
 [
-"nd-198-ge",
+"nd-199-ge",
 "srcl",
 "src/scene/node.c",
-"198:>=",
+"199:>=",
 ">",
 [
 "testNode",
@@ -16884,10 +16884,10 @@
 ]
 ],
 [
-"nd-198-neg",
+"nd-199-neg",
 "srcl",
 "src/scene/node.c",
-"198:((unsigned)in->kind < (unsigned)GSHSCENE_NODE_GROUP || (unsigned)in->kind >= (unsigned)GSHSCENE_NODE_KIND_COUNT)",
+"199:((unsigned)in->kind < (unsigned)GSHSCENE_NODE_GROUP || (unsigned)in->kind >= (unsigned)GSHSCENE_NODE_KIND_COUNT)",
 "(!((unsigned)in->kind < (unsigned)GSHSCENE_NODE_GROUP || (unsigned)in->kind >= (unsigned)GSHSCENE_NODE_KIND_COUNT))",
 [
 "testNode",
@@ -16903,10 +16903,10 @@
 ]
 ],
 [
-"nd-199-ret",
+"nd-200-ret",
 "srcl",
 "src/scene/node.c",
-"199:GSHSCENE_ERR_INVALID",
+"200:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testNode",
@@ -16922,10 +16922,10 @@
 ]
 ],
 [
-"nd-201-ne",
+"nd-202-ne",
 "srcl",
 "src/scene/node.c",
-"201:!=",
+"202:!=",
 "==",
 [
 "testNode",
@@ -16941,10 +16941,10 @@
 ]
 ],
 [
-"nd-201-neg",
+"nd-202-neg",
 "srcl",
 "src/scene/node.c",
-"201:((in->flags & ~GSHSCENE_NODE_HIDDEN) != 0)",
+"202:((in->flags & ~GSHSCENE_NODE_HIDDEN) != 0)",
 "(!((in->flags & ~GSHSCENE_NODE_HIDDEN) != 0))",
 [
 "testNode",
@@ -16960,30 +16960,11 @@
 ]
 ],
 [
-"nd-202-ret",
+"nd-203-ret",
 "srcl",
 "src/scene/node.c",
-"202:GSHSCENE_ERR_INVALID",
+"203:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-205-del",
-"srcl",
-"src/scene/node.c",
-"205:gshscene_node_init(in->kind, &node);",
-";",
 [
 "testNode",
 "testEdit",
@@ -17001,7 +16982,7 @@
 "nd-206-del",
 "srcl",
 "src/scene/node.c",
-"206:node.flags = in->flags;",
+"206:gshscene_node_init(in->kind, &node);",
 ";",
 [
 "testNode",
@@ -17017,10 +16998,29 @@
 ]
 ],
 [
-"nd-208-ne",
+"nd-207-del",
 "srcl",
 "src/scene/node.c",
-"208:!=",
+"207:node.flags = in->flags;",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-209-ne",
+"srcl",
+"src/scene/node.c",
+"209:!=",
 "==",
 [
 "testNode",
@@ -17036,30 +17036,11 @@
 ]
 ],
 [
-"nd-208-neg",
+"nd-209-neg",
 "srcl",
 "src/scene/node.c",
-"208:(result != GSHSCENE_OK)",
+"209:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-211-del",
-"srcl",
-"src/scene/node.c",
-"211:node.layer = in->layer;",
-";",
 [
 "testNode",
 "testEdit",
@@ -17077,7 +17058,7 @@
 "nd-212-del",
 "srcl",
 "src/scene/node.c",
-"212:result = gshscene_list_canonical_depth(in->depth, &node.depth);",
+"212:node.layer = in->layer;",
 ";",
 [
 "testNode",
@@ -17093,10 +17074,29 @@
 ]
 ],
 [
-"nd-213-ne",
+"nd-213-del",
 "srcl",
 "src/scene/node.c",
-"213:!=",
+"213:result = gshscene_list_canonical_depth(in->depth, &node.depth);",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-214-ne",
+"srcl",
+"src/scene/node.c",
+"214:!=",
 "==",
 [
 "testNode",
@@ -17112,10 +17112,10 @@
 ]
 ],
 [
-"nd-213-neg",
+"nd-214-neg",
 "srcl",
 "src/scene/node.c",
-"213:(result != GSHSCENE_OK)",
+"214:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testNode",
@@ -17131,10 +17131,10 @@
 ]
 ],
 [
-"nd-222-ne",
+"nd-224-ne",
 "srcl",
 "src/scene/node.c",
-"222:!=",
+"224:!=",
 "==",
 [
 "testNode",
@@ -17150,49 +17150,11 @@
 ]
 ],
 [
-"nd-222-neg",
+"nd-224-neg",
 "srcl",
 "src/scene/node.c",
-"222:(result != GSHSCENE_OK)",
+"224:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-225-del",
-"srcl",
-"src/scene/node.c",
-"225:node.opacity = canonical.opacity;",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-226-del",
-"srcl",
-"src/scene/node.c",
-"226:node.blend_space = canonical.blend_space;",
-";",
 [
 "testNode",
 "testEdit",
@@ -17210,7 +17172,7 @@
 "nd-227-del",
 "srcl",
 "src/scene/node.c",
-"227:node.ordering = canonical.ordering;",
+"227:node.opacity = canonical.opacity;",
 ";",
 [
 "testNode",
@@ -17229,7 +17191,7 @@
 "nd-228-del",
 "srcl",
 "src/scene/node.c",
-"228:node.composite = canonical.composite;",
+"228:node.blend_space = canonical.blend_space;",
 ";",
 [
 "testNode",
@@ -17245,11 +17207,11 @@
 ]
 ],
 [
-"nd-229-neg",
+"nd-229-del",
 "srcl",
 "src/scene/node.c",
-"229:(in->clip)",
-"(!(in->clip))",
+"229:node.ordering = canonical.ordering;",
+";",
 [
 "testNode",
 "testEdit",
@@ -17267,84 +17229,8 @@
 "nd-230-del",
 "srcl",
 "src/scene/node.c",
-"230:result = check_region(store, in->clip);",
+"230:node.composite = canonical.composite;",
 ";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-231-eq",
-"srcl",
-"src/scene/node.c",
-"231:==",
-"!=",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-231-neg",
-"srcl",
-"src/scene/node.c",
-"231:(result == GSHSCENE_OK)",
-"(!(result == GSHSCENE_OK))",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-232-del",
-"srcl",
-"src/scene/node.c",
-"232:result = node_map(&in->clip_map, &node.clip_map);",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-234-eq",
-"srcl",
-"src/scene/node.c",
-"234:==",
-"!=",
 [
 "testNode",
 "testEdit",
@@ -17362,8 +17248,8 @@
 "nd-234-neg",
 "srcl",
 "src/scene/node.c",
-"234:(result == GSHSCENE_OK)",
-"(!(result == GSHSCENE_OK))",
+"234:(in->clip)",
+"(!(in->clip))",
 [
 "testNode",
 "testEdit",
@@ -17381,7 +17267,7 @@
 "nd-235-del",
 "srcl",
 "src/scene/node.c",
-"235:result = gshscene_list_check_rule(in->clip_rule);",
+"235:result = check_region(store, in->clip);",
 ";",
 [
 "testNode",
@@ -17397,11 +17283,11 @@
 ]
 ],
 [
-"nd-237-ne",
+"nd-236-eq",
 "srcl",
 "src/scene/node.c",
-"237:!=",
-"==",
+"236:==",
+"!=",
 [
 "testNode",
 "testEdit",
@@ -17416,11 +17302,68 @@
 ]
 ],
 [
-"nd-237-neg",
+"nd-236-neg",
 "srcl",
 "src/scene/node.c",
-"237:(result != GSHSCENE_OK)",
-"(!(result != GSHSCENE_OK))",
+"236:(result == GSHSCENE_OK)",
+"(!(result == GSHSCENE_OK))",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-237-del",
+"srcl",
+"src/scene/node.c",
+"237:result = node_map(&in->clip_map, &node.clip_map);",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-239-eq",
+"srcl",
+"src/scene/node.c",
+"239:==",
+"!=",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-239-neg",
+"srcl",
+"src/scene/node.c",
+"239:(result == GSHSCENE_OK)",
+"(!(result == GSHSCENE_OK))",
 [
 "testNode",
 "testEdit",
@@ -17438,7 +17381,7 @@
 "nd-240-del",
 "srcl",
 "src/scene/node.c",
-"240:node.clip = in->clip;",
+"240:result = gshscene_list_check_rule(in->clip_rule);",
 ";",
 [
 "testNode",
@@ -17454,10 +17397,48 @@
 ]
 ],
 [
-"nd-241-del",
+"nd-242-ne",
 "srcl",
 "src/scene/node.c",
-"241:node.clip_rule = in->clip_rule;",
+"242:!=",
+"==",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-242-neg",
+"srcl",
+"src/scene/node.c",
+"242:(result != GSHSCENE_OK)",
+"(!(result != GSHSCENE_OK))",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-245-del",
+"srcl",
+"src/scene/node.c",
+"245:node.clip = in->clip;",
 ";",
 [
 "testNode",
@@ -17476,103 +17457,8 @@
 "nd-246-del",
 "srcl",
 "src/scene/node.c",
-"246:result = check_region(store, in->resource);",
+"246:node.clip_rule = in->clip_rule;",
 ";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-247-eq",
-"srcl",
-"src/scene/node.c",
-"247:==",
-"!=",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-247-neg",
-"srcl",
-"src/scene/node.c",
-"247:(result == GSHSCENE_OK)",
-"(!(result == GSHSCENE_OK))",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-248-del",
-"srcl",
-"src/scene/node.c",
-"248:result = gshscene_list_check_rule(in->fill_rule);",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-250-eq",
-"srcl",
-"src/scene/node.c",
-"250:==",
-"!=",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-250-neg",
-"srcl",
-"src/scene/node.c",
-"250:(result == GSHSCENE_OK)",
-"(!(result == GSHSCENE_OK))",
 [
 "testNode",
 "testEdit",
@@ -17590,7 +17476,7 @@
 "nd-251-del",
 "srcl",
 "src/scene/node.c",
-"251:result = gshscene_list_canonical_paint(store, &in->paint, &node.paint);",
+"251:result = check_region(store, in->resource);",
 ";",
 [
 "testNode",
@@ -17606,11 +17492,11 @@
 ]
 ],
 [
-"nd-253-ne",
+"nd-252-eq",
 "srcl",
 "src/scene/node.c",
-"253:!=",
-"==",
+"252:==",
+"!=",
 [
 "testNode",
 "testEdit",
@@ -17625,11 +17511,68 @@
 ]
 ],
 [
-"nd-253-neg",
+"nd-252-neg",
 "srcl",
 "src/scene/node.c",
-"253:(result != GSHSCENE_OK)",
-"(!(result != GSHSCENE_OK))",
+"252:(result == GSHSCENE_OK)",
+"(!(result == GSHSCENE_OK))",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-253-del",
+"srcl",
+"src/scene/node.c",
+"253:result = gshscene_list_check_rule(in->fill_rule);",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-255-eq",
+"srcl",
+"src/scene/node.c",
+"255:==",
+"!=",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-255-neg",
+"srcl",
+"src/scene/node.c",
+"255:(result == GSHSCENE_OK)",
+"(!(result == GSHSCENE_OK))",
 [
 "testNode",
 "testEdit",
@@ -17647,7 +17590,7 @@
 "nd-256-del",
 "srcl",
 "src/scene/node.c",
-"256:node.resource = in->resource;",
+"256:result = gshscene_list_canonical_paint(store, &in->paint, &node.paint);",
 ";",
 [
 "testNode",
@@ -17663,10 +17606,48 @@
 ]
 ],
 [
-"nd-257-del",
+"nd-258-ne",
 "srcl",
 "src/scene/node.c",
-"257:node.fill_rule = in->fill_rule;",
+"258:!=",
+"==",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-258-neg",
+"srcl",
+"src/scene/node.c",
+"258:(result != GSHSCENE_OK)",
+"(!(result != GSHSCENE_OK))",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-261-del",
+"srcl",
+"src/scene/node.c",
+"261:node.resource = in->resource;",
 ";",
 [
 "testNode",
@@ -17682,10 +17663,29 @@
 ]
 ],
 [
-"nd-260-eq",
+"nd-262-del",
 "srcl",
 "src/scene/node.c",
-"260:==",
+"262:node.fill_rule = in->fill_rule;",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-265-eq",
+"srcl",
+"src/scene/node.c",
+"265:==",
 "!=",
 [
 "testNode",
@@ -17701,10 +17701,10 @@
 ]
 ],
 [
-"nd-260-neg",
+"nd-265-neg",
 "srcl",
 "src/scene/node.c",
-"260:(in->target == 0)",
+"265:(in->target == 0)",
 "(!(in->target == 0))",
 [
 "testNode",
@@ -17720,10 +17720,10 @@
 ]
 ],
 [
-"nd-261-ret",
+"nd-266-ret",
 "srcl",
 "src/scene/node.c",
-"261:GSHSCENE_ERR_INVALID",
+"266:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testNode",
@@ -17739,68 +17739,11 @@
 ]
 ],
 [
-"nd-263-del",
+"nd-268-del",
 "srcl",
 "src/scene/node.c",
-"263:node.target = in->target;",
+"268:node.target = in->target;",
 ";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-271-ne",
-"srcl",
-"src/scene/node.c",
-"271:im != b-",
-"im == b-",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-271-ne2",
-"srcl",
-"src/scene/node.c",
-"271:nd != b-",
-"nd == b-",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-271-neg",
-"srcl",
-"src/scene/node.c",
-"271:(a->dim != b->dim || a->kind != b->kind)",
-"(!(a->dim != b->dim || a->kind != b->kind))",
 [
 "testNode",
 "testEdit",
@@ -17818,8 +17761,27 @@
 "nd-276-ne",
 "srcl",
 "src/scene/node.c",
-"276:!=",
-"==",
+"276:im != b-",
+"im == b-",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-276-ne2",
+"srcl",
+"src/scene/node.c",
+"276:nd != b-",
+"nd == b-",
 [
 "testNode",
 "testEdit",
@@ -17837,7 +17799,45 @@
 "nd-276-neg",
 "srcl",
 "src/scene/node.c",
-"276:(gshgeom_f64_bits(a->m[i][j]) != gshgeom_f64_bits(b->m[i][j]))",
+"276:(a->dim != b->dim || a->kind != b->kind)",
+"(!(a->dim != b->dim || a->kind != b->kind))",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-281-ne",
+"srcl",
+"src/scene/node.c",
+"281:!=",
+"==",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-281-neg",
+"srcl",
+"src/scene/node.c",
+"281:(gshgeom_f64_bits(a->m[i][j]) != gshgeom_f64_bits(b->m[i][j]))",
 "(!(gshgeom_f64_bits(a->m[i][j]) != gshgeom_f64_bits(b->m[i][j])))",
 [
 "testNode",
@@ -17853,10 +17853,10 @@
 ]
 ],
 [
-"nd-280-ne",
+"nd-285-ne",
 "srcl",
 "src/scene/node.c",
-"280:!=",
+"285:!=",
 "==",
 [
 "testNode",
@@ -17872,10 +17872,10 @@
 ]
 ],
 [
-"nd-280-neg",
+"nd-285-neg",
 "srcl",
 "src/scene/node.c",
-"280:(gshgeom_f64_bits(a->t[i]) != gshgeom_f64_bits(b->t[i]))",
+"285:(gshgeom_f64_bits(a->t[i]) != gshgeom_f64_bits(b->t[i]))",
 "(!(gshgeom_f64_bits(a->t[i]) != gshgeom_f64_bits(b->t[i])))",
 [
 "testNode",
@@ -17891,10 +17891,10 @@
 ]
 ],
 [
-"nd-288-ne",
+"nd-293-ne",
 "srcl",
 "src/scene/node.c",
-"288:nd != b-",
+"293:nd != b-",
 "nd == b-",
 [
 "testNode",
@@ -17910,10 +17910,10 @@
 ]
 ],
 [
-"nd-288-ne2",
+"nd-293-ne2",
 "srcl",
 "src/scene/node.c",
-"288:gs != b-",
+"293:gs != b-",
 "gs == b-",
 [
 "testNode",
@@ -17929,30 +17929,11 @@
 ]
 ],
 [
-"nd-288-ne3",
+"nd-293-ne3",
 "srcl",
 "src/scene/node.c",
-"288:er != b-",
+"293:er != b-",
 "er == b-",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-289-ne",
-"srcl",
-"src/scene/node.c",
-"289:!=",
-"==",
 [
 "testNode",
 "testEdit",
@@ -17970,7 +17951,26 @@
 "nd-294-ne",
 "srcl",
 "src/scene/node.c",
-"294:y) != gs",
+"294:!=",
+"==",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-299-ne",
+"srcl",
+"src/scene/node.c",
+"299:y) != gs",
 "y) == gs",
 [
 "testNode",
@@ -17986,10 +17986,10 @@
 ]
 ],
 [
-"nd-294-ne2",
+"nd-299-ne2",
 "srcl",
 "src/scene/node.c",
-"294:ip != b-",
+"299:ip != b-",
 "ip == b-",
 [
 "testNode",
@@ -18005,10 +18005,10 @@
 ]
 ],
 [
-"nd-295-ne",
+"nd-300-ne",
 "srcl",
 "src/scene/node.c",
-"295:!=",
+"300:!=",
 "==",
 [
 "testNode",
@@ -18024,29 +18024,10 @@
 ]
 ],
 [
-"nd-296-ne",
+"nd-305-eq",
 "srcl",
 "src/scene/node.c",
-"296:!=",
-"==",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-299-eq",
-"srcl",
-"src/scene/node.c",
-"299:ip == NU",
+"305:ip == NU",
 "ip != NU",
 [
 "testNode",
@@ -18062,10 +18043,10 @@
 ]
 ],
 [
-"nd-299-or",
+"nd-305-or",
 "srcl",
 "src/scene/node.c",
-"299:||",
+"305:||",
 "&&",
 [
 "testNode",
@@ -18081,10 +18062,10 @@
 ]
 ],
 [
-"nd-299-eq2",
+"nd-305-eq2",
 "srcl",
 "src/scene/node.c",
-"299:le == b-",
+"305:le == b-",
 "le != b-",
 [
 "testNode",
@@ -18100,125 +18081,11 @@
 ]
 ],
 [
-"nd-299-and",
+"nd-305-and",
 "srcl",
 "src/scene/node.c",
-"299:&&",
+"305:&&",
 "||",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-301-ne",
-"srcl",
-"src/scene/node.c",
-"301:ce != b-",
-"ce == b-",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-301-ne2",
-"srcl",
-"src/scene/node.c",
-"301:le != b-",
-"le == b-",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-301-ne3",
-"srcl",
-"src/scene/node.c",
-"301:nd != b-",
-"nd == b-",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-302-ne",
-"srcl",
-"src/scene/node.c",
-"302:!=",
-"==",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-303-ne",
-"srcl",
-"src/scene/node.c",
-"303:!=",
-"==",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-306-lt",
-"srcl",
-"src/scene/node.c",
-"306:<",
-"<=",
 [
 "testNode",
 "testEdit",
@@ -18236,7 +18103,64 @@
 "nd-307-ne",
 "srcl",
 "src/scene/node.c",
-"307:!=",
+"307:ce != b-",
+"ce == b-",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-307-ne2",
+"srcl",
+"src/scene/node.c",
+"307:le != b-",
+"le == b-",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-307-ne3",
+"srcl",
+"src/scene/node.c",
+"307:nd != b-",
+"nd == b-",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-308-ne",
+"srcl",
+"src/scene/node.c",
+"308:!=",
 "==",
 [
 "testNode",
@@ -18252,10 +18176,67 @@
 ]
 ],
 [
-"nd-307-neg",
+"nd-309-ne",
 "srcl",
 "src/scene/node.c",
-"307:(gshgeom_f64_bits(a->paint.rgba[i]) != gshgeom_f64_bits(b->paint.rgba[i]))",
+"309:!=",
+"==",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-312-lt",
+"srcl",
+"src/scene/node.c",
+"312:<",
+"<=",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-313-ne",
+"srcl",
+"src/scene/node.c",
+"313:!=",
+"==",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-313-neg",
+"srcl",
+"src/scene/node.c",
+"313:(gshgeom_f64_bits(a->paint.rgba[i]) != gshgeom_f64_bits(b->paint.rgba[i]))",
 "(!(gshgeom_f64_bits(a->paint.rgba[i]) != gshgeom_f64_bits(b->paint.rgba[i])))",
 [
 "testNode",
@@ -18271,10 +18252,10 @@
 ]
 ],
 [
-"nd-313-eq",
+"nd-319-eq",
 "srcl",
 "src/scene/node.c",
-"313:==",
+"319:==",
 "!=",
 [
 "testNode",
@@ -18290,10 +18271,10 @@
 ]
 ],
 [
-"nd-318-ne",
+"nd-324-ne",
 "srcl",
 "src/scene/node.c",
-"318:id != b-",
+"324:id != b-",
 "id == b-",
 [
 "testNode",
@@ -18309,10 +18290,10 @@
 ]
 ],
 [
-"nd-318-ne2",
+"nd-324-ne2",
 "srcl",
 "src/scene/node.c",
-"318:arent != b->pa",
+"324:arent != b->pa",
 "arent == b->pa",
 [
 "testNode",
@@ -18328,10 +18309,10 @@
 ]
 ],
 [
-"nd-318-ne3",
+"nd-324-ne3",
 "srcl",
 "src/scene/node.c",
-"318:ey != b-",
+"324:ey != b-",
 "ey == b-",
 [
 "testNode",
@@ -18347,49 +18328,11 @@
 ]
 ],
 [
-"nd-318-ne4",
+"nd-324-ne4",
 "srcl",
 "src/scene/node.c",
-"318:count != b->ch",
+"324:count != b->ch",
 "count == b->ch",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-318-neg",
-"srcl",
-"src/scene/node.c",
-"318:(a->id != b->id || a->parent != b->parent || a->has_key != b->has_key || a->child_count != b->child_count)",
-"(!(a->id != b->id || a->parent != b->parent || a->has_key != b->has_key || a->child_count != b->child_count))",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-321-neg",
-"srcl",
-"src/scene/node.c",
-"321:(a->has_key && gshscene_key_compare(&a->key, &b->key) != 0)",
-"(!(a->has_key && gshscene_key_compare(&a->key, &b->key) != 0))",
 [
 "testNode",
 "testEdit",
@@ -18407,7 +18350,45 @@
 "nd-324-neg",
 "srcl",
 "src/scene/node.c",
-"324:(!gshscene_props_equal(&a->p, &b->p))",
+"324:(a->id != b->id || a->parent != b->parent || a->has_key != b->has_key || a->child_count != b->child_count)",
+"(!(a->id != b->id || a->parent != b->parent || a->has_key != b->has_key || a->child_count != b->child_count))",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-327-neg",
+"srcl",
+"src/scene/node.c",
+"327:(a->has_key && gshscene_key_compare(&a->key, &b->key) != 0)",
+"(!(a->has_key && gshscene_key_compare(&a->key, &b->key) != 0))",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-330-neg",
+"srcl",
+"src/scene/node.c",
+"330:(!gshscene_props_equal(&a->p, &b->p))",
 "(!(!gshscene_props_equal(&a->p, &b->p)))",
 [
 "testNode",
@@ -18423,10 +18404,10 @@
 ]
 ],
 [
-"nd-327-eq",
+"nd-333-eq",
 "srcl",
 "src/scene/node.c",
-"327:nt == 0 ",
+"333:nt == 0 ",
 "nt != 0 ",
 [
 "testNode",
@@ -18442,68 +18423,11 @@
 ]
 ],
 [
-"nd-327-eq2",
+"nd-333-eq2",
 "srcl",
 "src/scene/node.c",
-"327:n) == 0;",
+"333:n) == 0;",
 "n) != 0;",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-333-del",
-"srcl",
-"src/scene/node.c",
-"333:gshscene_resource_retain(p->clip);",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-334-del",
-"srcl",
-"src/scene/node.c",
-"334:gshscene_resource_retain(p->resource);",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-335-del",
-"srcl",
-"src/scene/node.c",
-"335:gshscene_resource_retain(p->paint.gradient);",
-";",
 [
 "testNode",
 "testEdit",
@@ -18521,7 +18445,7 @@
 "nd-339-del",
 "srcl",
 "src/scene/node.c",
-"339:gshscene_resource_release(p->clip);",
+"339:gshscene_resource_retain(p->clip);",
 ";",
 [
 "testNode",
@@ -18540,7 +18464,7 @@
 "nd-340-del",
 "srcl",
 "src/scene/node.c",
-"340:gshscene_resource_release(p->resource);",
+"340:gshscene_resource_retain(p->resource);",
 ";",
 [
 "testNode",
@@ -18556,10 +18480,10 @@
 ]
 ],
 [
-"nd-350-del",
+"nd-341-del",
 "srcl",
 "src/scene/node.c",
-"350:gcu_atomic_size_init(&node->refs, 1);",
+"341:gshscene_resource_retain(p->paint.gradient);",
 ";",
 [
 "testNode",
@@ -18575,10 +18499,10 @@
 ]
 ],
 [
-"nd-351-del",
+"nd-346-del",
 "srcl",
 "src/scene/node.c",
-"351:node->core = core;",
+"346:gshscene_resource_release(p->clip);",
 ";",
 [
 "testNode",
@@ -18594,10 +18518,10 @@
 ]
 ],
 [
-"nd-352-del",
+"nd-347-del",
 "srcl",
 "src/scene/node.c",
-"352:gshscene_core_ref(core);",
+"347:gshscene_resource_release(p->resource);",
 ";",
 [
 "testNode",
@@ -18613,10 +18537,10 @@
 ]
 ],
 [
-"nd-356-del",
+"nd-358-del",
 "srcl",
 "src/scene/node.c",
-"356:props_retain(&node->p);",
+"358:gcu_atomic_size_init(&node->refs, 1);",
 ";",
 [
 "testNode",
@@ -18632,87 +18556,68 @@
 ]
 ],
 [
-"nd-362-neg",
+"nd-359-del",
 "srcl",
 "src/scene/node.c",
-"362:(!copy)",
+"359:node->core = core;",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-360-del",
+"srcl",
+"src/scene/node.c",
+"360:gshscene_core_ref(core);",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-364-del",
+"srcl",
+"src/scene/node.c",
+"364:props_retain(&node->p);",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-370-neg",
+"srcl",
+"src/scene/node.c",
+"370:(!copy)",
 "(!(!copy))",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-365-del",
-"srcl",
-"src/scene/node.c",
-"365:copy->has_key = node->has_key;",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-366-del",
-"srcl",
-"src/scene/node.c",
-"366:copy->key = node->key;",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-367-neg",
-"srcl",
-"src/scene/node.c",
-"367:(node->child_count)",
-"(!(node->child_count))",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-368-del",
-"srcl",
-"src/scene/node.c",
-"368:copy->children = gshscene_alloc(&node->core->alloc, node->child_count * sizeof *copy->children);",
-";",
 [
 "testNode",
 "testEdit",
@@ -18730,7 +18635,7 @@
 "nd-373-del",
 "srcl",
 "src/scene/node.c",
-"373:memcpy(copy->children, node->children, node->child_count * sizeof *copy->children);",
+"373:copy->has_key = node->has_key;",
 ";",
 [
 "testNode",
@@ -18749,7 +18654,7 @@
 "nd-374-del",
 "srcl",
 "src/scene/node.c",
-"374:copy->child_count = node->child_count;",
+"374:copy->key = node->key;",
 ";",
 [
 "testNode",
@@ -18765,10 +18670,86 @@
 ]
 ],
 [
-"nd-385-or",
+"nd-375-neg",
 "srcl",
 "src/scene/node.c",
-"385:||",
+"375:(node->child_count)",
+"(!(node->child_count))",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-376-del",
+"srcl",
+"src/scene/node.c",
+"376:copy->children = gshscene_alloc(&node->core->alloc, node->child_count * sizeof *copy->children);",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-381-del",
+"srcl",
+"src/scene/node.c",
+"381:memcpy(copy->children, node->children, node->child_count * sizeof *copy->children);",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-382-del",
+"srcl",
+"src/scene/node.c",
+"382:copy->child_count = node->child_count;",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-393-or",
+"srcl",
+"src/scene/node.c",
+"393:||",
 "&&",
 [
 "testNode",
@@ -18784,10 +18765,10 @@
 ]
 ],
 [
-"nd-385-ne",
+"nd-393-ne",
 "srcl",
 "src/scene/node.c",
-"385:!=",
+"393:!=",
 "==",
 [
 "testNode",
@@ -18803,106 +18784,11 @@
 ]
 ],
 [
-"nd-385-neg",
+"nd-393-neg",
 "srcl",
 "src/scene/node.c",
-"385:(!node || gcu_atomic_size_fetch_sub(&node->refs, 1) != 1)",
+"393:(!node || gcu_atomic_size_fetch_sub(&node->refs, 1) != 1)",
 "(!(!node || gcu_atomic_size_fetch_sub(&node->refs, 1) != 1))",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-389-del",
-"srcl",
-"src/scene/node.c",
-"389:props_release(&node->p);",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-390-del",
-"srcl",
-"src/scene/node.c",
-"390:gshscene_free(&core->alloc, node->children);",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-391-del",
-"srcl",
-"src/scene/node.c",
-"391:gshscene_free(&core->alloc, node);",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-392-del",
-"srcl",
-"src/scene/node.c",
-"392:gshscene_core_unref(core);",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-396-del",
-"srcl",
-"src/scene/node.c",
-"396:props_retain(canonical);",
-";",
 [
 "testNode",
 "testEdit",
@@ -18939,7 +18825,7 @@
 "nd-398-del",
 "srcl",
 "src/scene/node.c",
-"398:node->p = *canonical;",
+"398:gshscene_free(&core->alloc, node->children);",
 ";",
 [
 "testNode",
@@ -18955,11 +18841,11 @@
 ]
 ],
 [
-"nd-404-neg",
+"nd-399-del",
 "srcl",
 "src/scene/node.c",
-"404:(extra > SIZE_MAX / sizeof *node->children - node->child_count)",
-"(!(extra > SIZE_MAX / sizeof *node->children - node->child_count))",
+"399:gshscene_free(&core->alloc, node);",
+";",
 [
 "testNode",
 "testEdit",
@@ -18974,11 +18860,68 @@
 ]
 ],
 [
-"nd-408-neg",
+"nd-400-del",
 "srcl",
 "src/scene/node.c",
-"408:(need <= node->child_cap)",
-"(!(need <= node->child_cap))",
+"400:gshscene_core_unref(core);",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-404-del",
+"srcl",
+"src/scene/node.c",
+"404:props_retain(canonical);",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-405-del",
+"srcl",
+"src/scene/node.c",
+"405:props_release(&node->p);",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-406-del",
+"srcl",
+"src/scene/node.c",
+"406:node->p = *canonical;",
+";",
 [
 "testNode",
 "testEdit",
@@ -18996,7 +18939,45 @@
 "nd-412-neg",
 "srcl",
 "src/scene/node.c",
-"412:(cap < need)",
+"412:(extra > SIZE_MAX / sizeof *node->children - node->child_count)",
+"(!(extra > SIZE_MAX / sizeof *node->children - node->child_count))",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-416-neg",
+"srcl",
+"src/scene/node.c",
+"416:(need <= node->child_cap)",
+"(!(need <= node->child_cap))",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-420-neg",
+"srcl",
+"src/scene/node.c",
+"420:(cap < need)",
 "(!(cap < need))",
 [
 "testNode",
@@ -19012,10 +18993,10 @@
 ]
 ],
 [
-"nd-413-del",
+"nd-421-del",
 "srcl",
 "src/scene/node.c",
-"413:cap *= 2;",
+"421:cap *= 2;",
 ";",
 [
 "testNode",
@@ -19031,10 +19012,10 @@
 ]
 ],
 [
-"nd-419-neg",
+"nd-427-neg",
 "srcl",
 "src/scene/node.c",
-"419:(node->child_count)",
+"427:(node->child_count)",
 "(!(node->child_count))",
 [
 "testNode",
@@ -19050,10 +19031,10 @@
 ]
 ],
 [
-"nd-420-del",
+"nd-428-del",
 "srcl",
 "src/scene/node.c",
-"420:memcpy(grown, node->children, node->child_count * sizeof *grown);",
+"428:memcpy(grown, node->children, node->child_count * sizeof *grown);",
 ";",
 [
 "testNode",
@@ -19069,10 +19050,10 @@
 ]
 ],
 [
-"nd-422-del",
+"nd-430-del",
 "srcl",
 "src/scene/node.c",
-"422:gshscene_free(&node->core->alloc, node->children);",
+"430:gshscene_free(&node->core->alloc, node->children);",
 ";",
 [
 "testNode",
@@ -19088,10 +19069,10 @@
 ]
 ],
 [
-"nd-423-del",
+"nd-431-del",
 "srcl",
 "src/scene/node.c",
-"423:node->children = grown;",
+"431:node->children = grown;",
 ";",
 [
 "testNode",
@@ -19107,10 +19088,10 @@
 ]
 ],
 [
-"nd-429-neg",
+"nd-437-neg",
 "srcl",
 "src/scene/node.c",
-"429:(position < node->child_count)",
+"437:(position < node->child_count)",
 "(!(position < node->child_count))",
 [
 "testNode",
@@ -19126,10 +19107,10 @@
 ]
 ],
 [
-"nd-434-del",
+"nd-442-del",
 "srcl",
 "src/scene/node.c",
-"434:node->child_count++;",
+"442:node->child_count++;",
 ";",
 [
 "testNode",
@@ -19145,10 +19126,10 @@
 ]
 ],
 [
-"nd-439-eq",
+"nd-447-eq",
 "srcl",
 "src/scene/node.c",
-"439:==",
+"447:==",
 "!=",
 [
 "testNode",
@@ -19164,10 +19145,10 @@
 ]
 ],
 [
-"nd-439-neg",
+"nd-447-neg",
 "srcl",
 "src/scene/node.c",
-"439:(node->children[i] == child)",
+"447:(node->children[i] == child)",
 "(!(node->children[i] == child))",
 [
 "testNode",
@@ -19183,10 +19164,10 @@
 ]
 ],
 [
-"nd-440-del",
+"nd-448-del",
 "srcl",
 "src/scene/node.c",
-"440:memmove(&node->children[i], &node->children[i + 1], (node->child_count - i - 1) * sizeof *node->children);",
+"448:memmove(&node->children[i], &node->children[i + 1], (node->child_count - i - 1) * sizeof *node->children);",
 ";",
 [
 "testNode",
@@ -19202,10 +19183,10 @@
 ]
 ],
 [
-"nd-441-del",
+"nd-449-del",
 "srcl",
 "src/scene/node.c",
-"441:node->child_count--;",
+"449:node->child_count--;",
 ";",
 [
 "testNode",
@@ -19221,10 +19202,10 @@
 ]
 ],
 [
-"nd-452-del",
+"nd-460-del",
 "srcl",
 "src/scene/node.c",
-"452:gshgeom_hash_u64(h, node->id);",
+"460:gshgeom_hash_u64(h, node->id);",
 ";",
 [
 "testNode",
@@ -19240,10 +19221,10 @@
 ]
 ],
 [
-"nd-452-hwu64",
+"nd-460-hwu64",
 "srcl",
 "src/scene/node.c",
-"452:gshgeom_hash_u64(",
+"460:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testNode",
@@ -19259,10 +19240,10 @@
 ]
 ],
 [
-"nd-453-del",
+"nd-461-del",
 "srcl",
 "src/scene/node.c",
-"453:gshgeom_hash_u8(h, (uint8_t)p->kind);",
+"461:gshgeom_hash_u8(h, (uint8_t)p->kind);",
 ";",
 [
 "testNode",
@@ -19278,10 +19259,10 @@
 ]
 ],
 [
-"nd-453-hwu8",
+"nd-461-hwu8",
 "srcl",
 "src/scene/node.c",
-"453:gshgeom_hash_u8(",
+"461:gshgeom_hash_u8(",
 "gshgeom_hash_u32(",
 [
 "testNode",
@@ -19297,10 +19278,10 @@
 ]
 ],
 [
-"nd-454-del",
+"nd-462-del",
 "srcl",
 "src/scene/node.c",
-"454:gshgeom_hash_u8(h, (uint8_t)p->flags);",
+"462:gshgeom_hash_u8(h, (uint8_t)p->flags);",
 ";",
 [
 "testNode",
@@ -19316,181 +19297,10 @@
 ]
 ],
 [
-"nd-454-hwu8",
+"nd-462-hwu8",
 "srcl",
 "src/scene/node.c",
-"454:gshgeom_hash_u8(",
-"gshgeom_hash_u32(",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-455-del",
-"srcl",
-"src/scene/node.c",
-"455:gshgeom_hash_u64(h, node->parent);",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-455-hwu64",
-"srcl",
-"src/scene/node.c",
-"455:gshgeom_hash_u64(",
-"gshgeom_hash_u32(",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-456-del",
-"srcl",
-"src/scene/node.c",
-"456:gshgeom_hash_u8(h, node->has_key ? 1 : 0);",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-456-hwu8",
-"srcl",
-"src/scene/node.c",
-"456:gshgeom_hash_u8(",
-"gshgeom_hash_u32(",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-457-neg",
-"srcl",
-"src/scene/node.c",
-"457:(node->has_key)",
-"(!(node->has_key))",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-458-del",
-"srcl",
-"src/scene/node.c",
-"458:gshgeom_hash_u64(h, node->key.domain);",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-458-hwu64",
-"srcl",
-"src/scene/node.c",
-"458:gshgeom_hash_u64(",
-"gshgeom_hash_u32(",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-459-del",
-"srcl",
-"src/scene/node.c",
-"459:gshgeom_hash_u64(h, node->key.value);",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-459-hwu64",
-"srcl",
-"src/scene/node.c",
-"459:gshgeom_hash_u64(",
+"462:gshgeom_hash_u8(",
 "gshgeom_hash_u32(",
 [
 "testNode",
@@ -19509,7 +19319,7 @@
 "nd-463-del",
 "srcl",
 "src/scene/node.c",
-"463:gshgeom_hash_u64(h, gshgeom_map_hash(&p->map));",
+"463:gshgeom_hash_u64(h, node->parent);",
 ";",
 [
 "testNode",
@@ -19547,7 +19357,7 @@
 "nd-464-del",
 "srcl",
 "src/scene/node.c",
-"464:gshgeom_hash_f64(h, p->opacity);",
+"464:gshgeom_hash_u8(h, node->has_key ? 1 : 0);",
 ";",
 [
 "testNode",
@@ -19563,11 +19373,30 @@
 ]
 ],
 [
-"nd-465-del",
+"nd-464-hwu8",
 "srcl",
 "src/scene/node.c",
-"465:gshscene_space_hash(h, &p->blend_space);",
-";",
+"464:gshgeom_hash_u8(",
+"gshgeom_hash_u32(",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-465-neg",
+"srcl",
+"src/scene/node.c",
+"465:(node->has_key)",
+"(!(node->has_key))",
 [
 "testNode",
 "testEdit",
@@ -19585,7 +19414,7 @@
 "nd-466-del",
 "srcl",
 "src/scene/node.c",
-"466:gshgeom_hash_u8(h, (uint8_t)p->composite);",
+"466:gshgeom_hash_u64(h, node->key.domain);",
 ";",
 [
 "testNode",
@@ -19601,10 +19430,10 @@
 ]
 ],
 [
-"nd-466-hwu8",
+"nd-466-hwu64",
 "srcl",
 "src/scene/node.c",
-"466:gshgeom_hash_u8(",
+"466:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testNode",
@@ -19623,7 +19452,7 @@
 "nd-467-del",
 "srcl",
 "src/scene/node.c",
-"467:gshgeom_hash_u32(h, p->ordering);",
+"467:gshgeom_hash_u64(h, node->key.value);",
 ";",
 [
 "testNode",
@@ -19639,86 +19468,10 @@
 ]
 ],
 [
-"nd-467-hwu32",
+"nd-467-hwu64",
 "srcl",
 "src/scene/node.c",
-"467:gshgeom_hash_u32(",
-"gshgeom_hash_u64(",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-468-del",
-"srcl",
-"src/scene/node.c",
-"468:gshgeom_hash_i32(h, p->layer);",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-469-del",
-"srcl",
-"src/scene/node.c",
-"469:gshgeom_hash_f64(h, p->depth);",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-470-del",
-"srcl",
-"src/scene/node.c",
-"470:gshgeom_hash_u8(h, p->clip ? 1 : 0);",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-470-hwu8",
-"srcl",
-"src/scene/node.c",
-"470:gshgeom_hash_u8(",
+"467:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testNode",
@@ -19734,11 +19487,30 @@
 ]
 ],
 [
-"nd-471-neg",
+"nd-471-del",
 "srcl",
 "src/scene/node.c",
-"471:(p->clip)",
-"(!(p->clip))",
+"471:gshgeom_hash_u64(h, gshgeom_map_hash(&p->map));",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-471-hwu64",
+"srcl",
+"src/scene/node.c",
+"471:gshgeom_hash_u64(",
+"gshgeom_hash_u32(",
 [
 "testNode",
 "testEdit",
@@ -19756,27 +19528,8 @@
 "nd-472-del",
 "srcl",
 "src/scene/node.c",
-"472:gshgeom_hash_u64(h, gshscene_resource_hash(p->clip));",
+"472:gshgeom_hash_f64(h, p->opacity);",
 ";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-472-hwu64",
-"srcl",
-"src/scene/node.c",
-"472:gshgeom_hash_u64(",
-"gshgeom_hash_u32(",
 [
 "testNode",
 "testEdit",
@@ -19794,7 +19547,7 @@
 "nd-473-del",
 "srcl",
 "src/scene/node.c",
-"473:gshgeom_hash_u64(h, gshgeom_map_hash(&p->clip_map));",
+"473:gshscene_space_hash(h, &p->blend_space);",
 ";",
 [
 "testNode",
@@ -19810,29 +19563,10 @@
 ]
 ],
 [
-"nd-473-hwu64",
+"nd-475-del",
 "srcl",
 "src/scene/node.c",
-"473:gshgeom_hash_u64(",
-"gshgeom_hash_u32(",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-474-del",
-"srcl",
-"src/scene/node.c",
-"474:gshgeom_hash_u8(h, (uint8_t)p->clip_rule);",
+"475:gshgeom_hash_u32(h, p->ordering);",
 ";",
 [
 "testNode",
@@ -19848,11 +19582,11 @@
 ]
 ],
 [
-"nd-474-hwu8",
+"nd-475-hwu32",
 "srcl",
 "src/scene/node.c",
-"474:gshgeom_hash_u8(",
-"gshgeom_hash_u32(",
+"475:gshgeom_hash_u32(",
+"gshgeom_hash_u64(",
 [
 "testNode",
 "testEdit",
@@ -19870,7 +19604,7 @@
 "nd-476-del",
 "srcl",
 "src/scene/node.c",
-"476:gshgeom_hash_u64(h, (uint64_t)node->child_count);",
+"476:gshgeom_hash_i32(h, p->layer);",
 ";",
 [
 "testNode",
@@ -19886,30 +19620,11 @@
 ]
 ],
 [
-"nd-476-hwu64",
+"nd-477-del",
 "srcl",
 "src/scene/node.c",
-"476:gshgeom_hash_u64(",
-"gshgeom_hash_u32(",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-477-lt",
-"srcl",
-"src/scene/node.c",
-"477:<",
-"<=",
+"477:gshgeom_hash_f64(h, p->depth);",
+";",
 [
 "testNode",
 "testEdit",
@@ -19927,7 +19642,7 @@
 "nd-478-del",
 "srcl",
 "src/scene/node.c",
-"478:gshgeom_hash_u64(h, node->children[i]);",
+"478:gshgeom_hash_u8(h, p->clip ? 1 : 0);",
 ";",
 [
 "testNode",
@@ -19943,10 +19658,105 @@
 ]
 ],
 [
-"nd-478-hwu64",
+"nd-478-hwu8",
 "srcl",
 "src/scene/node.c",
-"478:gshgeom_hash_u64(",
+"478:gshgeom_hash_u8(",
+"gshgeom_hash_u32(",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-479-neg",
+"srcl",
+"src/scene/node.c",
+"479:(p->clip)",
+"(!(p->clip))",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-480-del",
+"srcl",
+"src/scene/node.c",
+"480:gshgeom_hash_u64(h, gshscene_resource_hash(p->clip));",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-480-hwu64",
+"srcl",
+"src/scene/node.c",
+"480:gshgeom_hash_u64(",
+"gshgeom_hash_u32(",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-481-del",
+"srcl",
+"src/scene/node.c",
+"481:gshgeom_hash_u64(h, gshgeom_map_hash(&p->clip_map));",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-481-hwu64",
+"srcl",
+"src/scene/node.c",
+"481:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testNode",
@@ -19965,7 +19775,7 @@
 "nd-482-del",
 "srcl",
 "src/scene/node.c",
-"482:gshgeom_hash_u64(h, gshscene_resource_hash(p->resource));",
+"482:gshgeom_hash_u8(h, (uint8_t)p->clip_rule);",
 ";",
 [
 "testNode",
@@ -19981,48 +19791,10 @@
 ]
 ],
 [
-"nd-482-hwu64",
+"nd-482-hwu8",
 "srcl",
 "src/scene/node.c",
-"482:gshgeom_hash_u64(",
-"gshgeom_hash_u32(",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-483-del",
-"srcl",
-"src/scene/node.c",
-"483:gshgeom_hash_u64(h, gshgeom_map_hash(&p->map));",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-483-hwu64",
-"srcl",
-"src/scene/node.c",
-"483:gshgeom_hash_u64(",
+"482:gshgeom_hash_u8(",
 "gshgeom_hash_u32(",
 [
 "testNode",
@@ -20041,7 +19813,7 @@
 "nd-484-del",
 "srcl",
 "src/scene/node.c",
-"484:gshgeom_hash_u8(h, (uint8_t)p->fill_rule);",
+"484:gshgeom_hash_u64(h, (uint64_t)node->child_count);",
 ";",
 [
 "testNode",
@@ -20057,10 +19829,10 @@
 ]
 ],
 [
-"nd-484-hwu8",
+"nd-484-hwu64",
 "srcl",
 "src/scene/node.c",
-"484:gshgeom_hash_u8(",
+"484:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testNode",
@@ -20076,10 +19848,29 @@
 ]
 ],
 [
-"nd-485-del",
+"nd-485-lt",
 "srcl",
 "src/scene/node.c",
-"485:gshgeom_hash_u8(h, (uint8_t)p->paint.kind);",
+"485:<",
+"<=",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-486-del",
+"srcl",
+"src/scene/node.c",
+"486:gshgeom_hash_u64(h, node->children[i]);",
 ";",
 [
 "testNode",
@@ -20095,49 +19886,11 @@
 ]
 ],
 [
-"nd-485-hwu8",
+"nd-486-hwu64",
 "srcl",
 "src/scene/node.c",
-"485:gshgeom_hash_u8(",
+"486:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-487-del",
-"srcl",
-"src/scene/node.c",
-"487:gshgeom_hash_f64(h, p->paint.rgba[k]);",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-489-del",
-"srcl",
-"src/scene/node.c",
-"489:gshscene_space_hash(h, &p->paint.space);",
-";",
 [
 "testNode",
 "testEdit",
@@ -20155,7 +19908,7 @@
 "nd-490-del",
 "srcl",
 "src/scene/node.c",
-"490:gshgeom_hash_u32(h, p->paint.entry);",
+"490:gshgeom_hash_u64(h, gshscene_resource_hash(p->resource));",
 ";",
 [
 "testNode",
@@ -20171,11 +19924,11 @@
 ]
 ],
 [
-"nd-490-hwu32",
+"nd-490-hwu64",
 "srcl",
 "src/scene/node.c",
-"490:gshgeom_hash_u32(",
-"gshgeom_hash_u64(",
+"490:gshgeom_hash_u64(",
+"gshgeom_hash_u32(",
 [
 "testNode",
 "testEdit",
@@ -20193,7 +19946,7 @@
 "nd-491-del",
 "srcl",
 "src/scene/node.c",
-"491:gshgeom_hash_u64(h, p->paint.gradient ? gshscene_resource_hash(p->paint.gradient) : 0);",
+"491:gshgeom_hash_u64(h, gshgeom_map_hash(&p->map));",
 ";",
 [
 "testNode",
@@ -20231,8 +19984,27 @@
 "nd-492-del",
 "srcl",
 "src/scene/node.c",
-"492:gshgeom_hash_i32(h, p->layer);",
+"492:gshgeom_hash_u8(h, (uint8_t)p->fill_rule);",
 ";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-492-hwu8",
+"srcl",
+"src/scene/node.c",
+"492:gshgeom_hash_u8(",
+"gshgeom_hash_u32(",
 [
 "testNode",
 "testEdit",
@@ -20250,7 +20022,7 @@
 "nd-493-del",
 "srcl",
 "src/scene/node.c",
-"493:gshgeom_hash_f64(h, p->depth);",
+"493:gshgeom_hash_u8(h, (uint8_t)p->paint.kind);",
 ";",
 [
 "testNode",
@@ -20266,30 +20038,30 @@
 ]
 ],
 [
-"nd-496-del",
+"nd-493-hwu8",
 "srcl",
 "src/scene/node.c",
-"496:gshgeom_hash_u64(h, p->target);",
-";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-496-hwu64",
-"srcl",
-"src/scene/node.c",
-"496:gshgeom_hash_u64(",
+"493:gshgeom_hash_u8(",
 "gshgeom_hash_u32(",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-495-del",
+"srcl",
+"src/scene/node.c",
+"495:gshgeom_hash_f64(h, p->paint.rgba[k]);",
+";",
 [
 "testNode",
 "testEdit",
@@ -20307,27 +20079,8 @@
 "nd-497-del",
 "srcl",
 "src/scene/node.c",
-"497:gshgeom_hash_u64(h, gshgeom_map_hash(&p->map));",
+"497:gshscene_space_hash(h, &p->paint.space);",
 ";",
-[
-"testNode",
-"testEdit",
-"testScene",
-"testScene_dump",
-"testVersion",
-"testPaint_scene",
-"testOrder",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"nd-497-hwu64",
-"srcl",
-"src/scene/node.c",
-"497:gshgeom_hash_u64(",
-"gshgeom_hash_u32(",
 [
 "testNode",
 "testEdit",
@@ -20345,8 +20098,27 @@
 "nd-498-del",
 "srcl",
 "src/scene/node.c",
-"498:gshgeom_hash_i32(h, p->layer);",
+"498:gshgeom_hash_u32(h, p->paint.entry);",
 ";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-498-hwu32",
+"srcl",
+"src/scene/node.c",
+"498:gshgeom_hash_u32(",
+"gshgeom_hash_u64(",
 [
 "testNode",
 "testEdit",
@@ -20364,7 +20136,178 @@
 "nd-499-del",
 "srcl",
 "src/scene/node.c",
-"499:gshgeom_hash_f64(h, p->depth);",
+"499:gshgeom_hash_u64(h, p->paint.gradient ? gshscene_resource_hash(p->paint.gradient) : 0);",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-499-hwu64",
+"srcl",
+"src/scene/node.c",
+"499:gshgeom_hash_u64(",
+"gshgeom_hash_u32(",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-500-del",
+"srcl",
+"src/scene/node.c",
+"500:gshgeom_hash_i32(h, p->layer);",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-501-del",
+"srcl",
+"src/scene/node.c",
+"501:gshgeom_hash_f64(h, p->depth);",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-504-del",
+"srcl",
+"src/scene/node.c",
+"504:gshgeom_hash_u64(h, p->target);",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-504-hwu64",
+"srcl",
+"src/scene/node.c",
+"504:gshgeom_hash_u64(",
+"gshgeom_hash_u32(",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-505-del",
+"srcl",
+"src/scene/node.c",
+"505:gshgeom_hash_u64(h, gshgeom_map_hash(&p->map));",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-505-hwu64",
+"srcl",
+"src/scene/node.c",
+"505:gshgeom_hash_u64(",
+"gshgeom_hash_u32(",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-506-del",
+"srcl",
+"src/scene/node.c",
+"506:gshgeom_hash_i32(h, p->layer);",
+";",
+[
+"testNode",
+"testEdit",
+"testScene",
+"testScene_dump",
+"testVersion",
+"testPaint_scene",
+"testOrder",
+"testEmit",
+"testPalette",
+"testGradient"
+]
+],
+[
+"nd-507-del",
+"srcl",
+"src/scene/node.c",
+"507:gshgeom_hash_f64(h, p->depth);",
 ";",
 [
 "testNode",
@@ -22036,28 +21979,10 @@
 ]
 ],
 [
-"vs-269-wd",
+"vs-274-neg",
 "srcl",
 "src/scene/version.c",
-"269:%016llx",
-"%llx",
-[
-"testVersion",
-"testScene_dump",
-"testScene",
-"testEmit",
-"testDiff",
-"testPaint_scene",
-"testOrder",
-"testPalette",
-"testGradient"
-]
-],
-[
-"vs-273-neg",
-"srcl",
-"src/scene/version.c",
-"273:(p->clip)",
+"274:(p->clip)",
 "(!(p->clip))",
 [
 "testVersion",
@@ -22072,10 +21997,10 @@
 ]
 ],
 [
-"vs-274-wd",
+"vs-275-wd",
 "srcl",
 "src/scene/version.c",
-"274:%s:%016llx:%0",
+"275:%s:%016llx:%0",
 "%s:%llx:%0",
 [
 "testVersion",
@@ -22090,10 +22015,10 @@
 ]
 ],
 [
-"vs-274-wd2",
+"vs-275-wd2",
 "srcl",
 "src/scene/version.c",
-"274:lx:%016llx:%u",
+"275:lx:%016llx:%u",
 "lx:%llx:%u",
 [
 "testVersion",
@@ -22108,10 +22033,10 @@
 ]
 ],
 [
-"vs-279-neg",
+"vs-280-neg",
 "srcl",
 "src/scene/version.c",
-"279:(fputs(\" clip=-\", out) < 0)",
+"280:(fputs(\" clip=-\", out) < 0)",
 "(!(fputs(\" clip=-\", out) < 0))",
 [
 "testVersion",
@@ -22126,47 +22051,11 @@
 ]
 ],
 [
-"vs-282-neg",
+"vs-283-neg",
 "srcl",
 "src/scene/version.c",
-"282:(fputs(\" children=\", out) < 0)",
+"283:(fputs(\" children=\", out) < 0)",
 "(!(fputs(\" children=\", out) < 0))",
-[
-"testVersion",
-"testScene_dump",
-"testScene",
-"testEmit",
-"testDiff",
-"testPaint_scene",
-"testOrder",
-"testPalette",
-"testGradient"
-]
-],
-[
-"vs-285-eq",
-"srcl",
-"src/scene/version.c",
-"285:==",
-"!=",
-[
-"testVersion",
-"testScene_dump",
-"testScene",
-"testEmit",
-"testDiff",
-"testPaint_scene",
-"testOrder",
-"testPalette",
-"testGradient"
-]
-],
-[
-"vs-285-neg",
-"srcl",
-"src/scene/version.c",
-"285:(node->child_count == 0)",
-"(!(node->child_count == 0))",
 [
 "testVersion",
 "testScene_dump",
@@ -22198,10 +22087,46 @@
 ]
 ],
 [
-"vs-288-lt",
+"vs-286-neg",
 "srcl",
 "src/scene/version.c",
-"288:<",
+"286:(node->child_count == 0)",
+"(!(node->child_count == 0))",
+[
+"testVersion",
+"testScene_dump",
+"testScene",
+"testEmit",
+"testDiff",
+"testPaint_scene",
+"testOrder",
+"testPalette",
+"testGradient"
+]
+],
+[
+"vs-287-eq",
+"srcl",
+"src/scene/version.c",
+"287:==",
+"!=",
+[
+"testVersion",
+"testScene_dump",
+"testScene",
+"testEmit",
+"testDiff",
+"testPaint_scene",
+"testOrder",
+"testPalette",
+"testGradient"
+]
+],
+[
+"vs-289-lt",
+"srcl",
+"src/scene/version.c",
+"289:<",
 "<=",
 [
 "testVersion",
@@ -22216,10 +22141,10 @@
 ]
 ],
 [
-"vs-289-neg",
+"vs-290-neg",
 "srcl",
 "src/scene/version.c",
-"289:(fprintf(out, i ? \",%llu\" : \"%llu\", HEX(node->children[i])) < 0)",
+"290:(fprintf(out, i ? \",%llu\" : \"%llu\", HEX(node->children[i])) < 0)",
 "(!(fprintf(out, i ? \",%llu\" : \"%llu\", HEX(node->children[i])) < 0))",
 [
 "testVersion",
@@ -22234,10 +22159,10 @@
 ]
 ],
 [
-"vs-296-lt",
+"vs-297-lt",
 "srcl",
 "src/scene/version.c",
-"296:<",
+"297:<",
 "<=",
 [
 "testVersion",
@@ -22252,10 +22177,10 @@
 ]
 ],
 [
-"vs-297-wd",
+"vs-298-wd",
 "srcl",
 "src/scene/version.c",
-"297:%s:%016llx ma",
+"298:%s:%016llx ma",
 "%s:%llx ma",
 [
 "testVersion",
@@ -22270,10 +22195,10 @@
 ]
 ],
 [
-"vs-297-wd2",
+"vs-298-wd2",
 "srcl",
 "src/scene/version.c",
-"297:ap=%016llx ru",
+"298:ap=%016llx ru",
 "ap=%llx ru",
 [
 "testVersion",
@@ -22288,10 +22213,10 @@
 ]
 ],
 [
-"vs-297-wd3",
+"vs-298-wd3",
 "srcl",
 "src/scene/version.c",
-"297:%u %016llx %0",
+"298:%u %016llx %0",
 "%u %llx %0",
 [
 "testVersion",
@@ -22306,10 +22231,10 @@
 ]
 ],
 [
-"vs-297-wd4",
+"vs-298-wd4",
 "srcl",
 "src/scene/version.c",
-"297:lx %016llx %0",
+"298:lx %016llx %0",
 "lx %llx %0",
 [
 "testVersion",
@@ -22324,10 +22249,10 @@
 ]
 ],
 [
-"vs-297-wd5",
+"vs-298-wd5",
 "srcl",
 "src/scene/version.c",
-"297:lx %016llx %0",
+"298:lx %016llx %0",
 "lx %llx %0",
 [
 "testVersion",
@@ -22342,10 +22267,10 @@
 ]
 ],
 [
-"vs-297-wd6",
+"vs-298-wd6",
 "srcl",
 "src/scene/version.c",
-"297:lx %016llx sp",
+"298:lx %016llx sp",
 "lx %llx sp",
 [
 "testVersion",
@@ -22360,10 +22285,10 @@
 ]
 ],
 [
-"vs-303-wd",
+"vs-304-wd",
 "srcl",
 "src/scene/version.c",
-"303:nt=%016llx la",
+"304:nt=%016llx la",
 "nt=%llx la",
 [
 "testVersion",
@@ -22378,10 +22303,10 @@
 ]
 ],
 [
-"vs-303-wd2",
+"vs-304-wd2",
 "srcl",
 "src/scene/version.c",
-"303:th=%016llx\", ",
+"304:th=%016llx\", ",
 "th=%llx\", ",
 [
 "testVersion",
@@ -22396,10 +22321,10 @@
 ]
 ],
 [
-"vs-310-lt",
+"vs-311-lt",
 "srcl",
 "src/scene/version.c",
-"310:<",
+"311:<",
 "<=",
 [
 "testVersion",
@@ -22414,10 +22339,10 @@
 ]
 ],
 [
-"vs-310-or",
+"vs-311-or",
 "srcl",
 "src/scene/version.c",
-"310:||",
+"311:||",
 "&&",
 [
 "testVersion",
@@ -22432,10 +22357,10 @@
 ]
 ],
 [
-"vs-311-wd",
+"vs-312-wd",
 "srcl",
 "src/scene/version.c",
-"311:ap=%016llx la",
+"312:ap=%016llx la",
 "ap=%llx la",
 [
 "testVersion",
@@ -22450,10 +22375,10 @@
 ]
 ],
 [
-"vs-311-wd2",
+"vs-312-wd2",
 "srcl",
 "src/scene/version.c",
-"311:th=%016llx\", ",
+"312:th=%016llx\", ",
 "th=%llx\", ",
 [
 "testVersion",
@@ -22468,10 +22393,10 @@
 ]
 ],
 [
-"vs-320-or",
+"vs-321-or",
 "srcl",
 "src/scene/version.c",
-"320:||",
+"321:||",
 "&&",
 [
 "testVersion",
@@ -22486,10 +22411,10 @@
 ]
 ],
 [
-"vs-320-neg",
+"vs-321-neg",
 "srcl",
 "src/scene/version.c",
-"320:(!version || !out)",
+"321:(!version || !out)",
 "(!(!version || !out))",
 [
 "testVersion",
@@ -22504,10 +22429,10 @@
 ]
 ],
 [
-"vs-321-ret",
+"vs-322-ret",
 "srcl",
 "src/scene/version.c",
-"321:GSHSCENE_ERR_INVALID",
+"322:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testVersion",
@@ -22522,10 +22447,10 @@
 ]
 ],
 [
-"vs-324-str",
+"vs-325-str",
 "srcl",
 "src/scene/version.c",
-"324:, \"gshs",
+"325:, \"gshs",
 ", \"Zshs",
 [
 "testVersion",
@@ -22540,10 +22465,10 @@
 ]
 ],
 [
-"vs-324-wd",
+"vs-325-wd",
 "srcl",
 "src/scene/version.c",
-"324:fg=%016llx %0",
+"325:fg=%016llx %0",
 "fg=%llx %0",
 [
 "testVersion",
@@ -22558,10 +22483,10 @@
 ]
 ],
 [
-"vs-324-wd2",
+"vs-325-wd2",
 "srcl",
 "src/scene/version.c",
-"324:lx %016llx %0",
+"325:lx %016llx %0",
 "lx %llx %0",
 [
 "testVersion",
@@ -22576,10 +22501,10 @@
 ]
 ],
 [
-"vs-324-wd3",
+"vs-325-wd3",
 "srcl",
 "src/scene/version.c",
-"324:lx %016llx %0",
+"325:lx %016llx %0",
 "lx %llx %0",
 [
 "testVersion",
@@ -22594,10 +22519,10 @@
 ]
 ],
 [
-"vs-328-wd",
+"vs-329-wd",
 "srcl",
 "src/scene/version.c",
-"328:te=%016llx ha",
+"329:te=%016llx ha",
 "te=%llx ha",
 [
 "testVersion",
@@ -22612,29 +22537,11 @@
 ]
 ],
 [
-"vs-328-wd2",
+"vs-329-wd2",
 "srcl",
 "src/scene/version.c",
-"328:sh=%016llx\\n\"",
+"329:sh=%016llx\\n\"",
 "sh=%llx\\n\"",
-[
-"testVersion",
-"testScene_dump",
-"testScene",
-"testEmit",
-"testDiff",
-"testPaint_scene",
-"testOrder",
-"testPalette",
-"testGradient"
-]
-],
-[
-"vs-332-lt",
-"srcl",
-"src/scene/version.c",
-"332:<",
-"<=",
 [
 "testVersion",
 "testScene_dump",
@@ -22666,100 +22573,10 @@
 ]
 ],
 [
-"vs-333-or",
+"vs-334-lt",
 "srcl",
 "src/scene/version.c",
-"333:||",
-"&&",
-[
-"testVersion",
-"testScene_dump",
-"testScene",
-"testEmit",
-"testDiff",
-"testPaint_scene",
-"testOrder",
-"testPalette",
-"testGradient"
-]
-],
-[
-"vs-333-eq",
-"srcl",
-"src/scene/version.c",
-"333:==",
-"!=",
-[
-"testVersion",
-"testScene_dump",
-"testScene",
-"testEmit",
-"testDiff",
-"testPaint_scene",
-"testOrder",
-"testPalette",
-"testGradient"
-]
-],
-[
-"vs-333-neg",
-"srcl",
-"src/scene/version.c",
-"333:(put_node(out, version->nodes[i]) < 0 || fputc('\\n', out) == EOF)",
-"(!(put_node(out, version->nodes[i]) < 0 || fputc('\\n', out) == EOF))",
-[
-"testVersion",
-"testScene_dump",
-"testScene",
-"testEmit",
-"testDiff",
-"testPaint_scene",
-"testOrder",
-"testPalette",
-"testGradient"
-]
-],
-[
-"vs-339-eq",
-"srcl",
-"src/scene/version.c",
-"339:==",
-"!=",
-[
-"testVersion",
-"testScene_dump",
-"testScene",
-"testEmit",
-"testDiff",
-"testPaint_scene",
-"testOrder",
-"testPalette",
-"testGradient"
-]
-],
-[
-"vs-339-and",
-"srcl",
-"src/scene/version.c",
-"339:&&",
-"||",
-[
-"testVersion",
-"testScene_dump",
-"testScene",
-"testEmit",
-"testDiff",
-"testPaint_scene",
-"testOrder",
-"testPalette",
-"testGradient"
-]
-],
-[
-"vs-346-lt",
-"srcl",
-"src/scene/version.c",
-"346:<",
+"334:<",
 "<=",
 [
 "testVersion",
@@ -22774,10 +22591,118 @@
 ]
 ],
 [
-"vs-347-ne",
+"vs-334-or",
 "srcl",
 "src/scene/version.c",
-"347:!=",
+"334:||",
+"&&",
+[
+"testVersion",
+"testScene_dump",
+"testScene",
+"testEmit",
+"testDiff",
+"testPaint_scene",
+"testOrder",
+"testPalette",
+"testGradient"
+]
+],
+[
+"vs-334-eq",
+"srcl",
+"src/scene/version.c",
+"334:==",
+"!=",
+[
+"testVersion",
+"testScene_dump",
+"testScene",
+"testEmit",
+"testDiff",
+"testPaint_scene",
+"testOrder",
+"testPalette",
+"testGradient"
+]
+],
+[
+"vs-334-neg",
+"srcl",
+"src/scene/version.c",
+"334:(put_node(out, version->nodes[i]) < 0 || fputc('\\n', out) == EOF)",
+"(!(put_node(out, version->nodes[i]) < 0 || fputc('\\n', out) == EOF))",
+[
+"testVersion",
+"testScene_dump",
+"testScene",
+"testEmit",
+"testDiff",
+"testPaint_scene",
+"testOrder",
+"testPalette",
+"testGradient"
+]
+],
+[
+"vs-340-eq",
+"srcl",
+"src/scene/version.c",
+"340:==",
+"!=",
+[
+"testVersion",
+"testScene_dump",
+"testScene",
+"testEmit",
+"testDiff",
+"testPaint_scene",
+"testOrder",
+"testPalette",
+"testGradient"
+]
+],
+[
+"vs-340-and",
+"srcl",
+"src/scene/version.c",
+"340:&&",
+"||",
+[
+"testVersion",
+"testScene_dump",
+"testScene",
+"testEmit",
+"testDiff",
+"testPaint_scene",
+"testOrder",
+"testPalette",
+"testGradient"
+]
+],
+[
+"vs-347-lt",
+"srcl",
+"src/scene/version.c",
+"347:<",
+"<=",
+[
+"testVersion",
+"testScene_dump",
+"testScene",
+"testEmit",
+"testDiff",
+"testPaint_scene",
+"testOrder",
+"testPalette",
+"testGradient"
+]
+],
+[
+"vs-348-ne",
+"srcl",
+"src/scene/version.c",
+"348:!=",
 "==",
 [
 "testVersion",
@@ -22792,10 +22717,10 @@
 ]
 ],
 [
-"vs-347-neg",
+"vs-348-neg",
 "srcl",
 "src/scene/version.c",
-"347:(a[i] != b[i])",
+"348:(a[i] != b[i])",
 "(!(a[i] != b[i]))",
 [
 "testVersion",
@@ -22810,10 +22735,10 @@
 ]
 ],
 [
-"vs-351-ne",
+"vs-352-ne",
 "srcl",
 "src/scene/version.c",
-"351:!=",
+"352:!=",
 "==",
 [
 "testVersion",
@@ -22828,29 +22753,11 @@
 ]
 ],
 [
-"vs-351-neg",
+"vs-352-neg",
 "srcl",
 "src/scene/version.c",
-"351:(a_count != b_count)",
+"352:(a_count != b_count)",
 "(!(a_count != b_count))",
-[
-"testVersion",
-"testScene_dump",
-"testScene",
-"testEmit",
-"testDiff",
-"testPaint_scene",
-"testOrder",
-"testPalette",
-"testGradient"
-]
-],
-[
-"vs-359-del",
-"srcl",
-"src/scene/version.c",
-"359:gshgeom_hash_init(&h);",
-";",
 [
 "testVersion",
 "testScene_dump",
@@ -22867,7 +22774,7 @@
 "vs-360-del",
 "srcl",
 "src/scene/version.c",
-"360:gshgeom_hash_u64(&h, (uint64_t)count);",
+"360:gshgeom_hash_init(&h);",
 ";",
 [
 "testVersion",
@@ -22882,10 +22789,28 @@
 ]
 ],
 [
-"vs-360-hwu64",
+"vs-361-del",
 "srcl",
 "src/scene/version.c",
-"360:gshgeom_hash_u64(",
+"361:gshgeom_hash_u64(&h, (uint64_t)count);",
+";",
+[
+"testVersion",
+"testScene_dump",
+"testScene",
+"testEmit",
+"testDiff",
+"testPaint_scene",
+"testOrder",
+"testPalette",
+"testGradient"
+]
+],
+[
+"vs-361-hwu64",
+"srcl",
+"src/scene/version.c",
+"361:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testVersion",
@@ -22900,10 +22825,10 @@
 ]
 ],
 [
-"vs-361-lt",
+"vs-362-lt",
 "srcl",
 "src/scene/version.c",
-"361:<",
+"362:<",
 "<=",
 [
 "testVersion",
@@ -22918,29 +22843,11 @@
 ]
 ],
 [
-"vs-362-hwu64",
+"vs-363-hwu64",
 "srcl",
 "src/scene/version.c",
-"362:gshgeom_hash_u64(",
+"363:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
-[
-"testVersion",
-"testScene_dump",
-"testScene",
-"testEmit",
-"testDiff",
-"testPaint_scene",
-"testOrder",
-"testPalette",
-"testGradient"
-]
-],
-[
-"vs-381-del",
-"srcl",
-"src/scene/version.c",
-"381:visit.node = node->id;",
-";",
 [
 "testVersion",
 "testScene_dump",
@@ -22957,7 +22864,7 @@
 "vs-382-del",
 "srcl",
 "src/scene/version.c",
-"382:walk->path[walk->path_count] = node->id;",
+"382:visit.node = node->id;",
 ";",
 [
 "testVersion",
@@ -22975,7 +22882,7 @@
 "vs-383-del",
 "srcl",
 "src/scene/version.c",
-"383:visit.path = walk->path;",
+"383:walk->path[walk->path_count] = node->id;",
 ";",
 [
 "testVersion",
@@ -22993,7 +22900,7 @@
 "vs-384-del",
 "srcl",
 "src/scene/version.c",
-"384:visit.path_count = walk->path_count + 1;",
+"384:visit.path = walk->path;",
 ";",
 [
 "testVersion",
@@ -23011,7 +22918,7 @@
 "vs-385-del",
 "srcl",
 "src/scene/version.c",
-"385:visit.kind = node->p.kind;",
+"385:visit.path_count = walk->path_count + 1;",
 ";",
 [
 "testVersion",
@@ -23029,7 +22936,7 @@
 "vs-386-del",
 "srcl",
 "src/scene/version.c",
-"386:visit.props = &node->p;",
+"386:visit.kind = node->p.kind;",
 ";",
 [
 "testVersion",
@@ -23044,10 +22951,28 @@
 ]
 ],
 [
-"vs-388-ne",
+"vs-387-del",
 "srcl",
 "src/scene/version.c",
-"388:!=",
+"387:visit.props = &node->p;",
+";",
+[
+"testVersion",
+"testScene_dump",
+"testScene",
+"testEmit",
+"testDiff",
+"testPaint_scene",
+"testOrder",
+"testPalette",
+"testGradient"
+]
+],
+[
+"vs-389-ne",
+"srcl",
+"src/scene/version.c",
+"389:!=",
 "==",
 [
 "testVersion",
@@ -23062,10 +22987,10 @@
 ]
 ],
 [
-"vs-388-neg",
+"vs-389-neg",
 "srcl",
 "src/scene/version.c",
-"388:(result != GSHSCENE_OK)",
+"389:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testVersion",
@@ -23080,10 +23005,10 @@
 ]
 ],
 [
-"vs-392-ne",
+"vs-393-ne",
 "srcl",
 "src/scene/version.c",
-"392:!=",
+"393:!=",
 "==",
 [
 "testVersion",
@@ -23098,10 +23023,10 @@
 ]
 ],
 [
-"vs-392-neg",
+"vs-393-neg",
 "srcl",
 "src/scene/version.c",
-"392:(stop != 0)",
+"393:(stop != 0)",
 "(!(stop != 0))",
 [
 "testVersion",
@@ -23116,10 +23041,10 @@
 ]
 ],
 [
-"vs-393-del",
+"vs-394-del",
 "srcl",
 "src/scene/version.c",
-"393:v->stopped_with = stop;",
+"394:v->stopped_with = stop;",
 ";",
 [
 "testVersion",
@@ -23134,10 +23059,10 @@
 ]
 ],
 [
-"vs-416-or",
+"vs-417-or",
 "srcl",
 "src/scene/version.c",
-"416:||",
+"417:||",
 "&&",
 [
 "testVersion",
@@ -23152,10 +23077,10 @@
 ]
 ],
 [
-"vs-416-neg",
+"vs-417-neg",
 "srcl",
 "src/scene/version.c",
-"416:(!version || !fn)",
+"417:(!version || !fn)",
 "(!(!version || !fn))",
 [
 "testVersion",
@@ -23170,10 +23095,10 @@
 ]
 ],
 [
-"vs-424-neg",
+"vs-425-neg",
 "srcl",
 "src/scene/version.c",
-"424:(!root)",
+"425:(!root)",
 "(!(!root))",
 [
 "testVersion",
@@ -23188,10 +23113,10 @@
 ]
 ],
 [
-"vs-428-eq",
+"vs-429-eq",
 "srcl",
 "src/scene/version.c",
-"428:==",
+"429:==",
 "!=",
 [
 "testVersion",
@@ -23206,10 +23131,10 @@
 ]
 ],
 [
-"vs-428-neg",
+"vs-429-neg",
 "srcl",
 "src/scene/version.c",
-"428:(result == WALK_STOP)",
+"429:(result == WALK_STOP)",
 "(!(result == WALK_STOP))",
 [
 "testVersion",
@@ -23224,10 +23149,10 @@
 ]
 ],
 [
-"vs-431-eq",
+"vs-432-eq",
 "srcl",
 "src/scene/version.c",
-"431:==",
+"432:==",
 "!=",
 [
 "testVersion",
@@ -34718,10 +34643,10 @@
 ]
 ],
 [
-"bl-263-del",
+"bl-342-del",
 "srcl",
 "src/list/list.c",
-"263:gshscene_resource_release(item_at(list, i)->paint.gradient);",
+"342:gshscene_resource_retain(item->paint.gradient);",
 ";",
 [
 "testBytes",
@@ -34741,10 +34666,10 @@
 ]
 ],
 [
-"bl-325-del",
+"bl-346-del",
 "srcl",
 "src/list/list.c",
-"325:gshscene_resource_retain(item->paint.gradient);",
+"346:list->expansion = total;",
 ";",
 [
 "testBytes",
@@ -34764,33 +34689,10 @@
 ]
 ],
 [
-"bl-328-del",
+"bl-403-ne",
 "srcl",
 "src/list/list.c",
-"328:list->expansion = total;",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-385-ne",
-"srcl",
-"src/list/list.c",
-"385:   paint->kind != GSHSCENE_PAINT",
+"403:   paint->kind != GSHSCENE_PAINT",
 "   paint->kind == GSHSCENE_PAINT",
 [
 "testBytes",
@@ -34810,10 +34712,10 @@
 ]
 ],
 [
-"bl-385-ne2",
+"bl-403-ne2",
 "srcl",
 "src/list/list.c",
-"385:&& paint->kind != GSHSCENE_PAINT",
+"403:&& paint->kind != GSHSCENE_PAINT",
 "&& paint->kind == GSHSCENE_PAINT",
 [
 "testBytes",
@@ -34833,10 +34735,10 @@
 ]
 ],
 [
-"bl-389-eq",
+"bl-407-eq",
 "srcl",
 "src/list/list.c",
-"389:==",
+"407:==",
 "!=",
 [
 "testBytes",
@@ -34856,10 +34758,10 @@
 ]
 ],
 [
-"bl-390-ne",
+"bl-408-ne",
 "srcl",
 "src/list/list.c",
-"390:re != st",
+"408:re != st",
 "re == st",
 [
 "testBytes",
@@ -34879,10 +34781,10 @@
 ]
 ],
 [
-"bl-390-ne2",
+"bl-408-ne2",
 "srcl",
 "src/list/list.c",
-"390:nd != GS",
+"408:nd != GS",
 "nd == GS",
 [
 "testBytes",
@@ -34902,10 +34804,10 @@
 ]
 ],
 [
-"bl-391-ne",
+"bl-409-ne",
 "srcl",
 "src/list/list.c",
-"391:!=",
+"409:!=",
 "==",
 [
 "testBytes",
@@ -34925,10 +34827,10 @@
 ]
 ],
 [
-"bl-395-eq",
+"bl-413-eq",
 "srcl",
 "src/list/list.c",
-"395:==",
+"413:==",
 "!=",
 [
 "testBytes",
@@ -34948,10 +34850,10 @@
 ]
 ],
 [
-"bl-395-gt",
+"bl-413-gt",
 "srcl",
 "src/list/list.c",
-"395:ry > GS",
+"413:ry > GS",
 "ry >= GS",
 [
 "testBytes",
@@ -34971,10 +34873,10 @@
 ]
 ],
 [
-"bl-395-ne",
+"bl-413-ne",
 "srcl",
 "src/list/list.c",
-"395:!=",
+"413:!=",
 "==",
 [
 "testBytes",
@@ -34994,10 +34896,10 @@
 ]
 ],
 [
-"bl-395-neg",
+"bl-413-neg",
 "srcl",
 "src/list/list.c",
-"395:(paint->kind == GSHSCENE_PAINT_PALETTE ? paint->entry > GSHSCENE_PALETTE_ENTRY_MAX : paint->entry != 0)",
+"413:(paint->kind == GSHSCENE_PAINT_PALETTE ? paint->entry > GSHSCENE_PALETTE_ENTRY_MAX : paint->entry != 0)",
 "(!(paint->kind == GSHSCENE_PAINT_PALETTE ? paint->entry > GSHSCENE_PALETTE_ENTRY_MAX : paint->entry != 0))",
 [
 "testBytes",
@@ -35017,10 +34919,10 @@
 ]
 ],
 [
-"bl-415-del",
+"bl-433-del",
 "srcl",
 "src/list/list.c",
-"415:out->entry = paint->entry;",
+"433:out->entry = paint->entry;",
 ";",
 [
 "testBytes",
@@ -35040,10 +34942,10 @@
 ]
 ],
 [
-"bl-416-del",
+"bl-434-del",
 "srcl",
 "src/list/list.c",
-"416:out->gradient = paint->gradient;",
+"434:out->gradient = paint->gradient;",
 ";",
 [
 "testBytes",
@@ -35063,10 +34965,10 @@
 ]
 ],
 [
-"bl-449-ge",
+"bl-467-ge",
 "srcl",
 "src/list/list.c",
-"449:ng >= (u",
+"467:ng >= (u",
 "ng > (u",
 [
 "testBytes",
@@ -35086,10 +34988,10 @@
 ]
 ],
 [
-"bl-449-or",
+"bl-467-or",
 "srcl",
 "src/list/list.c",
-"449:||",
+"467:||",
 "&&",
 [
 "testBytes",
@@ -35109,10 +35011,10 @@
 ]
 ],
 [
-"bl-449-ge2",
+"bl-467-ge2",
 "srcl",
 "src/list/list.c",
-"449:te >= (u",
+"467:te >= (u",
 "te > (u",
 [
 "testBytes",
@@ -35132,10 +35034,10 @@
 ]
 ],
 [
-"bl-449-neg",
+"bl-467-neg",
 "srcl",
 "src/list/list.c",
-"449:(group->ordering >= (uint32_t)GSHSCENE_ORDERING_COUNT || group->composite >= (uint32_t)GSHSCENE_COMPOSITE_COUNT)",
+"467:(group->ordering >= (uint32_t)GSHSCENE_ORDERING_COUNT || group->composite >= (uint32_t)GSHSCENE_COMPOSITE_COUNT)",
 "(!(group->ordering >= (uint32_t)GSHSCENE_ORDERING_COUNT || group->composite >= (uint32_t)GSHSCENE_COMPOSITE_COUNT))",
 [
 "testBytes",
@@ -35155,10 +35057,10 @@
 ]
 ],
 [
-"bl-459-del",
+"bl-485-del",
 "srcl",
 "src/list/list.c",
-"459:out->composite = group->composite;",
+"485:out->composite = group->composite;",
 ";",
 [
 "testBytes",
@@ -35178,10 +35080,10 @@
 ]
 ],
 [
-"bl-495-ge",
+"bl-550-ge",
 "srcl",
 "src/list/list.c",
-"495:>=",
+"550:>=",
 ">",
 [
 "testBytes",
@@ -35201,10 +35103,10 @@
 ]
 ],
 [
-"bl-495-neg",
+"bl-550-neg",
 "srcl",
 "src/list/list.c",
-"495:(list->depth >= list->limits.max_depth)",
+"550:(list->depth >= list->limits.max_depth)",
 "(!(list->depth >= list->limits.max_depth))",
 [
 "testBytes",
@@ -35224,10 +35126,10 @@
 ]
 ],
 [
-"bl-498-lt",
+"bl-553-lt",
 "srcl",
 "src/list/list.c",
-"498:<",
+"553:<",
 "<=",
 [
 "testBytes",
@@ -35247,10 +35149,10 @@
 ]
 ],
 [
-"bl-498-neg",
+"bl-553-neg",
 "srcl",
 "src/list/list.c",
-"498:(list->depth < list->stack_capacity)",
+"553:(list->depth < list->stack_capacity)",
 "(!(list->depth < list->stack_capacity))",
 [
 "testBytes",
@@ -35270,10 +35172,10 @@
 ]
 ],
 [
-"bl-507-neg",
+"bl-562-neg",
 "srcl",
 "src/list/list.c",
-"507:(list->depth)",
+"562:(list->depth)",
 "(!(list->depth))",
 [
 "testBytes",
@@ -35293,10 +35195,10 @@
 ]
 ],
 [
-"bl-508-del",
+"bl-563-del",
 "srcl",
 "src/list/list.c",
-"508:memcpy(memory, list->stack, list->depth);",
+"563:memcpy(memory, list->stack, list->depth);",
 ";",
 [
 "testBytes",
@@ -35316,10 +35218,10 @@
 ]
 ],
 [
-"bl-577-del",
+"bl-632-del",
 "srcl",
 "src/list/list.c",
-"577:list->stack[list->depth++] = PUSH_CLIP;",
+"632:list->stack[list->depth++] = PUSH_CLIP;",
 ";",
 [
 "testBytes",
@@ -35339,10 +35241,10 @@
 ]
 ],
 [
-"bl-584-eq",
+"bl-639-eq",
 "srcl",
 "src/list/list.c",
-"584:==",
+"639:==",
 "!=",
 [
 "testBytes",
@@ -35362,10 +35264,10 @@
 ]
 ],
 [
-"bl-584-ne",
+"bl-639-ne",
 "srcl",
 "src/list/list.c",
-"584:!=",
+"639:!=",
 "==",
 [
 "testBytes",
@@ -35385,10 +35287,10 @@
 ]
 ],
 [
-"bl-584-neg",
+"bl-639-neg",
 "srcl",
 "src/list/list.c",
-"584:(!list || list->closed || list->depth == 0 || list->stack[list->depth - 1] != push)",
+"639:(!list || list->closed || list->depth == 0 || list->stack[list->depth - 1] != push)",
 "(!(!list || list->closed || list->depth == 0 || list->stack[list->depth - 1] != push))",
 [
 "testBytes",
@@ -35408,10 +35310,10 @@
 ]
 ],
 [
-"bl-591-del",
+"bl-646-del",
 "srcl",
 "src/list/list.c",
-"591:list->depth--;",
+"646:list->depth--;",
 ";",
 [
 "testBytes",
@@ -35431,10 +35333,10 @@
 ]
 ],
 [
-"bl-619-del",
+"bl-674-del",
 "srcl",
 "src/list/list.c",
-"619:list->stack[list->depth++] = PUSH_GROUP;",
+"674:list->stack[list->depth++] = PUSH_GROUP;",
 ";",
 [
 "testBytes",
@@ -35454,286 +35356,10 @@
 ]
 ],
 [
-"bl-658-del",
+"bl-714-del",
 "srcl",
 "src/list/list.c",
-"658:gshscene_resource_release(item_at(list, i)->paint.gradient);",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-660-del",
-"srcl",
-"src/list/list.c",
-"660:list->count = count;",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-665-del",
-"srcl",
-"src/list/list.c",
-"665:list->expansion = 0;",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-666-del",
-"srcl",
-"src/list/list.c",
-"666:list->depth = 0;",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-676-eq",
-"srcl",
-"src/list/list.c",
-"676:==",
-"!=",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-676-del",
-"srcl",
-"src/list/list.c",
-"676:list->stack[list->depth++] = item->kind == GSHSCENE_ITEM_CLIP_PUSH ? PUSH_CLIP : PUSH_GROUP;",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-678-del",
-"srcl",
-"src/list/list.c",
-"678:list->depth--;",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-699-del",
-"srcl",
-"src/list/list.c",
-"699:list->foreground = value;",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-715-and",
-"srcl",
-"src/list/list.c",
-"715:&&",
-"||",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-715-ne",
-"srcl",
-"src/list/list.c",
-"715:re != li",
-"re == li",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-715-or",
-"srcl",
-"src/list/list.c",
-"715:||",
-"&&",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-715-ne2",
-"srcl",
-"src/list/list.c",
-"715:nd != GS",
-"nd == GS",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-718-del",
-"srcl",
-"src/list/list.c",
-"718:gshscene_resource_retain(palette);",
+"714:list->count = count;",
 ";",
 [
 "testBytes",
@@ -35756,7 +35382,7 @@
 "bl-719-del",
 "srcl",
 "src/list/list.c",
-"719:gshscene_resource_release(list->palette);",
+"719:list->expansion = 0;",
 ";",
 [
 "testBytes",
@@ -35779,7 +35405,7 @@
 "bl-720-del",
 "srcl",
 "src/list/list.c",
-"720:list->palette = palette;",
+"720:list->depth = 0;",
 ";",
 [
 "testBytes",
@@ -35799,240 +35425,10 @@
 ]
 ],
 [
-"bl-730-and",
+"bl-730-eq",
 "srcl",
 "src/list/list.c",
-"730:&&",
-"||",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-730-ne",
-"srcl",
-"src/list/list.c",
-"730:!=",
-"==",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-730-neg",
-"srcl",
-"src/list/list.c",
-"730:(!paint || !foreground || !out || (palette && palette->kind != GSHSCENE_RESOURCE_PALETTE))",
-"(!(!paint || !foreground || !out || (palette && palette->kind != GSHSCENE_RESOURCE_PALETTE)))",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-740-del",
-"srcl",
-"src/list/list.c",
-"740:c = *foreground;",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-741-del",
-"srcl",
-"src/list/list.c",
-"741:c.rgba[3] = foreground->rgba[3] * paint->rgba[3];",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-745-or",
-"srcl",
-"src/list/list.c",
-"745:||",
-"&&",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-745-ge",
-"srcl",
-"src/list/list.c",
-"745:>=",
-">",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-745-neg",
-"srcl",
-"src/list/list.c",
-"745:(!palette || paint->entry >= palette->u.palette.count)",
-"(!(!palette || paint->entry >= palette->u.palette.count))",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-748-del",
-"srcl",
-"src/list/list.c",
-"748:c = palette->u.palette.colors[paint->entry];",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-791-str",
-"srcl",
-"src/list/list.c",
-"791:n \"unkn",
-"n \"Znkn",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-813-eq",
-"srcl",
-"src/list/list.c",
-"813:==",
+"730:==",
 "!=",
 [
 "testBytes",
@@ -36052,11 +35448,11 @@
 ]
 ],
 [
-"bl-813-neg",
+"bl-730-del",
 "srcl",
 "src/list/list.c",
-"813:(context == (uint32_t)GSHSCENE_ORDER_DEPTH)",
-"(!(context == (uint32_t)GSHSCENE_ORDER_DEPTH))",
+"730:list->stack[list->depth++] = item->kind == GSHSCENE_ITEM_CLIP_PUSH ? PUSH_CLIP : PUSH_GROUP;",
+";",
 [
 "testBytes",
 "testCore",
@@ -36075,10 +35471,240 @@
 ]
 ],
 [
-"bl-821-ne",
+"bl-732-del",
 "srcl",
 "src/list/list.c",
-"821:!=",
+"732:list->depth--;",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-753-del",
+"srcl",
+"src/list/list.c",
+"753:list->foreground = value;",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-769-and",
+"srcl",
+"src/list/list.c",
+"769:&&",
+"||",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-769-ne",
+"srcl",
+"src/list/list.c",
+"769:re != li",
+"re == li",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-769-or",
+"srcl",
+"src/list/list.c",
+"769:||",
+"&&",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-769-ne2",
+"srcl",
+"src/list/list.c",
+"769:nd != GS",
+"nd == GS",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-772-del",
+"srcl",
+"src/list/list.c",
+"772:gshscene_resource_retain(palette);",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-773-del",
+"srcl",
+"src/list/list.c",
+"773:gshscene_resource_release(list->palette);",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-774-del",
+"srcl",
+"src/list/list.c",
+"774:list->palette = palette;",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-784-and",
+"srcl",
+"src/list/list.c",
+"784:&&",
+"||",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-784-ne",
+"srcl",
+"src/list/list.c",
+"784:!=",
 "==",
 [
 "testBytes",
@@ -36098,11 +35724,11 @@
 ]
 ],
 [
-"bl-821-neg",
+"bl-784-neg",
 "srcl",
 "src/list/list.c",
-"821:(context != (uint32_t)GSHSCENE_ORDER_OVERLAY)",
-"(!(context != (uint32_t)GSHSCENE_ORDER_OVERLAY))",
+"784:(!paint || !foreground || !out || (palette && palette->kind != GSHSCENE_RESOURCE_PALETTE))",
+"(!(!paint || !foreground || !out || (palette && palette->kind != GSHSCENE_RESOURCE_PALETTE)))",
 [
 "testBytes",
 "testCore",
@@ -36121,10 +35747,10 @@
 ]
 ],
 [
-"bl-862-del",
+"bl-794-del",
 "srcl",
 "src/list/list.c",
-"862:gshscene_free(alloc, s->units);",
+"794:c = *foreground;",
 ";",
 [
 "testBytes",
@@ -36144,10 +35770,10 @@
 ]
 ],
 [
-"bl-864-del",
+"bl-795-del",
 "srcl",
 "src/list/list.c",
-"864:gshscene_free(alloc, s->frames);",
+"795:c.rgba[3] = foreground->rgba[3] * paint->rgba[3];",
 ";",
 [
 "testBytes",
@@ -36167,10 +35793,79 @@
 ]
 ],
 [
-"bl-865-del",
+"bl-799-or",
 "srcl",
 "src/list/list.c",
-"865:gshscene_free(alloc, s->ties);",
+"799:||",
+"&&",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-799-ge",
+"srcl",
+"src/list/list.c",
+"799:>=",
+">",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-799-neg",
+"srcl",
+"src/list/list.c",
+"799:(!palette || paint->entry >= palette->u.palette.count)",
+"(!(!palette || paint->entry >= palette->u.palette.count))",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-802-del",
+"srcl",
+"src/list/list.c",
+"802:c = palette->u.palette.colors[paint->entry];",
 ";",
 [
 "testBytes",
@@ -36190,11 +35885,34 @@
 ]
 ],
 [
-"bl-897-lt",
+"bl-875-str",
 "srcl",
 "src/list/list.c",
-"897:<",
-"<=",
+"875:n \"unkn",
+"n \"Znkn",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-897-eq",
+"srcl",
+"src/list/list.c",
+"897:==",
+"!=",
 [
 "testBytes",
 "testCore",
@@ -36216,8 +35934,8 @@
 "bl-897-neg",
 "srcl",
 "src/list/list.c",
-"897:(unit_before(list, context, &units[j], &units[i], &tied) < 0)",
-"(!(unit_before(list, context, &units[j], &units[i], &tied) < 0))",
+"897:(context == (uint32_t)GSHSCENE_ORDER_DEPTH)",
+"(!(context == (uint32_t)GSHSCENE_ORDER_DEPTH))",
 [
 "testBytes",
 "testCore",
@@ -36236,240 +35954,10 @@
 ]
 ],
 [
-"bl-898-del",
+"bl-905-ne",
 "srcl",
 "src/list/list.c",
-"898:temp[k++] = units[j++];",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-900-del",
-"srcl",
-"src/list/list.c",
-"900:temp[k++] = units[i++];",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-904-del",
-"srcl",
-"src/list/list.c",
-"904:temp[k++] = units[i++];",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-907-del",
-"srcl",
-"src/list/list.c",
-"907:temp[k++] = units[j++];",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-910-del",
-"srcl",
-"src/list/list.c",
-"910:memcpy(units, temp, count * sizeof *units);",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-918-del",
-"srcl",
-"src/list/list.c",
-"918:f->base = *unit_top;",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-919-del",
-"srcl",
-"src/list/list.c",
-"919:f->units = &s->units[*unit_top];",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-924-del",
-"srcl",
-"src/list/list.c",
-"924:f->context = context;",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-930-del",
-"srcl",
-"src/list/list.c",
-"930:u.end = s->match[i];",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-932-del",
-"srcl",
-"src/list/list.c",
-"932:f->units[f->count++] = u;",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-936-ne",
-"srcl",
-"src/list/list.c",
-"936:!=",
+"905:!=",
 "==",
 [
 "testBytes",
@@ -36489,11 +35977,11 @@
 ]
 ],
 [
-"bl-936-neg",
+"bl-905-neg",
 "srcl",
 "src/list/list.c",
-"936:(context != (uint32_t)GSHSCENE_ORDER_FLAT && f->count > 1)",
-"(!(context != (uint32_t)GSHSCENE_ORDER_FLAT && f->count > 1))",
+"905:(context != (uint32_t)GSHSCENE_ORDER_OVERLAY)",
+"(!(context != (uint32_t)GSHSCENE_ORDER_OVERLAY))",
 [
 "testBytes",
 "testCore",
@@ -36512,10 +36000,33 @@
 ]
 ],
 [
-"bl-937-del",
+"bl-946-del",
 "srcl",
 "src/list/list.c",
-"937:units_sort(list, context, f->units, s->temp, f->count);",
+"946:gshscene_free(alloc, s->units);",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-948-del",
+"srcl",
+"src/list/list.c",
+"948:gshscene_free(alloc, s->frames);",
 ";",
 [
 "testBytes",
@@ -36538,7 +36049,7 @@
 "bl-949-del",
 "srcl",
 "src/list/list.c",
-"949:s->open[open_n++] = i;",
+"949:gshscene_free(alloc, s->ties);",
 ";",
 [
 "testBytes",
@@ -36558,11 +36069,11 @@
 ]
 ],
 [
-"bl-951-del",
+"bl-981-lt",
 "srcl",
 "src/list/list.c",
-"951:s->match[s->open[--open_n]] = i;",
-";",
+"981:<",
+"<=",
 [
 "testBytes",
 "testCore",
@@ -36581,11 +36092,11 @@
 ]
 ],
 [
-"bl-958-del",
+"bl-981-neg",
 "srcl",
 "src/list/list.c",
-"958:frame_open(list, s, &frame_count, &unit_top, 0, n, GSHSCENE_ORDER_FLAT, SIZE_MAX);",
-";",
+"981:(unit_before(list, context, &units[j], &units[i], &tied) < 0)",
+"(!(unit_before(list, context, &units[j], &units[i], &tied) < 0))",
 [
 "testBytes",
 "testCore",
@@ -36604,332 +36115,10 @@
 ]
 ],
 [
-"bl-959-neg",
+"bl-982-del",
 "srcl",
 "src/list/list.c",
-"959:(frame_count > 0)",
-"(!(frame_count > 0))",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-962-ne",
-"srcl",
-"src/list/list.c",
-"962:!=",
-"==",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-962-neg",
-"srcl",
-"src/list/list.c",
-"962:(f->closing != SIZE_MAX)",
-"(!(f->closing != SIZE_MAX))",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-963-del",
-"srcl",
-"src/list/list.c",
-"963:s->out[out_n++] = f->closing;",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-966-del",
-"srcl",
-"src/list/list.c",
-"966:frame_count--;",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-972-eq",
-"srcl",
-"src/list/list.c",
-"972:==",
-"!=",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-972-and",
-"srcl",
-"src/list/list.c",
-"972:&&",
-"||",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-972-gt",
-"srcl",
-"src/list/list.c",
-"972:xt > 1)",
-"xt >= 1)",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-972-neg",
-"srcl",
-"src/list/list.c",
-"972:(f->context == (uint32_t)GSHSCENE_ORDER_DEPTH && f->next > 1)",
-"(!(f->context == (uint32_t)GSHSCENE_ORDER_DEPTH && f->next > 1))",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-977-del",
-"srcl",
-"src/list/list.c",
-"977:tie->first = f->prev_pos;",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-978-del",
-"srcl",
-"src/list/list.c",
-"978:tie->second = pos;",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-979-del",
-"srcl",
-"src/list/list.c",
-"979:tie->depth = item->depth;",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-980-ne",
-"srcl",
-"src/list/list.c",
-"980:!=",
-"==",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-980-del",
-"srcl",
-"src/list/list.c",
-"980:tie->reason = before->layer != item->layer ? GSHSCENE_TIE_LAYER : GSHSCENE_TIE_DECLARED;",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-983-del",
-"srcl",
-"src/list/list.c",
-"983:f->prev_pos = pos;",
+"982:temp[k++] = units[j++];",
 ";",
 [
 "testBytes",
@@ -36952,7 +36141,7 @@
 "bl-984-del",
 "srcl",
 "src/list/list.c",
-"984:s->out[out_n++] = u.start;",
+"984:temp[k++] = units[i++];",
 ";",
 [
 "testBytes",
@@ -36972,125 +36161,10 @@
 ]
 ],
 [
-"bl-986-eq",
+"bl-988-del",
 "srcl",
 "src/list/list.c",
-"986:==",
-"!=",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-1015-eq",
-"srcl",
-"src/list/list.c",
-"1015:at == 0 ",
-"at != 0 ",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-1015-or",
-"srcl",
-"src/list/list.c",
-"1015:||",
-"&&",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-1015-eq2",
-"srcl",
-"src/list/list.c",
-"1015: n == 0)",
-" n != 0)",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-1015-neg",
-"srcl",
-"src/list/list.c",
-"1015:(list->nonflat == 0 || n == 0)",
-"(!(list->nonflat == 0 || n == 0))",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-1024-del",
-"srcl",
-"src/list/list.c",
-"1024:s.units = array_alloc(alloc, n, sizeof *s.units);",
+"988:temp[k++] = units[i++];",
 ";",
 [
 "testBytes",
@@ -37110,10 +36184,10 @@
 ]
 ],
 [
-"bl-1026-del",
+"bl-991-del",
 "srcl",
 "src/list/list.c",
-"1026:s.frames = array_alloc(alloc, n + 1, sizeof *s.frames);",
+"991:temp[k++] = units[j++];",
 ";",
 [
 "testBytes",
@@ -37133,10 +36207,10 @@
 ]
 ],
 [
-"bl-1027-del",
+"bl-994-del",
 "srcl",
 "src/list/list.c",
-"1027:s.ties = array_alloc(alloc, n, sizeof *s.ties);",
+"994:memcpy(units, temp, count * sizeof *units);",
 ";",
 [
 "testBytes",
@@ -37156,11 +36230,11 @@
 ]
 ],
 [
-"bl-1028-neg",
+"bl-1002-del",
 "srcl",
 "src/list/list.c",
-"1028:(!s.match || !s.out || !s.open || !s.units || !s.temp || !s.frames || !s.ties)",
-"(!(!s.match || !s.out || !s.open || !s.units || !s.temp || !s.frames || !s.ties))",
+"1002:f->base = *unit_top;",
+";",
 [
 "testBytes",
 "testCore",
@@ -37179,10 +36253,148 @@
 ]
 ],
 [
-"bl-1029-del",
+"bl-1003-del",
 "srcl",
 "src/list/list.c",
-"1029:scratch_free(alloc, &s);",
+"1003:f->units = &s->units[*unit_top];",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1008-del",
+"srcl",
+"src/list/list.c",
+"1008:f->context = context;",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1014-del",
+"srcl",
+"src/list/list.c",
+"1014:u.end = s->match[i];",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1016-del",
+"srcl",
+"src/list/list.c",
+"1016:f->units[f->count++] = u;",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1020-ne",
+"srcl",
+"src/list/list.c",
+"1020:!=",
+"==",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1020-neg",
+"srcl",
+"src/list/list.c",
+"1020:(context != (uint32_t)GSHSCENE_ORDER_FLAT && f->count > 1)",
+"(!(context != (uint32_t)GSHSCENE_ORDER_FLAT && f->count > 1))",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1021-del",
+"srcl",
+"src/list/list.c",
+"1021:units_sort(list, context, f->units, s->temp, f->count);",
 ";",
 [
 "testBytes",
@@ -37205,7 +36417,7 @@
 "bl-1033-del",
 "srcl",
 "src/list/list.c",
-"1033:resolve_order(list, &s, &tie_n);",
+"1033:s->open[open_n++] = i;",
 ";",
 [
 "testBytes",
@@ -37225,33 +36437,10 @@
 ]
 ],
 [
-"bl-1035-neg",
+"bl-1035-del",
 "srcl",
 "src/list/list.c",
-"1035:(tie_n > 0)",
-"(!(tie_n > 0))",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-1036-del",
-"srcl",
-"src/list/list.c",
-"1036:ties = array_alloc(alloc, tie_n, sizeof *ties);",
+"1035:s->match[s->open[--open_n]] = i;",
 ";",
 [
 "testBytes",
@@ -37271,10 +36460,10 @@
 ]
 ],
 [
-"bl-1038-del",
+"bl-1042-del",
 "srcl",
 "src/list/list.c",
-"1038:scratch_free(alloc, &s);",
+"1042:frame_open(list, s, &frame_count, &unit_top, 0, n, GSHSCENE_ORDER_FLAT, SIZE_MAX);",
 ";",
 [
 "testBytes",
@@ -37294,11 +36483,11 @@
 ]
 ],
 [
-"bl-1041-del",
+"bl-1043-neg",
 "srcl",
 "src/list/list.c",
-"1041:memcpy(ties, s.ties, tie_n * sizeof *ties);",
-";",
+"1043:(frame_count > 0)",
+"(!(frame_count > 0))",
 [
 "testBytes",
 "testCore",
@@ -37317,11 +36506,11 @@
 ]
 ],
 [
-"bl-1044-del",
+"bl-1046-ne",
 "srcl",
 "src/list/list.c",
-"1044:scratch_free(alloc, &s);",
-";",
+"1046:!=",
+"==",
 [
 "testBytes",
 "testCore",
@@ -37340,11 +36529,11 @@
 ]
 ],
 [
-"bl-1046-del",
+"bl-1046-neg",
 "srcl",
 "src/list/list.c",
-"1046:list->ties = ties;",
-";",
+"1046:(f->closing != SIZE_MAX)",
+"(!(f->closing != SIZE_MAX))",
 [
 "testBytes",
 "testCore",
@@ -37366,7 +36555,7 @@
 "bl-1047-del",
 "srcl",
 "src/list/list.c",
-"1047:list->tie_count = tie_n;",
+"1047:s->out[out_n++] = f->closing;",
 ";",
 [
 "testBytes",
@@ -37386,10 +36575,194 @@
 ]
 ],
 [
-"bl-1053-ne",
+"bl-1050-del",
 "srcl",
 "src/list/list.c",
-"1053:!=",
+"1050:frame_count--;",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1056-eq",
+"srcl",
+"src/list/list.c",
+"1056:==",
+"!=",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1056-and",
+"srcl",
+"src/list/list.c",
+"1056:&&",
+"||",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1056-gt",
+"srcl",
+"src/list/list.c",
+"1056:xt > 1)",
+"xt >= 1)",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1056-neg",
+"srcl",
+"src/list/list.c",
+"1056:(f->context == (uint32_t)GSHSCENE_ORDER_DEPTH && f->next > 1)",
+"(!(f->context == (uint32_t)GSHSCENE_ORDER_DEPTH && f->next > 1))",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1061-del",
+"srcl",
+"src/list/list.c",
+"1061:tie->first = f->prev_pos;",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1062-del",
+"srcl",
+"src/list/list.c",
+"1062:tie->second = pos;",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1063-del",
+"srcl",
+"src/list/list.c",
+"1063:tie->depth = item->depth;",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1064-ne",
+"srcl",
+"src/list/list.c",
+"1064:!=",
 "==",
 [
 "testBytes",
@@ -37409,11 +36782,11 @@
 ]
 ],
 [
-"bl-1053-neg",
+"bl-1064-del",
 "srcl",
 "src/list/list.c",
-"1053:(!list || list->closed || list->depth != 0)",
-"(!(!list || list->closed || list->depth != 0))",
+"1064:tie->reason = before->layer != item->layer ? GSHSCENE_TIE_LAYER : GSHSCENE_TIE_DECLARED;",
+";",
 [
 "testBytes",
 "testCore",
@@ -37432,10 +36805,470 @@
 ]
 ],
 [
-"bl-1071-ne",
+"bl-1067-del",
 "srcl",
 "src/list/list.c",
-"1071:!=",
+"1067:f->prev_pos = pos;",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1068-del",
+"srcl",
+"src/list/list.c",
+"1068:s->out[out_n++] = u.start;",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1070-eq",
+"srcl",
+"src/list/list.c",
+"1070:==",
+"!=",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1099-eq",
+"srcl",
+"src/list/list.c",
+"1099:at == 0 ",
+"at != 0 ",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1099-or",
+"srcl",
+"src/list/list.c",
+"1099:||",
+"&&",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1099-eq2",
+"srcl",
+"src/list/list.c",
+"1099: n == 0)",
+" n != 0)",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1099-neg",
+"srcl",
+"src/list/list.c",
+"1099:(list->nonflat == 0 || n == 0)",
+"(!(list->nonflat == 0 || n == 0))",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1108-del",
+"srcl",
+"src/list/list.c",
+"1108:s.units = array_alloc(alloc, n, sizeof *s.units);",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1110-del",
+"srcl",
+"src/list/list.c",
+"1110:s.frames = array_alloc(alloc, n + 1, sizeof *s.frames);",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1111-del",
+"srcl",
+"src/list/list.c",
+"1111:s.ties = array_alloc(alloc, n, sizeof *s.ties);",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1112-neg",
+"srcl",
+"src/list/list.c",
+"1112:(!s.match || !s.out || !s.open || !s.units || !s.temp || !s.frames || !s.ties)",
+"(!(!s.match || !s.out || !s.open || !s.units || !s.temp || !s.frames || !s.ties))",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1113-del",
+"srcl",
+"src/list/list.c",
+"1113:scratch_free(alloc, &s);",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1117-del",
+"srcl",
+"src/list/list.c",
+"1117:resolve_order(list, &s, &tie_n);",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1119-neg",
+"srcl",
+"src/list/list.c",
+"1119:(tie_n > 0)",
+"(!(tie_n > 0))",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1120-del",
+"srcl",
+"src/list/list.c",
+"1120:ties = array_alloc(alloc, tie_n, sizeof *ties);",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1122-del",
+"srcl",
+"src/list/list.c",
+"1122:scratch_free(alloc, &s);",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1125-del",
+"srcl",
+"src/list/list.c",
+"1125:memcpy(ties, s.ties, tie_n * sizeof *ties);",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1128-del",
+"srcl",
+"src/list/list.c",
+"1128:scratch_free(alloc, &s);",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1130-del",
+"srcl",
+"src/list/list.c",
+"1130:list->ties = ties;",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1131-del",
+"srcl",
+"src/list/list.c",
+"1131:list->tie_count = tie_n;",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1137-ne",
+"srcl",
+"src/list/list.c",
+"1137:!=",
 "==",
 [
 "testBytes",
@@ -37455,10 +37288,10 @@
 ]
 ],
 [
-"bl-1071-neg",
+"bl-1137-neg",
 "srcl",
 "src/list/list.c",
-"1071:(!list || list->closed || list->depth != 0)",
+"1137:(!list || list->closed || list->depth != 0)",
 "(!(!list || list->closed || list->depth != 0))",
 [
 "testBytes",
@@ -37478,10 +37311,56 @@
 ]
 ],
 [
-"bl-1075-neg",
+"bl-1155-ne",
 "srcl",
 "src/list/list.c",
-"1075:(list->tie_count > 1)",
+"1155:!=",
+"==",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1155-neg",
+"srcl",
+"src/list/list.c",
+"1155:(!list || list->closed || list->depth != 0)",
+"(!(!list || list->closed || list->depth != 0))",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1159-neg",
+"srcl",
+"src/list/list.c",
+"1159:(list->tie_count > 1)",
 "(!(list->tie_count > 1))",
 [
 "testBytes",
@@ -37501,10 +37380,10 @@
 ]
 ],
 [
-"bl-1076-del",
+"bl-1160-del",
 "srcl",
 "src/list/list.c",
-"1076:qsort(list->ties, list->tie_count, sizeof *list->ties, tie_compare);",
+"1160:qsort(list->ties, list->tie_count, sizeof *list->ties, tie_compare);",
 ";",
 [
 "testBytes",
@@ -37524,10 +37403,10 @@
 ]
 ],
 [
-"bl-1084-eq",
+"bl-1168-eq",
 "srcl",
 "src/list/list.c",
-"1084:==",
+"1168:==",
 "!=",
 [
 "testBytes",
@@ -37547,10 +37426,10 @@
 ]
 ],
 [
-"bl-1084-neg",
+"bl-1168-neg",
 "srcl",
 "src/list/list.c",
-"1084:(list->tie_count == list->tie_capacity)",
+"1168:(list->tie_count == list->tie_capacity)",
 "(!(list->tie_count == list->tie_capacity))",
 [
 "testBytes",
@@ -37570,10 +37449,10 @@
 ]
 ],
 [
-"bl-1090-neg",
+"bl-1174-neg",
 "srcl",
 "src/list/list.c",
-"1090:(list->tie_count)",
+"1174:(list->tie_count)",
 "(!(list->tie_count))",
 [
 "testBytes",
@@ -37593,10 +37472,10 @@
 ]
 ],
 [
-"bl-1091-del",
+"bl-1175-del",
 "srcl",
 "src/list/list.c",
-"1091:memcpy(grown, list->ties, list->tie_count * sizeof *grown);",
+"1175:memcpy(grown, list->ties, list->tie_count * sizeof *grown);",
 ";",
 [
 "testBytes",
@@ -37616,10 +37495,10 @@
 ]
 ],
 [
-"bl-1094-del",
+"bl-1178-del",
 "srcl",
 "src/list/list.c",
-"1094:list->ties = grown;",
+"1178:list->ties = grown;",
 ";",
 [
 "testBytes",
@@ -37639,10 +37518,10 @@
 ]
 ],
 [
-"bl-1095-del",
+"bl-1179-del",
 "srcl",
 "src/list/list.c",
-"1095:list->tie_capacity = capacity;",
+"1179:list->tie_capacity = capacity;",
 ";",
 [
 "testBytes",
@@ -37662,10 +37541,10 @@
 ]
 ],
 [
-"bl-1106-and",
+"bl-1190-and",
 "srcl",
 "src/list/list.c",
-"1106:&&",
+"1190:&&",
 "||",
 [
 "testBytes",
@@ -37685,10 +37564,10 @@
 ]
 ],
 [
-"bl-1110-ge",
+"bl-1194-ge",
 "srcl",
 "src/list/list.c",
-"1110:>=",
+"1194:>=",
 ">",
 [
 "testBytes",
@@ -37708,10 +37587,10 @@
 ]
 ],
 [
-"bl-1110-neg",
+"bl-1194-neg",
 "srcl",
 "src/list/list.c",
-"1110:(!list || !out || !list->closed || index >= list->tie_count)",
+"1194:(!list || !out || !list->closed || index >= list->tie_count)",
 "(!(!list || !out || !list->closed || index >= list->tie_count))",
 [
 "testBytes",
@@ -37731,10 +37610,10 @@
 ]
 ],
 [
-"bl-1156-eq",
+"bl-1240-eq",
 "srcl",
 "src/list/list.c",
-"1156:==",
+"1240:==",
 "!=",
 [
 "testBytes",
@@ -37754,10 +37633,10 @@
 ]
 ],
 [
-"bl-1156-and",
+"bl-1240-and",
 "srcl",
 "src/list/list.c",
-"1156:&&",
+"1240:&&",
 "||",
 [
 "testBytes",
@@ -37777,10 +37656,10 @@
 ]
 ],
 [
-"bl-1156-lt",
+"bl-1240-lt",
 "srcl",
 "src/list/list.c",
-"1156:<",
+"1240:<",
 "<=",
 [
 "testBytes",
@@ -37800,10 +37679,10 @@
 ]
 ],
 [
-"bl-1208-ne",
+"bl-1292-ne",
 "srcl",
 "src/list/list.c",
-"1208:!=",
+"1292:!=",
 "==",
 [
 "testBytes",
@@ -37823,10 +37702,10 @@
 ]
 ],
 [
-"bl-1209-ne",
+"bl-1293-ne",
 "srcl",
 "src/list/list.c",
-"1209:nt != b-",
+"1293:nt != b-",
 "nt == b-",
 [
 "testBytes",
@@ -37846,10 +37725,10 @@
 ]
 ],
 [
-"bl-1209-ne2",
+"bl-1293-ne2",
 "srcl",
 "src/list/list.c",
-"1209:ry != b-",
+"1293:ry != b-",
 "ry == b-",
 [
 "testBytes",
@@ -37869,56 +37748,10 @@
 ]
 ],
 [
-"bl-1219-eq",
+"bl-1309-ne",
 "srcl",
 "src/list/list.c",
-"1219:te == b-",
-"te != b-",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-1219-eq2",
-"srcl",
-"src/list/list.c",
-"1219:ng == b-",
-"ng != b-",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-1223-ne",
-"srcl",
-"src/list/list.c",
-"1223:nt != b-",
+"1309:nt != b-",
 "nt == b-",
 [
 "testBytes",
@@ -37938,10 +37771,10 @@
 ]
 ],
 [
-"bl-1223-ne2",
+"bl-1309-ne2",
 "srcl",
 "src/list/list.c",
-"1223:te != b-",
+"1309:te != b-",
 "te == b-",
 [
 "testBytes",
@@ -37961,10 +37794,10 @@
 ]
 ],
 [
-"bl-1223-neg",
+"bl-1309-neg",
 "srcl",
 "src/list/list.c",
-"1223:(!a || !b || a->count != b->count || !gshscene_color_equal(&a->foreground, &b->foreground) || a->palette != b->palette)",
+"1309:(!a || !b || a->count != b->count || !gshscene_color_equal(&a->foreground, &b->foreground) || a->palette != b->palette)",
 "(!(!a || !b || a->count != b->count || !gshscene_color_equal(&a->foreground, &b->foreground) || a->palette != b->palette))",
 [
 "testBytes",
@@ -37984,10 +37817,10 @@
 ]
 ],
 [
-"bl-1262-del",
+"bl-1348-del",
 "srcl",
 "src/list/list.c",
-"1262:gshscene_color_hash(&h, &list->foreground);",
+"1348:gshscene_color_hash(&h, &list->foreground);",
 ";",
 [
 "testBytes",
@@ -38007,10 +37840,10 @@
 ]
 ],
 [
-"bl-1263-del",
+"bl-1349-del",
 "srcl",
 "src/list/list.c",
-"1263:gshgeom_hash_u64(&h, list->palette ? gshscene_resource_hash(list->palette) : 0);",
+"1349:gshgeom_hash_u64(&h, list->palette ? gshscene_resource_hash(list->palette) : 0);",
 ";",
 [
 "testBytes",
@@ -38030,10 +37863,10 @@
 ]
 ],
 [
-"bl-1263-hwu64",
+"bl-1349-hwu64",
 "srcl",
 "src/list/list.c",
-"1263:gshgeom_hash_u64(",
+"1349:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testBytes",
@@ -38053,10 +37886,10 @@
 ]
 ],
 [
-"bl-1277-del",
+"bl-1363-del",
 "srcl",
 "src/list/list.c",
-"1277:gshgeom_hash_u32(&h, item->paint.entry);",
+"1363:gshgeom_hash_u32(&h, item->paint.entry);",
 ";",
 [
 "testBytes",
@@ -38076,10 +37909,10 @@
 ]
 ],
 [
-"bl-1277-hwu32",
+"bl-1363-hwu32",
 "srcl",
 "src/list/list.c",
-"1277:gshgeom_hash_u32(",
+"1363:gshgeom_hash_u32(",
 "gshgeom_hash_u64(",
 [
 "testBytes",
@@ -38099,10 +37932,10 @@
 ]
 ],
 [
-"bl-1278-del",
+"bl-1364-del",
 "srcl",
 "src/list/list.c",
-"1278:gshgeom_hash_u64(&h, item->paint.gradient ? gshscene_resource_hash(item->paint.gradient) : 0);",
+"1364:gshgeom_hash_u64(&h, item->paint.gradient ? gshscene_resource_hash(item->paint.gradient) : 0);",
 ";",
 [
 "testBytes",
@@ -38122,10 +37955,10 @@
 ]
 ],
 [
-"bl-1278-hwu64",
+"bl-1364-hwu64",
 "srcl",
 "src/list/list.c",
-"1278:gshgeom_hash_u64(",
+"1364:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testBytes",
@@ -38145,56 +37978,10 @@
 ]
 ],
 [
-"bl-1291-del",
+"bl-1422-str",
 "srcl",
 "src/list/list.c",
-"1291:gshgeom_hash_u8(&h, (uint8_t)item->group.composite);",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-1291-hwu8",
-"srcl",
-"src/list/list.c",
-"1291:gshgeom_hash_u8(",
-"gshgeom_hash_u32(",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient",
-"testColor_bound"
-]
-],
-[
-"bl-1335-str",
-"srcl",
-"src/list/list.c",
-"1335:, \"gshs",
+"1422:, \"gshs",
 ", \"Zshs",
 [
 "testBytes",
@@ -38214,10 +38001,10 @@
 ]
 ],
 [
-"bl-1335-wd",
+"bl-1422-wd",
 "srcl",
 "src/list/list.c",
-"1335:fg=%016llx %0",
+"1422:fg=%016llx %0",
 "fg=%llx %0",
 [
 "testBytes",
@@ -38237,10 +38024,10 @@
 ]
 ],
 [
-"bl-1335-wd2",
+"bl-1422-wd2",
 "srcl",
 "src/list/list.c",
-"1335:lx %016llx %0",
+"1422:lx %016llx %0",
 "lx %llx %0",
 [
 "testBytes",
@@ -38260,10 +38047,10 @@
 ]
 ],
 [
-"bl-1335-wd3",
+"bl-1422-wd3",
 "srcl",
 "src/list/list.c",
-"1335:lx %016llx %0",
+"1422:lx %016llx %0",
 "lx %llx %0",
 [
 "testBytes",
@@ -38283,10 +38070,10 @@
 ]
 ],
 [
-"bl-1339-wd",
+"bl-1426-wd",
 "srcl",
 "src/list/list.c",
-"1339:te=%016llx ha",
+"1426:te=%016llx ha",
 "te=%llx ha",
 [
 "testBytes",
@@ -38306,10 +38093,10 @@
 ]
 ],
 [
-"bl-1339-wd2",
+"bl-1426-wd2",
 "srcl",
 "src/list/list.c",
-"1339:sh=%016llx\\n\"",
+"1426:sh=%016llx\\n\"",
 "sh=%llx\\n\"",
 [
 "testBytes",
@@ -38329,10 +38116,10 @@
 ]
 ],
 [
-"bl-1359-wd",
+"bl-1446-wd",
 "srcl",
 "src/list/list.c",
-"1359:%016llx",
+"1446:%016llx",
 "%llx",
 [
 "testBytes",
@@ -38352,10 +38139,10 @@
 ]
 ],
 [
-"bl-1384-del",
+"bl-1471-del",
 "srcl",
 "src/list/list.c",
-"1384:written = fprintf(out, \" composite=%u order=%u\", (unsigned)item->group.composite, (unsigned)item->group.ordering);",
+"1471:written = fprintf(out, \" composite=%u order=%u\", (unsigned)item->group.composite, (unsigned)item->group.ordering);",
 ";",
 [
 "testBytes",
@@ -38375,10 +38162,10 @@
 ]
 ],
 [
-"bl-1407-lt",
+"bl-1497-lt",
 "srcl",
 "src/list/list.c",
-"1407:<",
+"1497:<",
 "<=",
 [
 "testBytes",
@@ -38398,10 +38185,10 @@
 ]
 ],
 [
-"bl-1409-wd",
+"bl-1499-wd",
 "srcl",
 "src/list/list.c",
-"1409:%016llx",
+"1499:%016llx",
 "%llx",
 [
 "testBytes",
