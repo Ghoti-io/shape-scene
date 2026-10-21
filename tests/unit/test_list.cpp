@@ -466,8 +466,10 @@ TEST(ListRecord, TheBoundariesOfEveryRangeAreAccepted) {
     GSHSCENE_Paint p = solid(0.0, 0.0, 0.0, alpha);
     EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0), GSHSCENE_OK) << alpha;
   }
-  GSHSCENE_Paint wide = solid(2.0, -0.5, 1e300, 1.0);  // outside the gamut is allowed
+  GSHSCENE_Paint wide = solid(2.0, -0.5, 65536.0, 1.0);  // outside the gamut is allowed, up to N1's bound
   EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_EVEN_ODD, &wide, 0, 0), GSHSCENE_OK);
+  GSHSCENE_Paint past = solid(2.0, -0.5, 1e300, 1.0);  // past it, nothing is recorded (testColor_bound has the rest)
+  EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_EVEN_ODD, &past, 0, 0), GSHSCENE_ERR_LIMIT);
   for (double opacity : {0.0, 1.0}) {
     GSHSCENE_Group g = make_group(opacity);
     EXPECT_EQ(gshscene_list_group_push(l.list, &g, 0, 0), GSHSCENE_OK) << opacity;
@@ -477,7 +479,7 @@ TEST(ListRecord, TheBoundariesOfEveryRangeAreAccepted) {
     EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, layer, 0), GSHSCENE_OK);
     EXPECT_EQ(item_of(l.list, gshscene_list_count(l.list) - 1)->layer, layer);
   }
-  EXPECT_EQ(item_of(l.list, 3)->paint.rgba[2], 1e300);
+  EXPECT_EQ(item_of(l.list, 3)->paint.rgba[2], 65536.0);
 }
 
 TEST(ListRecord, AGlyphRunCanBeFilledAndUsedAsAClip) {

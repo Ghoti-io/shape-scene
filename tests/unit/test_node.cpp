@@ -315,14 +315,16 @@ TEST(NodeRules, AShapeNeedsAPathOrGlyphRunOfTheStoreAndAValidRuleAndPaint) {
   n.paint = solid(0, 0, 0, 1);
   n.paint.space = space_of(GCOL_PRIMARIES_PROPHOTO, GCOL_TRANSFER_SRGB);
   EXPECT_EQ(f.add(n), GSHSCENE_ERR_UNSUPPORTED);
-  n.paint = solid(-0.5, 2.0, 1e9, 0.25);  // outside the gamut is allowed (AD-23)
+  n.paint = solid(-0.5, 2.0, 1e9, 0.25);  // past N1's bound (2^16): refused, after the checks above
+  EXPECT_EQ(f.add(n), GSHSCENE_ERR_LIMIT);
+  n.paint = solid(-0.5, 2.0, 65536.0, 0.25);  // outside the gamut is allowed (AD-23), up to the bound
   uint64_t id = 0;
   ASSERT_EQ(f.add(n, &id), GSHSCENE_OK);
   GSHSCENE_Node_Info info;
   ASSERT_EQ(gshscene_edit_node(f.e.edit, id, &info), GSHSCENE_OK);
   EXPECT_EQ(info.node.paint.rgba[0], -0.5);
   EXPECT_EQ(info.node.paint.rgba[1], 2.0);
-  EXPECT_EQ(info.node.paint.rgba[2], 1e9);
+  EXPECT_EQ(info.node.paint.rgba[2], 65536.0);
   EXPECT_EQ(info.node.paint.rgba[3], 0.25);
   EXPECT_EQ(info.node.resource, f.sq.get());
 }

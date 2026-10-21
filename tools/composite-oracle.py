@@ -47,6 +47,15 @@ getcontext().prec = 80
 ZERO = F(0)
 ONE = F(1)
 
+# --- N1: the bound of a recorded component and the saturation ---------------------------------------------------------
+COMPONENT_MAX = F(2) ** 16
+SATURATION = F(2) ** 64
+
+
+def sat(x):
+    """N1: x clamped to [-2^64, 2^64], exactly."""
+    return SATURATION if x > SATURATION else -SATURATION if x < -SATURATION else x
+
 # --- N1: the gamuts ----------------------------------------------------------------------------------
 WHITE_D65 = (F("0.3127"), F("0.3290"))
 GAMUTS = {
@@ -170,10 +179,11 @@ def convert(rgb, a, b, ex):
     """Straight (r, g, b) from space a to space b, both concrete."""
     if a == b:
         return list(rgb)
-    lin = [decode(a, v, ex) for v in rgb]
+    # N1: each step saturated, so that no power is taken of a value past 2^64.
+    lin = [sat(decode(a, v, ex)) for v in rgb]
     if a[0] != b[0]:
-        lin = matvec(MATRIX_INVERSE[b[0]], matvec(MATRIX[a[0]], lin))
-    return [encode(b, v, ex) for v in lin]
+        lin = [sat(v) for v in matvec(MATRIX_INVERSE[b[0]], matvec(MATRIX[a[0]], lin))]
+    return [sat(encode(b, v, ex)) for v in lin]
 
 
 def convert_premultiplied(px, a, b, ex):
@@ -183,7 +193,7 @@ def convert_premultiplied(px, a, b, ex):
     alpha = px[3]
     if alpha == 0:
         return [ZERO, ZERO, ZERO, ZERO]
-    straight = [px[i] / alpha for i in range(3)]
+    straight = [sat(px[i] / alpha) for i in range(3)]
     out = convert(straight, a, b, ex)
     return [out[0] * alpha, out[1] * alpha, out[2] * alpha, alpha]
 
@@ -233,7 +243,7 @@ def operator(op, s, d):
 def apply(d, s, m, op):
     """N5: (1 - m) D + m op(S, D)."""
     o = operator(op, s, d)
-    return [(ONE - m) * d[i] + m * o[i] for i in range(4)]
+    return [sat((ONE - m) * d[i] + m * o[i]) for i in range(4)]
 
 
 def is_unbounded(op):
@@ -466,6 +476,21 @@ def selftest():
     # the white of one gamut is the white of another (they share D65)
     white = convert([ONE, ONE, ONE], SPACE_LINEAR_SRGB, SPACE_LINEAR_P3, ex)
     check(all(abs(v - 1) < F(1, 10 ** 60) for v in white), "white is white in P3")
+
+    # N1: the saturation is a clamp at 2^64, exact inside; a conversion saturates after each of its steps.
+    check(sat(SATURATION) == SATURATION and sat(-SATURATION) == -SATURATION, "sat is inclusive")
+    check(sat(SATURATION + 1) == SATURATION and sat(-SATURATION - 1) == -SATURATION, "sat clamps past the bound")
+    check(sat(F(1, 3)) == F(1, 3), "sat leaves a value inside alone")
+    g10, g01 = (1, GAMMA, 10.0), (1, GAMMA, 0.1)
+    out = convert([COMPONENT_MAX, -COMPONENT_MAX, ZERO], g10, (1, GAMMA, 2.0), ex)
+    check(out[:2] == [F(2) ** 32, -F(2) ** 32], "the decode saturates before the encode: %s" % out[:2])
+    out = convert([COMPONENT_MAX, -COMPONENT_MAX, ZERO], g10, g01, ex)
+    check(out[:2] == [SATURATION, -SATURATION], "gamma 10 to gamma 0.1 at the bound is the saturation")
+    half = convert_premultiplied([-SATURATION, ZERO, ZERO, F(1, 2)], g01, SPACE_LINEAR_SRGB, ex)[0]
+    check(half == convert([-SATURATION, ZERO, ZERO], g01, SPACE_LINEAR_SRGB, ex)[0] / 2,
+          "an un-premultiply past the bound is saturated before it is converted")
+    check(apply([-SATURATION, ZERO, ZERO, ONE], [-SATURATION, ZERO, ZERO, ONE], ONE, "plus")[0] == -SATURATION,
+          "plus past the bound saturates")
 
     # N6 to N10 with a hand-worked case: a half-covering opaque red over opaque blue, then a group.
     red = dict(k=FILL, paint=PAINT_SOLID, rgba=(1.0, 0.0, 0.0, 1.0), space=TARGET)

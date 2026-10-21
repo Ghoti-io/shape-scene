@@ -174,6 +174,37 @@ case("palette entries in a group of an operator", [group(1.0, "src-in"), entry(0
 case("a missing palette entry draws nothing", [entry(4, 1.0), entry(0, 0.5)], palette=PALETTE)
 case("no palette: every palette fill draws nothing", [entry(0, 1.0), fill(SOURCE, 0.5)])
 case("a linear target and an sRGB paint", [fill((0.5, 0.25, 0.75, 0.5), 1.0, SRGB)], target=LIN)
+# N1 (Corey, 2026-10-21): a recorded component at the bound, and the saturation at each point that names it.  Only
+# these cases reach it: every other answer above is the same with and without it.
+K16 = 2.0 ** 16
+G10 = (1, oracle.GAMMA, 10.0)    # sRGB primaries, gamma 10: decode raises to the 10th power
+G01 = (1, oracle.GAMMA, 0.1)     # gamma 0.1: encode raises to the 10th power
+case("a component at the bound in the target's space is not saturated", [fill((K16, -K16, 0.5, 1.0))],
+     target=LIN, backdrop=(0.0, 0.0, 0.0, 0.0))
+case("saturation: gamma 10 to gamma 0.1 at 2^16 (the decode and the encode)", [fill((K16, -K16, 0.5, 1.0), 1.0, G10)],
+     target=G01, backdrop=(0.0, 0.0, 0.0, 0.0))
+case("saturation: a gamma 0.1 group's encode, decoded at its pop", [
+    group(1.0, "src-over", G01), fill((K16, -K16, 1.0, 1.0), 1.0, LIN), pop()], target=LIN, backdrop=(0.0, 0.0, 0.0, 0.0))
+case("saturation: the decode of a gamma-10 paint, encoded into a gamma-2 target", [fill((K16, -K16, 0.5, 1.0), 1.0, G10)],
+     target=(1, oracle.GAMMA, 2.0), backdrop=(0.0, 0.0, 0.0, 0.0))
+case("saturation: the matrix from a gamma-10 BT.2020 paint into a gamma-10 sRGB target", [
+    fill((K16, -K16, -K16, 1.0), 1.0, (4, oracle.GAMMA, 10.0))], target=G10, backdrop=(0.0, 0.0, 0.0, 0.0))
+case("saturation: negative plus groups accumulate to the bound", [
+    group(1.0, "src-over", LIN), fill((-K16, K16, 0.25, 1.0), 1.0, G10),
+    group(1.0, "plus"), fill((-K16, K16, 0.25, 1.0), 1.0, G10), pop(),
+    group(1.0, "plus"), fill((-K16, K16, 0.25, 1.0), 1.0, G10), pop(),
+    group(1.0, "plus"), fill((-K16, -K16, 0.25, 1.0), 1.0, G10), pop(), pop()], target=LIN, backdrop=(0.0, 0.0, 0.0, 0.0))
+case("saturation: the un-premultiply of a layer that plus under a clip left past the bound", [
+    group(1.0, "src-over", G01), fill((-K16, K16, 0.5, 0.5), 1.0, LIN),
+    clip(0.25), group(1.0, "plus"), fill((-K16, K16, 0.5, 1.0), 1.0, LIN), pop(), unclip(), pop()], target=LIN,
+     backdrop=(0.0, 0.0, 0.0, 0.0))
+case("saturation: nested groups in alternating spaces", [
+    group(1.0, "src-over", G01), group(0.5, "src-over", G10), group(1.0, "src-over", G01), group(1.0, "src-over", LIN),
+    fill((K16, -K16, 2.0, 1.0), 1.0, G10), pop(), pop(), pop(), pop()], target=SRGB, backdrop=(0.0, 0.0, 0.0, 0.0))
+case("saturation: the foreground at the bound in gamma 10, in a gamma 0.1 target", [currentcolor(1.0)],
+     fg=((K16, -K16, 0.0, 1.0), G10), target=G01, backdrop=(0.0, 0.0, 0.0, 0.0))
+case("saturation: a palette entry at the bound in gamma 10, in a gamma 0.1 target", [entry(0, 0.5)],
+     palette=[((-K16, K16, 0.25, 1.0), G10)], target=G01, backdrop=(0.0, 0.0, 0.0, 0.0))
 
 
 def converts(c):

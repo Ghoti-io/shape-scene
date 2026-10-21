@@ -107,7 +107,8 @@ GSHSCENE_API GSHSCENE_Store * gshscene_edit_store(const GSHSCENE_Edit * edit);
  * @param out_id The new node's ID; written only on success; may be NULL.
  * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, an edit that is spent, no such group, a position out
  *   of range, properties the kind forbids, a resource of another store, a bound key);
- *   ::GSHSCENE_ERR_UNSUPPORTED (a 3D map); ::GSHSCENE_ERR_LIMIT (`max_nodes`); ::GSHSCENE_ERR_OOM.
+ *   ::GSHSCENE_ERR_UNSUPPORTED (a 3D map); ::GSHSCENE_ERR_LIMIT (`max_nodes`; a shape's paint with a component past
+ *   `2^16`, N1, decided after the properties' validity); ::GSHSCENE_ERR_OOM.
  */
 GSHSCENE_API GSHSCENE_Result gshscene_edit_add(GSHSCENE_Edit * edit, uint64_t parent, size_t position,
     const GSHSCENE_Node * props, const GSHSCENE_Key * key, uint64_t * out_id);
@@ -149,7 +150,8 @@ GSHSCENE_API GSHSCENE_Result gshscene_edit_remove_key(GSHSCENE_Edit * edit, cons
  *
  * @param color The color; copied.
  * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, a spent edit, an invalid color); ::GSHSCENE_ERR_UNSUPPORTED (a
- *   reserved color space).  A failing call changes nothing.
+ *   reserved color space); ::GSHSCENE_ERR_LIMIT (a component past `2^16`, N1, after the validity checks).  A failing
+ *   call changes nothing.
  */
 GSHSCENE_API GSHSCENE_Result gshscene_edit_set_foreground(GSHSCENE_Edit * edit, const GSHSCENE_Color * color);
 

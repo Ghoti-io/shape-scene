@@ -48,7 +48,11 @@
  * Every closed list is checked to be in paint order (N11) and its ties to be real.
  * Color-paint story P2 adds two ops at the end: a gradient interned in the scene's store from the input (every kind,
  * extend and stop shape, maps singular and not, values at and past G14's bounds, G14 asserted by its bound), and a
- * shape node painted with one, whose emitted fills are checked.
+ * shape node painted with one, whose emitted fills are checked.  N1's bound (Corey, 2026-10-21) adds one more: a
+ * color component at, just past and far past `2^16`, through each entry point that records one (a fill, a list's and
+ * an edit's foreground, a palette, a solid gradient stop, a shape node), asserted by the bound: past it is never
+ * recorded, it is `ERR_LIMIT` only where nothing else is invalid, an invalid alpha or space is decided first, and a
+ * failure changes nothing.
  *
  * The op numbers below are mirrored by tools/gen-fuzz-corpus.py; the replay
  * also fails if the corpus never reaches an outcome (a limit, a refusal, an
@@ -82,7 +86,7 @@ enum {
   OP_PUBLISH, OP_MERGE, OP_HOLD, OP_RELEASE_VERSION, OP_DIFF, OP_EMIT, OP_VISIT, OP_DUMP, OP_SCENE_INTERN,
   OP_FILL_EX, OP_CLIP_PUSH_EX, OP_GROUP_PUSH_EX, OP_LIST_FOREGROUND, OP_NODE_PROPS, OP_EDIT_FOREGROUND, OP_LIST_PALETTE,
   OP_FILL_FIXED, OP_TRUNCATE, OP_EDIT_PALETTE, OP_INTERN_GRADIENT, OP_FILL_GRADIENT, OP_SCENE_GRADIENT,
-  OP_GRADIENT_NODE, OP_COUNT
+  OP_GRADIENT_NODE, OP_COLOR_BOUND, OP_COUNT
 };
 
 /* --- the outcomes the corpus must reach ------------------------------------------------------------ */
@@ -91,7 +95,8 @@ enum {
   OUT_LIST_LIMIT = 0, OUT_INTERN_LIMIT, OUT_EDIT_LIMIT, OUT_PUBLISH_LIMIT, OUT_PUBLISH_REFUSED, OUT_PUBLISH_INVALID,
   OUT_PUBLISH_OK, OUT_MERGE_OK, OUT_EMIT_OK, OUT_DIFF_OK, OUT_INSTANCE_PICTURE, OUT_LIST_TIES, OUT_FOREGROUND_VERSION,
   OUT_PARAMETER_REFUSED, OUT_EMIT_TIES, OUT_PALETTE_FILL, OUT_TRUNCATED, OUT_GRADIENT_FILL, OUT_GRADIENT_DEGENERATE,
-  OUT_GRADIENT_REFUSED, OUT_GRADIENT_LIMIT, OUT_GRADIENT_NODE, OUT_GRADIENT_EMITTED, OUT_COUNT
+  OUT_GRADIENT_REFUSED, OUT_GRADIENT_LIMIT, OUT_GRADIENT_NODE, OUT_GRADIENT_EMITTED, OUT_COLOR_LIMIT, OUT_COLOR_AT_BOUND,
+  OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limit", "edit limit", "publish limit",
@@ -99,7 +104,8 @@ static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limi
     "a closed list with ties", "a version whose foreground changed", "a merge refused over the foreground",
     "an emitted list with ties", "a palette fill recorded", "a list truncated", "a gradient fill recorded",
     "a degenerate gradient interned", "a gradient refused at intern",
-    "a gradient past G14's bounds refused", "a shape node painted with a gradient", "an emitted list with a gradient fill"};
+    "a gradient past G14's bounds refused", "a shape node painted with a gradient", "an emitted list with a gradient fill",
+    "a color past N1's bound refused", "a color at N1's bound recorded"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -1641,6 +1647,151 @@ static void op(S * s, unsigned code) {
         if (r == GSHSCENE_ERR_LIMIT) {
           CHECK(before >= lim->max_nodes);
         }
+      }
+      break;
+    }
+    case OP_COLOR_BOUND: {
+      /* N1: a component at or past 2^16 at each entry point that records one, asserted by the bound. */
+      static const double values[8] = {0.5, 0x1p16, -0x1p16, 0x1.0000000000001p16, -0x1.0000000000001p16, 0x1p17, 0x1p64,
+          -1e300};
+      double v = values[pick(s, 8)];
+      int past = !(v >= -0x1p16 && v <= 0x1p16);
+      unsigned k = pick(s, 3);
+      int bad_alpha = pick(s, 5) == 0;
+      unsigned sp = arg(s) % 10;
+      GSHSCENE_Color c;
+      memset(&c, 0, sizeof c);
+      c.rgba[0] = c.rgba[1] = c.rgba[2] = 0.25;
+      c.rgba[k] = v;
+      c.rgba[3] = bad_alpha ? 2.0 : 0.75;
+      c.space = pool_space(sp);
+      /* What the checks decide, in their order: the alpha and the space's validity, the reserved space, then N1. */
+      GSHSCENE_Result want = bad_alpha || sp == 7 || sp == 8 ? GSHSCENE_ERR_INVALID
+                             : sp == 6                       ? GSHSCENE_ERR_UNSUPPORTED
+                             : past                          ? GSHSCENE_ERR_LIMIT
+                                                             : GSHSCENE_OK;
+      GSHSCENE_Paint paint;
+      memset(&paint, 0, sizeof paint);
+      paint.kind = GSHSCENE_PAINT_SOLID;
+      memcpy(paint.rgba, c.rgba, sizeof paint.rgba);
+      paint.space = c.space;
+      unsigned where = pick(s, 6);
+      if (where == 0) {
+        /* A fill: other arguments may be invalid too, so a past value is never recorded and a LIMIT is the bound's. */
+        if (!s->list) {
+          break;
+        }
+        ListSnap b = snap(s->list);
+        const GSHSCENE_Resource * target = s->res[pick(s, POOL)];
+        r = gshscene_list_fill(s->list, target, NULL, GSHGEOM_FILL_NONZERO, &paint, 0, 0);
+        CHECK(r != GSHSCENE_ERR_INTERNAL && r != GSHSCENE_ERR_OOM);
+        if (want == GSHSCENE_ERR_INVALID) {
+          CHECK(r == GSHSCENE_ERR_INVALID);
+        }
+        if (past) {
+          CHECK(r != GSHSCENE_OK);
+        } else {
+          CHECK(r != GSHSCENE_ERR_LIMIT || gshscene_list_count(s->list) >= lim->max_list_items);
+        }
+        if (r != GSHSCENE_OK) {
+          CHECK(gshscene_list_count(s->list) == b.count && gshscene_list_expansion(s->list) == b.expansion);
+        }
+        outcomes[OUT_COLOR_LIMIT] += past && r == GSHSCENE_ERR_LIMIT;
+        outcomes[OUT_COLOR_AT_BOUND] += r == GSHSCENE_OK && (v == 0x1p16 || v == -0x1p16);
+      } else if (where == 1 || where == 2) {
+        /* A list's or an edit's foreground: exactly what the checks decide (a closed list or a spent edit: invalid). */
+        GSHSCENE_Color before, after;
+        unsigned e = pick(s, EDITS);
+        if (where == 1 ? !s->list : !has_edit(s, e)) {
+          break;
+        }
+        if (where == 1) {
+          CHECK(gshscene_list_foreground(s->list, &before) == GSHSCENE_OK);
+          r = gshscene_list_set_foreground(s->list, &c);
+          CHECK(gshscene_list_foreground(s->list, &after) == GSHSCENE_OK);
+          CHECK(r == want || (r == GSHSCENE_ERR_INVALID && gshscene_list_is_closed(s->list)));
+        } else {
+          CHECK(gshscene_edit_foreground(s->edits[e], &before) == GSHSCENE_OK);
+          r = gshscene_edit_set_foreground(s->edits[e], &c);
+          CHECK(gshscene_edit_foreground(s->edits[e], &after) == GSHSCENE_OK);
+          CHECK(r == want || r == GSHSCENE_ERR_INVALID);
+        }
+        CHECK(memcmp(&after, r == GSHSCENE_OK ? &c : &before, sizeof c) == 0);
+        outcomes[OUT_COLOR_LIMIT] += past && r == GSHSCENE_ERR_LIMIT;
+        outcomes[OUT_COLOR_AT_BOUND] += r == GSHSCENE_OK && (v == 0x1p16 || v == -0x1p16);
+      } else if (where == 3) {
+        /* A palette of two entries, the one under test first or second, the other valid. */
+        GSHSCENE_Color entries[2];
+        unsigned at = pick(s, 2);
+        gshscene_color_init(&entries[0]);
+        entries[1] = entries[0];
+        entries[at] = c;
+        const GSHSCENE_Resource * palette = NULL;
+        r = gshscene_store_intern_palette(s->store, 2, entries, &palette);
+        CHECK(r == want || ((r == GSHSCENE_ERR_LIMIT || r == GSHSCENE_ERR_OOM) && want == GSHSCENE_OK));
+        CHECK((r == GSHSCENE_OK) == (palette != NULL));
+        gshscene_resource_release(palette);
+        outcomes[OUT_COLOR_LIMIT] += past && r == GSHSCENE_ERR_LIMIT;
+      } else if (where == 4) {
+        /* A gradient with the color as a solid stop (the gradient interpolates in the target's space, so any stop's
+         * space is allowed), and a foreground stop. */
+        GSHSCENE_Gradient g;
+        memset(&g, 0, sizeof g);
+        g.kind = GSHSCENE_GRADIENT_LINEAR;
+        g.p1[0] = 4.0;
+        gshgeom_map_identity(2, &g.map);
+        GSHSCENE_Gradient_Stop stops[2];
+        memset(stops, 0, sizeof stops);
+        unsigned at = pick(s, 2);
+        stops[at].offset = 0.0;
+        stops[at].color = paint;
+        stops[1 - at].offset = 1.0;
+        stops[1 - at].color.kind = GSHSCENE_PAINT_FOREGROUND;
+        stops[1 - at].color.rgba[3] = 1.0;
+        g.stops = stops;
+        g.stop_count = 2;
+        const GSHSCENE_Resource * grad = NULL;
+        r = gshscene_store_intern_gradient(s->store, &g, &grad);
+        CHECK(r == want || ((r == GSHSCENE_ERR_LIMIT && lim->max_resource_elements < 2) || r == GSHSCENE_ERR_OOM ||
+                               (r == GSHSCENE_ERR_LIMIT && want == GSHSCENE_OK)));
+        if (past) {
+          CHECK(r != GSHSCENE_OK);
+        }
+        CHECK((r == GSHSCENE_OK) == (grad != NULL));
+        gshscene_resource_release(grad);
+        outcomes[OUT_COLOR_LIMIT] += past && r == GSHSCENE_ERR_LIMIT;
+      } else {
+        /* A shape node, added or set: the resource or the parent may be invalid too. */
+        unsigned e = pick(s, EDITS);
+        if (!has_edit(s, e)) {
+          break;
+        }
+        GSHSCENE_Node n;
+        gshscene_node_init(GSHSCENE_NODE_SHAPE, &n);
+        n.resource = s->sres[pick(s, POOL)];
+        n.paint = paint;
+        size_t before = gshscene_edit_node_count(s->edits[e]);
+        uint64_t id = 0;
+        if (pick(s, 3) == 0) {
+          r = gshscene_edit_set(s->edits[e], some_id(s), &n);
+        } else {
+          r = gshscene_edit_add(s->edits[e], some_id(s), GSHSCENE_APPEND, &n, NULL, &id);
+        }
+        CHECK(r != GSHSCENE_ERR_INTERNAL && r != GSHSCENE_ERR_OOM);
+        if (want == GSHSCENE_ERR_INVALID) {
+          CHECK(r == GSHSCENE_ERR_INVALID);
+        }
+        if (past) {
+          CHECK(r != GSHSCENE_OK);
+        } else {
+          CHECK(r != GSHSCENE_ERR_LIMIT || before >= lim->max_nodes);
+        }
+        if (r == GSHSCENE_OK) {
+          remember(s, id);
+        } else {
+          CHECK(gshscene_edit_node_count(s->edits[e]) == before);
+        }
+        outcomes[OUT_COLOR_LIMIT] += past && r == GSHSCENE_ERR_LIMIT;
       }
       break;
     }

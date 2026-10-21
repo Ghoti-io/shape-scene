@@ -124,7 +124,7 @@ TEST(Composite, EveryVectorIsTheExactAnswerOfTheOracle) {
       if (c.exact) {
         EXPECT_EQ(got.v[k], c.want[k]) << c.name << " channel " << k << " (exact: bit for bit)";
       } else {
-        EXPECT_NEAR(got.v[k], c.want[k], 1e-13) << c.name << " channel " << k;
+        EXPECT_NEAR(got.v[k], c.want[k], 1e-13 * std::max(1.0, std::fabs(c.want[k]))) << c.name << " channel " << k;
       }
     }
     exact += c.exact ? 1 : 0;

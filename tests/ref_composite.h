@@ -120,6 +120,22 @@ inline double sign_of(double x) {
   return x < 0 ? -1.0 : 1.0;
 }
 
+/** N1: sat(x), x clamped to [-2^64, 2^64]. */
+inline double sat(double x) {
+  const double k = 0x1p64;
+  return x > k ? k : x < -k ? -k : x;
+}
+
+/** N1: sat(c / a) for a != 0, with no infinity formed: past the bound the quotient is not taken. */
+inline double unpremultiply(double c, double a) {
+  const double k = 0x1p64;
+  double m = a < 0 ? -a : a;
+  if ((c < 0 ? -c : c) >= k * m) {
+    return (c < 0) != (a < 0) ? -k : k;
+  }
+  return c / a;
+}
+
 /** N2. */
 inline double decode(const Space & s, double x) {
   if (s.transfer == 1) {
@@ -149,7 +165,7 @@ inline void convert(const double in[3], const Space & a, const Space & b, double
     }
     return;
   }
-  double lin[3] = {decode(a, in[0]), decode(a, in[1]), decode(a, in[2])};
+  double lin[3] = {sat(decode(a, in[0])), sat(decode(a, in[1])), sat(decode(a, in[2]))};
   if (a.primaries != b.primaries) {
     Mat ma, mb, mbi;
     rgb_to_xyz(a.primaries, ma);
@@ -159,11 +175,11 @@ inline void convert(const double in[3], const Space & a, const Space & b, double
     mul3(ma, lin, xyz);
     mul3(mbi, xyz, moved);
     for (int i = 0; i < 3; i++) {
-      lin[i] = moved[i];
+      lin[i] = sat(moved[i]);
     }
   }
   for (int i = 0; i < 3; i++) {
-    out[i] = encode(b, lin[i]);
+    out[i] = sat(encode(b, lin[i]));
   }
 }
 
@@ -178,7 +194,7 @@ inline Px convert_premultiplied(const Px & p, const Space & a, const Space & b) 
   if (p.v[3] == 0.0) {
     return Px{{0, 0, 0, 0}};
   }
-  double straight[3] = {p.v[0] / p.v[3], p.v[1] / p.v[3], p.v[2] / p.v[3]};
+  double straight[3] = {unpremultiply(p.v[0], p.v[3]), unpremultiply(p.v[1], p.v[3]), unpremultiply(p.v[2], p.v[3])};
   double c[3];
   convert(straight, a, b, c);
   return Px{{c[0] * p.v[3], c[1] * p.v[3], c[2] * p.v[3], p.v[3]}};
@@ -215,7 +231,7 @@ inline Px apply(const Px & d, const Px & s, double m, int composite) {
   Px o = op(composite, s, d);
   Px out;
   for (int i = 0; i < 4; i++) {
-    out.v[i] = (1 - m) * d.v[i] + m * o.v[i];
+    out.v[i] = sat((1 - m) * d.v[i] + m * o.v[i]);
   }
   return out;
 }
@@ -560,7 +576,7 @@ finish:
       r.rgba[0] = r.rgba[1] = r.rgba[2] = 0.0;
     } else {
       for (int k = 0; k < 3; k++) {
-        r.rgba[k] = r.rgba[k] / a;
+        r.rgba[k] = unpremultiply(r.rgba[k], a);
       }
     }
   }

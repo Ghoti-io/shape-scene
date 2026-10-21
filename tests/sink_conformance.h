@@ -2141,4 +2141,104 @@ TEST_P(SinkConformance, S17_GradientsAreDrawnByKindRefusedOtherwiseAndNoticedWhe
   }
 }
 
+// N1's saturation (Corey, 2026-10-21), on every sink alike: a value past 2^64 is clamped to 2^64 after each decode,
+// matrix and encode of a conversion and after each apply.  Each case is a list whose values reach the saturation and
+// then cancel exactly under PLUS (to black, or to a half-red that only the saturated sum leaves), beside a list of the
+// same units whose colors are zero: they draw alike on a sink that saturates where the definition says, and differ on
+// one that leaves a step unsaturated (that one draws red where the other draws black).  Every square lies on whole
+// pixels, so no coverage is partial.  A sink that approximates a group's blend space (no BLEND_SPACES: the render
+// reports it) is skipped, never passed.
+TEST_P(SinkConformance, N1_ValuesPastTheSaturationMeanTheSameOnEverySink) {
+  const double k16 = 65536.0;
+  auto space = [](GCOL_Primaries p, GCOL_Transfer t, double g) {
+    GSHSCENE_Color_Space sp{};
+    sp.primaries = p;
+    sp.transfer = t;
+    sp.gamma = g;
+    return sp;
+  };
+  const GSHSCENE_Color_Space lin = space(GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_LINEAR, 0.0);
+  const GSHSCENE_Color_Space g10 = space(GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_GAMMA, 10.0);
+  const GSHSCENE_Color_Space g8 = space(GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_GAMMA, 8.0);
+  const GSHSCENE_Color_Space g0125 = space(GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_GAMMA, 0.125);
+  const GSHSCENE_Color_Space bt2020_g10 = space(GCOL_PRIMARIES_BT2020, GCOL_TRANSFER_GAMMA, 10.0);
+  struct Fill {
+    double r, g, b, alpha;
+    GSHSCENE_Color_Space space;
+  };
+  struct Case {
+    const char * name;
+    GSHSCENE_Color_Space blend;
+    std::vector<Fill> past;  // the first fill in the group, each other in a PLUS group of its own inside it
+    std::vector<Fill> plain; // the same units, colors that give the same answer without reaching the saturation
+  };
+  const Case cases[] = {
+      // A linear 2^16 into a gamma-1/8 group encodes to 2^128, saturated to 2^64 (then halved by the alpha); -2^8
+      // encodes to exactly -2^64.  Unsaturated, the sum is 2^127 - 2^63, which PLUS clamps to 1: red.
+      {"the encode", g0125, {{k16, 0, 0, 0.5, lin}, {-256.0, 0, 0, 0.5, lin}}, {{0, 0, 0, 0.5, lin}, {0, 0, 0, 0.5, lin}}},
+      // A gamma-10 2^16 decodes to 2^160, saturated to 2^64; a gamma-8 -2^8 decodes to exactly -2^64.
+      {"the decode", lin, {{k16, 0, 0, 0.5, g10}, {-256.0, 0, 0, 0.5, g8}}, {{0, 0, 0, 0.5, g10}, {0, 0, 0, 0.5, g8}}},
+      // A gamma-10 BT.2020 (2^16, -2^16, -2^16) decodes to the saturation, and the matrix to sRGB takes red to 2.32 *
+      // 2^64 and green and blue past -2^64: each saturates, and the gamma-8 (-2^8, 2^8, 2^8) cancels them.
+      {"the matrix", lin, {{k16, -k16, -k16, 0.5, bt2020_g10}, {-256.0, 256.0, 256.0, 0.5, g8}},
+       {{0, 0, 0, 0.5, bt2020_g10}, {0, 0, 0, 0.5, g8}}},
+      // Two -2^64 under PLUS are -2^65, saturated by the apply to -2^64; +2^64 cancels it and a linear 1/2 is left.
+      // Unsaturated, -2^64 + 1/2 is left: black where the definition draws half red.
+      {"the apply", lin,
+       {{-256.0, 0, 0, 1.0, g8}, {-256.0, 0, 0, 1.0, g8}, {256.0, 0, 0, 1.0, g8}, {0.5, 0, 0, 1.0, lin}},
+       {{0, 0, 0, 1.0, g8}, {0, 0, 0, 1.0, g8}, {0, 0, 0, 1.0, g8}, {0.5, 0, 0, 1.0, lin}}},
+  };
+  int compared = 0;
+  for (uint32_t kind : f()->kinds) {
+    if (!gshscene_target_kind_has_pixels((GSHSCENE_Target_Kind)kind)) {
+      continue;
+    }
+    SinkRef sink(make());
+    Scene s;
+    for (const Case & c : cases) {
+      auto draw = [&](const std::vector<Fill> & fills, bool * clean) {
+        GSHSCENE_List * l = s.open();
+        GSHSCENE_Group outer{};
+        outer.opacity = 1.0;
+        outer.blend_space = c.blend;
+        GSHSCENE_Group plus{};
+        plus.opacity = 1.0;
+        plus.composite = GSHSCENE_COMPOSITE_PLUS;
+        EXPECT_EQ(gshscene_list_group_push(l, &outer, 0, 0.0), GSHSCENE_OK);
+        for (size_t i = 0; i < fills.size(); i++) {
+          GSHSCENE_Paint p = solid(fills[i].r, fills[i].g, fills[i].b, fills[i].alpha);
+          p.space = fills[i].space;
+          if (i > 0) {
+            EXPECT_EQ(gshscene_list_group_push(l, &plus, 0, 0.0), GSHSCENE_OK);
+          }
+          EXPECT_EQ(gshscene_list_fill(l, s.sq(8, 8, 16), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK)
+              << c.name;
+          if (i > 0) {
+            EXPECT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);
+          }
+        }
+        EXPECT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);
+        EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+        auto out = make_surface(kind);
+        ReportRef r;
+        EXPECT_EQ(run(f(), sink.sink, request_for(l, *out, r.report)).result, GSHSCENE_OK) << c.name;
+        *clean = gshscene_report_count(r.report) == 0;
+        return out->snapshot();
+      };
+      bool clean_past = false;
+      bool clean_plain = false;
+      uint64_t past = draw(c.past, &clean_past);
+      uint64_t plain = draw(c.plain, &clean_plain);
+      if (!clean_past || !clean_plain) {
+        continue; // approximated: by its caps, the definition's value is not what this sink draws
+      }
+      EXPECT_EQ(past, plain) << c.name << ": a value past 2^64 is saturated there, on every sink";
+      compared++;
+    }
+  }
+  if (compared == 0) {
+    GTEST_SKIP() << "no pixel target, or every case approximated by the sink's caps";
+  }
+}
+
 #endif /* GHOTI_IO_GSHSCENE_TEST_SINK_CONFORMANCE_H */

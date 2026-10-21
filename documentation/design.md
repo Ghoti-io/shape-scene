@@ -125,19 +125,63 @@ except for the gamma transfer, where it is finite and in `[0.1, 10]`. These are 
 compares them), so every matrix below is exactly rational. `gshscene_color_space_from_info` maps a
 `GCOL_Color_Info` that names one of these (and carries no ICC profile).
 
+*The bound and the saturation (Corey, 2026-10-21; color-paint story P2's change log).* Every color component the
+scene records is finite and of magnitude at most `2^16` (`GSHSCENE_COLOR_COMPONENT_MAX`): the `r, g, b` of a solid
+paint (a fill's, a shape node's, a solid gradient stop's), of the foreground (a list's and an edit's) and of each
+palette entry; an alpha is in `[0, 1]` already. Past it the record call is `ERR_LIMIT` (`gshscene_list_fill`,
+`gshscene_edit_add` and `_set`, `gshscene_store_intern_gradient` with G14, `gshscene_list_set_foreground`,
+`gshscene_edit_set_foreground`, `gshscene_store_intern_palette`, `gshscene_color_check`), decided after every check
+that makes the call `ERR_INVALID` or `ERR_UNSUPPORTED`, as G14's are. Every value computed from them is **saturated**,
+`sat(x) = min(max(x, -2^64), 2^64)` (`GSHSCENE_COLOR_SATURATION`), at exactly these points, each component on its own:
+N2's decode and encode results within a conversion; N3's matrix result `M_B^-1 M_A v` (the product as one, however an
+implementation forms it); every **un-premultiply** `C / A` (N3's premultiplied conversion, G4's flag 1, and a sink's
+store to a straight target); and N5's result, so every fill, every group composite (`PLUS` included) at every depth.
+The saturation is part of the definition, not a sink's choice: the oracles, the scene's conversion (G3) and every sink
+apply it at the same points, so a value past `2^64` has one meaning on every sink. Content near `[0, 1]` does not reach
+it: one conversion of a component of magnitude at most 1 is at most `2.33^10 < 2^13` (a matrix, then a gamma-0.1
+encode); a component above about 1.6 does, through a gamma-10 decode and a gamma-0.1 encode (the 100th power), as do
+long chains of conversions and accumulations under `PLUS`. Every committed hash and golden is the same with it.
+
+Why every value stays finite. Call a value *bounded* when its magnitude is at most `2^64`. A recorded component,
+alpha, opacity, coverage, clip and N4 factor is bounded, every saturated value is bounded, and the root layer starts
+at what the target holds (finite; at most about `2^128` in a float target). Each step takes bounded values (and the
+root's) to a finite result, which the next saturation makes bounded again:
+
+| Step | Worst magnitude before its saturation |
+| --- | --- |
+| decode: gamma `g <= 10`, `sign(x) abs(x)^g`; sRGB `((x + 0.055) / 1.055)^2.4` or `x / 12.92` | `(2^64)^10 = 2^640`; `2^154`; below `2^64` |
+| matrix: a row of `M_B^-1 M_A` sums to at most 2.33 in magnitude (formed through XYZ: 1.09 then 5.28) | `2^66` (`2^67`) |
+| encode: `sign(y) abs(y)^(1/g)`, `1/g <= 10`; sRGB `1.055 y^(1/2.4) - 0.055` or `12.92 y` | `2^640`; `2^27`; `2^68` |
+| un-premultiply `C / A`, `A` in `(0, 1]` (the root's: finite) | unbounded as `A` goes to 0: see below |
+| premultiply, alpha times alpha, opacity, coverage: a factor in `[0, 1]` | bounded stays bounded |
+| N4 `Fa Cs + Fb Cd`, `PLUS`'s `Cs + Cd`, N5 `(1 - m) D + m op`: factors in `[0, 1]`, `D` at most the root's | `2^130` |
+| G4: an interpolation of bounded interpolants by a fraction in `[0, 1]` | bounded (a convex combination) |
+
+So the worst step is a power, `2^640`, far below the largest double (just under `2^1024`). What made a bound on the
+recorded values alone useless is that conversions chain: a gamma-10 decode followed by a gamma-0.1 encode is the
+100th power, and nested groups and `PLUS` compound further. Saturating after each step means a power's argument is
+always bounded, so no power is ever taken of an unsaturated power and no comparison of logarithms is needed: a sink
+evaluates each step in doubles and clamps its double result. The one step whose exact value is unbounded is the
+un-premultiply, and it is evaluated without forming it: when `|C| >= 2^64 |A|` the result is `sign(C / A) 2^64` and
+nothing is divided (`2^64 |A|` is exact, a power-of-two scaling); otherwise `|C / A| < 2^64`. So no step forms an
+infinity, and no NaN can arise. `2^16` is not what finiteness needs (`2^64` at record would do): it keeps every
+recorded value `2^48` below the saturation, so that only a transfer's power, a matrix or an accumulation reaches it.
+
 **N2 Transfer.** `decode` takes an encoded component to linear light, `encode` is its inverse, on real values
 of any sign. Linear: the identity. sRGB: decode `x / 12.92` for `x <= 0.04045`, else `((x + 0.055) / 1.055)^2.4`;
 encode `12.92 y` for `y <= 0.0031308`, else `1.055 y^(1/2.4) - 0.055` (the linear segment continues below zero,
 as in `color`). Gamma `g`: decode `sign(x) |x|^g`, encode `sign(y) |y|^(1/g)`. A test compares these with
-`color`'s evaluator on a grid, below zero included.
+`color`'s evaluator on a grid, below zero included. Within a conversion each decode and each encode is saturated (N1).
 
 **N3 Conversion.** For a gamut with primaries `c = r, g, b` and white `W`, let `X_c = x_c / y_c`, `Y_c = 1`,
 `Z_c = (1 - x_c - y_c) / y_c`; solve `[X_r X_g X_b; 1 1 1; Z_r Z_g Z_b] S = W` and let the matrix `M` from linear
 RGB to XYZ have the columns `S_c (X_c, 1, Z_c)`. A straight color `(r, g, b)` goes from space `A` to space `B`
-as `encode_B(M_B^-1 M_A decode_A(r, g, b))`; it is untouched (exactly, not recomputed) when the spaces are the
-same, and when only the transfers differ the two matrices cancel and are not applied. Alpha is never converted. A
-premultiplied value `(R, G, B, A)` is converted by un-premultiplying (`c = C / A`; for `A = 0` the result is
-`(0, 0, 0, 0)`), converting the straight color, and premultiplying again.
+as `encode_B(M_B^-1 M_A decode_A(r, g, b))`, saturated after each of the three (N1:
+`sat(encode_B(sat(M_B^-1 M_A sat(decode_A(r, g, b)))))`, the middle one only when the gamuts differ); it is
+untouched (exactly, not recomputed) when the spaces are the same, and when only the transfers differ the two matrices
+cancel and are not applied. Alpha is never converted. A premultiplied value `(R, G, B, A)` is converted by
+un-premultiplying (`c = sat(C / A)`, evaluated as N1 says; for `A = 0` the result is `(0, 0, 0, 0)`), converting the
+straight color, and premultiplying again.
 
 **N4 Composite operators.** On premultiplied values, source `S = (Cs, As)` and backdrop `D = (Cd, Ad)`,
 `op(S, D) = (Fa Cs + Fb Cd, Fa As + Fb Ad)` with `(Fa, Fb)`: `CLEAR (0, 0)`, `SRC (1, 0)`, `DEST (0, 1)`,
@@ -148,8 +192,8 @@ from above only). An operator is **bounded** if `op(0, D) = D` for every `D` (`D
 `DEST_OVER`, `DEST_OUT`, `SRC_ATOP`, `XOR`, `PLUS`) and **unbounded** otherwise (`CLEAR`, `SRC`, `SRC_IN`,
 `DEST_IN`, `SRC_OUT`, `DEST_ATOP`: they change the backdrop where the source is empty).
 
-**N5 The primitive.** `apply(D, S, m, op) = (1 - m) D + m op(S, D)`, componentwise on premultiplied values, for a
-coverage `m` in `[0, 1]`. Everything composited is one `apply`.
+**N5 The primitive.** `apply(D, S, m, op) = sat((1 - m) D + m op(S, D))`, componentwise on premultiplied values, for a
+coverage `m` in `[0, 1]`, saturated (N1). Everything composited is one `apply`, so every layer value is bounded.
 
 **N6 Layers and the root.** Compositing happens in a layer: a premultiplied value per device pixel in a blend
 space. The root layer is the target: its blend space is the target's and its initial value is what the target
@@ -165,9 +209,9 @@ clips in force (N9). Its operator is `SRC_OVER`, so `apply` gives `L (1 - m As) 
 
 **N8 Group composite.** At the pop of a group with opacity `o`, operator `op`, layer `G` in space `Bg`, onto the
 enclosing layer `P` in space `Bp`: `S = o convert(G, Bg -> Bp)` (premultiplied; scaling and converting commute) and
-`P' = apply(P, S, m, op)`, where `m` is the product of the clips that were in force in the enclosing group when the
-group was pushed (1 if none). If `op` is unbounded the group affects every pixel with `m > 0`, including those
-where `G` is empty.
+`P' = apply(P, S, m, op)` (the conversion and the `apply` saturated, N1), where `m` is the product of the clips that
+were in force in the enclosing group when the group was pushed (1 if none). If `op` is unbounded the group affects
+every pixel with `m > 0`, including those where `G` is empty.
 
 **N9 Clip.** A clip push contributes the coverage `c` of its region (a path or glyph run under its map by its
 rule, again the sink's coverage). The clips in force are those pushed and not popped within the same group (the
@@ -254,14 +298,17 @@ foreground and palette) and converted by N2/N3 into the interpolation space (`sp
 when zero; a stop's zero space is the target's too) by `gshscene_gradient_resolve`, which every sink calls once per
 gradient per render; each component is within `GSHSCENE_RESOLVE_TOLERANCE * max(1, |c|)` (1e-13) of N3's exact value,
 measured against the oracle (the worst measured is about 4.5e-15). A stop already in the interpolation space is copied
-exactly. A missing palette entry refuses the fill (`PALETTE_ENTRY`). A solid stop in the target's space is allowed only
-in a gradient whose space is zero.
+exactly. The conversion saturates as N3 says (N1), so a stop at the bound converted into a space whose transfer
+raises it is `2^64` exactly. A missing palette entry refuses the fill (`PALETTE_ENTRY`). A solid stop in the target's
+space is allowed only in a gradient whose space is zero.
 
 **G4 The color function.** A stop `(r, g, b, a)`'s interpolant is `(a r, a g, a b, a)` (flag 1) or `(r, g, b, a)`
 (flag 0). With no stops `C` is transparent black; with one, that stop's interpolant everywhere. Otherwise, among stops
 of one offset the first is used below it and the last at and above it, and between adjacent distinct offsets `C` is the
 linear interpolation of the interpolants; `C(o_last)` is the last stop's. The straight color is `C` (flag 0) or `C`
-un-premultiplied (flag 1; alpha 0 gives `(0, 0, 0, 0)`).
+un-premultiplied (flag 1; alpha 0 gives `(0, 0, 0, 0)`), saturated as every un-premultiply is (N1). In real arithmetic
+it is a weighted mean of bounded stop colors and never reaches `2^64`; a double evaluation can (an alpha a few
+subnormal steps wide rounds by a large part of itself), and the saturation is what keeps it to the definition.
 
 **G5 Extend.** Outside `[o_first, o_last]` with two or more stops: `PAD` takes the first stop below and the last
 above; with `P > 0`, `REPEAT` takes `C(o_first + ((t - o_first) mod P))` and `REFLECT` `C(o_first + P - |((t -
@@ -326,8 +373,9 @@ stays finite over the **sampling domain**, gradient-space points with both coord
 | G4's fraction `(t - o_i) / (o_j - o_i)` | in `[0, 1]` |
 
 With `a = 0`, G8's one root `w = c / 2b` grows without bound only as `b` goes to zero, at the edge of the cone, where a
-sink states what it does. A sink evaluates inside the domain, or refuses the fill as its own limit (S6). The magnitude of
-a color (a solid stop's, the foreground's, a palette entry's) is not bounded here, as N1 bounds no fill's color.
+sink states what it does. A sink evaluates inside the domain, or refuses the fill as its own limit (S6). A solid stop's
+color is bounded by N1 (`2^16`) and refused with these, `ERR_LIMIT` after every validity check; its conversion is
+saturated (G3).
 
 **Recording without floats.** `gshscene_store_intern_gradient_fixed` (fixed.h) takes COLRv1's numbers for a run from a
 font: integer geometry over `2^bits` (linear's rotation point becomes `d = p2 - p0`, a sweep's half turns become `v *

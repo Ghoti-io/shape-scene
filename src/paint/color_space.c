@@ -130,7 +130,7 @@ int gshscene_color_is_default(const GSHSCENE_Color * color) {
   return gshscene_color_space_is_target(&color->space);
 }
 
-GSHSCENE_Result gshscene_color_check(const GSHSCENE_Color * color) {
+GSHSCENE_Result gshscene_color_check_valid(const GSHSCENE_Color * color) {
   if (!color) {
     return GSHSCENE_ERR_INVALID;
   }
@@ -143,4 +143,13 @@ GSHSCENE_Result gshscene_color_check(const GSHSCENE_Color * color) {
     return GSHSCENE_ERR_INVALID;
   }
   return gshscene_color_space_check(&color->space);
+}
+
+GSHSCENE_Result gshscene_color_check(const GSHSCENE_Color * color) {
+  GSHSCENE_Result result = gshscene_color_check_valid(color);
+  if (result != GSHSCENE_OK) {
+    return result;
+  }
+  /* N1: the bound, after every validity check. */
+  return gshscene_color_bounded(color->rgba) ? GSHSCENE_OK : GSHSCENE_ERR_LIMIT;
 }

@@ -40,7 +40,13 @@
  * extend, interpolation space and flag, no stops to four (unsorted, equal
  * offsets, foreground and palette stops), a gradient map that turns or is flat,
  * and values at and past G14's bounds (refused at intern: the fill is then not
- * recorded).  The step byte's high bits
+ * recorded).  N1 (Corey, 2026-10-21): a fill whose `c` byte has its two high
+ * bits set takes a color at `2^16` or one step past it, in a gamma-10 or gamma-0.1
+ * space (past it is refused, `ERR_LIMIT`, and not recorded); a group whose `a % 4`
+ * is 3 and `c` has its high bit blends in gamma 0.1; a built gradient's solid stop
+ * of the top color byte is `2^16` in gamma 10 when the gradient interpolates in
+ * linear sRGB; and every built gradient is resolved and its stops checked finite
+ * and within the saturation.  The step byte's high bits
  * take radial gradients, every gradient, or stated interpolation spaces away
  * from the sink's caps (S17).  After the
  * render the contract's invariants are checked, and a violation is an `abort`:
@@ -89,7 +95,7 @@ enum {
   OUT_OK = 0, OUT_STRICT_PLANNED, OUT_STRICT_DRAWING, OUT_CANCEL_START, OUT_CANCEL_MID, OUT_SUBMITTED_PAST_CANCEL,
   OUT_LIMIT_WORKSPACE, OUT_LIMIT_REPORT, OUT_IO, OUT_OOM, OUT_SEAMLESS, OUT_CALLER_MEMORY_REFUSED, OUT_APPROXIMATED,
   OUT_TIES, OUT_DEFERRED, OUT_INVALID, OUT_UNSUPPORTED, OUT_GRADIENT_DRAWN, OUT_GRADIENT_REFUSED, OUT_NOTICE,
-  OUT_GRADIENT_BUILT, OUT_GRADIENT_LIMIT, OUT_COUNT
+  OUT_GRADIENT_BUILT, OUT_GRADIENT_LIMIT, OUT_COLOR_LIMIT, OUT_COLOR_AT_BOUND, OUT_STOP_SATURATED, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"ok", "strict, refused by the plan", "strict, refused while drawing",
@@ -98,7 +104,8 @@ static const char * const outcome_names[OUT_COUNT] = {"ok", "strict, refused by 
     "caller memory refused", "an approximation", "a tie", "a deferred completion", "an invalid request",
     "an unsupported target", "a gradient resolved by the test sink", "a gradient kind refused",
     "a notice (a gradient that draws nothing)", "a gradient built from the input",
-    "a gradient past G14's bounds refused"};
+    "a gradient past G14's bounds refused", "a fill's color past N1's bound refused",
+    "a fill's color at N1's bound recorded", "a stop resolved to N1's saturation"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -460,6 +467,13 @@ static const GSHSCENE_Resource * gradient_built(Scene * s, Input * in) {
       stops[i].color.kind = GSHSCENE_PAINT_SOLID;
       stops[i].color.rgba[0] = (double)(c >> 4) / 15.0;
       stops[i].color.space = g.space; /* the target's only in a target-space gradient (G3) */
+      if ((c >> 4) == 15 && (f & 8)) {
+        /* N1: at the bound in gamma 10, so that the resolve into linear sRGB decodes to 2^160 and saturates. */
+        stops[i].color.rgba[0] = 0x1p16;
+        stops[i].color.space.primaries = GCOL_PRIMARIES_SRGB;
+        stops[i].color.space.transfer = GCOL_TRANSFER_GAMMA;
+        stops[i].color.space.gamma = 10.0;
+      }
     }
   }
   g.stop_count = n;
@@ -480,6 +494,25 @@ static const GSHSCENE_Resource * gradient_built(Scene * s, Input * in) {
   CHECK(!beyond || result != GSHSCENE_OK); /* G14 */
   outcomes[OUT_GRADIENT_BUILT] += result == GSHSCENE_OK;
   outcomes[OUT_GRADIENT_LIMIT] += beyond && result == GSHSCENE_ERR_LIMIT;
+  if (result == GSHSCENE_OK) {
+    /* N1: every resolved stop is finite and within the saturation, whatever the spaces. */
+    GSHSCENE_Color fg;
+    gshscene_color_init(&fg);
+    GSHSCENE_Color_Space target;
+    memset(&target, 0, sizeof target);
+    target.primaries = GCOL_PRIMARIES_SRGB;
+    target.transfer = GCOL_TRANSFER_SRGB;
+    GSHSCENE_Resolved_Stop resolved[4];
+    if (gshscene_gradient_resolve(r, &fg, NULL, &target, NULL, resolved, 4) == GSHSCENE_OK) {
+      for (size_t i = 0; i < n; i++) {
+        for (int k = 0; k < 4; k++) {
+          double x = resolved[i].rgba[k];
+          CHECK(x - x == 0.0 && x <= 0x1p64 && x >= -0x1p64);
+          outcomes[OUT_STOP_SATURATED] += x == 0x1p64 || x == -0x1p64;
+        }
+      }
+    }
+  }
   return result == GSHSCENE_OK ? keep(s, r) : NULL;
 }
 
@@ -532,9 +565,28 @@ static GSHSCENE_List * build(Scene * s, Input * in, int * ties) {
             singular = (c & 0xe0) == 0xe0;
           }
         }
+        int past = 0;
+        int at_bound = 0;
+        if (op == 0 && (c & 0xC0) == 0xC0) {
+          /* N1: a color at 2^16 or one step past it, in a space whose transfer raises it (gamma 10) or not (0.1). */
+          static const double bound[4] = {0x1p16, -0x1p16, 0x1.0000000000001p16, -0x1.0000000000001p16};
+          unsigned w = (b >> 5) & 3u;
+          paint.rgba[(a >> 6) % 3] = bound[w];
+          paint.space.primaries = GCOL_PRIMARIES_SRGB;
+          paint.space.transfer = GCOL_TRANSFER_GAMMA;
+          paint.space.gamma = (a & 2) ? 10.0 : 0.1;
+          past = w >= 2;
+          at_bound = !past;
+        }
         const GSHSCENE_Resource * r = square(s, a % SIDE, b % SIDE, 1 + c % 20);
         if (r && (paint.kind != GSHSCENE_PAINT_GRADIENT || paint.gradient)) {
-          gshscene_list_fill(list, r, singular ? &flat : NULL, (GSHGEOM_Fill_Rule)(a & 1), &paint, layer, d);
+          GSHSCENE_Result fr = gshscene_list_fill(list, r, singular ? &flat : NULL, (GSHGEOM_Fill_Rule)(a & 1), &paint,
+              layer, d);
+          if (past || at_bound) {
+            CHECK(fr == (past ? GSHSCENE_ERR_LIMIT : GSHSCENE_OK) || fr == GSHSCENE_ERR_OOM);
+            outcomes[OUT_COLOR_LIMIT] += past && fr == GSHSCENE_ERR_LIMIT;
+            outcomes[OUT_COLOR_AT_BOUND] += at_bound && fr == GSHSCENE_OK;
+          }
         }
         break;
       }
@@ -562,6 +614,11 @@ static GSHSCENE_List * build(Scene * s, Input * in, int * ties) {
         } else if (a % 4 == 2) {
           g.blend_space.primaries = GCOL_PRIMARIES_SRGB;
           g.blend_space.transfer = GCOL_TRANSFER_SRGB;
+        } else if (a % 4 == 3 && (c & 0x80)) {
+          /* N1: a gamma-0.1 group, whose encode raises a fill's color to the tenth power. */
+          g.blend_space.primaries = GCOL_PRIMARIES_SRGB;
+          g.blend_space.transfer = GCOL_TRANSFER_GAMMA;
+          g.blend_space.gamma = 0.1;
         }
         if (depth < sizeof stack && gshscene_list_group_push(list, &g, layer, d) == GSHSCENE_OK) {
           stack[depth++] = 2;

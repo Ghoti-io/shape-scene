@@ -161,9 +161,13 @@ void gshscene_convert_straight(const GSHSCENE_Color_Space * from, const GSHSCENE
     out[2] = in[2];
     return;
   }
-  double lin[3] = {decode(from, in[0]), decode(from, in[1]), decode(from, in[2])};
+  /* N1's saturation after each step, so that a power only ever takes a value of magnitude at most 2^64. */
+  double lin[3];
+  for (int i = 0; i < 3; i++) {
+    lin[i] = gshscene_saturate(decode(from, in[i]));
+  }
   if (from->primaries != to->primaries) {
-    /* Only the transfers differ: the matrices cancel and are not applied. */
+    /* (When only the transfers differ the matrices cancel and are not applied.) */
     double ma[3][3];
     double mb[3][3];
     double mbi[3][3];
@@ -173,8 +177,11 @@ void gshscene_convert_straight(const GSHSCENE_Color_Space * from, const GSHSCENE
     inverse3(mb, mbi);
     mul3(ma, lin, xyz);
     mul3(mbi, xyz, lin);
+    for (int i = 0; i < 3; i++) {
+      lin[i] = gshscene_saturate(lin[i]);
+    }
   }
   for (int i = 0; i < 3; i++) {
-    out[i] = encode(to, lin[i]);
+    out[i] = gshscene_saturate(encode(to, lin[i]));
   }
 }

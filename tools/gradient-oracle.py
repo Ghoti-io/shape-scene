@@ -480,14 +480,22 @@ def evaluate(case):
     return finish(rgba, premul, alpha, t, exact, margin)
 
 
+SATURATION = F(2) ** 64
+
+
+def sat(x):
+    """N1's saturation: x clamped to [-2^64, 2^64], exactly."""
+    return SATURATION if x > SATURATION else -SATURATION if x < -SATURATION else x
+
+
 def finish(rgba, premul, alpha, t, exact, margin):
-    """G4's straight color, its alpha times the paint's (G12)."""
+    """G4's straight color (un-premultiplied and saturated, N1), its alpha times the paint's (G12)."""
     vals = [to_fraction(c) if isinstance(c, (Q, D)) else F(c) for c in rgba]
     if any(isinstance(c, D) or (isinstance(c, Q) and not c.rational()) for c in rgba):
         exact = False
     if premul:
         a = vals[3]
-        vals = [ZERO] * 4 if a == 0 else [vals[0] / a, vals[1] / a, vals[2] / a, a]
+        vals = [ZERO] * 4 if a == 0 else [sat(vals[0] / a), sat(vals[1] / a), sat(vals[2] / a), a]
     vals[3] = vals[3] * alpha
     return dict(drawn=1, reason="", t=None if t is None else to_fraction(t), rgba=vals, exact=exact, margin=margin)
 
@@ -563,19 +571,20 @@ def convert(rgb, a, b):
     if (a[0], a[1], F(a[2])) == (b[0], b[1], F(b[2])):
         return rgb, True
     exact = True
+    # N1: each step saturated, so that no power is taken of a value past 2^64.
     lin = []
     for c in rgb:
         v, e = decode(a, c)
-        lin.append(v)
+        lin.append(sat(v))
         exact = exact and e
     if a[0] != b[0]:
         ma, mb = to_xyz(a[0]), to_xyz(b[0])
         xyz = [sum(ma[r][k] * lin[k] for k in range(3)) for r in range(3)]
-        lin = solve3(mb, xyz)
+        lin = [sat(v) for v in solve3(mb, xyz)]
     out = []
     for c in lin:
         v, e = encode(b, c)
-        out.append(v)
+        out.append(sat(v))
         exact = exact and e
     return out, exact
 
@@ -689,6 +698,15 @@ def selftest():
     check(all(abs(c - 1) < F(1, 10 ** 60) for c in white), "white is white in every gamut")
     m = to_xyz(1)
     check(abs(m[0][0] - F("0.4123907992659595")) < F(1, 10 ** 15), "the sRGB matrix against its published value")
+    # N1: a conversion saturates after each step, and G4's un-premultiply saturates.
+    k16 = F(2) ** 16
+    out, _ = convert((k16, -k16, ZERO), (1, 3, 10.0), (1, 3, 2.0))
+    check(abs(out[0] - F(2) ** 32) < F(1, 10 ** 40) and abs(out[1] + F(2) ** 32) < F(1, 10 ** 40),
+          "the decode saturates before the encode")
+    out, _ = convert((k16, -k16, ZERO), (1, 1, 0.0), (1, 3, 0.1))
+    check(out[:2] == [SATURATION, -SATURATION], "the encode saturates")
+    done = finish([SATURATION, -SATURATION, ZERO, F(1, 2)], 1, ONE, None, True, None)
+    check(done["rgba"][:2] == [SATURATION, -SATURATION], "G4's un-premultiply saturates")
     if failures:
         for f in failures:
             print("FAIL  gradient-oracle selftest: %s" % f)

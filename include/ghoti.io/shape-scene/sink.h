@@ -132,6 +132,14 @@
  * destroy.
  *
  * **S11 Arithmetic.**  The CPU reference's; shape-cpu's header (story 13b).
+ * Whatever its precision, every sink applies N1's **saturation** (paint.h): each
+ * decode, matrix result and encode of a conversion, every un-premultiply (a
+ * group's conversion, G4's flag, a store to a straight target, evaluated without
+ * dividing past the bound) and every `apply` is clamped to `[-2^64, 2^64]`
+ * (::GSHSCENE_COLOR_SATURATION), at those points and no others, so every sink and
+ * writer gives a value past `2^64` the same meaning; the conformance suite's
+ * saturation cases and the composite vectors check it.  A writer that emits a
+ * format whose consumer converts (SVG, PDF) states where that consumer departs.
  *
  * **S12 Determinism.**  A sink's output depends on the list, the target and the
  * request only: not on the thread, the allocator, the workspace's address or its

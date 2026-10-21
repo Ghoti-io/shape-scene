@@ -465,9 +465,19 @@ GSHSCENE_Result gshscene_list_canonical_map(const GSHGEOM_Map * map, GSHGEOM_Map
   return canonical_map(map, out);
 }
 
-GSHSCENE_Result gshscene_list_canonical_paint(const GSHSCENE_Store * store, const GSHSCENE_Paint * paint,
+GSHSCENE_Result gshscene_list_canonical_paint_valid(const GSHSCENE_Store * store, const GSHSCENE_Paint * paint,
     GSHSCENE_Paint * out) {
   return canonical_paint(store, paint, out);
+}
+
+GSHSCENE_Result gshscene_list_canonical_paint(const GSHSCENE_Store * store, const GSHSCENE_Paint * paint,
+    GSHSCENE_Paint * out) {
+  GSHSCENE_Result result = canonical_paint(store, paint, out);
+  if (result != GSHSCENE_OK) {
+    return result;
+  }
+  /* N1: the bound, after every validity check (a shape node's paint is its last). */
+  return gshscene_color_bounded(out->rgba) ? GSHSCENE_OK : GSHSCENE_ERR_LIMIT;
 }
 
 GSHSCENE_Result gshscene_list_canonical_group(const GSHSCENE_Group * group, GSHSCENE_Group * out) {
@@ -523,6 +533,9 @@ GSHSCENE_Result gshscene_list_fill(GSHSCENE_List * list, const GSHSCENE_Resource
   }
   if (result == GSHSCENE_OK) {
     result = gshscene_list_canonical_depth(depth, &item.depth);
+  }
+  if (result == GSHSCENE_OK && !gshscene_color_bounded(item.paint.rgba)) {
+    result = GSHSCENE_ERR_LIMIT; /* N1, after every validity check */
   }
   if (result != GSHSCENE_OK) {
     return result;

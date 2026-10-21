@@ -56,15 +56,15 @@
  * ### What a list means (normative; the whole text is in documentation/design.md)
  *
  * All of it in real arithmetic, with no rounding or clamping unless said (a
- * sink's precision is its own).  Values are premultiplied, in a **layer** in a
+ * sink's precision is its own; N1's saturation, paint.h, is said).  Values are premultiplied, in a **layer** in a
  * blend space.  **N4**: an operator maps source `S = (Cs, As)` and backdrop
  * `D = (Cd, Ad)` to `(Fa Cs + Fb Cd, Fa As + Fb Ad)` with `(Fa, Fb)` of
  * `CLEAR (0, 0)`, `SRC (1, 0)`, `DEST (0, 1)`, `SRC_OVER (1, 1-As)`,
  * `DEST_OVER (1-Ad, 1)`, `SRC_IN (Ad, 0)`, `DEST_IN (0, As)`, `SRC_OUT (1-Ad, 0)`,
  * `DEST_OUT (0, 1-As)`, `SRC_ATOP (Ad, 1-As)`, `DEST_ATOP (1-Ad, As)`,
  * `XOR (1-Ad, 1-As)`, and `PLUS`: `min(1, Cs + Cd)` per channel and
- * `min(1, As + Ad)`.  **N5**: `apply(D, S, m, op) = (1 - m) D + m op(S, D)` for a
- * coverage `m`.  **N6**: the list's root layer is the target (its blend space is
+ * `min(1, As + Ad)`.  **N5**: `apply(D, S, m, op) = sat((1 - m) D + m op(S, D))`
+ * for a coverage `m`, saturated at `2^64` (N1).  **N6**: the list's root layer is the target (its blend space is
  * the target's); a group's layer starts at `(0, 0, 0, 0)` in its own blend space
  * (its `blend_space`, or its enclosing group's if zero).  **N7**: a fill is
  * `apply(L, S, k * c, SRC_OVER)` where `S` is the paint's color converted to the
@@ -283,7 +283,8 @@ GSHSCENE_API GSHSCENE_Result gshscene_list_reset(GSHSCENE_List * list);
  * argument the item's rules forbid (including a resource of the wrong kind or of another store, an
  * invalid map, a fill rule outside the enum), ::GSHSCENE_ERR_UNSUPPORTED for a reserved
  * value, ::GSHSCENE_ERR_LIMIT when a limit would pass and ::GSHSCENE_ERR_OOM; and a failing call
- * leaves the list as it was and takes no reference.
+ * leaves the list as it was and takes no reference.  A fill whose solid paint has a component past `2^16` in
+ * magnitude is ::GSHSCENE_ERR_LIMIT (N1, paint.h), decided after every other argument's validity.
  *
  * @param list The list.
  * @param resource A path or glyph run of the list's store.
@@ -326,7 +327,8 @@ GSHSCENE_API GSHSCENE_Result gshscene_list_instance(GSHSCENE_List * list,
  *
  * @param color The color, or NULL for the default (opaque black in the target's space); copied.
  * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL list, a closed list, an invalid color);
- *   ::GSHSCENE_ERR_UNSUPPORTED (a reserved space).  A failing call changes nothing.
+ *   ::GSHSCENE_ERR_UNSUPPORTED (a reserved space); ::GSHSCENE_ERR_LIMIT (a component past `2^16`, N1, after the
+ *   validity checks).  A failing call changes nothing.
  */
 GSHSCENE_API GSHSCENE_Result gshscene_list_set_foreground(GSHSCENE_List * list, const GSHSCENE_Color * color);
 

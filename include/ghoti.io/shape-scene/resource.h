@@ -362,7 +362,8 @@ GSHSCENE_API GSHSCENE_Result gshscene_store_intern_picture(GSHSCENE_Store * stor
  * @param colors The colors; may be NULL only when @p count is 0.
  * @param out The handle, with a reference for the caller; written only on success.
  * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, an invalid color); ::GSHSCENE_ERR_UNSUPPORTED (a reserved
- *   space); ::GSHSCENE_ERR_LIMIT (more than ::GSHSCENE_PALETTE_MAX_ENTRIES, the store's limits); ::GSHSCENE_ERR_OOM.
+ *   space); ::GSHSCENE_ERR_LIMIT (more than ::GSHSCENE_PALETTE_MAX_ENTRIES, the store's limits, or an entry with a
+ *   component past `2^16`, N1, decided after every entry's validity); ::GSHSCENE_ERR_OOM.
  */
 GSHSCENE_API GSHSCENE_Result gshscene_store_intern_palette(GSHSCENE_Store * store, size_t count,
     const GSHSCENE_Color * colors, const GSHSCENE_Resource ** out);
@@ -389,7 +390,8 @@ GSHSCENE_API GSHSCENE_Result gshscene_resource_palette_color(
  * @param out The handle, with a reference for the caller; written only on success.
  * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, a kind, extend, unit or flag outside its range, a non-finite
  *   double, a nonzero field of another kind, an invalid or 3D map, an invalid stop); ::GSHSCENE_ERR_UNSUPPORTED (a
- *   reserved space); ::GSHSCENE_ERR_LIMIT (more stops than `max_resource_elements`, the store's other limits);
+ *   reserved space); ::GSHSCENE_ERR_LIMIT (more stops than `max_resource_elements`, the store's other limits, G14's
+ *   bounds, a solid stop with a component past `2^16` (N1));
  *   ::GSHSCENE_ERR_OOM.
  */
 GSHSCENE_API GSHSCENE_Result gshscene_store_intern_gradient(GSHSCENE_Store * store, const GSHSCENE_Gradient * gradient,

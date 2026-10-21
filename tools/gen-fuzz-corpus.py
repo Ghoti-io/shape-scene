@@ -34,7 +34,8 @@ OPS = ["LIST_CREATE", "FILL", "CLIP_PUSH", "CLIP_POP", "GROUP_PUSH", "GROUP_POP"
        "SCENE_DESTROY", "OPEN_EDIT", "DESTROY_EDIT", "ADD", "SET", "REMOVE", "MOVE", "UPSERT", "REMOVE_KEY",
        "PUBLISH", "MERGE", "HOLD", "RELEASE_VERSION", "DIFF", "EMIT", "VISIT", "DUMP", "SCENE_INTERN",
        "FILL_EX", "CLIP_PUSH_EX", "GROUP_PUSH_EX", "LIST_FOREGROUND", "NODE_PROPS", "EDIT_FOREGROUND", "LIST_PALETTE",
-       "FILL_FIXED", "TRUNCATE", "EDIT_PALETTE", "INTERN_GRADIENT", "FILL_GRADIENT", "SCENE_GRADIENT", "GRADIENT_NODE"]
+       "FILL_FIXED", "TRUNCATE", "EDIT_PALETTE", "INTERN_GRADIENT", "FILL_GRADIENT", "SCENE_GRADIENT", "GRADIENT_NODE",
+       "COLOR_BOUND"]
 OP = {name: i for i, name in enumerate(OPS)}
 
 BIASED = {
@@ -162,6 +163,26 @@ def scripted():
     past[1] = 48
     seq = bytearray([0xFF, 0xFF]) + bytes([OP["SCENE_GRADIENT"], 0]) + past
     out["scripted-gradient-past-bound.bin"] = bytes(seq)
+    # N1's bound (Corey, 2026-10-21).  COLOR_BOUND reads: the value (0.5, 2^16, -2^16, one step past each, 2^17, 2^64,
+    # -1e300), the component, the alpha pick (0: an invalid alpha), the space, where (0 a fill, 1 the list's
+    # foreground, 2 an edit's, 3 a palette, 4 a gradient stop, 5 a shape node), then where's own picks.  At the bound
+    # and one step past it at each entry point, and one past it with an invalid alpha (invalid, decided first).
+    cb = OP["COLOR_BOUND"]
+    seq = (bytearray([0xFF, 0xFF]) + bytes([cb, 1, 0, 1, 0, 1]) + bytes([cb, 3, 1, 1, 2, 1]) + bytes([cb, 2, 2, 1, 0, 0, 0])
+           + bytes([cb, 4, 2, 1, 0, 0, 0]) + bytes([cb, 4, 0, 0, 0, 0, 0]) + bytes([cb, 3, 2, 1, 1, 3, 1])
+           + bytes([cb, 5, 0, 1, 2, 4, 0]) + open_edit() + bytes([cb, 6, 1, 1, 0, 2, 0])
+           + bytes([cb, 7, 0, 1, 0, 5, 0, 0, 1, 0]) + bytes([cb, 1, 0, 1, 0, 5, 0, 0, 1, 0]))
+    out["scripted-color-bound.bin"] = bytes(seq)
+    # INTERN_GRADIENT reads: the slot, the stop count and each stop (offset, kind, alpha, and for a solid red and space),
+    # the fixed pick (not 0: doubles), the kind, six values (b % 9 - 4), the other-kind pick, the extend, the flag picks,
+    # the space and the map.  A degenerate linear gradient (p0 = p1) in slot 0, a drawn one in slot 1, and a fill of it
+    # (FILL_GRADIENT: the slot, the alpha, the map, the path).  Random inputs reached these by luck until the op table
+    # grew (N1's COLOR_BOUND), which is why they are scripted.
+    stops = bytes([2, 2, 0, 4, 2, 2, 6, 2, 4])
+    degenerate = bytes([OP["INTERN_GRADIENT"], 0]) + stops + bytes([1, 1, 4, 4, 4, 4, 4, 4, 1, 0, 0, 0, 2, 0])
+    drawn = bytes([OP["INTERN_GRADIENT"], 1]) + stops + bytes([1, 1, 4, 4, 12, 4, 4, 4, 1, 0, 0, 0, 2, 0])
+    fillg = bytes([OP["FILL_GRADIENT"], 1, 4, 0, 0])
+    out["scripted-gradient-fill.bin"] = bytes(bytearray([0xFF, 0xFF]) + degenerate + drawn + fillg)
     # Found by story 16's libFuzzer soak: an instance of its own parent group, entered first as another instance's
     # target, which publish answered with ERR_INTERNAL instead of a cycle problem.
     out["regression-cycle-entered-through-an-instance.bin"] = base64.b64decode(

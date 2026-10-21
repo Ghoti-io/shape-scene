@@ -93,6 +93,12 @@ static int limited(const GSHSCENE_Gradient * g) {
       return 0;
     }
   }
+  /* N1's bound on a solid stop's color (a foreground or palette stop's components are zero), refused with G14's. */
+  for (size_t i = 0; i < g->stop_count; i++) {
+    if (!gshscene_color_bounded(g->stops[i].color.rgba)) {
+      return 0;
+    }
+  }
   return 1;
 }
 
@@ -165,7 +171,7 @@ static GSHSCENE_Result canonical(const GSHSCENE_Store * store, const GSHSCENE_Gr
     if (!gshscene_finite(s->offset) || s->color.kind == GSHSCENE_PAINT_GRADIENT) {
       return GSHSCENE_ERR_INVALID;
     }
-    result = gshscene_list_canonical_paint(store, &s->color, &stops[i].color);
+    result = gshscene_list_canonical_paint_valid(store, &s->color, &stops[i].color);
     if (result != GSHSCENE_OK) {
       return result;
     }

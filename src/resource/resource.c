@@ -650,9 +650,15 @@ GSHSCENE_Result gshscene_store_intern_palette(
     return GSHSCENE_ERR_LIMIT;
   }
   for (size_t i = 0; i < count; i++) {
-    GSHSCENE_Result checked = gshscene_color_check(&colors[i]);
+    GSHSCENE_Result checked = gshscene_color_check_valid(&colors[i]);
     if (checked != GSHSCENE_OK) {
       return checked;
+    }
+  }
+  /* N1: the bound, after every entry's validity. */
+  for (size_t i = 0; i < count; i++) {
+    if (!gshscene_color_bounded(colors[i].rgba)) {
+      return GSHSCENE_ERR_LIMIT;
     }
   }
   Palette_Source src = {count, colors};

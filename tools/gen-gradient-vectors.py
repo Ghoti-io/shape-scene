@@ -184,6 +184,18 @@ COLORS = [(0.0, 0.0, 0.0), (1.0, 1.0, 1.0), (0.25, 0.5, 0.75), (0.03125, 0.001, 
           (0.5, 0.5, 0.5), (0.04043, 0.003125, 0.0031)]  # the last just below each sRGB knee
 
 
+# N1's saturation (Corey, 2026-10-21): stops at the bound 2^16 whose conversion reaches 2^64 at the decode, the
+# matrix and the encode; the other components stay inside.  (gamma 10: decode is the 10th power; gamma 0.1: encode is.)
+K16 = 2.0 ** 16
+SATURATING = [
+    ((1, 3, 10.0), (1, 3, 0.1), (K16, -K16, 0.5)),       # decode and encode
+    ((1, 3, 10.0), (1, 3, 2.0), (K16, -K16, 0.5)),       # the decode, then a gamma-2 encode
+    ((4, 3, 10.0), (1, 3, 10.0), (K16, -K16, -K16)),     # the matrix (BT.2020 to sRGB), then a gamma-10 encode
+    ((1, 1, 0.0), (1, 3, 0.1), (K16, -K16, 1.0)),        # the encode of a linear stop
+    ((1, 1, 0.0), (1, 1, 0.0), (K16, -K16, 0.0)),        # the same space: copied, never saturated
+]
+
+
 def resolve_cases():
     out = []
     for a in SPACES:
@@ -191,6 +203,9 @@ def resolve_cases():
             for rgb in COLORS:
                 got, exact = oracle.convert(rgb, a, b)
                 out.append(dict(a=a, b=b, rgb=rgb, want=got, exact=exact))
+    for a, b, rgb in SATURATING:
+        got, exact = oracle.convert(rgb, a, b)
+        out.append(dict(a=a, b=b, rgb=rgb, want=got, exact=exact))
     return out
 
 

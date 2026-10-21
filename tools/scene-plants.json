@@ -7,6 +7,7 @@
 "es != GC",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -21,6 +22,7 @@
 "er != GC",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -35,6 +37,7 @@
 "!=",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -49,6 +52,7 @@
 "(!(!space))",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -63,6 +67,7 @@
 "GSHSCENE_ERR_LIMIT",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -77,6 +82,7 @@
 ">",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -91,6 +97,7 @@
 "&&",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -105,6 +112,7 @@
 ">",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -119,6 +127,7 @@
 "GSHSCENE_ERR_LIMIT",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -133,6 +142,7 @@
 "(!(gshscene_color_space_is_target(space)))",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -147,6 +157,7 @@
 "es != GC",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -161,6 +172,7 @@
 "&&",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -175,6 +187,7 @@
 "er != GC",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -189,6 +202,7 @@
 "(!(space->primaries == GCOL_PRIMARIES_UNKNOWN || space->transfer == GCOL_TRANSFER_UNKNOWN))",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -203,6 +217,7 @@
 "GSHSCENE_ERR_LIMIT",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -217,6 +232,7 @@
 "!=",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -231,6 +247,7 @@
 "(!(space->transfer == GCOL_TRANSFER_GAMMA))",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -245,6 +262,7 @@
 "&&",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -259,6 +277,7 @@
 ">",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -273,6 +292,7 @@
 "||",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -287,6 +307,7 @@
 "<",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -301,6 +322,7 @@
 "(!(!gshscene_finite(space->gamma) || !(space->gamma >= GAMMA_MIN && space->gamma <= GAMMA_MAX)))",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -315,6 +337,7 @@
 "GSHSCENE_ERR_LIMIT",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -329,6 +352,7 @@
 "==",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -343,6 +367,7 @@
 "(!(gshgeom_f64_bits(space->gamma) != 0))",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -357,6 +382,7 @@
 "GSHSCENE_ERR_LIMIT",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -371,6 +397,7 @@
 "GSHSCENE_ERR_INVALID",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -385,6 +412,7 @@
 "GSHSCENE_ERR_INVALID",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -399,6 +427,7 @@
 "&&",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -413,6 +442,7 @@
 "(!(!info || !out))",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -427,6 +457,7 @@
 "GSHSCENE_ERR_LIMIT",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -441,6 +472,7 @@
 "&&",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -455,6 +487,7 @@
 "!=",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -469,6 +502,7 @@
 "(!(!info->primaries_stated || info->transfer == GCOL_TRANSFER_UNKNOWN))",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -483,6 +517,7 @@
 "GSHSCENE_ERR_LIMIT",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -497,6 +532,7 @@
 "es == NU",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -511,6 +547,7 @@
 "ze == 0 ",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -525,6 +562,7 @@
 "th == NU",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -539,6 +577,7 @@
 "(!(info->icc_bytes != NULL || info->icc_size != 0 || info->icc_linked_path != NULL))",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -553,6 +592,7 @@
 "GSHSCENE_ERR_INVALID",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -567,6 +607,7 @@
 ";",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -581,6 +622,7 @@
 "!=",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -595,6 +637,7 @@
 ";",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -609,6 +652,7 @@
 "!=",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -623,6 +667,7 @@
 "(!(space.primaries == GCOL_PRIMARIES_UNKNOWN))",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -637,6 +682,7 @@
 "GSHSCENE_ERR_INVALID",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -651,6 +697,7 @@
 "!=",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -665,6 +712,7 @@
 "(!(result == GSHSCENE_OK))",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -679,6 +727,7 @@
 "(!(!color))",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -693,6 +742,7 @@
 ";",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -707,6 +757,7 @@
 ";",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -721,6 +772,7 @@
 ";",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -735,6 +787,7 @@
 ";",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -749,6 +802,7 @@
 ";",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -763,6 +817,7 @@
 ";",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -777,6 +832,7 @@
 ";",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -791,6 +847,7 @@
 "<=",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -805,6 +862,7 @@
 "==",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -819,6 +877,7 @@
 "(!(gshgeom_f64_bits(color->rgba[i]) != gshgeom_f64_bits(def.rgba[i])))",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -833,6 +892,7 @@
 "(!(!color))",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -847,6 +907,7 @@
 "GSHSCENE_ERR_LIMIT",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -861,6 +922,7 @@
 "<=",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -875,6 +937,7 @@
 "(!(!gshscene_finite(color->rgba[i])))",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -889,6 +952,7 @@
 "GSHSCENE_ERR_LIMIT",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -903,6 +967,7 @@
 "||",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -917,6 +982,7 @@
 "<",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -931,6 +997,7 @@
 "(!(!(color->rgba[3] >= 0.0 && color->rgba[3] <= 1.0)))",
 [
 "testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -945,6 +1012,37 @@
 "GSHSCENE_ERR_LIMIT",
 [
 "testColor",
+"testColor_bound",
+"testList",
+"testNode",
+"testPaint_scene",
+"testScene_dump"
+]
+],
+[
+"cs-150-ne",
+"srcl",
+"src/paint/color_space.c",
+"150:!=",
+"==",
+[
+"testColor",
+"testColor_bound",
+"testList",
+"testNode",
+"testPaint_scene",
+"testScene_dump"
+]
+],
+[
+"cs-150-neg",
+"srcl",
+"src/paint/color_space.c",
+"150:(result != GSHSCENE_OK)",
+"(!(result != GSHSCENE_OK))",
+[
+"testColor",
+"testColor_bound",
 "testList",
 "testNode",
 "testPaint_scene",
@@ -28743,6 +28841,7 @@
 "!=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -28758,6 +28857,7 @@
 "<=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -28773,6 +28873,7 @@
 "==",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -28788,6 +28889,7 @@
 "(!(gshgeom_f64_bits(v[i]) != 0))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -28803,6 +28905,7 @@
 "(!(!gshscene_finite(v[i])))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -28818,6 +28921,7 @@
 "!=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -28833,6 +28937,7 @@
 "&&",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -28848,6 +28953,7 @@
 ">",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -28863,6 +28969,7 @@
 "||",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -28878,6 +28985,7 @@
 "<",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -28893,6 +29001,7 @@
 "<=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -28908,6 +29017,7 @@
 "(!(!within(v[i])))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -28923,6 +29033,7 @@
 "&&",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -28938,6 +29049,7 @@
 "(!(!all_within(values, 16) || !all_within(map, 6)))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -28953,6 +29065,7 @@
 "<=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -28968,6 +29081,7 @@
 "(!(!within(g->stops[i].offset)))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -28976,13 +29090,46 @@
 ]
 ],
 [
-"bg-107-del",
+"bg-97-lt",
 "srcl",
 "src/resource/gradient.c",
-"107:memset(out, 0, sizeof *out);",
+"97:<",
+"<=",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-98-neg",
+"srcl",
+"src/resource/gradient.c",
+"98:(!gshscene_color_bounded(g->stops[i].color.rgba))",
+"(!(!gshscene_color_bounded(g->stops[i].color.rgba)))",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-113-del",
+"srcl",
+"src/resource/gradient.c",
+"113:memset(out, 0, sizeof *out);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -28991,13 +29138,14 @@
 ]
 ],
 [
-"bg-108-del",
+"bg-114-del",
 "srcl",
 "src/resource/gradient.c",
-"108:out->kind = in->kind;",
+"114:out->kind = in->kind;",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29006,13 +29154,14 @@
 ]
 ],
 [
-"bg-115-ne",
+"bg-121-ne",
 "srcl",
 "src/resource/gradient.c",
-"115:!=",
+"121:!=",
 "==",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29021,13 +29170,14 @@
 ]
 ],
 [
-"bg-115-neg",
+"bg-121-neg",
 "srcl",
 "src/resource/gradient.c",
-"115:(!all_finite(linear, 6) || !all_zero_bits(radial, 6) || !all_zero_bits(sweep, 4) || in->angle_unit != 0)",
+"121:(!all_finite(linear, 6) || !all_zero_bits(radial, 6) || !all_zero_bits(sweep, 4) || in->angle_unit != 0)",
 "(!(!all_finite(linear, 6) || !all_zero_bits(radial, 6) || !all_zero_bits(sweep, 4) || in->angle_unit != 0))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29036,13 +29186,14 @@
 ]
 ],
 [
-"bg-116-ret",
+"bg-122-ret",
 "srcl",
 "src/resource/gradient.c",
-"116:GSHSCENE_ERR_INVALID",
+"122:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29051,13 +29202,14 @@
 ]
 ],
 [
-"bg-119-del",
+"bg-125-del",
 "srcl",
 "src/resource/gradient.c",
-"119:out->p0[i] = canonical_zero(in->p0[i]);",
+"125:out->p0[i] = canonical_zero(in->p0[i]);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29066,13 +29218,14 @@
 ]
 ],
 [
-"bg-120-del",
+"bg-126-del",
 "srcl",
 "src/resource/gradient.c",
-"120:out->p1[i] = canonical_zero(in->p1[i]);",
+"126:out->p1[i] = canonical_zero(in->p1[i]);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29081,13 +29234,14 @@
 ]
 ],
 [
-"bg-121-del",
+"bg-127-del",
 "srcl",
 "src/resource/gradient.c",
-"121:out->d[i] = canonical_zero(in->d[i]);",
+"127:out->d[i] = canonical_zero(in->d[i]);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29096,13 +29250,14 @@
 ]
 ],
 [
-"bg-125-ne",
+"bg-131-ne",
 "srcl",
 "src/resource/gradient.c",
-"125:!=",
+"131:!=",
 "==",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29111,13 +29266,14 @@
 ]
 ],
 [
-"bg-125-neg",
+"bg-131-neg",
 "srcl",
 "src/resource/gradient.c",
-"125:(!all_finite(radial, 6) || !all_zero_bits(linear, 6) || !all_zero_bits(sweep, 4) || in->angle_unit != 0)",
+"131:(!all_finite(radial, 6) || !all_zero_bits(linear, 6) || !all_zero_bits(sweep, 4) || in->angle_unit != 0)",
 "(!(!all_finite(radial, 6) || !all_zero_bits(linear, 6) || !all_zero_bits(sweep, 4) || in->angle_unit != 0))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29126,13 +29282,14 @@
 ]
 ],
 [
-"bg-126-ret",
+"bg-132-ret",
 "srcl",
 "src/resource/gradient.c",
-"126:GSHSCENE_ERR_INVALID",
+"132:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29141,13 +29298,14 @@
 ]
 ],
 [
-"bg-129-del",
+"bg-135-del",
 "srcl",
 "src/resource/gradient.c",
-"129:out->c0[i] = canonical_zero(in->c0[i]);",
+"135:out->c0[i] = canonical_zero(in->c0[i]);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29156,13 +29314,14 @@
 ]
 ],
 [
-"bg-130-del",
+"bg-136-del",
 "srcl",
 "src/resource/gradient.c",
-"130:out->c1[i] = canonical_zero(in->c1[i]);",
+"136:out->c1[i] = canonical_zero(in->c1[i]);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29171,13 +29330,14 @@
 ]
 ],
 [
-"bg-132-del",
+"bg-138-del",
 "srcl",
 "src/resource/gradient.c",
-"132:out->r0 = canonical_zero(in->r0);",
+"138:out->r0 = canonical_zero(in->r0);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29186,13 +29346,14 @@
 ]
 ],
 [
-"bg-133-del",
+"bg-139-del",
 "srcl",
 "src/resource/gradient.c",
-"133:out->r1 = canonical_zero(in->r1);",
+"139:out->r1 = canonical_zero(in->r1);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29201,13 +29362,14 @@
 ]
 ],
 [
-"bg-137-ge",
+"bg-143-ge",
 "srcl",
 "src/resource/gradient.c",
-"137:>=",
+"143:>=",
 ">",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29216,13 +29378,14 @@
 ]
 ],
 [
-"bg-138-ret",
+"bg-144-ret",
 "srcl",
 "src/resource/gradient.c",
-"138:GSHSCENE_ERR_INVALID",
+"144:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29231,13 +29394,14 @@
 ]
 ],
 [
-"bg-140-del",
+"bg-146-del",
 "srcl",
 "src/resource/gradient.c",
-"140:out->center[0] = canonical_zero(in->center[0]);",
+"146:out->center[0] = canonical_zero(in->center[0]);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29246,13 +29410,14 @@
 ]
 ],
 [
-"bg-141-del",
+"bg-147-del",
 "srcl",
 "src/resource/gradient.c",
-"141:out->center[1] = canonical_zero(in->center[1]);",
+"147:out->center[1] = canonical_zero(in->center[1]);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29261,13 +29426,14 @@
 ]
 ],
 [
-"bg-142-del",
+"bg-148-del",
 "srcl",
 "src/resource/gradient.c",
-"142:out->angle_unit = in->angle_unit;",
+"148:out->angle_unit = in->angle_unit;",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29276,13 +29442,14 @@
 ]
 ],
 [
-"bg-143-del",
+"bg-149-del",
 "srcl",
 "src/resource/gradient.c",
-"143:out->a0 = canonical_zero(in->a0);",
+"149:out->a0 = canonical_zero(in->a0);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29291,163 +29458,14 @@
 ]
 ],
 [
-"bg-144-del",
+"bg-150-del",
 "srcl",
 "src/resource/gradient.c",
-"144:out->a1 = canonical_zero(in->a1);",
+"150:out->a1 = canonical_zero(in->a1);",
 ";",
 [
 "testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-147-ret",
-"srcl",
-"src/resource/gradient.c",
-"147:GSHSCENE_ERR_INVALID",
-"GSHSCENE_ERR_LIMIT",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-149-ge",
-"srcl",
-"src/resource/gradient.c",
-"149:>=",
-">",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-149-or",
-"srcl",
-"src/resource/gradient.c",
-"149:||",
-"&&",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-149-gt",
-"srcl",
-"src/resource/gradient.c",
-"149:ed > 1u",
-"ed >= 1u",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-149-neg",
-"srcl",
-"src/resource/gradient.c",
-"149:(in->extend >= (uint32_t)GSHSCENE_EXTEND_COUNT || in->premultiplied > 1u)",
-"(!(in->extend >= (uint32_t)GSHSCENE_EXTEND_COUNT || in->premultiplied > 1u))",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-150-ret",
-"srcl",
-"src/resource/gradient.c",
-"150:GSHSCENE_ERR_INVALID",
-"GSHSCENE_ERR_LIMIT",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-152-ne",
-"srcl",
-"src/resource/gradient.c",
-"152:im != 2 ",
-"im == 2 ",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-152-or",
-"srcl",
-"src/resource/gradient.c",
-"152:||",
-"&&",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-152-ne2",
-"srcl",
-"src/resource/gradient.c",
-"152:p) != GS",
-"p) == GS",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-152-neg",
-"srcl",
-"src/resource/gradient.c",
-"152:(in->map.dim != 2 || gshscene_list_canonical_map(&in->map, &out->map) != GSHSCENE_OK)",
-"(!(in->map.dim != 2 || gshscene_list_canonical_map(&in->map, &out->map) != GSHSCENE_OK))",
-[
-"testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29463,6 +29481,7 @@
 "GSHSCENE_ERR_LIMIT",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29471,13 +29490,14 @@
 ]
 ],
 [
-"bg-156-ne",
+"bg-155-ge",
 "srcl",
 "src/resource/gradient.c",
-"156:!=",
-"==",
+"155:>=",
+">",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29486,88 +29506,14 @@
 ]
 ],
 [
-"bg-156-neg",
+"bg-155-or",
 "srcl",
 "src/resource/gradient.c",
-"156:(result != GSHSCENE_OK)",
-"(!(result != GSHSCENE_OK))",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-159-del",
-"srcl",
-"src/resource/gradient.c",
-"159:out->extend = in->extend;",
-";",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-160-del",
-"srcl",
-"src/resource/gradient.c",
-"160:out->space = in->space;",
-";",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-161-del",
-"srcl",
-"src/resource/gradient.c",
-"161:out->premultiplied = in->premultiplied;",
-";",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-163-lt",
-"srcl",
-"src/resource/gradient.c",
-"163:<",
-"<=",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-165-or",
-"srcl",
-"src/resource/gradient.c",
-"165:||",
+"155:||",
 "&&",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29576,13 +29522,14 @@
 ]
 ],
 [
-"bg-165-eq",
+"bg-155-gt",
 "srcl",
 "src/resource/gradient.c",
-"165:==",
-"!=",
+"155:ed > 1u",
+"ed >= 1u",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29591,13 +29538,14 @@
 ]
 ],
 [
-"bg-165-neg",
+"bg-155-neg",
 "srcl",
 "src/resource/gradient.c",
-"165:(!gshscene_finite(s->offset) || s->color.kind == GSHSCENE_PAINT_GRADIENT)",
-"(!(!gshscene_finite(s->offset) || s->color.kind == GSHSCENE_PAINT_GRADIENT))",
+"155:(in->extend >= (uint32_t)GSHSCENE_EXTEND_COUNT || in->premultiplied > 1u)",
+"(!(in->extend >= (uint32_t)GSHSCENE_EXTEND_COUNT || in->premultiplied > 1u))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29606,13 +29554,14 @@
 ]
 ],
 [
-"bg-166-ret",
+"bg-156-ret",
 "srcl",
 "src/resource/gradient.c",
-"166:GSHSCENE_ERR_INVALID",
+"156:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29621,13 +29570,94 @@
 ]
 ],
 [
-"bg-169-ne",
+"bg-158-ne",
 "srcl",
 "src/resource/gradient.c",
-"169:!=",
+"158:im != 2 ",
+"im == 2 ",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-158-or",
+"srcl",
+"src/resource/gradient.c",
+"158:||",
+"&&",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-158-ne2",
+"srcl",
+"src/resource/gradient.c",
+"158:p) != GS",
+"p) == GS",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-158-neg",
+"srcl",
+"src/resource/gradient.c",
+"158:(in->map.dim != 2 || gshscene_list_canonical_map(&in->map, &out->map) != GSHSCENE_OK)",
+"(!(in->map.dim != 2 || gshscene_list_canonical_map(&in->map, &out->map) != GSHSCENE_OK))",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-159-ret",
+"srcl",
+"src/resource/gradient.c",
+"159:GSHSCENE_ERR_INVALID",
+"GSHSCENE_ERR_LIMIT",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-162-ne",
+"srcl",
+"src/resource/gradient.c",
+"162:!=",
 "==",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29636,13 +29666,14 @@
 ]
 ],
 [
-"bg-169-neg",
+"bg-162-neg",
 "srcl",
 "src/resource/gradient.c",
-"169:(result != GSHSCENE_OK)",
+"162:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29651,13 +29682,94 @@
 ]
 ],
 [
-"bg-173-eq",
+"bg-165-del",
 "srcl",
 "src/resource/gradient.c",
-"173:==",
+"165:out->extend = in->extend;",
+";",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-166-del",
+"srcl",
+"src/resource/gradient.c",
+"166:out->space = in->space;",
+";",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-167-del",
+"srcl",
+"src/resource/gradient.c",
+"167:out->premultiplied = in->premultiplied;",
+";",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-169-lt",
+"srcl",
+"src/resource/gradient.c",
+"169:<",
+"<=",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-171-or",
+"srcl",
+"src/resource/gradient.c",
+"171:||",
+"&&",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-171-eq",
+"srcl",
+"src/resource/gradient.c",
+"171:==",
 "!=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29666,13 +29778,14 @@
 ]
 ],
 [
-"bg-173-neg",
+"bg-171-neg",
 "srcl",
 "src/resource/gradient.c",
-"173:(stops[i].color.kind == GSHSCENE_PAINT_SOLID && !target && gshscene_color_space_is_target(&stops[i].color.space))",
-"(!(stops[i].color.kind == GSHSCENE_PAINT_SOLID && !target && gshscene_color_space_is_target(&stops[i].color.space)))",
+"171:(!gshscene_finite(s->offset) || s->color.kind == GSHSCENE_PAINT_GRADIENT)",
+"(!(!gshscene_finite(s->offset) || s->color.kind == GSHSCENE_PAINT_GRADIENT))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29681,13 +29794,14 @@
 ]
 ],
 [
-"bg-174-ret",
+"bg-172-ret",
 "srcl",
 "src/resource/gradient.c",
-"174:GSHSCENE_ERR_INVALID",
+"172:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29696,13 +29810,94 @@
 ]
 ],
 [
-"bg-176-del",
+"bg-175-ne",
 "srcl",
 "src/resource/gradient.c",
-"176:stops[i].offset = canonical_zero(s->offset);",
+"175:!=",
+"==",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-175-neg",
+"srcl",
+"src/resource/gradient.c",
+"175:(result != GSHSCENE_OK)",
+"(!(result != GSHSCENE_OK))",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-179-eq",
+"srcl",
+"src/resource/gradient.c",
+"179:==",
+"!=",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-179-neg",
+"srcl",
+"src/resource/gradient.c",
+"179:(stops[i].color.kind == GSHSCENE_PAINT_SOLID && !target && gshscene_color_space_is_target(&stops[i].color.space))",
+"(!(stops[i].color.kind == GSHSCENE_PAINT_SOLID && !target && gshscene_color_space_is_target(&stops[i].color.space)))",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-180-ret",
+"srcl",
+"src/resource/gradient.c",
+"180:GSHSCENE_ERR_INVALID",
+"GSHSCENE_ERR_LIMIT",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-182-del",
+"srcl",
+"src/resource/gradient.c",
+"182:stops[i].offset = canonical_zero(s->offset);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29711,13 +29906,14 @@
 ]
 ],
 [
-"bg-178-del",
+"bg-184-del",
 "srcl",
 "src/resource/gradient.c",
-"178:out->stop_count = in->stop_count;",
+"184:out->stop_count = in->stop_count;",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29726,13 +29922,14 @@
 ]
 ],
 [
-"bg-179-del",
+"bg-185-del",
 "srcl",
 "src/resource/gradient.c",
-"179:out->stops = stops;",
+"185:out->stops = stops;",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29741,13 +29938,14 @@
 ]
 ],
 [
-"bg-192-lt",
+"bg-198-lt",
 "srcl",
 "src/resource/gradient.c",
-"192:(a < mi",
+"198:(a < mi",
 "(a <= mi",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29756,13 +29954,14 @@
 ]
 ],
 [
-"bg-192-and",
+"bg-198-and",
 "srcl",
 "src/resource/gradient.c",
-"192:&&",
+"198:&&",
 "||",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29771,13 +29970,14 @@
 ]
 ],
 [
-"bg-192-lt2",
+"bg-198-lt2",
 "srcl",
 "src/resource/gradient.c",
-"192: b < hi",
+"198: b < hi",
 " b <= hi",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29786,13 +29986,14 @@
 ]
 ],
 [
-"bg-192-neg",
+"bg-198-neg",
 "srcl",
 "src/resource/gradient.c",
-"192:(a < mid && b < hi)",
+"198:(a < mid && b < hi)",
 "(!(a < mid && b < hi))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29801,103 +30002,14 @@
 ]
 ],
 [
-"bg-194-lt",
+"bg-200-lt",
 "srcl",
 "src/resource/gradient.c",
-"194:<",
+"200:<",
 "<=",
 [
 "testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-194-del",
-"srcl",
-"src/resource/gradient.c",
-"194:scratch[k++] = stops[b].offset < stops[a].offset ? stops[b++] : stops[a++];",
-";",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-196-lt",
-"srcl",
-"src/resource/gradient.c",
-"196:<",
-"<=",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-196-neg",
-"srcl",
-"src/resource/gradient.c",
-"196:(a < mid)",
-"(!(a < mid))",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-197-del",
-"srcl",
-"src/resource/gradient.c",
-"197:scratch[k++] = stops[a++];",
-";",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-199-lt",
-"srcl",
-"src/resource/gradient.c",
-"199:<",
-"<=",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-199-neg",
-"srcl",
-"src/resource/gradient.c",
-"199:(b < hi)",
-"(!(b < hi))",
-[
-"testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29909,10 +30021,43 @@
 "bg-200-del",
 "srcl",
 "src/resource/gradient.c",
-"200:scratch[k++] = stops[b++];",
+"200:scratch[k++] = stops[b].offset < stops[a].offset ? stops[b++] : stops[a++];",
 ";",
 [
 "testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-202-lt",
+"srcl",
+"src/resource/gradient.c",
+"202:<",
+"<=",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-202-neg",
+"srcl",
+"src/resource/gradient.c",
+"202:(a < mid)",
+"(!(a < mid))",
+[
+"testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29924,10 +30069,11 @@
 "bg-203-del",
 "srcl",
 "src/resource/gradient.c",
-"203:memcpy(stops, scratch, count * sizeof *stops);",
+"203:scratch[k++] = stops[a++];",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29936,13 +30082,14 @@
 ]
 ],
 [
-"bg-210-del",
+"bg-205-lt",
 "srcl",
 "src/resource/gradient.c",
-"210:gshgeom_hash_u8(h, (uint8_t)paint->kind);",
-";",
+"205:<",
+"<=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29951,13 +30098,78 @@
 ]
 ],
 [
-"bg-210-hwu8",
+"bg-205-neg",
 "srcl",
 "src/resource/gradient.c",
-"210:gshgeom_hash_u8(",
+"205:(b < hi)",
+"(!(b < hi))",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-206-del",
+"srcl",
+"src/resource/gradient.c",
+"206:scratch[k++] = stops[b++];",
+";",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-209-del",
+"srcl",
+"src/resource/gradient.c",
+"209:memcpy(stops, scratch, count * sizeof *stops);",
+";",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-216-del",
+"srcl",
+"src/resource/gradient.c",
+"216:gshgeom_hash_u8(h, (uint8_t)paint->kind);",
+";",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-216-hwu8",
+"srcl",
+"src/resource/gradient.c",
+"216:gshgeom_hash_u8(",
 "gshgeom_hash_u32(",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -29966,58 +30178,14 @@
 ]
 ],
 [
-"bg-212-del",
+"bg-218-del",
 "srcl",
 "src/resource/gradient.c",
-"212:gshgeom_hash_f64(h, paint->rgba[k]);",
+"218:gshgeom_hash_f64(h, paint->rgba[k]);",
 ";",
 [
 "testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-214-del",
-"srcl",
-"src/resource/gradient.c",
-"214:gshscene_space_hash(h, &paint->space);",
-";",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-215-del",
-"srcl",
-"src/resource/gradient.c",
-"215:gshgeom_hash_u32(h, paint->entry);",
-";",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-215-hwu32",
-"srcl",
-"src/resource/gradient.c",
-"215:gshgeom_hash_u32(",
-"gshgeom_hash_u64(",
-[
-"testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30029,10 +30197,11 @@
 "bg-220-del",
 "srcl",
 "src/resource/gradient.c",
-"220:gshgeom_hash_init(&h);",
+"220:gshscene_space_hash(h, &paint->space);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30044,10 +30213,11 @@
 "bg-221-del",
 "srcl",
 "src/resource/gradient.c",
-"221:gshgeom_hash_u32(&h, GRADIENT_FORMAT_VERSION);",
+"221:gshgeom_hash_u32(h, paint->entry);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30063,111 +30233,7 @@
 "gshgeom_hash_u64(",
 [
 "testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-222-del",
-"srcl",
-"src/resource/gradient.c",
-"222:gshgeom_hash_u32(&h, (uint32_t)GSHSCENE_RESOURCE_GRADIENT);",
-";",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-222-hwu32",
-"srcl",
-"src/resource/gradient.c",
-"222:gshgeom_hash_u32(",
-"gshgeom_hash_u64(",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-223-del",
-"srcl",
-"src/resource/gradient.c",
-"223:gshgeom_hash_u8(&h, (uint8_t)g->kind);",
-";",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-223-hwu8",
-"srcl",
-"src/resource/gradient.c",
-"223:gshgeom_hash_u8(",
-"gshgeom_hash_u32(",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-224-del",
-"srcl",
-"src/resource/gradient.c",
-"224:gshgeom_hash_u8(&h, (uint8_t)g->extend);",
-";",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-224-hwu8",
-"srcl",
-"src/resource/gradient.c",
-"224:gshgeom_hash_u8(",
-"gshgeom_hash_u32(",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-225-del",
-"srcl",
-"src/resource/gradient.c",
-"225:gshscene_space_hash(&h, &g->space);",
-";",
-[
-"testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30179,25 +30245,11 @@
 "bg-226-del",
 "srcl",
 "src/resource/gradient.c",
-"226:gshgeom_hash_u8(&h, (uint8_t)g->premultiplied);",
+"226:gshgeom_hash_init(&h);",
 ";",
 [
 "testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-226-hwu8",
-"srcl",
-"src/resource/gradient.c",
-"226:gshgeom_hash_u8(",
-"gshgeom_hash_u32(",
-[
-"testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30209,10 +30261,11 @@
 "bg-227-del",
 "srcl",
 "src/resource/gradient.c",
-"227:gshgeom_hash_u64(&h, gshgeom_map_hash(&g->map));",
+"227:gshgeom_hash_u32(&h, GRADIENT_FORMAT_VERSION);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30221,13 +30274,78 @@
 ]
 ],
 [
-"bg-227-hwu64",
+"bg-227-hwu32",
 "srcl",
 "src/resource/gradient.c",
-"227:gshgeom_hash_u64(",
+"227:gshgeom_hash_u32(",
+"gshgeom_hash_u64(",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-228-del",
+"srcl",
+"src/resource/gradient.c",
+"228:gshgeom_hash_u32(&h, (uint32_t)GSHSCENE_RESOURCE_GRADIENT);",
+";",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-228-hwu32",
+"srcl",
+"src/resource/gradient.c",
+"228:gshgeom_hash_u32(",
+"gshgeom_hash_u64(",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-229-del",
+"srcl",
+"src/resource/gradient.c",
+"229:gshgeom_hash_u8(&h, (uint8_t)g->kind);",
+";",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-229-hwu8",
+"srcl",
+"src/resource/gradient.c",
+"229:gshgeom_hash_u8(",
 "gshgeom_hash_u32(",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30239,10 +30357,27 @@
 "bg-230-del",
 "srcl",
 "src/resource/gradient.c",
-"230:gshgeom_hash_f64(&h, g->p0[0]);",
+"230:gshgeom_hash_u8(&h, (uint8_t)g->extend);",
 ";",
 [
 "testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-230-hwu8",
+"srcl",
+"src/resource/gradient.c",
+"230:gshgeom_hash_u8(",
+"gshgeom_hash_u32(",
+[
+"testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30254,10 +30389,11 @@
 "bg-231-del",
 "srcl",
 "src/resource/gradient.c",
-"231:gshgeom_hash_f64(&h, g->p0[1]);",
+"231:gshscene_space_hash(&h, &g->space);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30269,10 +30405,27 @@
 "bg-232-del",
 "srcl",
 "src/resource/gradient.c",
-"232:gshgeom_hash_f64(&h, g->p1[0]);",
+"232:gshgeom_hash_u8(&h, (uint8_t)g->premultiplied);",
 ";",
 [
 "testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-232-hwu8",
+"srcl",
+"src/resource/gradient.c",
+"232:gshgeom_hash_u8(",
+"gshgeom_hash_u32(",
+[
+"testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30284,10 +30437,11 @@
 "bg-233-del",
 "srcl",
 "src/resource/gradient.c",
-"233:gshgeom_hash_f64(&h, g->p1[1]);",
+"233:gshgeom_hash_u64(&h, gshgeom_map_hash(&g->map));",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30296,13 +30450,14 @@
 ]
 ],
 [
-"bg-234-del",
+"bg-233-hwu64",
 "srcl",
 "src/resource/gradient.c",
-"234:gshgeom_hash_f64(&h, g->d[0]);",
-";",
+"233:gshgeom_hash_u64(",
+"gshgeom_hash_u32(",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30311,13 +30466,30 @@
 ]
 ],
 [
-"bg-235-del",
+"bg-236-del",
 "srcl",
 "src/resource/gradient.c",
-"235:gshgeom_hash_f64(&h, g->d[1]);",
+"236:gshgeom_hash_f64(&h, g->p0[0]);",
 ";",
 [
 "testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-237-del",
+"srcl",
+"src/resource/gradient.c",
+"237:gshgeom_hash_f64(&h, g->p0[1]);",
+";",
+[
+"testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30329,10 +30501,11 @@
 "bg-238-del",
 "srcl",
 "src/resource/gradient.c",
-"238:gshgeom_hash_f64(&h, g->c0[0]);",
+"238:gshgeom_hash_f64(&h, g->p1[0]);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30344,10 +30517,11 @@
 "bg-239-del",
 "srcl",
 "src/resource/gradient.c",
-"239:gshgeom_hash_f64(&h, g->c0[1]);",
+"239:gshgeom_hash_f64(&h, g->p1[1]);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30359,10 +30533,11 @@
 "bg-240-del",
 "srcl",
 "src/resource/gradient.c",
-"240:gshgeom_hash_f64(&h, g->r0);",
+"240:gshgeom_hash_f64(&h, g->d[0]);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30374,10 +30549,11 @@
 "bg-241-del",
 "srcl",
 "src/resource/gradient.c",
-"241:gshgeom_hash_f64(&h, g->c1[0]);",
+"241:gshgeom_hash_f64(&h, g->d[1]);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30386,13 +30562,14 @@
 ]
 ],
 [
-"bg-242-del",
+"bg-244-del",
 "srcl",
 "src/resource/gradient.c",
-"242:gshgeom_hash_f64(&h, g->c1[1]);",
+"244:gshgeom_hash_f64(&h, g->c0[0]);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30401,13 +30578,14 @@
 ]
 ],
 [
-"bg-243-del",
+"bg-245-del",
 "srcl",
 "src/resource/gradient.c",
-"243:gshgeom_hash_f64(&h, g->r1);",
+"245:gshgeom_hash_f64(&h, g->c0[1]);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30419,10 +30597,11 @@
 "bg-246-del",
 "srcl",
 "src/resource/gradient.c",
-"246:gshgeom_hash_f64(&h, g->center[0]);",
+"246:gshgeom_hash_f64(&h, g->r0);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30434,10 +30613,11 @@
 "bg-247-del",
 "srcl",
 "src/resource/gradient.c",
-"247:gshgeom_hash_f64(&h, g->center[1]);",
+"247:gshgeom_hash_f64(&h, g->c1[0]);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30449,25 +30629,11 @@
 "bg-248-del",
 "srcl",
 "src/resource/gradient.c",
-"248:gshgeom_hash_u8(&h, (uint8_t)g->angle_unit);",
+"248:gshgeom_hash_f64(&h, g->c1[1]);",
 ";",
 [
 "testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-248-hwu8",
-"srcl",
-"src/resource/gradient.c",
-"248:gshgeom_hash_u8(",
-"gshgeom_hash_u32(",
-[
-"testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30479,10 +30645,11 @@
 "bg-249-del",
 "srcl",
 "src/resource/gradient.c",
-"249:gshgeom_hash_f64(&h, g->a0);",
+"249:gshgeom_hash_f64(&h, g->r1);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30491,13 +30658,14 @@
 ]
 ],
 [
-"bg-250-del",
+"bg-252-del",
 "srcl",
 "src/resource/gradient.c",
-"250:gshgeom_hash_f64(&h, g->a1);",
+"252:gshgeom_hash_f64(&h, g->center[0]);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30509,10 +30677,11 @@
 "bg-253-del",
 "srcl",
 "src/resource/gradient.c",
-"253:gshgeom_hash_u64(&h, (uint64_t)g->stop_count);",
+"253:gshgeom_hash_f64(&h, g->center[1]);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30521,28 +30690,30 @@
 ]
 ],
 [
-"bg-253-hwu64",
+"bg-254-del",
 "srcl",
 "src/resource/gradient.c",
-"253:gshgeom_hash_u64(",
+"254:gshgeom_hash_u8(&h, (uint8_t)g->angle_unit);",
+";",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-254-hwu8",
+"srcl",
+"src/resource/gradient.c",
+"254:gshgeom_hash_u8(",
 "gshgeom_hash_u32(",
 [
 "testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-254-lt",
-"srcl",
-"src/resource/gradient.c",
-"254:<",
-"<=",
-[
-"testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30554,10 +30725,11 @@
 "bg-255-del",
 "srcl",
 "src/resource/gradient.c",
-"255:gshgeom_hash_f64(&h, g->stops[i].offset);",
+"255:gshgeom_hash_f64(&h, g->a0);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30569,10 +30741,11 @@
 "bg-256-del",
 "srcl",
 "src/resource/gradient.c",
-"256:paint_hash(&h, &g->stops[i].color);",
+"256:gshgeom_hash_f64(&h, g->a1);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30581,13 +30754,94 @@
 ]
 ],
 [
-"bg-262-eq",
+"bg-259-del",
 "srcl",
 "src/resource/gradient.c",
-"262:==",
+"259:gshgeom_hash_u64(&h, (uint64_t)g->stop_count);",
+";",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-259-hwu64",
+"srcl",
+"src/resource/gradient.c",
+"259:gshgeom_hash_u64(",
+"gshgeom_hash_u32(",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-260-lt",
+"srcl",
+"src/resource/gradient.c",
+"260:<",
+"<=",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-261-del",
+"srcl",
+"src/resource/gradient.c",
+"261:gshgeom_hash_f64(&h, g->stops[i].offset);",
+";",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-262-del",
+"srcl",
+"src/resource/gradient.c",
+"262:paint_hash(&h, &g->stops[i].color);",
+";",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-268-eq",
+"srcl",
+"src/resource/gradient.c",
+"268:==",
 "!=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30596,13 +30850,14 @@
 ]
 ],
 [
-"bg-266-ne",
+"bg-272-ne",
 "srcl",
 "src/resource/gradient.c",
-"266:im != b-",
+"272:im != b-",
 "im == b-",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30611,13 +30866,14 @@
 ]
 ],
 [
-"bg-266-or",
+"bg-272-or",
 "srcl",
 "src/resource/gradient.c",
-"266:||",
+"272:||",
 "&&",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30626,13 +30882,14 @@
 ]
 ],
 [
-"bg-266-ne2",
+"bg-272-ne2",
 "srcl",
 "src/resource/gradient.c",
-"266:nd != b-",
+"272:nd != b-",
 "nd == b-",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30641,13 +30898,14 @@
 ]
 ],
 [
-"bg-266-neg",
+"bg-272-neg",
 "srcl",
 "src/resource/gradient.c",
-"266:(a->dim != b->dim || a->kind != b->kind)",
+"272:(a->dim != b->dim || a->kind != b->kind)",
 "(!(a->dim != b->dim || a->kind != b->kind))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30656,13 +30914,14 @@
 ]
 ],
 [
-"bg-271-neg",
+"bg-277-neg",
 "srcl",
 "src/resource/gradient.c",
-"271:(!same_bits(a->m[i][j], b->m[i][j]))",
+"277:(!same_bits(a->m[i][j], b->m[i][j]))",
 "(!(!same_bits(a->m[i][j], b->m[i][j])))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30671,13 +30930,14 @@
 ]
 ],
 [
-"bg-275-neg",
+"bg-281-neg",
 "srcl",
 "src/resource/gradient.c",
-"275:(!same_bits(a->t[i], b->t[i]))",
+"281:(!same_bits(a->t[i], b->t[i]))",
 "(!(!same_bits(a->t[i], b->t[i])))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30686,13 +30946,14 @@
 ]
 ],
 [
-"bg-283-ne",
+"bg-289-ne",
 "srcl",
 "src/resource/gradient.c",
-"283:nd != b-",
+"289:nd != b-",
 "nd == b-",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30701,13 +30962,14 @@
 ]
 ],
 [
-"bg-283-ne2",
+"bg-289-ne2",
 "srcl",
 "src/resource/gradient.c",
-"283:ry != b-",
+"289:ry != b-",
 "ry == b-",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30716,13 +30978,14 @@
 ]
 ],
 [
-"bg-283-neg",
+"bg-289-neg",
 "srcl",
 "src/resource/gradient.c",
-"283:(a->kind != b->kind || a->entry != b->entry || !gshscene_space_equal(&a->space, &b->space))",
+"289:(a->kind != b->kind || a->entry != b->entry || !gshscene_space_equal(&a->space, &b->space))",
 "(!(a->kind != b->kind || a->entry != b->entry || !gshscene_space_equal(&a->space, &b->space)))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30731,13 +30994,14 @@
 ]
 ],
 [
-"bg-286-lt",
+"bg-292-lt",
 "srcl",
 "src/resource/gradient.c",
-"286:<",
+"292:<",
 "<=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30746,13 +31010,14 @@
 ]
 ],
 [
-"bg-287-neg",
+"bg-293-neg",
 "srcl",
 "src/resource/gradient.c",
-"287:(!same_bits(a->rgba[k], b->rgba[k]))",
+"293:(!same_bits(a->rgba[k], b->rgba[k]))",
 "(!(!same_bits(a->rgba[k], b->rgba[k])))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30761,13 +31026,14 @@
 ]
 ],
 [
-"bg-297-ne",
+"bg-303-ne",
 "srcl",
 "src/resource/gradient.c",
-"297:>kind != b->ki",
+"303:>kind != b->ki",
 ">kind == b->ki",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30776,13 +31042,14 @@
 ]
 ],
 [
-"bg-297-ne2",
+"bg-303-ne2",
 "srcl",
 "src/resource/gradient.c",
-"297:xtend != b->ex",
+"303:xtend != b->ex",
 "xtend == b->ex",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30791,13 +31058,14 @@
 ]
 ],
 [
-"bg-297-ne3",
+"bg-303-ne3",
 "srcl",
 "src/resource/gradient.c",
-"297:ed != b-",
+"303:ed != b-",
 "ed == b-",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30806,13 +31074,14 @@
 ]
 ],
 [
-"bg-298-ne",
+"bg-304-ne",
 "srcl",
 "src/resource/gradient.c",
-"298:!=",
+"304:!=",
 "==",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30821,13 +31090,14 @@
 ]
 ],
 [
-"bg-299-ne",
+"bg-305-ne",
 "srcl",
 "src/resource/gradient.c",
-"299:!=",
+"305:!=",
 "==",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30836,13 +31106,14 @@
 ]
 ],
 [
-"bg-306-lt",
+"bg-312-lt",
 "srcl",
 "src/resource/gradient.c",
-"306:<",
+"312:<",
 "<=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30851,13 +31122,14 @@
 ]
 ],
 [
-"bg-307-neg",
+"bg-313-neg",
 "srcl",
 "src/resource/gradient.c",
-"307:(!same_bits(ga[i], gb[i]))",
+"313:(!same_bits(ga[i], gb[i]))",
 "(!(!same_bits(ga[i], gb[i])))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30866,13 +31138,14 @@
 ]
 ],
 [
-"bg-311-lt",
+"bg-317-lt",
 "srcl",
 "src/resource/gradient.c",
-"311:<",
+"317:<",
 "<=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30881,13 +31154,14 @@
 ]
 ],
 [
-"bg-312-or",
+"bg-318-or",
 "srcl",
 "src/resource/gradient.c",
-"312:||",
+"318:||",
 "&&",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30896,13 +31170,14 @@
 ]
 ],
 [
-"bg-312-neg",
+"bg-318-neg",
 "srcl",
 "src/resource/gradient.c",
-"312:(!same_bits(a->stops[i].offset, b->stops[i].offset) || !paint_same(&a->stops[i].color, &b->stops[i].color))",
+"318:(!same_bits(a->stops[i].offset, b->stops[i].offset) || !paint_same(&a->stops[i].color, &b->stops[i].color))",
 "(!(!same_bits(a->stops[i].offset, b->stops[i].offset) || !paint_same(&a->stops[i].color, &b->stops[i].color)))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30911,13 +31186,14 @@
 ]
 ],
 [
-"bg-324-neg",
+"bg-330-neg",
 "srcl",
 "src/resource/gradient.c",
-"324:(!resource)",
+"330:(!resource)",
 "(!(!resource))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30926,13 +31202,14 @@
 ]
 ],
 [
-"bg-327-neg",
+"bg-333-neg",
 "srcl",
 "src/resource/gradient.c",
-"327:(g->stop_count)",
+"333:(g->stop_count)",
 "(!(g->stop_count))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30941,13 +31218,14 @@
 ]
 ],
 [
-"bg-328-del",
+"bg-334-del",
 "srcl",
 "src/resource/gradient.c",
-"328:resource->u.gradient.stops = gshscene_alloc(&store->alloc, g->stop_count * sizeof(GSHSCENE_Gradient_Stop));",
+"334:resource->u.gradient.stops = gshscene_alloc(&store->alloc, g->stop_count * sizeof(GSHSCENE_Gradient_Stop));",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30956,13 +31234,14 @@
 ]
 ],
 [
-"bg-333-del",
+"bg-339-del",
 "srcl",
 "src/resource/gradient.c",
-"333:memcpy(resource->u.gradient.stops, g->stops, g->stop_count * sizeof(GSHSCENE_Gradient_Stop));",
+"339:memcpy(resource->u.gradient.stops, g->stops, g->stop_count * sizeof(GSHSCENE_Gradient_Stop));",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -30971,133 +31250,14 @@
 ]
 ],
 [
-"bg-335-del",
+"bg-341-del",
 "srcl",
 "src/resource/gradient.c",
-"335:resource->u.gradient.g = *g;",
+"341:resource->u.gradient.g = *g;",
 ";",
 [
 "testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-336-del",
-"srcl",
-"src/resource/gradient.c",
-"336:resource->u.gradient.g.stops = resource->u.gradient.stops;",
-";",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-337-lt",
-"srcl",
-"src/resource/gradient.c",
-"337:<",
-"<=",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-339-eq",
-"srcl",
-"src/resource/gradient.c",
-"339:==",
-"!=",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-339-neg",
-"srcl",
-"src/resource/gradient.c",
-"339:(p->kind == GSHSCENE_PAINT_FOREGROUND)",
-"(!(p->kind == GSHSCENE_PAINT_FOREGROUND))",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-340-del",
-"srcl",
-"src/resource/gradient.c",
-"340:resource->u.gradient.foreground = 1;",
-";",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-341-eq",
-"srcl",
-"src/resource/gradient.c",
-"341:==",
-"!=",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-341-and",
-"srcl",
-"src/resource/gradient.c",
-"341:&&",
-"||",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-341-neg",
-"srcl",
-"src/resource/gradient.c",
-"341:(p->kind == GSHSCENE_PAINT_PALETTE && p->entry + 1u > resource->u.gradient.palette_need)",
-"(!(p->kind == GSHSCENE_PAINT_PALETTE && p->entry + 1u > resource->u.gradient.palette_need))",
-[
-"testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31109,10 +31269,11 @@
 "bg-342-del",
 "srcl",
 "src/resource/gradient.c",
-"342:resource->u.gradient.palette_need = p->entry + 1u;",
+"342:resource->u.gradient.g.stops = resource->u.gradient.stops;",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31121,13 +31282,94 @@
 ]
 ],
 [
-"bg-355-and",
+"bg-343-lt",
 "srcl",
 "src/resource/gradient.c",
-"355:&&",
+"343:<",
+"<=",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-345-eq",
+"srcl",
+"src/resource/gradient.c",
+"345:==",
+"!=",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-345-neg",
+"srcl",
+"src/resource/gradient.c",
+"345:(p->kind == GSHSCENE_PAINT_FOREGROUND)",
+"(!(p->kind == GSHSCENE_PAINT_FOREGROUND))",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-346-del",
+"srcl",
+"src/resource/gradient.c",
+"346:resource->u.gradient.foreground = 1;",
+";",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-347-eq",
+"srcl",
+"src/resource/gradient.c",
+"347:==",
+"!=",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-347-and",
+"srcl",
+"src/resource/gradient.c",
+"347:&&",
 "||",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31136,13 +31378,62 @@
 ]
 ],
 [
-"bg-355-neg",
+"bg-347-neg",
 "srcl",
 "src/resource/gradient.c",
-"355:(!store || !gradient || !out || (gradient->stop_count && !gradient->stops))",
+"347:(p->kind == GSHSCENE_PAINT_PALETTE && p->entry + 1u > resource->u.gradient.palette_need)",
+"(!(p->kind == GSHSCENE_PAINT_PALETTE && p->entry + 1u > resource->u.gradient.palette_need))",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-348-del",
+"srcl",
+"src/resource/gradient.c",
+"348:resource->u.gradient.palette_need = p->entry + 1u;",
+";",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-361-and",
+"srcl",
+"src/resource/gradient.c",
+"361:&&",
+"||",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-361-neg",
+"srcl",
+"src/resource/gradient.c",
+"361:(!store || !gradient || !out || (gradient->stop_count && !gradient->stops))",
 "(!(!store || !gradient || !out || (gradient->stop_count && !gradient->stops)))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31151,13 +31442,14 @@
 ]
 ],
 [
-"bg-356-ret",
+"bg-362-ret",
 "srcl",
 "src/resource/gradient.c",
-"356:GSHSCENE_ERR_INVALID",
+"362:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31166,13 +31458,14 @@
 ]
 ],
 [
-"bg-359-gt",
+"bg-365-gt",
 "srcl",
 "src/resource/gradient.c",
-"359:nt > st",
+"365:nt > st",
 "nt >= st",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31181,13 +31474,14 @@
 ]
 ],
 [
-"bg-359-or",
+"bg-365-or",
 "srcl",
 "src/resource/gradient.c",
-"359:||",
+"365:||",
 "&&",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31196,13 +31490,14 @@
 ]
 ],
 [
-"bg-359-gt2",
+"bg-365-gt2",
 "srcl",
 "src/resource/gradient.c",
-"359:nt > GS",
+"365:nt > GS",
 "nt >= GS",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31211,13 +31506,14 @@
 ]
 ],
 [
-"bg-359-neg",
+"bg-365-neg",
 "srcl",
 "src/resource/gradient.c",
-"359:(count > store->limits.max_resource_elements || count > GSHSCENE_GRADIENT_STOPS_MAX)",
+"365:(count > store->limits.max_resource_elements || count > GSHSCENE_GRADIENT_STOPS_MAX)",
 "(!(count > store->limits.max_resource_elements || count > GSHSCENE_GRADIENT_STOPS_MAX))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31226,13 +31522,14 @@
 ]
 ],
 [
-"bg-360-ret",
+"bg-366-ret",
 "srcl",
 "src/resource/gradient.c",
-"360:GSHSCENE_ERR_LIMIT",
+"366:GSHSCENE_ERR_LIMIT",
 "GSHSCENE_ERR_INVALID",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31241,13 +31538,14 @@
 ]
 ],
 [
-"bg-363-neg",
+"bg-369-neg",
 "srcl",
 "src/resource/gradient.c",
-"363:(count)",
+"369:(count)",
 "(!(count))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31256,13 +31554,14 @@
 ]
 ],
 [
-"bg-365-del",
+"bg-371-del",
 "srcl",
 "src/resource/gradient.c",
-"365:stops = gshscene_alloc(&store->alloc, 2 * count * sizeof *stops);",
+"371:stops = gshscene_alloc(&store->alloc, 2 * count * sizeof *stops);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31271,13 +31570,14 @@
 ]
 ],
 [
-"bg-372-eq",
+"bg-378-eq",
 "srcl",
 "src/resource/gradient.c",
-"372:==",
+"378:==",
 "!=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31286,13 +31586,14 @@
 ]
 ],
 [
-"bg-372-and",
+"bg-378-and",
 "srcl",
 "src/resource/gradient.c",
-"372:&&",
+"378:&&",
 "||",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31301,13 +31602,14 @@
 ]
 ],
 [
-"bg-372-neg",
+"bg-378-neg",
 "srcl",
 "src/resource/gradient.c",
-"372:(result == GSHSCENE_OK && !limited(&g))",
+"378:(result == GSHSCENE_OK && !limited(&g))",
 "(!(result == GSHSCENE_OK && !limited(&g)))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31316,13 +31618,14 @@
 ]
 ],
 [
-"bg-375-eq",
+"bg-381-eq",
 "srcl",
 "src/resource/gradient.c",
-"375:==",
+"381:==",
 "!=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31331,13 +31634,14 @@
 ]
 ],
 [
-"bg-375-neg",
+"bg-381-neg",
 "srcl",
 "src/resource/gradient.c",
-"375:(result == GSHSCENE_OK)",
+"381:(result == GSHSCENE_OK)",
 "(!(result == GSHSCENE_OK))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31346,13 +31650,14 @@
 ]
 ],
 [
-"bg-376-del",
+"bg-382-del",
 "srcl",
 "src/resource/gradient.c",
-"376:sort_stops(stops, count ? stops + count : NULL, count);",
+"382:sort_stops(stops, count ? stops + count : NULL, count);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31361,13 +31666,14 @@
 ]
 ],
 [
-"bg-381-del",
+"bg-387-del",
 "srcl",
 "src/resource/gradient.c",
-"381:gshscene_free(&store->alloc, stops);",
+"387:gshscene_free(&store->alloc, stops);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31376,13 +31682,14 @@
 ]
 ],
 [
-"bg-386-ne",
+"bg-392-ne",
 "srcl",
 "src/resource/gradient.c",
-"386:!=",
+"392:!=",
 "==",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31391,13 +31698,14 @@
 ]
 ],
 [
-"bg-386-neg",
+"bg-392-neg",
 "srcl",
 "src/resource/gradient.c",
-"386:(!resource || !out || resource->kind != GSHSCENE_RESOURCE_GRADIENT)",
+"392:(!resource || !out || resource->kind != GSHSCENE_RESOURCE_GRADIENT)",
 "(!(!resource || !out || resource->kind != GSHSCENE_RESOURCE_GRADIENT))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31406,13 +31714,14 @@
 ]
 ],
 [
-"bg-387-ret",
+"bg-393-ret",
 "srcl",
 "src/resource/gradient.c",
-"387:GSHSCENE_ERR_INVALID",
+"393:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31421,13 +31730,14 @@
 ]
 ],
 [
-"bg-396-wd",
+"bg-402-wd",
 "srcl",
 "src/resource/gradient.c",
-"396:%s=%016llx %0",
+"402:%s=%016llx %0",
 "%s=%llx %0",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31436,13 +31746,14 @@
 ]
 ],
 [
-"bg-396-wd2",
+"bg-402-wd2",
 "srcl",
 "src/resource/gradient.c",
-"396:lx %016llx\", ",
+"402:lx %016llx\", ",
 "lx %llx\", ",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31451,13 +31762,14 @@
 ]
 ],
 [
-"bg-401-str",
+"bg-407-str",
 "srcl",
 "src/resource/gradient.c",
-"401:, \"grad",
+"407:, \"grad",
 ", \"Zrad",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31466,13 +31778,14 @@
 ]
 ],
 [
-"bg-410-eq",
+"bg-416-eq",
 "srcl",
 "src/resource/gradient.c",
-"410:==",
+"416:==",
 "!=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31481,13 +31794,14 @@
 ]
 ],
 [
-"bg-410-del",
+"bg-416-del",
 "srcl",
 "src/resource/gradient.c",
-"410:w = fputs(\"linear\", out) == EOF ? -1 : 0;",
+"416:w = fputs(\"linear\", out) == EOF ? -1 : 0;",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31496,13 +31810,14 @@
 ]
 ],
 [
-"bg-410-str",
+"bg-416-str",
 "srcl",
 "src/resource/gradient.c",
-"410:l",
+"416:l",
 "Z",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31511,103 +31826,14 @@
 ]
 ],
 [
-"bg-411-ge",
+"bg-417-ge",
 "srcl",
 "src/resource/gradient.c",
-"411:>=",
+"417:>=",
 ">",
 [
 "testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-411-neg",
-"srcl",
-"src/resource/gradient.c",
-"411:(w >= 0)",
-"(!(w >= 0))",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-412-del",
-"srcl",
-"src/resource/gradient.c",
-"412:w = dump_xy(out, \"p0\", g->p0);",
-";",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-412-str",
-"srcl",
-"src/resource/gradient.c",
-"412:, \"p0\",",
-", \"Z0\",",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-414-neg",
-"srcl",
-"src/resource/gradient.c",
-"414:(w >= 0)",
-"(!(w >= 0))",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-415-del",
-"srcl",
-"src/resource/gradient.c",
-"415:w = dump_xy(out, \"p1\", g->p1);",
-";",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-415-str",
-"srcl",
-"src/resource/gradient.c",
-"415:, \"p1\",",
-", \"Z1\",",
-[
-"testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31623,6 +31849,7 @@
 "(!(w >= 0))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31634,10 +31861,11 @@
 "bg-418-del",
 "srcl",
 "src/resource/gradient.c",
-"418:w = dump_xy(out, \"d\", g->d);",
+"418:w = dump_xy(out, \"p0\", g->p0);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31649,10 +31877,11 @@
 "bg-418-str",
 "srcl",
 "src/resource/gradient.c",
-"418:, \"d\", ",
-", \"Z\", ",
+"418:, \"p0\",",
+", \"Z0\",",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31661,13 +31890,14 @@
 ]
 ],
 [
-"bg-422-eq",
+"bg-420-neg",
 "srcl",
 "src/resource/gradient.c",
-"422:==",
-"!=",
+"420:(w >= 0)",
+"(!(w >= 0))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31676,13 +31906,14 @@
 ]
 ],
 [
-"bg-422-del",
+"bg-421-del",
 "srcl",
 "src/resource/gradient.c",
-"422:w = fputs(\"radial\", out) == EOF ? -1 : 0;",
+"421:w = dump_xy(out, \"p1\", g->p1);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31691,28 +31922,14 @@
 ]
 ],
 [
-"bg-422-str",
+"bg-421-str",
 "srcl",
 "src/resource/gradient.c",
-"422:r",
-"Z",
+"421:, \"p1\",",
+", \"Z1\",",
 [
 "testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-423-ge",
-"srcl",
-"src/resource/gradient.c",
-"423:>=",
-">",
-[
-"testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31728,6 +31945,7 @@
 "(!(w >= 0))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31739,10 +31957,11 @@
 "bg-424-del",
 "srcl",
 "src/resource/gradient.c",
-"424:w = dump_xy(out, \"c0\", g->c0);",
+"424:w = dump_xy(out, \"d\", g->d);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31754,10 +31973,11 @@
 "bg-424-str",
 "srcl",
 "src/resource/gradient.c",
-"424:, \"c0\",",
-", \"Z0\",",
+"424:, \"d\", ",
+", \"Z\", ",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31766,13 +31986,14 @@
 ]
 ],
 [
-"bg-426-neg",
+"bg-428-eq",
 "srcl",
 "src/resource/gradient.c",
-"426:(w >= 0)",
-"(!(w >= 0))",
+"428:==",
+"!=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31781,13 +32002,46 @@
 ]
 ],
 [
-"bg-427-del",
+"bg-428-del",
 "srcl",
 "src/resource/gradient.c",
-"427:w = fprintf(out, \" r0=%016llx\", HEX(gshgeom_f64_bits(g->r0)));",
+"428:w = fputs(\"radial\", out) == EOF ? -1 : 0;",
 ";",
 [
 "testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-428-str",
+"srcl",
+"src/resource/gradient.c",
+"428:r",
+"Z",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-429-ge",
+"srcl",
+"src/resource/gradient.c",
+"429:>=",
+">",
+[
+"testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31803,6 +32057,7 @@
 "(!(w >= 0))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31814,10 +32069,11 @@
 "bg-430-del",
 "srcl",
 "src/resource/gradient.c",
-"430:w = dump_xy(out, \"c1\", g->c1);",
+"430:w = dump_xy(out, \"c0\", g->c0);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31829,10 +32085,11 @@
 "bg-430-str",
 "srcl",
 "src/resource/gradient.c",
-"430:, \"c1\",",
-", \"Z1\",",
+"430:, \"c0\",",
+", \"Z0\",",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31848,6 +32105,7 @@
 "(!(w >= 0))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31859,10 +32117,11 @@
 "bg-433-del",
 "srcl",
 "src/resource/gradient.c",
-"433:w = fprintf(out, \" r1=%016llx\", HEX(gshgeom_f64_bits(g->r1)));",
+"433:w = fprintf(out, \" r0=%016llx\", HEX(gshgeom_f64_bits(g->r0)));",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31871,13 +32130,14 @@
 ]
 ],
 [
-"bg-437-eq",
+"bg-435-neg",
 "srcl",
 "src/resource/gradient.c",
-"437:==",
-"!=",
+"435:(w >= 0)",
+"(!(w >= 0))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31886,13 +32146,14 @@
 ]
 ],
 [
-"bg-437-del",
+"bg-436-del",
 "srcl",
 "src/resource/gradient.c",
-"437:w = fputs(\"sweep\", out) == EOF ? -1 : 0;",
+"436:w = dump_xy(out, \"c1\", g->c1);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31901,28 +32162,14 @@
 ]
 ],
 [
-"bg-437-str",
+"bg-436-str",
 "srcl",
 "src/resource/gradient.c",
-"437:s(\"swee",
-"s(\"Zwee",
+"436:, \"c1\",",
+", \"Z1\",",
 [
 "testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-438-ge",
-"srcl",
-"src/resource/gradient.c",
-"438:>=",
-">",
-[
-"testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31938,6 +32185,7 @@
 "(!(w >= 0))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31949,10 +32197,11 @@
 "bg-439-del",
 "srcl",
 "src/resource/gradient.c",
-"439:w = dump_xy(out, \"c\", g->center);",
+"439:w = fprintf(out, \" r1=%016llx\", HEX(gshgeom_f64_bits(g->r1)));",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -31961,58 +32210,110 @@
 ]
 ],
 [
-"bg-439-str",
+"bg-443-eq",
 "srcl",
 "src/resource/gradient.c",
-"439:, \"c\", ",
-", \"Z\", ",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-441-neg",
-"srcl",
-"src/resource/gradient.c",
-"441:(w >= 0)",
-"(!(w >= 0))",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-447-or",
-"srcl",
-"src/resource/gradient.c",
-"447:||",
-"&&",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-447-eq",
-"srcl",
-"src/resource/gradient.c",
-"447:==",
+"443:==",
 "!=",
 [
 "testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-443-del",
+"srcl",
+"src/resource/gradient.c",
+"443:w = fputs(\"sweep\", out) == EOF ? -1 : 0;",
+";",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-443-str",
+"srcl",
+"src/resource/gradient.c",
+"443:s(\"swee",
+"s(\"Zwee",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-444-ge",
+"srcl",
+"src/resource/gradient.c",
+"444:>=",
+">",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-444-neg",
+"srcl",
+"src/resource/gradient.c",
+"444:(w >= 0)",
+"(!(w >= 0))",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-445-del",
+"srcl",
+"src/resource/gradient.c",
+"445:w = dump_xy(out, \"c\", g->center);",
+";",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-445-str",
+"srcl",
+"src/resource/gradient.c",
+"445:, \"c\", ",
+", \"Z\", ",
+[
+"testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32024,10 +32325,59 @@
 "bg-447-neg",
 "srcl",
 "src/resource/gradient.c",
-"447:(w < 0 || fputc('\\n', out) == EOF)",
+"447:(w >= 0)",
+"(!(w >= 0))",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-453-or",
+"srcl",
+"src/resource/gradient.c",
+"453:||",
+"&&",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-453-eq",
+"srcl",
+"src/resource/gradient.c",
+"453:==",
+"!=",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-453-neg",
+"srcl",
+"src/resource/gradient.c",
+"453:(w < 0 || fputc('\\n', out) == EOF)",
 "(!(w < 0 || fputc('\\n', out) == EOF))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32036,13 +32386,14 @@
 ]
 ],
 [
-"bg-450-lt",
+"bg-456-lt",
 "srcl",
 "src/resource/gradient.c",
-"450:<",
+"456:<",
 "<=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32051,13 +32402,14 @@
 ]
 ],
 [
-"bg-452-str",
+"bg-458-str",
 "srcl",
 "src/resource/gradient.c",
-"452:, \"s %0",
+"458:, \"s %0",
 ", \"Z %0",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32066,13 +32418,14 @@
 ]
 ],
 [
-"bg-452-wd",
+"bg-458-wd",
 "srcl",
 "src/resource/gradient.c",
-"452:\"s %016llx pa",
+"458:\"s %016llx pa",
 "\"s %llx pa",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32081,13 +32434,14 @@
 ]
 ],
 [
-"bg-452-wd2",
+"bg-458-wd2",
 "srcl",
 "src/resource/gradient.c",
-"452:%u %016llx %0",
+"458:%u %016llx %0",
 "%u %llx %0",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32096,13 +32450,14 @@
 ]
 ],
 [
-"bg-452-wd3",
+"bg-458-wd3",
 "srcl",
 "src/resource/gradient.c",
-"452:lx %016llx %0",
+"458:lx %016llx %0",
 "lx %llx %0",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32111,13 +32466,14 @@
 ]
 ],
 [
-"bg-452-wd4",
+"bg-458-wd4",
 "srcl",
 "src/resource/gradient.c",
-"452:lx %016llx %0",
+"458:lx %016llx %0",
 "lx %llx %0",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32126,13 +32482,14 @@
 ]
 ],
 [
-"bg-452-wd5",
+"bg-458-wd5",
 "srcl",
 "src/resource/gradient.c",
-"452:lx %016llx sp",
+"458:lx %016llx sp",
 "lx %llx sp",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32141,13 +32498,14 @@
 ]
 ],
 [
-"bg-467-ne",
+"bg-473-ne",
 "srcl",
 "src/resource/gradient.c",
-"467:!=",
+"473:!=",
 "==",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32156,13 +32514,14 @@
 ]
 ],
 [
-"bg-468-and",
+"bg-474-and",
 "srcl",
 "src/resource/gradient.c",
-"468:&&",
+"474:&&",
 "||",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32171,13 +32530,14 @@
 ]
 ],
 [
-"bg-468-ne",
+"bg-474-ne",
 "srcl",
 "src/resource/gradient.c",
-"468:!=",
+"474:!=",
 "==",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32186,13 +32546,14 @@
 ]
 ],
 [
-"bg-469-ne",
+"bg-475-ne",
 "srcl",
 "src/resource/gradient.c",
-"469:!=",
+"475:!=",
 "==",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32201,13 +32562,14 @@
 ]
 ],
 [
-"bg-470-ret",
+"bg-476-ret",
 "srcl",
 "src/resource/gradient.c",
-"470:GSHSCENE_ERR_INVALID",
+"476:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32216,13 +32578,14 @@
 ]
 ],
 [
-"bg-473-lt",
+"bg-479-lt",
 "srcl",
 "src/resource/gradient.c",
-"473:<",
+"479:<",
 "<=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32231,13 +32594,14 @@
 ]
 ],
 [
-"bg-473-or",
+"bg-479-or",
 "srcl",
 "src/resource/gradient.c",
-"473:||",
+"479:||",
 "&&",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32246,13 +32610,14 @@
 ]
 ],
 [
-"bg-473-and",
+"bg-479-and",
 "srcl",
 "src/resource/gradient.c",
-"473:&&",
+"479:&&",
 "||",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32261,13 +32626,14 @@
 ]
 ],
 [
-"bg-473-neg",
+"bg-479-neg",
 "srcl",
 "src/resource/gradient.c",
-"473:(capacity < g->stop_count || (g->stop_count && !out))",
+"479:(capacity < g->stop_count || (g->stop_count && !out))",
 "(!(capacity < g->stop_count || (g->stop_count && !out)))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32276,13 +32642,14 @@
 ]
 ],
 [
-"bg-474-ret",
+"bg-480-ret",
 "srcl",
 "src/resource/gradient.c",
-"474:GSHSCENE_ERR_INVALID",
+"480:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32291,13 +32658,14 @@
 ]
 ],
 [
-"bg-477-and",
+"bg-483-and",
 "srcl",
 "src/resource/gradient.c",
-"477:&&",
+"483:&&",
 "||",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32306,13 +32674,14 @@
 ]
 ],
 [
-"bg-477-or",
+"bg-483-or",
 "srcl",
 "src/resource/gradient.c",
-"477:||",
+"483:||",
 "&&",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32321,13 +32690,14 @@
 ]
 ],
 [
-"bg-477-gt",
+"bg-483-gt",
 "srcl",
 "src/resource/gradient.c",
-"477:ed > pa",
+"483:ed > pa",
 "ed >= pa",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32336,13 +32706,14 @@
 ]
 ],
 [
-"bg-477-neg",
+"bg-483-neg",
 "srcl",
 "src/resource/gradient.c",
-"477:(gradient->u.gradient.palette_need && (!palette || gradient->u.gradient.palette_need > palette->u.palette.count))",
+"483:(gradient->u.gradient.palette_need && (!palette || gradient->u.gradient.palette_need > palette->u.palette.count))",
 "(!(gradient->u.gradient.palette_need && (!palette || gradient->u.gradient.palette_need > palette->u.palette.count)))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32351,13 +32722,14 @@
 ]
 ],
 [
-"bg-481-lt",
+"bg-487-lt",
 "srcl",
 "src/resource/gradient.c",
-"481:<",
+"487:<",
 "<=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32366,13 +32738,14 @@
 ]
 ],
 [
-"bg-484-ne",
+"bg-490-ne",
 "srcl",
 "src/resource/gradient.c",
-"484:!=",
+"490:!=",
 "==",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32381,13 +32754,14 @@
 ]
 ],
 [
-"bg-484-neg",
+"bg-490-neg",
 "srcl",
 "src/resource/gradient.c",
-"484:(r != GSHSCENE_OK)",
+"490:(r != GSHSCENE_OK)",
 "(!(r != GSHSCENE_OK))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32396,13 +32770,14 @@
 ]
 ],
 [
-"bg-488-del",
+"bg-494-del",
 "srcl",
 "src/resource/gradient.c",
-"488:out[i].offset = g->stops[i].offset;",
+"494:out[i].offset = g->stops[i].offset;",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32411,13 +32786,14 @@
 ]
 ],
 [
-"bg-490-del",
+"bg-496-del",
 "srcl",
 "src/resource/gradient.c",
-"490:out[i].rgba[3] = c.rgba[3];",
+"496:out[i].rgba[3] = c.rgba[3];",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32426,13 +32802,14 @@
 ]
 ],
 [
-"bg-492-neg",
+"bg-498-neg",
 "srcl",
 "src/resource/gradient.c",
-"492:(out_space)",
+"498:(out_space)",
 "(!(out_space))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32441,13 +32818,14 @@
 ]
 ],
 [
-"bg-507-ne",
+"bg-513-ne",
 "srcl",
 "src/resource/gradient.c",
-"507:!=",
+"513:!=",
 "==",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32456,13 +32834,14 @@
 ]
 ],
 [
-"bg-507-eq",
+"bg-513-eq",
 "srcl",
 "src/resource/gradient.c",
-"507:n) == GS",
+"513:n) == GS",
 "n) != GS",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32471,13 +32850,14 @@
 ]
 ],
 [
-"bg-507-eq2",
+"bg-513-eq2",
 "srcl",
 "src/resource/gradient.c",
-"507:gn == 0;",
+"513:gn == 0;",
 "gn != 0;",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32486,13 +32866,14 @@
 ]
 ],
 [
-"bg-512-ne",
+"bg-518-ne",
 "srcl",
 "src/resource/gradient.c",
-"512:!=",
+"518:!=",
 "==",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32501,13 +32882,14 @@
 ]
 ],
 [
-"bg-515-eq",
+"bg-521-eq",
 "srcl",
 "src/resource/gradient.c",
-"515:0] == 0.",
+"521:0] == 0.",
 "0] != 0.",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32516,13 +32898,14 @@
 ]
 ],
 [
-"bg-515-and",
+"bg-521-and",
 "srcl",
 "src/resource/gradient.c",
-"515:&&",
+"521:&&",
 "||",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32531,13 +32914,14 @@
 ]
 ],
 [
-"bg-515-eq2",
+"bg-521-eq2",
 "srcl",
 "src/resource/gradient.c",
-"515:1] == 0.",
+"521:1] == 0.",
 "1] != 0.",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32546,13 +32930,14 @@
 ]
 ],
 [
-"bg-515-neg",
+"bg-521-neg",
 "srcl",
 "src/resource/gradient.c",
-"515:(g->d[0] == 0.0 && g->d[1] == 0.0)",
+"521:(g->d[0] == 0.0 && g->d[1] == 0.0)",
 "(!(g->d[0] == 0.0 && g->d[1] == 0.0))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32561,13 +32946,14 @@
 ]
 ],
 [
-"bg-516-eq",
+"bg-522-eq",
 "srcl",
 "src/resource/gradient.c",
-"516:0] == g-",
+"522:0] == g-",
 "0] != g-",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32576,13 +32962,14 @@
 ]
 ],
 [
-"bg-516-and",
+"bg-522-and",
 "srcl",
 "src/resource/gradient.c",
-"516:&&",
+"522:&&",
 "||",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32591,13 +32978,14 @@
 ]
 ],
 [
-"bg-516-eq2",
+"bg-522-eq2",
 "srcl",
 "src/resource/gradient.c",
-"516:1] == g-",
+"522:1] == g-",
 "1] != g-",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32606,73 +32994,14 @@
 ]
 ],
 [
-"bg-516-neg",
+"bg-522-neg",
 "srcl",
 "src/resource/gradient.c",
-"516:(g->p0[0] == g->p1[0] && g->p0[1] == g->p1[1])",
+"522:(g->p0[0] == g->p1[0] && g->p0[1] == g->p1[1])",
 "(!(g->p0[0] == g->p1[0] && g->p0[1] == g->p1[1]))",
 [
 "testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-527-eq",
-"srcl",
-"src/resource/gradient.c",
-"527:n) == GS",
-"n) != GS",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-527-and",
-"srcl",
-"src/resource/gradient.c",
-"527:&&",
-"||",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-527-eq2",
-"srcl",
-"src/resource/gradient.c",
-"527:gn == 0)",
-"gn != 0)",
-[
-"testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-527-neg",
-"srcl",
-"src/resource/gradient.c",
-"527:(gshgeom_orient3d(o, b, c, d, &sign) == GSHGEOM_OK && sign == 0)",
-"(!(gshgeom_orient3d(o, b, c, d, &sign) == GSHGEOM_OK && sign == 0))",
-[
-"testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32684,10 +33013,27 @@
 "bg-533-eq",
 "srcl",
 "src/resource/gradient.c",
-"533:0] == g-",
-"0] != g-",
+"533:n) == GS",
+"n) != GS",
 [
 "testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-533-and",
+"srcl",
+"src/resource/gradient.c",
+"533:&&",
+"||",
+[
+"testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32699,25 +33045,11 @@
 "bg-533-eq2",
 "srcl",
 "src/resource/gradient.c",
-"533:1] == g-",
-"1] != g-",
+"533:gn == 0)",
+"gn != 0)",
 [
 "testGradient",
-"testDump",
-"testDump_sink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
-"bg-533-eq3",
-"srcl",
-"src/resource/gradient.c",
-"533:r0 == g-",
-"r0 != g-",
-[
-"testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32729,10 +33061,75 @@
 "bg-533-neg",
 "srcl",
 "src/resource/gradient.c",
-"533:(g->c0[0] == g->c1[0] && g->c0[1] == g->c1[1] && g->r0 == g->r1)",
+"533:(gshgeom_orient3d(o, b, c, d, &sign) == GSHGEOM_OK && sign == 0)",
+"(!(gshgeom_orient3d(o, b, c, d, &sign) == GSHGEOM_OK && sign == 0))",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-539-eq",
+"srcl",
+"src/resource/gradient.c",
+"539:0] == g-",
+"0] != g-",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-539-eq2",
+"srcl",
+"src/resource/gradient.c",
+"539:1] == g-",
+"1] != g-",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-539-eq3",
+"srcl",
+"src/resource/gradient.c",
+"539:r0 == g-",
+"r0 != g-",
+[
+"testGradient",
+"testColor_bound",
+"testDump",
+"testDump_sink",
+"fuzz-replay",
+"fuzz-render",
+"probe"
+]
+],
+[
+"bg-539-neg",
+"srcl",
+"src/resource/gradient.c",
+"539:(g->c0[0] == g->c1[0] && g->c0[1] == g->c1[1] && g->r0 == g->r1)",
 "(!(g->c0[0] == g->c1[0] && g->c0[1] == g->c1[1] && g->r0 == g->r1))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32741,13 +33138,14 @@
 ]
 ],
 [
-"bg-538-and",
+"bg-544-and",
 "srcl",
 "src/resource/gradient.c",
-"538:&&",
+"544:&&",
 "||",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32756,13 +33154,14 @@
 ]
 ],
 [
-"bg-538-eq",
+"bg-544-eq",
 "srcl",
 "src/resource/gradient.c",
-"538:==",
+"544:==",
 "!=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32771,13 +33170,14 @@
 ]
 ],
 [
-"bg-538-neg",
+"bg-544-neg",
 "srcl",
 "src/resource/gradient.c",
-"538:(repeats && g->a0 == g->a1)",
+"544:(repeats && g->a0 == g->a1)",
 "(!(repeats && g->a0 == g->a1))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32786,13 +33186,14 @@
 ]
 ],
 [
-"bg-543-ge",
+"bg-549-ge",
 "srcl",
 "src/resource/gradient.c",
-"543:>=",
+"549:>=",
 ">",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32801,13 +33202,14 @@
 ]
 ],
 [
-"bg-543-eq",
+"bg-549-eq",
 "srcl",
 "src/resource/gradient.c",
-"543:==",
+"549:==",
 "!=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32816,13 +33218,14 @@
 ]
 ],
 [
-"bg-548-ne",
+"bg-554-ne",
 "srcl",
 "src/resource/gradient.c",
-"548:>kind != GSHSC",
+"554:>kind != GSHSC",
 ">kind == GSHSC",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32831,13 +33234,14 @@
 ]
 ],
 [
-"bg-548-ne2",
+"bg-554-ne2",
 "srcl",
 "src/resource/gradient.c",
-"548:.kind != GSHSC",
+"554:.kind != GSHSC",
 ".kind == GSHSC",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32846,13 +33250,14 @@
 ]
 ],
 [
-"bg-549-ne",
+"bg-555-ne",
 "srcl",
 "src/resource/gradient.c",
-"549:!=",
+"555:!=",
 "==",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32861,13 +33266,14 @@
 ]
 ],
 [
-"bg-553-and",
+"bg-559-and",
 "srcl",
 "src/resource/gradient.c",
-"553:&&",
+"559:&&",
 "||",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32876,13 +33282,14 @@
 ]
 ],
 [
-"bg-554-lt",
+"bg-560-lt",
 "srcl",
 "src/resource/gradient.c",
-"554:<",
+"560:<",
 "<=",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32891,13 +33298,14 @@
 ]
 ],
 [
-"bg-554-and",
+"bg-560-and",
 "srcl",
 "src/resource/gradient.c",
-"554:&&",
+"560:&&",
 "||",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32906,13 +33314,14 @@
 ]
 ],
 [
-"bg-557-neg",
+"bg-563-neg",
 "srcl",
 "src/resource/gradient.c",
-"557:(not_invertible)",
+"563:(not_invertible)",
 "(!(not_invertible))",
 [
 "testGradient",
+"testColor_bound",
 "testDump",
 "testDump_sink",
 "fuzz-replay",
@@ -32928,6 +33337,7 @@
 "<=",
 [
 "testGradient",
+"testColor_bound",
 "probe"
 ]
 ],
@@ -32939,6 +33349,7 @@
 ";",
 [
 "testGradient",
+"testColor_bound",
 "probe"
 ]
 ],
@@ -32950,6 +33361,7 @@
 ";",
 [
 "testGradient",
+"testColor_bound",
 "probe"
 ]
 ],
@@ -32961,6 +33373,7 @@
 ";",
 [
 "testGradient",
+"testColor_bound",
 "probe"
 ]
 ],
@@ -32972,6 +33385,7 @@
 "!=",
 [
 "testGradient",
+"testColor_bound",
 "probe"
 ]
 ],
@@ -32983,6 +33397,7 @@
 "(!(x == 0.0))",
 [
 "testGradient",
+"testColor_bound",
 "probe"
 ]
 ],
@@ -32994,6 +33409,7 @@
 "(!(gshscene_space_equal(from, to)))",
 [
 "testGradient",
+"testColor_bound",
 "probe"
 ]
 ],
@@ -33005,6 +33421,7 @@
 ";",
 [
 "testGradient",
+"testColor_bound",
 "probe"
 ]
 ],
@@ -33016,6 +33433,7 @@
 ";",
 [
 "testGradient",
+"testColor_bound",
 "probe"
 ]
 ],
@@ -33027,61 +33445,79 @@
 ";",
 [
 "testGradient",
+"testColor_bound",
 "probe"
 ]
 ],
 [
-"bv-165-ne",
+"bv-169-ne",
 "srcl",
 "src/paint/convert.c",
-"165:!=",
+"169:!=",
 "==",
 [
 "testGradient",
+"testColor_bound",
 "probe"
 ]
 ],
 [
-"bv-165-neg",
+"bv-169-neg",
 "srcl",
 "src/paint/convert.c",
-"165:(from->primaries != to->primaries)",
+"169:(from->primaries != to->primaries)",
 "(!(from->primaries != to->primaries))",
 [
 "testGradient",
+"testColor_bound",
 "probe"
 ]
 ],
 [
-"bv-172-del",
+"bv-176-del",
 "srcl",
 "src/paint/convert.c",
-"172:rgb_to_xyz(to->primaries, mb);",
+"176:rgb_to_xyz(to->primaries, mb);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "probe"
 ]
 ],
 [
-"bv-175-del",
+"bv-179-del",
 "srcl",
 "src/paint/convert.c",
-"175:mul3(mbi, xyz, lin);",
+"179:mul3(mbi, xyz, lin);",
 ";",
 [
 "testGradient",
+"testColor_bound",
 "probe"
 ]
 ],
 [
-"bv-178-del",
+"bv-181-del",
 "srcl",
 "src/paint/convert.c",
-"178:out[i] = encode(to, lin[i]);",
+"181:lin[i] = gshscene_saturate(lin[i]);",
 ";",
 [
 "testGradient",
+"testColor_bound",
+"probe"
+]
+],
+[
+"bv-185-del",
+"srcl",
+"src/paint/convert.c",
+"185:out[i] = gshscene_saturate(encode(to, lin[i]));",
+";",
+[
+"testGradient",
+"testColor_bound",
 "probe"
 ]
 ],
@@ -33104,7 +33540,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -33126,7 +33563,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -33148,7 +33586,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -33170,7 +33609,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -33192,7 +33632,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -33214,7 +33655,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -33236,7 +33678,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -33258,7 +33701,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -33280,7 +33724,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -33302,7 +33747,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -33324,7 +33770,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -33346,14 +33793,38 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"br-666-and",
+"br-660-neg",
 "srcl",
 "src/resource/resource.c",
-"666:&&",
+"660:(!gshscene_color_bounded(colors[i].rgba))",
+"(!(!gshscene_color_bounded(colors[i].rgba)))",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"br-672-and",
+"srcl",
+"src/resource/resource.c",
+"672:&&",
 "||",
 [
 "testBytes",
@@ -33368,14 +33839,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"br-666-neg",
+"br-672-neg",
 "srcl",
 "src/resource/resource.c",
-"666:(!store || !out || (count && !rgba))",
+"672:(!store || !out || (count && !rgba))",
 "(!(!store || !out || (count && !rgba)))",
 [
 "testBytes",
@@ -33390,14 +33862,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"br-669-gt",
+"br-675-gt",
 "srcl",
 "src/resource/resource.c",
-"669:>",
+"675:>",
 ">=",
 [
 "testBytes",
@@ -33412,14 +33885,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"br-669-neg",
+"br-675-neg",
 "srcl",
 "src/resource/resource.c",
-"669:(count > GSHSCENE_PALETTE_MAX_ENTRIES)",
+"675:(count > GSHSCENE_PALETTE_MAX_ENTRIES)",
 "(!(count > GSHSCENE_PALETTE_MAX_ENTRIES))",
 [
 "testBytes",
@@ -33434,14 +33908,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"br-674-del",
+"br-680-del",
 "srcl",
 "src/resource/resource.c",
-"674:colors = gshscene_alloc(&store->alloc, count * sizeof *colors);",
+"680:colors = gshscene_alloc(&store->alloc, count * sizeof *colors);",
 ";",
 [
 "testBytes",
@@ -33456,14 +33931,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"br-675-neg",
+"br-681-neg",
 "srcl",
 "src/resource/resource.c",
-"675:(!colors)",
+"681:(!colors)",
 "(!(!colors))",
 [
 "testBytes",
@@ -33478,80 +33954,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
-]
-],
-[
-"br-680-del",
-"srcl",
-"src/resource/resource.c",
-"680:memset(&colors[i], 0, sizeof colors[i]);",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"br-683-del",
-"srcl",
-"src/resource/resource.c",
-"683:colors[i].rgba[k] = (double)(int32_t)rgba[4u * i + (size_t)k] / 255.0;",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"br-685-del",
-"srcl",
-"src/resource/resource.c",
-"685:colors[i].space.primaries = GCOL_PRIMARIES_SRGB;",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
 "br-686-del",
 "srcl",
 "src/resource/resource.c",
-"686:colors[i].space.transfer = GCOL_TRANSFER_SRGB;",
+"686:memset(&colors[i], 0, sizeof colors[i]);",
 ";",
 [
 "testBytes",
@@ -33566,14 +33977,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
 "br-689-del",
 "srcl",
 "src/resource/resource.c",
-"689:gshscene_free(&store->alloc, colors);",
+"689:colors[i].rgba[k] = (double)(int32_t)rgba[4u * i + (size_t)k] / 255.0;",
 ";",
 [
 "testBytes",
@@ -33588,14 +34000,84 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"br-694-and",
+"br-691-del",
 "srcl",
 "src/resource/resource.c",
-"694:&&",
+"691:colors[i].space.primaries = GCOL_PRIMARIES_SRGB;",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"br-692-del",
+"srcl",
+"src/resource/resource.c",
+"692:colors[i].space.transfer = GCOL_TRANSFER_SRGB;",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"br-695-del",
+"srcl",
+"src/resource/resource.c",
+"695:gshscene_free(&store->alloc, colors);",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"br-700-and",
+"srcl",
+"src/resource/resource.c",
+"700:&&",
 "||",
 [
 "testBytes",
@@ -33610,14 +34092,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"br-694-eq",
+"br-700-eq",
 "srcl",
 "src/resource/resource.c",
-"694:==",
+"700:==",
 "!=",
 [
 "testBytes",
@@ -33632,14 +34115,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"br-699-ne",
+"br-705-ne",
 "srcl",
 "src/resource/resource.c",
-"699:!=",
+"705:!=",
 "==",
 [
 "testBytes",
@@ -33654,14 +34138,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"br-699-ge",
+"br-705-ge",
 "srcl",
 "src/resource/resource.c",
-"699:>=",
+"705:>=",
 ">",
 [
 "testBytes",
@@ -33676,14 +34161,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"br-699-neg",
+"br-705-neg",
 "srcl",
 "src/resource/resource.c",
-"699:(!resource || !out || resource->kind != GSHSCENE_RESOURCE_PALETTE || index >= resource->u.palette.count)",
+"705:(!resource || !out || resource->kind != GSHSCENE_RESOURCE_PALETTE || index >= resource->u.palette.count)",
 "(!(!resource || !out || resource->kind != GSHSCENE_RESOURCE_PALETTE || index >= resource->u.palette.count))",
 [
 "testBytes",
@@ -33698,14 +34184,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"br-731-or",
+"br-737-or",
 "srcl",
 "src/resource/resource.c",
-"731:||",
+"737:||",
 "&&",
 [
 "testBytes",
@@ -33720,14 +34207,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"br-731-neg",
+"br-737-neg",
 "srcl",
 "src/resource/resource.c",
-"731:(!gshscene_color_is_default(&list->foreground) || list->palette)",
+"737:(!gshscene_color_is_default(&list->foreground) || list->palette)",
 "(!(!gshscene_color_is_default(&list->foreground) || list->palette))",
 [
 "testBytes",
@@ -33742,14 +34230,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"br-822-neg",
+"br-828-neg",
 "srcl",
 "src/resource/resource.c",
-"822:(fprintf(out, \"palette entries=%llu\\n\", HEX(count)) < 0)",
+"828:(fprintf(out, \"palette entries=%llu\\n\", HEX(count)) < 0)",
 "(!(fprintf(out, \"palette entries=%llu\\n\", HEX(count)) < 0))",
 [
 "testBytes",
@@ -33764,14 +34253,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"br-837-lt",
+"br-843-lt",
 "srcl",
 "src/resource/resource.c",
-"837:<",
+"843:<",
 "<=",
 [
 "testBytes",
@@ -33786,14 +34276,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"br-837-neg",
+"br-843-neg",
 "srcl",
 "src/resource/resource.c",
-"837:(gshscene_gradient_dump(resource, out) < 0)",
+"843:(gshscene_gradient_dump(resource, out) < 0)",
 "(!(gshscene_gradient_dump(resource, out) < 0))",
 [
 "testBytes",
@@ -33808,7 +34299,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -33830,7 +34322,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -33852,7 +34345,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -33874,7 +34368,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -33896,7 +34391,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -33918,7 +34414,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -33940,7 +34437,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -33962,7 +34460,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -33984,7 +34483,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34006,7 +34506,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34028,7 +34529,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34050,7 +34552,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34072,7 +34575,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34094,7 +34598,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34116,7 +34621,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34138,7 +34644,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34160,7 +34667,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34182,7 +34690,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34204,7 +34713,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34226,7 +34736,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34248,7 +34759,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34270,7 +34782,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34292,7 +34805,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34314,7 +34828,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34336,7 +34851,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34358,7 +34874,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34380,7 +34897,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34402,7 +34920,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34424,7 +34943,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34446,7 +34966,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34468,7 +34989,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34490,7 +35012,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34512,7 +35035,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34534,7 +35058,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34556,7 +35081,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34578,7 +35104,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34600,7 +35127,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34622,7 +35150,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
@@ -34644,14 +35173,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-485-ge",
+"bl-495-ge",
 "srcl",
 "src/list/list.c",
-"485:>=",
+"495:>=",
 ">",
 [
 "testBytes",
@@ -34666,14 +35196,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-485-neg",
+"bl-495-neg",
 "srcl",
 "src/list/list.c",
-"485:(list->depth >= list->limits.max_depth)",
+"495:(list->depth >= list->limits.max_depth)",
 "(!(list->depth >= list->limits.max_depth))",
 [
 "testBytes",
@@ -34688,14 +35219,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-488-lt",
+"bl-498-lt",
 "srcl",
 "src/list/list.c",
-"488:<",
+"498:<",
 "<=",
 [
 "testBytes",
@@ -34710,14 +35242,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-488-neg",
+"bl-498-neg",
 "srcl",
 "src/list/list.c",
-"488:(list->depth < list->stack_capacity)",
+"498:(list->depth < list->stack_capacity)",
 "(!(list->depth < list->stack_capacity))",
 [
 "testBytes",
@@ -34732,14 +35265,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-497-neg",
+"bl-507-neg",
 "srcl",
 "src/list/list.c",
-"497:(list->depth)",
+"507:(list->depth)",
 "(!(list->depth))",
 [
 "testBytes",
@@ -34754,14 +35288,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-498-del",
+"bl-508-del",
 "srcl",
 "src/list/list.c",
-"498:memcpy(memory, list->stack, list->depth);",
+"508:memcpy(memory, list->stack, list->depth);",
 ";",
 [
 "testBytes",
@@ -34776,14 +35311,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-564-del",
+"bl-577-del",
 "srcl",
 "src/list/list.c",
-"564:list->stack[list->depth++] = PUSH_CLIP;",
+"577:list->stack[list->depth++] = PUSH_CLIP;",
 ";",
 [
 "testBytes",
@@ -34798,14 +35334,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-571-eq",
+"bl-584-eq",
 "srcl",
 "src/list/list.c",
-"571:==",
+"584:==",
 "!=",
 [
 "testBytes",
@@ -34820,14 +35357,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-571-ne",
+"bl-584-ne",
 "srcl",
 "src/list/list.c",
-"571:!=",
+"584:!=",
 "==",
 [
 "testBytes",
@@ -34842,14 +35380,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-571-neg",
+"bl-584-neg",
 "srcl",
 "src/list/list.c",
-"571:(!list || list->closed || list->depth == 0 || list->stack[list->depth - 1] != push)",
+"584:(!list || list->closed || list->depth == 0 || list->stack[list->depth - 1] != push)",
 "(!(!list || list->closed || list->depth == 0 || list->stack[list->depth - 1] != push))",
 [
 "testBytes",
@@ -34864,14 +35403,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-578-del",
+"bl-591-del",
 "srcl",
 "src/list/list.c",
-"578:list->depth--;",
+"591:list->depth--;",
 ";",
 [
 "testBytes",
@@ -34886,14 +35426,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-606-del",
+"bl-619-del",
 "srcl",
 "src/list/list.c",
-"606:list->stack[list->depth++] = PUSH_GROUP;",
+"619:list->stack[list->depth++] = PUSH_GROUP;",
 ";",
 [
 "testBytes",
@@ -34908,14 +35449,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-645-del",
+"bl-658-del",
 "srcl",
 "src/list/list.c",
-"645:gshscene_resource_release(item_at(list, i)->paint.gradient);",
+"658:gshscene_resource_release(item_at(list, i)->paint.gradient);",
 ";",
 [
 "testBytes",
@@ -34930,14 +35472,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-647-del",
+"bl-660-del",
 "srcl",
 "src/list/list.c",
-"647:list->count = count;",
+"660:list->count = count;",
 ";",
 [
 "testBytes",
@@ -34952,14 +35495,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-652-del",
+"bl-665-del",
 "srcl",
 "src/list/list.c",
-"652:list->expansion = 0;",
+"665:list->expansion = 0;",
 ";",
 [
 "testBytes",
@@ -34974,14 +35518,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-653-del",
+"bl-666-del",
 "srcl",
 "src/list/list.c",
-"653:list->depth = 0;",
+"666:list->depth = 0;",
 ";",
 [
 "testBytes",
@@ -34996,14 +35541,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-663-eq",
+"bl-676-eq",
 "srcl",
 "src/list/list.c",
-"663:==",
+"676:==",
 "!=",
 [
 "testBytes",
@@ -35018,14 +35564,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-663-del",
+"bl-676-del",
 "srcl",
 "src/list/list.c",
-"663:list->stack[list->depth++] = item->kind == GSHSCENE_ITEM_CLIP_PUSH ? PUSH_CLIP : PUSH_GROUP;",
+"676:list->stack[list->depth++] = item->kind == GSHSCENE_ITEM_CLIP_PUSH ? PUSH_CLIP : PUSH_GROUP;",
 ";",
 [
 "testBytes",
@@ -35040,14 +35587,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-665-del",
+"bl-678-del",
 "srcl",
 "src/list/list.c",
-"665:list->depth--;",
+"678:list->depth--;",
 ";",
 [
 "testBytes",
@@ -35062,14 +35610,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-686-del",
+"bl-699-del",
 "srcl",
 "src/list/list.c",
-"686:list->foreground = value;",
+"699:list->foreground = value;",
 ";",
 [
 "testBytes",
@@ -35084,14 +35633,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-702-and",
+"bl-715-and",
 "srcl",
 "src/list/list.c",
-"702:&&",
+"715:&&",
 "||",
 [
 "testBytes",
@@ -35106,14 +35656,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-702-ne",
+"bl-715-ne",
 "srcl",
 "src/list/list.c",
-"702:re != li",
+"715:re != li",
 "re == li",
 [
 "testBytes",
@@ -35128,14 +35679,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-702-or",
+"bl-715-or",
 "srcl",
 "src/list/list.c",
-"702:||",
+"715:||",
 "&&",
 [
 "testBytes",
@@ -35150,14 +35702,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-702-ne2",
+"bl-715-ne2",
 "srcl",
 "src/list/list.c",
-"702:nd != GS",
+"715:nd != GS",
 "nd == GS",
 [
 "testBytes",
@@ -35172,14 +35725,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-705-del",
+"bl-718-del",
 "srcl",
 "src/list/list.c",
-"705:gshscene_resource_retain(palette);",
+"718:gshscene_resource_retain(palette);",
 ";",
 [
 "testBytes",
@@ -35194,14 +35748,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-706-del",
+"bl-719-del",
 "srcl",
 "src/list/list.c",
-"706:gshscene_resource_release(list->palette);",
+"719:gshscene_resource_release(list->palette);",
 ";",
 [
 "testBytes",
@@ -35216,14 +35771,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-707-del",
+"bl-720-del",
 "srcl",
 "src/list/list.c",
-"707:list->palette = palette;",
+"720:list->palette = palette;",
 ";",
 [
 "testBytes",
@@ -35238,14 +35794,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-717-and",
+"bl-730-and",
 "srcl",
 "src/list/list.c",
-"717:&&",
+"730:&&",
 "||",
 [
 "testBytes",
@@ -35260,14 +35817,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-717-ne",
+"bl-730-ne",
 "srcl",
 "src/list/list.c",
-"717:!=",
+"730:!=",
 "==",
 [
 "testBytes",
@@ -35282,14 +35840,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-717-neg",
+"bl-730-neg",
 "srcl",
 "src/list/list.c",
-"717:(!paint || !foreground || !out || (palette && palette->kind != GSHSCENE_RESOURCE_PALETTE))",
+"730:(!paint || !foreground || !out || (palette && palette->kind != GSHSCENE_RESOURCE_PALETTE))",
 "(!(!paint || !foreground || !out || (palette && palette->kind != GSHSCENE_RESOURCE_PALETTE)))",
 [
 "testBytes",
@@ -35304,14 +35863,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-727-del",
+"bl-740-del",
 "srcl",
 "src/list/list.c",
-"727:c = *foreground;",
+"740:c = *foreground;",
 ";",
 [
 "testBytes",
@@ -35326,14 +35886,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-728-del",
+"bl-741-del",
 "srcl",
 "src/list/list.c",
-"728:c.rgba[3] = foreground->rgba[3] * paint->rgba[3];",
+"741:c.rgba[3] = foreground->rgba[3] * paint->rgba[3];",
 ";",
 [
 "testBytes",
@@ -35348,14 +35909,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-732-or",
+"bl-745-or",
 "srcl",
 "src/list/list.c",
-"732:||",
+"745:||",
 "&&",
 [
 "testBytes",
@@ -35370,14 +35932,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-732-ge",
+"bl-745-ge",
 "srcl",
 "src/list/list.c",
-"732:>=",
+"745:>=",
 ">",
 [
 "testBytes",
@@ -35392,14 +35955,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-732-neg",
+"bl-745-neg",
 "srcl",
 "src/list/list.c",
-"732:(!palette || paint->entry >= palette->u.palette.count)",
+"745:(!palette || paint->entry >= palette->u.palette.count)",
 "(!(!palette || paint->entry >= palette->u.palette.count))",
 [
 "testBytes",
@@ -35414,14 +35978,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-735-del",
+"bl-748-del",
 "srcl",
 "src/list/list.c",
-"735:c = palette->u.palette.colors[paint->entry];",
+"748:c = palette->u.palette.colors[paint->entry];",
 ";",
 [
 "testBytes",
@@ -35436,14 +36001,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-778-str",
+"bl-791-str",
 "srcl",
 "src/list/list.c",
-"778:n \"unkn",
+"791:n \"unkn",
 "n \"Znkn",
 [
 "testBytes",
@@ -35458,14 +36024,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-800-eq",
+"bl-813-eq",
 "srcl",
 "src/list/list.c",
-"800:==",
+"813:==",
 "!=",
 [
 "testBytes",
@@ -35480,14 +36047,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-800-neg",
+"bl-813-neg",
 "srcl",
 "src/list/list.c",
-"800:(context == (uint32_t)GSHSCENE_ORDER_DEPTH)",
+"813:(context == (uint32_t)GSHSCENE_ORDER_DEPTH)",
 "(!(context == (uint32_t)GSHSCENE_ORDER_DEPTH))",
 [
 "testBytes",
@@ -35502,14 +36070,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-808-ne",
+"bl-821-ne",
 "srcl",
 "src/list/list.c",
-"808:!=",
+"821:!=",
 "==",
 [
 "testBytes",
@@ -35524,14 +36093,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-808-neg",
+"bl-821-neg",
 "srcl",
 "src/list/list.c",
-"808:(context != (uint32_t)GSHSCENE_ORDER_OVERLAY)",
+"821:(context != (uint32_t)GSHSCENE_ORDER_OVERLAY)",
 "(!(context != (uint32_t)GSHSCENE_ORDER_OVERLAY))",
 [
 "testBytes",
@@ -35546,14 +36116,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-849-del",
+"bl-862-del",
 "srcl",
 "src/list/list.c",
-"849:gshscene_free(alloc, s->units);",
+"862:gshscene_free(alloc, s->units);",
 ";",
 [
 "testBytes",
@@ -35568,14 +36139,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-851-del",
+"bl-864-del",
 "srcl",
 "src/list/list.c",
-"851:gshscene_free(alloc, s->frames);",
+"864:gshscene_free(alloc, s->frames);",
 ";",
 [
 "testBytes",
@@ -35590,14 +36162,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-852-del",
+"bl-865-del",
 "srcl",
 "src/list/list.c",
-"852:gshscene_free(alloc, s->ties);",
+"865:gshscene_free(alloc, s->ties);",
 ";",
 [
 "testBytes",
@@ -35612,14 +36185,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-884-lt",
+"bl-897-lt",
 "srcl",
 "src/list/list.c",
-"884:<",
+"897:<",
 "<=",
 [
 "testBytes",
@@ -35634,14 +36208,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-884-neg",
+"bl-897-neg",
 "srcl",
 "src/list/list.c",
-"884:(unit_before(list, context, &units[j], &units[i], &tied) < 0)",
+"897:(unit_before(list, context, &units[j], &units[i], &tied) < 0)",
 "(!(unit_before(list, context, &units[j], &units[i], &tied) < 0))",
 [
 "testBytes",
@@ -35656,14 +36231,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-885-del",
+"bl-898-del",
 "srcl",
 "src/list/list.c",
-"885:temp[k++] = units[j++];",
+"898:temp[k++] = units[j++];",
 ";",
 [
 "testBytes",
@@ -35678,14 +36254,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-887-del",
+"bl-900-del",
 "srcl",
 "src/list/list.c",
-"887:temp[k++] = units[i++];",
+"900:temp[k++] = units[i++];",
 ";",
 [
 "testBytes",
@@ -35700,14 +36277,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-891-del",
+"bl-904-del",
 "srcl",
 "src/list/list.c",
-"891:temp[k++] = units[i++];",
+"904:temp[k++] = units[i++];",
 ";",
 [
 "testBytes",
@@ -35722,14 +36300,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-894-del",
+"bl-907-del",
 "srcl",
 "src/list/list.c",
-"894:temp[k++] = units[j++];",
+"907:temp[k++] = units[j++];",
 ";",
 [
 "testBytes",
@@ -35744,14 +36323,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-897-del",
+"bl-910-del",
 "srcl",
 "src/list/list.c",
-"897:memcpy(units, temp, count * sizeof *units);",
+"910:memcpy(units, temp, count * sizeof *units);",
 ";",
 [
 "testBytes",
@@ -35766,14 +36346,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-905-del",
+"bl-918-del",
 "srcl",
 "src/list/list.c",
-"905:f->base = *unit_top;",
+"918:f->base = *unit_top;",
 ";",
 [
 "testBytes",
@@ -35788,80 +36369,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
-]
-],
-[
-"bl-906-del",
-"srcl",
-"src/list/list.c",
-"906:f->units = &s->units[*unit_top];",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"bl-911-del",
-"srcl",
-"src/list/list.c",
-"911:f->context = context;",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"bl-917-del",
-"srcl",
-"src/list/list.c",
-"917:u.end = s->match[i];",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
 "bl-919-del",
 "srcl",
 "src/list/list.c",
-"919:f->units[f->count++] = u;",
+"919:f->units = &s->units[*unit_top];",
 ";",
 [
 "testBytes",
@@ -35876,14 +36392,84 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-923-ne",
+"bl-924-del",
 "srcl",
 "src/list/list.c",
-"923:!=",
+"924:f->context = context;",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-930-del",
+"srcl",
+"src/list/list.c",
+"930:u.end = s->match[i];",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-932-del",
+"srcl",
+"src/list/list.c",
+"932:f->units[f->count++] = u;",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-936-ne",
+"srcl",
+"src/list/list.c",
+"936:!=",
 "==",
 [
 "testBytes",
@@ -35898,14 +36484,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-923-neg",
+"bl-936-neg",
 "srcl",
 "src/list/list.c",
-"923:(context != (uint32_t)GSHSCENE_ORDER_FLAT && f->count > 1)",
+"936:(context != (uint32_t)GSHSCENE_ORDER_FLAT && f->count > 1)",
 "(!(context != (uint32_t)GSHSCENE_ORDER_FLAT && f->count > 1))",
 [
 "testBytes",
@@ -35920,14 +36507,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-924-del",
+"bl-937-del",
 "srcl",
 "src/list/list.c",
-"924:units_sort(list, context, f->units, s->temp, f->count);",
+"937:units_sort(list, context, f->units, s->temp, f->count);",
 ";",
 [
 "testBytes",
@@ -35942,14 +36530,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-936-del",
+"bl-949-del",
 "srcl",
 "src/list/list.c",
-"936:s->open[open_n++] = i;",
+"949:s->open[open_n++] = i;",
 ";",
 [
 "testBytes",
@@ -35964,14 +36553,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-938-del",
+"bl-951-del",
 "srcl",
 "src/list/list.c",
-"938:s->match[s->open[--open_n]] = i;",
+"951:s->match[s->open[--open_n]] = i;",
 ";",
 [
 "testBytes",
@@ -35986,14 +36576,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-945-del",
+"bl-958-del",
 "srcl",
 "src/list/list.c",
-"945:frame_open(list, s, &frame_count, &unit_top, 0, n, GSHSCENE_ORDER_FLAT, SIZE_MAX);",
+"958:frame_open(list, s, &frame_count, &unit_top, 0, n, GSHSCENE_ORDER_FLAT, SIZE_MAX);",
 ";",
 [
 "testBytes",
@@ -36008,14 +36599,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-946-neg",
+"bl-959-neg",
 "srcl",
 "src/list/list.c",
-"946:(frame_count > 0)",
+"959:(frame_count > 0)",
 "(!(frame_count > 0))",
 [
 "testBytes",
@@ -36030,14 +36622,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-949-ne",
+"bl-962-ne",
 "srcl",
 "src/list/list.c",
-"949:!=",
+"962:!=",
 "==",
 [
 "testBytes",
@@ -36052,14 +36645,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-949-neg",
+"bl-962-neg",
 "srcl",
 "src/list/list.c",
-"949:(f->closing != SIZE_MAX)",
+"962:(f->closing != SIZE_MAX)",
 "(!(f->closing != SIZE_MAX))",
 [
 "testBytes",
@@ -36074,14 +36668,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-950-del",
+"bl-963-del",
 "srcl",
 "src/list/list.c",
-"950:s->out[out_n++] = f->closing;",
+"963:s->out[out_n++] = f->closing;",
 ";",
 [
 "testBytes",
@@ -36096,14 +36691,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-953-del",
+"bl-966-del",
 "srcl",
 "src/list/list.c",
-"953:frame_count--;",
+"966:frame_count--;",
 ";",
 [
 "testBytes",
@@ -36118,14 +36714,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-959-eq",
+"bl-972-eq",
 "srcl",
 "src/list/list.c",
-"959:==",
+"972:==",
 "!=",
 [
 "testBytes",
@@ -36140,14 +36737,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-959-and",
+"bl-972-and",
 "srcl",
 "src/list/list.c",
-"959:&&",
+"972:&&",
 "||",
 [
 "testBytes",
@@ -36162,14 +36760,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-959-gt",
+"bl-972-gt",
 "srcl",
 "src/list/list.c",
-"959:xt > 1)",
+"972:xt > 1)",
 "xt >= 1)",
 [
 "testBytes",
@@ -36184,14 +36783,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-959-neg",
+"bl-972-neg",
 "srcl",
 "src/list/list.c",
-"959:(f->context == (uint32_t)GSHSCENE_ORDER_DEPTH && f->next > 1)",
+"972:(f->context == (uint32_t)GSHSCENE_ORDER_DEPTH && f->next > 1)",
 "(!(f->context == (uint32_t)GSHSCENE_ORDER_DEPTH && f->next > 1))",
 [
 "testBytes",
@@ -36206,14 +36806,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-964-del",
+"bl-977-del",
 "srcl",
 "src/list/list.c",
-"964:tie->first = f->prev_pos;",
+"977:tie->first = f->prev_pos;",
 ";",
 [
 "testBytes",
@@ -36228,14 +36829,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-965-del",
+"bl-978-del",
 "srcl",
 "src/list/list.c",
-"965:tie->second = pos;",
+"978:tie->second = pos;",
 ";",
 [
 "testBytes",
@@ -36250,14 +36852,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-966-del",
+"bl-979-del",
 "srcl",
 "src/list/list.c",
-"966:tie->depth = item->depth;",
+"979:tie->depth = item->depth;",
 ";",
 [
 "testBytes",
@@ -36272,14 +36875,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-967-ne",
+"bl-980-ne",
 "srcl",
 "src/list/list.c",
-"967:!=",
+"980:!=",
 "==",
 [
 "testBytes",
@@ -36294,14 +36898,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-967-del",
+"bl-980-del",
 "srcl",
 "src/list/list.c",
-"967:tie->reason = before->layer != item->layer ? GSHSCENE_TIE_LAYER : GSHSCENE_TIE_DECLARED;",
+"980:tie->reason = before->layer != item->layer ? GSHSCENE_TIE_LAYER : GSHSCENE_TIE_DECLARED;",
 ";",
 [
 "testBytes",
@@ -36316,14 +36921,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-970-del",
+"bl-983-del",
 "srcl",
 "src/list/list.c",
-"970:f->prev_pos = pos;",
+"983:f->prev_pos = pos;",
 ";",
 [
 "testBytes",
@@ -36338,14 +36944,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-971-del",
+"bl-984-del",
 "srcl",
 "src/list/list.c",
-"971:s->out[out_n++] = u.start;",
+"984:s->out[out_n++] = u.start;",
 ";",
 [
 "testBytes",
@@ -36360,14 +36967,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-973-eq",
+"bl-986-eq",
 "srcl",
 "src/list/list.c",
-"973:==",
+"986:==",
 "!=",
 [
 "testBytes",
@@ -36382,14 +36990,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1002-eq",
+"bl-1015-eq",
 "srcl",
 "src/list/list.c",
-"1002:at == 0 ",
+"1015:at == 0 ",
 "at != 0 ",
 [
 "testBytes",
@@ -36404,14 +37013,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1002-or",
+"bl-1015-or",
 "srcl",
 "src/list/list.c",
-"1002:||",
+"1015:||",
 "&&",
 [
 "testBytes",
@@ -36426,14 +37036,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1002-eq2",
+"bl-1015-eq2",
 "srcl",
 "src/list/list.c",
-"1002: n == 0)",
+"1015: n == 0)",
 " n != 0)",
 [
 "testBytes",
@@ -36448,14 +37059,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1002-neg",
+"bl-1015-neg",
 "srcl",
 "src/list/list.c",
-"1002:(list->nonflat == 0 || n == 0)",
+"1015:(list->nonflat == 0 || n == 0)",
 "(!(list->nonflat == 0 || n == 0))",
 [
 "testBytes",
@@ -36470,14 +37082,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1011-del",
+"bl-1024-del",
 "srcl",
 "src/list/list.c",
-"1011:s.units = array_alloc(alloc, n, sizeof *s.units);",
+"1024:s.units = array_alloc(alloc, n, sizeof *s.units);",
 ";",
 [
 "testBytes",
@@ -36492,14 +37105,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1013-del",
+"bl-1026-del",
 "srcl",
 "src/list/list.c",
-"1013:s.frames = array_alloc(alloc, n + 1, sizeof *s.frames);",
+"1026:s.frames = array_alloc(alloc, n + 1, sizeof *s.frames);",
 ";",
 [
 "testBytes",
@@ -36514,14 +37128,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1014-del",
+"bl-1027-del",
 "srcl",
 "src/list/list.c",
-"1014:s.ties = array_alloc(alloc, n, sizeof *s.ties);",
+"1027:s.ties = array_alloc(alloc, n, sizeof *s.ties);",
 ";",
 [
 "testBytes",
@@ -36536,14 +37151,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1015-neg",
+"bl-1028-neg",
 "srcl",
 "src/list/list.c",
-"1015:(!s.match || !s.out || !s.open || !s.units || !s.temp || !s.frames || !s.ties)",
+"1028:(!s.match || !s.out || !s.open || !s.units || !s.temp || !s.frames || !s.ties)",
 "(!(!s.match || !s.out || !s.open || !s.units || !s.temp || !s.frames || !s.ties))",
 [
 "testBytes",
@@ -36558,14 +37174,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1016-del",
+"bl-1029-del",
 "srcl",
 "src/list/list.c",
-"1016:scratch_free(alloc, &s);",
+"1029:scratch_free(alloc, &s);",
 ";",
 [
 "testBytes",
@@ -36580,14 +37197,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1020-del",
+"bl-1033-del",
 "srcl",
 "src/list/list.c",
-"1020:resolve_order(list, &s, &tie_n);",
+"1033:resolve_order(list, &s, &tie_n);",
 ";",
 [
 "testBytes",
@@ -36602,14 +37220,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1022-neg",
+"bl-1035-neg",
 "srcl",
 "src/list/list.c",
-"1022:(tie_n > 0)",
+"1035:(tie_n > 0)",
 "(!(tie_n > 0))",
 [
 "testBytes",
@@ -36624,14 +37243,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1023-del",
+"bl-1036-del",
 "srcl",
 "src/list/list.c",
-"1023:ties = array_alloc(alloc, tie_n, sizeof *ties);",
+"1036:ties = array_alloc(alloc, tie_n, sizeof *ties);",
 ";",
 [
 "testBytes",
@@ -36646,14 +37266,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1025-del",
+"bl-1038-del",
 "srcl",
 "src/list/list.c",
-"1025:scratch_free(alloc, &s);",
+"1038:scratch_free(alloc, &s);",
 ";",
 [
 "testBytes",
@@ -36668,14 +37289,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1028-del",
+"bl-1041-del",
 "srcl",
 "src/list/list.c",
-"1028:memcpy(ties, s.ties, tie_n * sizeof *ties);",
+"1041:memcpy(ties, s.ties, tie_n * sizeof *ties);",
 ";",
 [
 "testBytes",
@@ -36690,14 +37312,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1031-del",
+"bl-1044-del",
 "srcl",
 "src/list/list.c",
-"1031:scratch_free(alloc, &s);",
+"1044:scratch_free(alloc, &s);",
 ";",
 [
 "testBytes",
@@ -36712,14 +37335,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1033-del",
+"bl-1046-del",
 "srcl",
 "src/list/list.c",
-"1033:list->ties = ties;",
+"1046:list->ties = ties;",
 ";",
 [
 "testBytes",
@@ -36734,14 +37358,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1034-del",
+"bl-1047-del",
 "srcl",
 "src/list/list.c",
-"1034:list->tie_count = tie_n;",
+"1047:list->tie_count = tie_n;",
 ";",
 [
 "testBytes",
@@ -36756,14 +37381,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1040-ne",
+"bl-1053-ne",
 "srcl",
 "src/list/list.c",
-"1040:!=",
+"1053:!=",
 "==",
 [
 "testBytes",
@@ -36778,14 +37404,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1040-neg",
+"bl-1053-neg",
 "srcl",
 "src/list/list.c",
-"1040:(!list || list->closed || list->depth != 0)",
+"1053:(!list || list->closed || list->depth != 0)",
 "(!(!list || list->closed || list->depth != 0))",
 [
 "testBytes",
@@ -36800,14 +37427,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1058-ne",
+"bl-1071-ne",
 "srcl",
 "src/list/list.c",
-"1058:!=",
+"1071:!=",
 "==",
 [
 "testBytes",
@@ -36822,14 +37450,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1058-neg",
+"bl-1071-neg",
 "srcl",
 "src/list/list.c",
-"1058:(!list || list->closed || list->depth != 0)",
+"1071:(!list || list->closed || list->depth != 0)",
 "(!(!list || list->closed || list->depth != 0))",
 [
 "testBytes",
@@ -36844,14 +37473,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1062-neg",
+"bl-1075-neg",
 "srcl",
 "src/list/list.c",
-"1062:(list->tie_count > 1)",
+"1075:(list->tie_count > 1)",
 "(!(list->tie_count > 1))",
 [
 "testBytes",
@@ -36866,14 +37496,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1063-del",
+"bl-1076-del",
 "srcl",
 "src/list/list.c",
-"1063:qsort(list->ties, list->tie_count, sizeof *list->ties, tie_compare);",
+"1076:qsort(list->ties, list->tie_count, sizeof *list->ties, tie_compare);",
 ";",
 [
 "testBytes",
@@ -36888,14 +37519,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1071-eq",
+"bl-1084-eq",
 "srcl",
 "src/list/list.c",
-"1071:==",
+"1084:==",
 "!=",
 [
 "testBytes",
@@ -36910,14 +37542,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1071-neg",
+"bl-1084-neg",
 "srcl",
 "src/list/list.c",
-"1071:(list->tie_count == list->tie_capacity)",
+"1084:(list->tie_count == list->tie_capacity)",
 "(!(list->tie_count == list->tie_capacity))",
 [
 "testBytes",
@@ -36932,14 +37565,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1077-neg",
+"bl-1090-neg",
 "srcl",
 "src/list/list.c",
-"1077:(list->tie_count)",
+"1090:(list->tie_count)",
 "(!(list->tie_count))",
 [
 "testBytes",
@@ -36954,14 +37588,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1078-del",
+"bl-1091-del",
 "srcl",
 "src/list/list.c",
-"1078:memcpy(grown, list->ties, list->tie_count * sizeof *grown);",
+"1091:memcpy(grown, list->ties, list->tie_count * sizeof *grown);",
 ";",
 [
 "testBytes",
@@ -36976,14 +37611,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1081-del",
+"bl-1094-del",
 "srcl",
 "src/list/list.c",
-"1081:list->ties = grown;",
+"1094:list->ties = grown;",
 ";",
 [
 "testBytes",
@@ -36998,14 +37634,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1082-del",
+"bl-1095-del",
 "srcl",
 "src/list/list.c",
-"1082:list->tie_capacity = capacity;",
+"1095:list->tie_capacity = capacity;",
 ";",
 [
 "testBytes",
@@ -37020,14 +37657,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1093-and",
+"bl-1106-and",
 "srcl",
 "src/list/list.c",
-"1093:&&",
+"1106:&&",
 "||",
 [
 "testBytes",
@@ -37042,14 +37680,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1097-ge",
+"bl-1110-ge",
 "srcl",
 "src/list/list.c",
-"1097:>=",
+"1110:>=",
 ">",
 [
 "testBytes",
@@ -37064,14 +37703,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1097-neg",
+"bl-1110-neg",
 "srcl",
 "src/list/list.c",
-"1097:(!list || !out || !list->closed || index >= list->tie_count)",
+"1110:(!list || !out || !list->closed || index >= list->tie_count)",
 "(!(!list || !out || !list->closed || index >= list->tie_count))",
 [
 "testBytes",
@@ -37086,14 +37726,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1143-eq",
+"bl-1156-eq",
 "srcl",
 "src/list/list.c",
-"1143:==",
+"1156:==",
 "!=",
 [
 "testBytes",
@@ -37108,14 +37749,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1143-and",
+"bl-1156-and",
 "srcl",
 "src/list/list.c",
-"1143:&&",
+"1156:&&",
 "||",
 [
 "testBytes",
@@ -37130,14 +37772,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1143-lt",
+"bl-1156-lt",
 "srcl",
 "src/list/list.c",
-"1143:<",
+"1156:<",
 "<=",
 [
 "testBytes",
@@ -37152,14 +37795,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1195-ne",
+"bl-1208-ne",
 "srcl",
 "src/list/list.c",
-"1195:!=",
+"1208:!=",
 "==",
 [
 "testBytes",
@@ -37174,14 +37818,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1196-ne",
+"bl-1209-ne",
 "srcl",
 "src/list/list.c",
-"1196:nt != b-",
+"1209:nt != b-",
 "nt == b-",
 [
 "testBytes",
@@ -37196,14 +37841,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1196-ne2",
+"bl-1209-ne2",
 "srcl",
 "src/list/list.c",
-"1196:ry != b-",
+"1209:ry != b-",
 "ry == b-",
 [
 "testBytes",
@@ -37218,14 +37864,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1206-eq",
+"bl-1219-eq",
 "srcl",
 "src/list/list.c",
-"1206:te == b-",
+"1219:te == b-",
 "te != b-",
 [
 "testBytes",
@@ -37240,14 +37887,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1206-eq2",
+"bl-1219-eq2",
 "srcl",
 "src/list/list.c",
-"1206:ng == b-",
+"1219:ng == b-",
 "ng != b-",
 [
 "testBytes",
@@ -37262,14 +37910,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1210-ne",
+"bl-1223-ne",
 "srcl",
 "src/list/list.c",
-"1210:nt != b-",
+"1223:nt != b-",
 "nt == b-",
 [
 "testBytes",
@@ -37284,14 +37933,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1210-ne2",
+"bl-1223-ne2",
 "srcl",
 "src/list/list.c",
-"1210:te != b-",
+"1223:te != b-",
 "te == b-",
 [
 "testBytes",
@@ -37306,14 +37956,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1210-neg",
+"bl-1223-neg",
 "srcl",
 "src/list/list.c",
-"1210:(!a || !b || a->count != b->count || !gshscene_color_equal(&a->foreground, &b->foreground) || a->palette != b->palette)",
+"1223:(!a || !b || a->count != b->count || !gshscene_color_equal(&a->foreground, &b->foreground) || a->palette != b->palette)",
 "(!(!a || !b || a->count != b->count || !gshscene_color_equal(&a->foreground, &b->foreground) || a->palette != b->palette))",
 [
 "testBytes",
@@ -37328,14 +37979,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1249-del",
+"bl-1262-del",
 "srcl",
 "src/list/list.c",
-"1249:gshscene_color_hash(&h, &list->foreground);",
+"1262:gshscene_color_hash(&h, &list->foreground);",
 ";",
 [
 "testBytes",
@@ -37350,14 +38002,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1250-del",
+"bl-1263-del",
 "srcl",
 "src/list/list.c",
-"1250:gshgeom_hash_u64(&h, list->palette ? gshscene_resource_hash(list->palette) : 0);",
+"1263:gshgeom_hash_u64(&h, list->palette ? gshscene_resource_hash(list->palette) : 0);",
 ";",
 [
 "testBytes",
@@ -37372,14 +38025,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1250-hwu64",
+"bl-1263-hwu64",
 "srcl",
 "src/list/list.c",
-"1250:gshgeom_hash_u64(",
+"1263:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testBytes",
@@ -37394,14 +38048,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1264-del",
+"bl-1277-del",
 "srcl",
 "src/list/list.c",
-"1264:gshgeom_hash_u32(&h, item->paint.entry);",
+"1277:gshgeom_hash_u32(&h, item->paint.entry);",
 ";",
 [
 "testBytes",
@@ -37416,14 +38071,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1264-hwu32",
+"bl-1277-hwu32",
 "srcl",
 "src/list/list.c",
-"1264:gshgeom_hash_u32(",
+"1277:gshgeom_hash_u32(",
 "gshgeom_hash_u64(",
 [
 "testBytes",
@@ -37438,58 +38094,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
-]
-],
-[
-"bl-1265-del",
-"srcl",
-"src/list/list.c",
-"1265:gshgeom_hash_u64(&h, item->paint.gradient ? gshscene_resource_hash(item->paint.gradient) : 0);",
-";",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient"
-]
-],
-[
-"bl-1265-hwu64",
-"srcl",
-"src/list/list.c",
-"1265:gshgeom_hash_u64(",
-"gshgeom_hash_u32(",
-[
-"testBytes",
-"testCore",
-"testStore",
-"testScene_limits",
-"testOrder",
-"testList",
-"testColor",
-"testDump",
-"testComposite",
-"testPaint_scene",
-"testEmit",
-"testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
 "bl-1278-del",
 "srcl",
 "src/list/list.c",
-"1278:gshgeom_hash_u8(&h, (uint8_t)item->group.composite);",
+"1278:gshgeom_hash_u64(&h, item->paint.gradient ? gshscene_resource_hash(item->paint.gradient) : 0);",
 ";",
 [
 "testBytes",
@@ -37504,14 +38117,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1278-hwu8",
+"bl-1278-hwu64",
 "srcl",
 "src/list/list.c",
-"1278:gshgeom_hash_u8(",
+"1278:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testBytes",
@@ -37526,14 +38140,61 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1322-str",
+"bl-1291-del",
 "srcl",
 "src/list/list.c",
-"1322:, \"gshs",
+"1291:gshgeom_hash_u8(&h, (uint8_t)item->group.composite);",
+";",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1291-hwu8",
+"srcl",
+"src/list/list.c",
+"1291:gshgeom_hash_u8(",
+"gshgeom_hash_u32(",
+[
+"testBytes",
+"testCore",
+"testStore",
+"testScene_limits",
+"testOrder",
+"testList",
+"testColor",
+"testDump",
+"testComposite",
+"testPaint_scene",
+"testEmit",
+"testPalette",
+"testGradient",
+"testColor_bound"
+]
+],
+[
+"bl-1335-str",
+"srcl",
+"src/list/list.c",
+"1335:, \"gshs",
 ", \"Zshs",
 [
 "testBytes",
@@ -37548,14 +38209,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1322-wd",
+"bl-1335-wd",
 "srcl",
 "src/list/list.c",
-"1322:fg=%016llx %0",
+"1335:fg=%016llx %0",
 "fg=%llx %0",
 [
 "testBytes",
@@ -37570,14 +38232,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1322-wd2",
+"bl-1335-wd2",
 "srcl",
 "src/list/list.c",
-"1322:lx %016llx %0",
+"1335:lx %016llx %0",
 "lx %llx %0",
 [
 "testBytes",
@@ -37592,14 +38255,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1322-wd3",
+"bl-1335-wd3",
 "srcl",
 "src/list/list.c",
-"1322:lx %016llx %0",
+"1335:lx %016llx %0",
 "lx %llx %0",
 [
 "testBytes",
@@ -37614,14 +38278,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1326-wd",
+"bl-1339-wd",
 "srcl",
 "src/list/list.c",
-"1326:te=%016llx ha",
+"1339:te=%016llx ha",
 "te=%llx ha",
 [
 "testBytes",
@@ -37636,14 +38301,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1326-wd2",
+"bl-1339-wd2",
 "srcl",
 "src/list/list.c",
-"1326:sh=%016llx\\n\"",
+"1339:sh=%016llx\\n\"",
 "sh=%llx\\n\"",
 [
 "testBytes",
@@ -37658,14 +38324,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1346-wd",
+"bl-1359-wd",
 "srcl",
 "src/list/list.c",
-"1346:%016llx",
+"1359:%016llx",
 "%llx",
 [
 "testBytes",
@@ -37680,14 +38347,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1371-del",
+"bl-1384-del",
 "srcl",
 "src/list/list.c",
-"1371:written = fprintf(out, \" composite=%u order=%u\", (unsigned)item->group.composite, (unsigned)item->group.ordering);",
+"1384:written = fprintf(out, \" composite=%u order=%u\", (unsigned)item->group.composite, (unsigned)item->group.ordering);",
 ";",
 [
 "testBytes",
@@ -37702,14 +38370,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1394-lt",
+"bl-1407-lt",
 "srcl",
 "src/list/list.c",
-"1394:<",
+"1407:<",
 "<=",
 [
 "testBytes",
@@ -37724,14 +38393,15 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ],
 [
-"bl-1396-wd",
+"bl-1409-wd",
 "srcl",
 "src/list/list.c",
-"1396:%016llx",
+"1409:%016llx",
 "%llx",
 [
 "testBytes",
@@ -37746,7 +38416,8 @@
 "testPaint_scene",
 "testEmit",
 "testPalette",
-"testGradient"
+"testGradient",
+"testColor_bound"
 ]
 ]
 ]

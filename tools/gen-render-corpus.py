@@ -122,6 +122,14 @@ def scripted():
     for b in built:
         body += b
     out["scripted-gradients-built.bin"] = header(request=4) + bytes(body)
+    # N1 (Corey, 2026-10-21): fills whose c byte has its two high bits set take a color at 2^16 (b >> 5 = 0, 1) or one
+    # step past it (2, 3) in gamma 10 (a & 2) or gamma 0.1; a group with a % 4 = 3 and c's high bit blends in gamma 0.1;
+    # and a built gradient interpolating in linear sRGB (flags 0x08) whose stop color byte is 0xF0 holds 2^16 in gamma
+    # 10, resolved to the saturation.
+    sat = bytes([FOREGROUND, 12, 204, 3]) + bytes([16, 16, 24, 16, 16, 16, 0, 0x08, 1, 0, 0xF0])
+    out["scripted-color-bound.bin"] = header(request=4) + ops(
+        (GROUP, 3, 0, 0x80), (FILL, 2, 0x00, 0xC3), (FILL, 0, 0x20, 0xC4), (GROUP_POP, 0, 0, 0), (FILL, 3, 0x40, 0xC5),
+        (FILL, 1, 0x60, 0xC6), tuple(sat[:4])) + sat[4:]
     return out
 
 

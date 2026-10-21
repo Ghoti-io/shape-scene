@@ -208,6 +208,28 @@ changes no result, cannot be seen by any test:
                ``x < 0`` against ``x <= 0`` in the absolute value (zero is
                exempt either way)
 
+  n1-, tst-n1-, orc-n1-, gorc-n1-
+               N1's bound and saturation (Corey, 2026-10-21): the bound's two
+               comparisons (inclusive, missing, either side) and the components it
+               reads, each entry point that reads it (the color check, a fill, a
+               shape node's paint, a palette, a solid stop) and its order after the
+               validity checks there, the two constants, the clamp's two sides, and
+               each point the saturation is named in the resolve (decode, matrix,
+               encode), the test evaluator (those, the un-premultiply and its guard,
+               the apply, G4) and both oracles.  The oracle's own copy of the bound
+               (``COMPONENT_MAX``) has no plant: only its selftest reads it, where
+               any bound up to 2^64 saturates the same.  Two older plants were
+               dropped as the sweep of the changed files found them equivalent:
+               the evaluator's alpha-0 branch of a premultiplied conversion (with
+               the saturation an alpha of 0 un-premultiplies to 2^64 and
+               premultiplies back to 0, the same answer), and a resource dump's
+               run format written as the resource format (both have been 1
+               since every format was reset).  The changed files' generated
+               plants were swept again (cs-, bv-, bg-, br-, bl-; 787 candidates
+               in ghoti-build:gcc16): 152 do not compile, 580 are caught (they
+               replace those files' entries in scene-plants.json) and 55
+               survive, none on a changed line, the kinds listed below.
+
   sk-, rp-, ds-, cn-, rule-, and the sink's hdr- and core- plants (story 13a)
                the sink contract: one named plant per S-rule (``rule-S1`` to
                ``rule-S15``, each failing the conformance suite or the contract's
@@ -722,7 +744,6 @@ PLANTS = [
     ('rs-dump-header-name', 'src', RS, '"gshscene.resource %u kind=%s hash=%016llx\\n"', '"gshscene.res %u kind=%s hash=%016llx\\n"', D),
     ('rs-dump-header-width', 'src', RS, '"gshscene.resource %u kind=%s hash=%016llx\\n"', '"gshscene.resource %u kind=%s hash=%llx\\n"', D),
     ('rs-dump-run-line', 'src', RS, '"run source=%u face=%016llx size=%016llx hint=%u version=%u glyphs=%llu\\n"', '"run source=%u face=%016llx size=%016llx hint=%u version=%u count=%llu\\n"', D),
-    ('rs-dump-run-format', 'src', RS, 'hash=%016llx\\n", kind_format(resource->kind),', 'hash=%016llx\\n", RESOURCE_FORMAT_VERSION,', D),
     ('rs-dump-run-face-width', 'src', RS, '"run source=%u face=%016llx size', '"run source=%u face=%llx size', D),
     ('rs-dump-run-size-width', 'src', RS, 'size=%016llx hint=%u', 'size=%llx hint=%u', D),
     ('rs-dump-face-line', 'src', RS, '"face font=%016llx index=%u coords=%u"', '"face font=%016llx index=%u axes=%u"', D),
@@ -1059,7 +1080,7 @@ PLANTS += [
     # the record calls
     ('ls-fill-null-list', 'src', LS, 'const GSHSCENE_Paint * paint, int32_t layer, double depth) {\n  if (!list || list->closed) {', 'const GSHSCENE_Paint * paint, int32_t layer, double depth) {\n  if (list->closed) {', L),
     ('ls-fill-closed', 'src', LS, 'const GSHSCENE_Paint * paint, int32_t layer, double depth) {\n  if (!list || list->closed) {', 'const GSHSCENE_Paint * paint, int32_t layer, double depth) {\n  if (!list) {', L),
-    ('ls-fill-depth-check', 'src', LS, '  if (result == GSHSCENE_OK) {\n    result = gshscene_list_canonical_depth(depth, &item.depth);\n  }\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  item.resource = resource;\n  item.fill_rule = rule;\n  item.layer = layer;\n  return list_append', '(void)depth;\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  item.resource = resource;\n  item.fill_rule = rule;\n  item.layer = layer;\n  return list_append', L),
+    ('ls-fill-depth-check', 'src', LS, '  if (result == GSHSCENE_OK) {\n    result = gshscene_list_canonical_depth(depth, &item.depth);\n  }\n  if (result == GSHSCENE_OK && !gshscene_color_bounded(item.paint.rgba)) {', '(void)depth;\n  if (result == GSHSCENE_OK && !gshscene_color_bounded(item.paint.rgba)) {', L),
     ('ls-clip-null-list', 'src', LS, 'const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, int32_t layer, double depth) {\n  if (!list || list->closed) {', 'const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, int32_t layer, double depth) {\n  if (list->closed) {', L),
     ('ls-clip-closed', 'src', LS, 'const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, int32_t layer, double depth) {\n  if (!list || list->closed) {', 'const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, int32_t layer, double depth) {\n  if (!list) {', L),
     ('ls-clip-rule-check', 'src', LS, '  if (result == GSHSCENE_OK) {\n    result = check_rule(rule);\n  }\n  if (result == GSHSCENE_OK) {\n    result = gshscene_list_canonical_depth(depth, &item.depth);\n  }\n  if (result == GSHSCENE_OK) {\n    result = stack_reserve(list);', '  if (result == GSHSCENE_OK) {\n    check_rule(rule);\n  }\n  if (result == GSHSCENE_OK) {\n    result = gshscene_list_canonical_depth(depth, &item.depth);\n  }\n  if (result == GSHSCENE_OK) {\n    result = stack_reserve(list);', L),
@@ -1228,8 +1249,8 @@ PLANTS += [
     ('orc-dest-atop', 'orc', 'tools/composite-oracle.py', 'return ONE - da, sa\n    if op == "xor":', 'return ONE - da, da\n    if op == "xor":', ['selftest', 'vectors']),
     ('orc-xor', 'orc', 'tools/composite-oracle.py', 'return ONE - da, ONE - sa\n    raise ValueError(op)', 'return ONE - sa, ONE - sa\n    raise ValueError(op)', ['selftest', 'vectors']),
     ('orc-plus-clamp', 'orc', 'tools/composite-oracle.py', 'return [min(ONE, s[i] + d[i]) for i in range(4)]', 'return [s[i] + d[i] for i in range(4)]', ['selftest', 'vectors']),
-    ('orc-apply-coverage-source', 'orc', 'tools/composite-oracle.py', 'return [(ONE - m) * d[i] + m * o[i] for i in range(4)]', 'return [(ONE - m) * d[i] + o[i] for i in range(4)]', ['selftest', 'vectors']),
-    ('orc-apply-coverage-backdrop', 'orc', 'tools/composite-oracle.py', 'return [(ONE - m) * d[i] + m * o[i] for i in range(4)]', 'return [d[i] + m * o[i] for i in range(4)]', ['selftest', 'vectors']),
+    ('orc-apply-coverage-source', 'orc', 'tools/composite-oracle.py', 'return [sat((ONE - m) * d[i] + m * o[i]) for i in range(4)]', 'return [sat((ONE - m) * d[i] + o[i]) for i in range(4)]', ['selftest', 'vectors']),
+    ('orc-apply-coverage-backdrop', 'orc', 'tools/composite-oracle.py', 'return [sat((ONE - m) * d[i] + m * o[i]) for i in range(4)]', 'return [sat(d[i] + m * o[i]) for i in range(4)]', ['selftest', 'vectors']),
     ('orc-premultiply', 'orc', 'tools/composite-oracle.py', 'return [rgb[0] * a, rgb[1] * a, rgb[2] * a, a]', 'return [rgb[0] * a, rgb[1] * a, rgb[2], a]', ['selftest', 'vectors']),
     ('orc-fill-clips', 'orc', 'tools/composite-oracle.py', 'm = cov[i] * product(top.clips)', 'm = cov[i]', ['selftest', 'vectors']),
     ('orc-fill-convert', 'orc', 'tools/composite-oracle.py', 'source = premultiply(convert(rgb, space, top.space, ex), alpha)', 'source = premultiply(rgb, alpha)', ['selftest', 'vectors']),
@@ -1245,13 +1266,13 @@ PLANTS += [
     ('orc-group-opacity', 'orc', 'tools/composite-oracle.py', 'source = [opacity * v for v in moved]', 'source = list(moved)', ['selftest', 'vectors']),
     ('orc-group-operator', 'orc', 'tools/composite-oracle.py', 'op = OPS[done.group["composite"]]', 'op = "src-over"', ['selftest', 'vectors']),
     ('orc-group-coverage', 'orc', 'tools/composite-oracle.py', 'parent.layer = apply(parent.layer, source, done.outer, op)', 'parent.layer = apply(parent.layer, source, ONE, op)', ['selftest', 'vectors']),
-    ('orc-convert-identity', 'orc', 'tools/composite-oracle.py', '    if a == b:\n        return list(rgb)\n    lin =', '    lin =', ['selftest', 'vectors']),
-    ('orc-convert-decode', 'orc', 'tools/composite-oracle.py', 'lin = [decode(a, v, ex) for v in rgb]', 'lin = list(rgb)', ['selftest', 'vectors']),
-    ('orc-convert-encode', 'orc', 'tools/composite-oracle.py', 'return [encode(b, v, ex) for v in lin]', 'return lin', ['selftest', 'vectors']),
-    ('orc-convert-matrix-skip', 'orc', 'tools/composite-oracle.py', '    if a[0] != b[0]:\n        lin = matvec', '    if False:\n        lin = matvec', ['selftest', 'vectors']),
-    ('orc-convert-matrix-order', 'orc', 'tools/composite-oracle.py', 'lin = matvec(MATRIX_INVERSE[b[0]], matvec(MATRIX[a[0]], lin))', 'lin = matvec(MATRIX_INVERSE[a[0]], matvec(MATRIX[b[0]], lin))', ['selftest', 'vectors']),
+    ('orc-convert-identity', 'orc', 'tools/composite-oracle.py', '    if a == b:\n        return list(rgb)\n    # N1', '    # N1', ['selftest', 'vectors']),
+    ('orc-convert-decode', 'orc', 'tools/composite-oracle.py', 'lin = [sat(decode(a, v, ex)) for v in rgb]', 'lin = [sat(v) for v in rgb]', ['selftest', 'vectors']),
+    ('orc-convert-encode', 'orc', 'tools/composite-oracle.py', 'return [sat(encode(b, v, ex)) for v in lin]', 'return [sat(v) for v in lin]', ['selftest', 'vectors']),
+    ('orc-convert-matrix-skip', 'orc', 'tools/composite-oracle.py', '    if a[0] != b[0]:\n        lin = [sat(v) for v in matvec', '    if False:\n        lin = [sat(v) for v in matvec', ['selftest', 'vectors']),
+    ('orc-convert-matrix-order', 'orc', 'tools/composite-oracle.py', 'matvec(MATRIX_INVERSE[b[0]], matvec(MATRIX[a[0]], lin))', 'matvec(MATRIX_INVERSE[a[0]], matvec(MATRIX[b[0]], lin))', ['selftest', 'vectors']),
     ('orc-premultiplied-conversion-zero', 'orc', 'tools/composite-oracle.py', 'if alpha == 0:\n        return [ZERO, ZERO, ZERO, ZERO]', 'if alpha == 0:\n        return [ZERO, ZERO, ZERO, ONE]', ['selftest', 'vectors']),
-    ('orc-premultiplied-unpremultiply', 'orc', 'tools/composite-oracle.py', 'straight = [px[i] / alpha for i in range(3)]', 'straight = [px[i] for i in range(3)]', ['selftest', 'vectors']),
+    ('orc-premultiplied-unpremultiply', 'orc', 'tools/composite-oracle.py', 'straight = [sat(px[i] / alpha) for i in range(3)]', 'straight = [sat(px[i]) for i in range(3)]', ['selftest', 'vectors']),
     ('orc-srgb-threshold', 'orc', 'tools/composite-oracle.py', 'if x <= F("0.04045"):', 'if x <= F("0.04046"):', ['selftest', 'vectors']),
     ('orc-srgb-slope', 'orc', 'tools/composite-oracle.py', 'return x / F("12.92")', 'return x / F("12.9")', ['selftest', 'vectors']),
     ('orc-srgb-offset', 'orc', 'tools/composite-oracle.py', '(x + F("0.055")) / F("1.055"), F("2.4"), ex)', '(x + F("0.056")) / F("1.055"), F("2.4"), ex)', ['selftest', 'vectors']),
@@ -1294,8 +1315,8 @@ PLANTS += [
     ('tst-dest-atop', 'tst', 'tests/ref_composite.h', 'case GSHSCENE_COMPOSITE_DEST_ATOP: fa = 1 - da; fb = sa; break;', 'case GSHSCENE_COMPOSITE_DEST_ATOP: fa = 1 - da; fb = da; break;', ['testComposite']),
     ('tst-xor', 'tst', 'tests/ref_composite.h', 'case GSHSCENE_COMPOSITE_XOR: fa = 1 - da; fb = 1 - sa; break;', 'case GSHSCENE_COMPOSITE_XOR: fa = 1 - sa; fb = 1 - sa; break;', ['testComposite']),
     ('tst-plus-clamp', 'tst', 'tests/ref_composite.h', 'composite == GSHSCENE_COMPOSITE_PLUS ? std::min(1.0, s.v[i] + d.v[i]) : fa * s.v[i] + fb * d.v[i]', 'composite == GSHSCENE_COMPOSITE_PLUS ? s.v[i] + d.v[i] : fa * s.v[i] + fb * d.v[i]', ['testComposite']),
-    ('tst-apply-source', 'tst', 'tests/ref_composite.h', 'out.v[i] = (1 - m) * d.v[i] + m * o.v[i];', 'out.v[i] = (1 - m) * d.v[i] + o.v[i];', ['testComposite']),
-    ('tst-apply-backdrop', 'tst', 'tests/ref_composite.h', 'out.v[i] = (1 - m) * d.v[i] + m * o.v[i];', 'out.v[i] = d.v[i] + m * o.v[i];', ['testComposite']),
+    ('tst-apply-source', 'tst', 'tests/ref_composite.h', 'out.v[i] = sat((1 - m) * d.v[i] + m * o.v[i]);', 'out.v[i] = sat((1 - m) * d.v[i] + o.v[i]);', ['testComposite']),
+    ('tst-apply-backdrop', 'tst', 'tests/ref_composite.h', 'out.v[i] = sat((1 - m) * d.v[i] + m * o.v[i]);', 'out.v[i] = sat(d.v[i] + m * o.v[i]);', ['testComposite']),
     ('tst-fill-clips', 'tst', 'tests/ref_composite.h', 'top.layer = apply(top.layer, s, coverage[i] * product(top.clips), GSHSCENE_COMPOSITE_SRC_OVER);', 'top.layer = apply(top.layer, s, coverage[i], GSHSCENE_COMPOSITE_SRC_OVER);', ['testComposite']),
     ('tst-fill-operator', 'tst', 'tests/ref_composite.h', 'top.layer = apply(top.layer, s, coverage[i] * product(top.clips), GSHSCENE_COMPOSITE_SRC_OVER);', 'top.layer = apply(top.layer, s, coverage[i] * product(top.clips), GSHSCENE_COMPOSITE_SRC);', ['testComposite']),
     ('tst-foreground-alpha', 'tst', 'tests/ref_composite.h', 'alpha = fgc.rgba[3] * item->paint.rgba[3];', 'alpha = fgc.rgba[3];', ['testComposite']),
@@ -1313,11 +1334,10 @@ PLANTS += [
     ('tst-group-operator', 'tst', 'tests/ref_composite.h', 'parent.layer = apply(parent.layer, s, done.outer, (int)done.group.composite);', 'parent.layer = apply(parent.layer, s, done.outer, GSHSCENE_COMPOSITE_SRC_OVER);', ['testComposite']),
     ('tst-group-coverage', 'tst', 'tests/ref_composite.h', 'parent.layer = apply(parent.layer, s, done.outer, (int)done.group.composite);', 'parent.layer = apply(parent.layer, s, 1.0, (int)done.group.composite);', ['testComposite']),
     ('tst-convert-same', 'tst', 'tests/ref_composite.h', '  if (same(a, b)) {\n    for (int i = 0; i < 3; i++) {\n      out[i] = in[i];', '  if (false) {\n    for (int i = 0; i < 3; i++) {\n      out[i] = in[i];', ['testComposite']),
-    ('tst-convert-decode', 'tst', 'tests/ref_composite.h', 'double lin[3] = {decode(a, in[0]), decode(a, in[1]), decode(a, in[2])};', 'double lin[3] = {in[0], in[1], in[2]};', ['testComposite']),
-    ('tst-convert-encode', 'tst', 'tests/ref_composite.h', '    out[i] = encode(b, lin[i]);', '    out[i] = lin[i];', ['testComposite']),
+    ('tst-convert-decode', 'tst', 'tests/ref_composite.h', 'double lin[3] = {sat(decode(a, in[0])), sat(decode(a, in[1])), sat(decode(a, in[2]))};', 'double lin[3] = {sat(in[0]), sat(in[1]), sat(in[2])};', ['testComposite']),
+    ('tst-convert-encode', 'tst', 'tests/ref_composite.h', '    out[i] = sat(encode(b, lin[i]));', '    out[i] = sat(lin[i]);', ['testComposite']),
     ('tst-convert-matrix-skip', 'tst', 'tests/ref_composite.h', '  if (a.primaries != b.primaries) {\n    Mat ma, mb, mbi;', '  if (false) {\n    Mat ma, mb, mbi;', ['testComposite']),
     ('tst-convert-matrix-order', 'tst', 'tests/ref_composite.h', '    rgb_to_xyz(a.primaries, ma);\n    rgb_to_xyz(b.primaries, mb);', '    rgb_to_xyz(b.primaries, ma);\n    rgb_to_xyz(a.primaries, mb);', ['testComposite']),
-    ('tst-premultiplied-zero', 'tst', 'tests/ref_composite.h', '  if (p.v[3] == 0.0) {\n    return Px{{0, 0, 0, 0}};\n  }', '', ['testComposite']),
     ('tst-srgb-threshold', 'tst', 'tests/ref_composite.h', 'return x <= 0.04045 ? x / 12.92', 'return x <= 0.04046 ? x / 12.92', ['testComposite']),
     ('tst-srgb-slope', 'tst', 'tests/ref_composite.h', 'x / 12.92 : gmath_pow', 'x / 12.9 : gmath_pow', ['testComposite']),
     ('tst-srgb-offset', 'tst', 'tests/ref_composite.h', 'gmath_pow((x + 0.055) / 1.055, 2.4)', 'gmath_pow((x + 0.056) / 1.055, 2.4)', ['testComposite']),
@@ -1451,7 +1471,7 @@ PLANTS += [
     ('pal-build-count', 'src', RS, '  resource->u.palette.count = src->count;', '  resource->u.palette.count = 0;', PT),
     ('pal-build-oom', 'src', RS, '    if (!resource->u.palette.colors) {\n      gshscene_store_discard_resource(resource);\n      return GSHSCENE_ERR_OOM;', '    if (0) {\n      gshscene_store_discard_resource(resource);\n      return GSHSCENE_ERR_OOM;', PT),
     ('pal-intern-limit', 'src', RS, '  if (count > GSHSCENE_PALETTE_MAX_ENTRIES) {\n    return GSHSCENE_ERR_LIMIT;\n  }\n  for (size_t i = 0; i < count; i++) {', '  if (count > GSHSCENE_PALETTE_MAX_ENTRIES + 1u) {\n    return GSHSCENE_ERR_LIMIT;\n  }\n  for (size_t i = 0; i < count; i++) {', PT),
-    ('pal-intern-check', 'src', RS, '    GSHSCENE_Result checked = gshscene_color_check(&colors[i]);\n    if (checked != GSHSCENE_OK) {\n      return checked;', '    GSHSCENE_Result checked = gshscene_color_check(&colors[i]);\n    if (0) {\n      return checked;', PT),
+    ('pal-intern-check', 'src', RS, '    GSHSCENE_Result checked = gshscene_color_check_valid(&colors[i]);\n    if (checked != GSHSCENE_OK) {\n      return checked;', '    GSHSCENE_Result checked = gshscene_color_check_valid(&colors[i]);\n    if (0) {\n      return checked;', PT),
     ('pal-intern-bytes', 'src', RS, 'gshscene_sat_mul(count, GSHSCENE_BYTES_PER_COLOR)', 'gshscene_sat_mul(count, GSHSCENE_BYTES_PER_AXIS)', PT),
     ('pal8-null', 'src', RS, '  if (!store || !out || (count && !rgba)) {', '  if (!store || !out) {', PT),
     ('pal8-limit', 'src', RS, '  if (count > GSHSCENE_PALETTE_MAX_ENTRIES) {\n    return GSHSCENE_ERR_LIMIT;\n  }\n  GSHSCENE_Color * colors = NULL;', '  GSHSCENE_Color * colors = NULL;', PT),
@@ -1858,7 +1878,7 @@ PLANTS += [
     ('gorc-period-zero', 'orc', GO, '        if extend != PAD:\n            return None\n        return interpolant', '        if extend == REFLECT:\n            return None\n        return interpolant', ['gselftest', 'gvectors']),
     ('gorc-equal-offsets', 'orc', GO, '    while j < len(stops) and not lt(t, stops[j][0]):', '    while j < len(stops) and lt(stops[j][0], t):', ['gselftest', 'gvectors']),
     ('gorc-premul', 'orc', GO, '    return [a * r, a * g, a * b, a] if premul else [r, g, b, a]', '    return [r, g, b, a]', ['gselftest', 'gvectors']),
-    ('gorc-unpremul', 'orc', GO, '        vals = [ZERO] * 4 if a == 0 else [vals[0] / a, vals[1] / a, vals[2] / a, a]', '        vals = [ZERO] * 4 if a == 0 else [vals[0], vals[1], vals[2], a]', ['gselftest', 'gvectors']),
+    ('gorc-unpremul', 'orc', GO, '        vals = [ZERO] * 4 if a == 0 else [sat(vals[0] / a), sat(vals[1] / a), sat(vals[2] / a), a]', '        vals = [ZERO] * 4 if a == 0 else [sat(vals[0]), sat(vals[1]), sat(vals[2]), a]', ['gselftest', 'gvectors']),
     ('gorc-alpha', 'orc', GO, '    vals[3] = vals[3] * alpha', '    vals[3] = vals[3]', ['gvectors']),
     ('gorc-normal', 'orc', GO, '        nx, ny = -dy, dx', '        nx, ny = dy, dx', ['gselftest', 'gvectors']),
     ('gorc-root', 'orc', GO, '        hi = Q(b / a, ONE / a, disc) if a > 0 else Q(b / a, -ONE / a, disc)', '        hi = Q(b / a, -ONE / a, disc) if a > 0 else Q(b / a, ONE / a, disc)', ['gselftest', 'gvectors']),
@@ -1885,6 +1905,62 @@ PLANTS += [
     ('gtst-sweep-wrap', 'tst', RC, '      if (rad < 0) {\n        rad += two_pi;', '      if (rad < 0) {\n        rad += two_pi / 2;', GT),
     ('gtst-unmap', 'tst', RC, '  x = (d * u - b * v) / det / s;', '  x = (d * u - c * v) / det / s;', GT),
     ('gtst-alpha', 'tst', RC, '  r.rgba[3] = r.rgba[3] * alpha;', '  r.rgba[3] = r.rgba[3] * (alpha > 2.0 ? alpha : 1.0);', GT),
+]
+
+# N1's bound and saturation (Corey, 2026-10-21; color-paint story P2's change log): each place the bound is read, its
+# comparisons and its order after the validity checks, each point of the saturation in the library (the resolve), the
+# test evaluator and both oracles, the clamp itself and the two constants.
+IH_ = "src/internal.h"
+CV_ = "src/paint/convert.c"
+CB = ["testColor_bound"]
+CBG = ["testColor_bound", "testGradient"]
+PLANTS += [
+    ('n1-check-unbounded', 'src', CS, '  return gshscene_color_bounded(color->rgba) ? GSHSCENE_OK : GSHSCENE_ERR_LIMIT;', '  return GSHSCENE_OK;', CB),
+    ('n1-check-first', 'src', CS, '  GSHSCENE_Result result = gshscene_color_check_valid(color);', '  GSHSCENE_Result result = color && !gshscene_color_bounded(color->rgba) ? GSHSCENE_ERR_LIMIT : gshscene_color_check_valid(color);', CB),
+    ('n1-bounded-upper', 'src', IH_, ' && rgba[i] <= GSHSCENE_COLOR_COMPONENT_MAX)', ' && rgba[i] < GSHSCENE_COLOR_COMPONENT_MAX)', CB),
+    ('n1-bounded-lower', 'src', IH_, '(rgba[i] >= -GSHSCENE_COLOR_COMPONENT_MAX &&', '(rgba[i] > -GSHSCENE_COLOR_COMPONENT_MAX &&', CB),
+    ('n1-bounded-upper-unchecked', 'src', IH_, '(rgba[i] >= -GSHSCENE_COLOR_COMPONENT_MAX && rgba[i] <= GSHSCENE_COLOR_COMPONENT_MAX)', '(rgba[i] >= -GSHSCENE_COLOR_COMPONENT_MAX)', CB),
+    ('n1-bounded-lower-unchecked', 'src', IH_, '(rgba[i] >= -GSHSCENE_COLOR_COMPONENT_MAX && rgba[i] <= GSHSCENE_COLOR_COMPONENT_MAX)', '(rgba[i] <= GSHSCENE_COLOR_COMPONENT_MAX)', CB),
+    ('n1-bounded-components', 'src', IH_, '  for (int i = 0; i < 3; i++) {\n    if (!(rgba[i] >= -GSHSCENE_COLOR_COMPONENT_MAX', '  for (int i = 0; i < 2; i++) {\n    if (!(rgba[i] >= -GSHSCENE_COLOR_COMPONENT_MAX', CB),
+    ('n1-sat-upper', 'src', IH_, '  return x > GSHSCENE_COLOR_SATURATION ? GSHSCENE_COLOR_SATURATION\n', '  return x > GSHSCENE_COLOR_SATURATION ? x\n', CBG),
+    ('n1-sat-lower', 'src', IH_, '      : x < -GSHSCENE_COLOR_SATURATION ? -GSHSCENE_COLOR_SATURATION : x;', '      : x < -GSHSCENE_COLOR_SATURATION ? x : x;', CBG),
+    ('n1-h-component', 'hdr', HP, '#define GSHSCENE_COLOR_COMPONENT_MAX 0x1p16', '#define GSHSCENE_COLOR_COMPONENT_MAX 0x1p17', CB),
+    ('n1-h-saturation', 'hdr', HP, '#define GSHSCENE_COLOR_SATURATION 0x1p64', '#define GSHSCENE_COLOR_SATURATION 0x1p65', CBG),
+    ('n1-fill-unchecked', 'src', LS, '  if (result == GSHSCENE_OK && !gshscene_color_bounded(item.paint.rgba)) {', '  if (0) {', CB),
+    ('n1-fill-first', 'src', LS, '  if (result == GSHSCENE_OK && !gshscene_color_bounded(item.paint.rgba)) {', '  if (!gshscene_color_bounded(item.paint.rgba)) {', CB),
+    ('n1-node-unchecked', 'src', LS, '  return gshscene_color_bounded(out->rgba) ? GSHSCENE_OK : GSHSCENE_ERR_LIMIT;', '  return GSHSCENE_OK;', CB),
+    ('n1-node-first', 'src', LS, 'GSHSCENE_Paint * out) {\n  GSHSCENE_Result result = canonical_paint(store, paint, out);', 'GSHSCENE_Paint * out) {\n  if (paint && !gshscene_color_bounded(paint->rgba)) {\n    return GSHSCENE_ERR_LIMIT;\n  }\n  GSHSCENE_Result result = canonical_paint(store, paint, out);', CB),
+    ('n1-palette-unchecked', 'src', RS, '    if (!gshscene_color_bounded(colors[i].rgba)) {\n      return GSHSCENE_ERR_LIMIT;', '    if (0) {\n      return GSHSCENE_ERR_LIMIT;', CB),
+    ('n1-palette-first', 'src', RS, '    GSHSCENE_Result checked = gshscene_color_check_valid(&colors[i]);', '    GSHSCENE_Result checked = gshscene_color_check(&colors[i]);', CB),
+    ('n1-stop-unchecked', 'src', GR, '    if (!gshscene_color_bounded(g->stops[i].color.rgba)) {', '    if (0) {', CB),
+    ('n1-stop-first', 'src', GR, '    result = gshscene_list_canonical_paint_valid(store, &s->color, &stops[i].color);', '    result = gshscene_list_canonical_paint(store, &s->color, &stops[i].color);', CB),
+    ('n1-resolve-decode', 'src', CV_, '    lin[i] = gshscene_saturate(decode(from, in[i]));', '    lin[i] = decode(from, in[i]);', CBG),
+    ('n1-resolve-matrix', 'src', CV_, '    for (int i = 0; i < 3; i++) {\n      lin[i] = gshscene_saturate(lin[i]);', '    for (int i = 0; i < 0; i++) {\n      lin[i] = gshscene_saturate(lin[i]);', CBG),
+    ('n1-resolve-encode', 'src', CV_, '    out[i] = gshscene_saturate(encode(to, lin[i]));', '    out[i] = encode(to, lin[i]);', CBG),
+    # the test evaluator (tests/ref_composite.h), each point and the clamp
+    ('tst-n1-decode', 'tst', RC, '{sat(decode(a, in[0])), sat(decode(a, in[1])), sat(decode(a, in[2]))}', '{decode(a, in[0]), decode(a, in[1]), decode(a, in[2])}', ['testComposite', 'testColor_bound']),
+    ('tst-n1-matrix', 'tst', RC, '      lin[i] = sat(moved[i]);', '      lin[i] = moved[i];', ['testComposite', 'testColor_bound']),
+    ('tst-n1-encode', 'tst', RC, '    out[i] = sat(encode(b, lin[i]));', '    out[i] = encode(b, lin[i]);', ['testComposite', 'testColor_bound']),
+    ('tst-n1-unpremultiply', 'tst', RC, '{unpremultiply(p.v[0], p.v[3]), unpremultiply(p.v[1], p.v[3]), unpremultiply(p.v[2], p.v[3])}', '{p.v[0] / p.v[3], p.v[1] / p.v[3], p.v[2] / p.v[3]}', ['testComposite', 'testColor_bound']),
+    ('tst-n1-unpremultiply-guard', 'tst', RC, '  if ((c < 0 ? -c : c) >= k * m) {', '  if ((c < 0 ? -c : c) >= k * m && 0) {', ['testColor_bound', 'testComposite']),
+    ('tst-n1-apply', 'tst', RC, '    out.v[i] = sat((1 - m) * d.v[i] + m * o.v[i]);', '    out.v[i] = (1 - m) * d.v[i] + m * o.v[i];', ['testComposite', 'testColor_bound']),
+    ('tst-n1-g4', 'tst', RC, '        r.rgba[k] = unpremultiply(r.rgba[k], a);', '        r.rgba[k] = r.rgba[k] / a;', ['testColor_bound', 'testGradient']),
+    ('tst-n1-bound', 'tst', RC, 'inline double sat(double x) {\n  const double k = 0x1p64;', 'inline double sat(double x) {\n  const double k = 0x1p63;', ['testComposite', 'testColor_bound']),
+    # the composite oracle and the gradient oracle
+    ('orc-n1-upper', 'orc', 'tools/composite-oracle.py', '    return SATURATION if x > SATURATION else -SATURATION', '    return x if x > SATURATION else -SATURATION', ['selftest', 'vectors']),
+    ('orc-n1-lower', 'orc', 'tools/composite-oracle.py', 'else -SATURATION if x < -SATURATION else x', 'else x if x < -SATURATION else x', ['selftest', 'vectors']),
+    ('orc-n1-bound', 'orc', 'tools/composite-oracle.py', 'SATURATION = F(2) ** 64', 'SATURATION = F(2) ** 63', ['selftest', 'vectors']),
+    ('orc-n1-decode', 'orc', 'tools/composite-oracle.py', 'lin = [sat(decode(a, v, ex)) for v in rgb]', 'lin = [decode(a, v, ex) for v in rgb]', ['selftest', 'vectors']),
+    ('orc-n1-matrix', 'orc', 'tools/composite-oracle.py', 'lin = [sat(v) for v in matvec(', 'lin = [v for v in matvec(', ['selftest', 'vectors']),
+    ('orc-n1-encode', 'orc', 'tools/composite-oracle.py', 'return [sat(encode(b, v, ex)) for v in lin]', 'return [encode(b, v, ex) for v in lin]', ['selftest', 'vectors']),
+    ('orc-n1-unpremultiply', 'orc', 'tools/composite-oracle.py', 'straight = [sat(px[i] / alpha) for i in range(3)]', 'straight = [px[i] / alpha for i in range(3)]', ['selftest', 'vectors']),
+    ('orc-n1-apply', 'orc', 'tools/composite-oracle.py', 'return [sat((ONE - m) * d[i] + m * o[i]) for i in range(4)]', 'return [(ONE - m) * d[i] + m * o[i] for i in range(4)]', ['selftest', 'vectors']),
+    ('gorc-n1-upper', 'orc', GO, '    return SATURATION if x > SATURATION else -SATURATION', '    return x if x > SATURATION else -SATURATION', ['gselftest', 'gvectors']),
+    ('gorc-n1-bound', 'orc', GO, 'SATURATION = F(2) ** 64', 'SATURATION = F(2) ** 63', ['gselftest', 'gvectors']),
+    ('gorc-n1-decode', 'orc', GO, '        lin.append(sat(v))', '        lin.append(v)', ['gselftest', 'gvectors']),
+    ('gorc-n1-matrix', 'orc', GO, '        lin = [sat(v) for v in solve3(mb, xyz)]', '        lin = solve3(mb, xyz)', ['gselftest', 'gvectors']),
+    ('gorc-n1-encode', 'orc', GO, '        out.append(sat(v))', '        out.append(v)', ['gselftest', 'gvectors']),
+    ('gorc-n1-g4', 'orc', GO, '[sat(vals[0] / a), sat(vals[1] / a), sat(vals[2] / a), a]', '[vals[0] / a, vals[1] / a, vals[2] / a, a]', ['gselftest', 'gvectors']),
 ]
 
 # The generated plants (tools/gen-scene-plants.py): the mutations of src/scene

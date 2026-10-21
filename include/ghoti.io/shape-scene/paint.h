@@ -51,6 +51,23 @@
  * it needs a chromatic adaptation the milestone does not choose), the parametric
  * and BT.1886 curves, PQ, HLG and ICC profiles are ::GSHSCENE_ERR_UNSUPPORTED.
  *
+ * **The bound and the saturation (Corey, 2026-10-21).**  Every color component
+ * the scene records (the `r, g, b` of a solid paint, of a solid gradient stop, of
+ * the foreground and of each palette entry) is finite and of magnitude at most
+ * ::GSHSCENE_COLOR_COMPONENT_MAX (`2^16`); past it the record call is
+ * ::GSHSCENE_ERR_LIMIT, decided after every check that makes it
+ * ::GSHSCENE_ERR_INVALID or ::GSHSCENE_ERR_UNSUPPORTED.  Every value computed from
+ * them is **saturated**, `sat(x) = min(max(x, -2^64), 2^64)`
+ * (::GSHSCENE_COLOR_SATURATION), at exactly these points: each decode and each
+ * encode within a conversion (N2), the matrix result (N3), every un-premultiply
+ * `C / A` (N3, G4, a store to a straight target) and every `apply` (N5, list.h).
+ * Every sink, the oracles and ::gshscene_gradient_resolve apply it at the same
+ * points.  Each step then takes values of magnitude at most `2^64` to a finite
+ * one (the worst is a power: `(2^64)^10 = 2^640`), and the un-premultiply is
+ * evaluated without dividing when `|C| >= 2^64 |A|` (the result is
+ * `sign(C / A) 2^64`), so no infinity is formed and no NaN arises.  The derivation
+ * is in `documentation/design.md`, N1.
+ *
  * ### N2 Transfer
  *
  * `decode` takes an encoded component to linear light and `encode` is its
@@ -59,7 +76,8 @@
  * encodes `12.92 y` for `y <= 0.0031308` and `1.055 y^(1/2.4) - 0.055` above (the
  * linear segment extends below zero, as in `color`); GAMMA `g` decodes
  * `sign(x) |x|^g` and encodes `sign(y) |y|^(1/g)`.  The power is the real power
- * function; a sink evaluates it with `math` and states its error.
+ * function; a sink evaluates it with `math` and states its error.  Within a
+ * conversion each decode and each encode is saturated (N1).
  *
  * ### N3 Conversion
  *
@@ -67,9 +85,10 @@
  * primary and the white, solve `[X_r X_g X_b; 1 1 1; Z_r Z_g Z_b] S = W`; the
  * matrix `M` taking linear RGB to XYZ has the columns `S_c (X_c, 1, Z_c)`.  A
  * straight color `(r, g, b)` goes from space `A` to space `B` as
- * `encode_B(M_B^-1 M_A decode_A(r, g, b))`, and is untouched (exactly) when the
- * spaces are the same; alpha is never converted.  A premultiplied value is
- * un-premultiplied, converted and premultiplied again (an alpha of 0 gives 0).
+ * `encode_B(M_B^-1 M_A decode_A(r, g, b))`, saturated after each step (N1), and
+ * is untouched (exactly) when the spaces are the same; alpha is never converted.
+ * A premultiplied value is un-premultiplied (saturated), converted and
+ * premultiplied again (an alpha of 0 gives 0).
  *
  * ### N10 The foreground
  *
@@ -124,7 +143,8 @@
  * against the drawing list's foreground and palette) and converted by N2/N3 into
  * the interpolation space: `space`, or the target's resolved space when `space`
  * is zero (a stop's zero space is the target's too).  ::gshscene_gradient_resolve
- * does this, and every sink calls it, once per gradient per render.  A missing
+ * does this, and every sink calls it, once per gradient per render; the
+ * conversion saturates as N3 says.  A missing
  * palette entry refuses the fill, `PALETTE_ENTRY`, as N14 does.  A solid stop in
  * the target's space is allowed only in a gradient whose `space` is zero.
  *
@@ -136,8 +156,8 @@
  * the **first** given is used below `o` and the **last** given at and above `o`;
  * for adjacent distinct offsets `o_i <= t < o_j`, `C(t) = I_i + (t - o_i) / (o_j -
  * o_i) (I_j - I_i)`; `C(o_last)` is the last stop's interpolant.  The **straight
- * color at t** is `C(t)` (flag 0) or `C(t)` un-premultiplied (flag 1; an alpha of
- * 0 gives `(0, 0, 0, 0)`).
+ * color at t** is `C(t)` (flag 0) or `C(t)` un-premultiplied and saturated (flag
+ * 1, N1; an alpha of 0 gives `(0, 0, 0, 0)`).
  *
  * **G5 Extend.**  For `t` outside `[o_first, o_last]` and `n >= 2`: `PAD` uses
  * `C(o_first)` below and `C(o_last)` above.  With `P > 0`, `REPEAT` uses
@@ -222,6 +242,7 @@
  * most `2^431`, `P` and `2P` at most `2^66` (nonzero: at least `2^-116`), so
  * `(t - o_first) / P` is at most `2^547`; G4's fraction is in `[0, 1]`.  A sink
  * evaluates inside the domain, or refuses the fill as its own limit (sink.h, S6).
+ * A solid stop's color is bounded by N1 (`2^16`) and refused with these.
  */
 
 #ifndef GHOTI_IO_GSHSCENE_PAINT_H
@@ -274,14 +295,17 @@ GSHSCENE_API GSHSCENE_Result gshscene_color_space_from_info(const GCOL_Color_Inf
 
 /** @brief A color: straight `r, g, b, a` and its space.  The foreground of a version or a list is one. */
 typedef struct GSHSCENE_Color {
-  double rgba[4];              ///< Straight components: each finite, `a` in `[0, 1]`, the others may leave `[0, 1]` (outside the gamut).
+  double rgba[4];              ///< Straight components: each finite, `a` in `[0, 1]`, the others may leave `[0, 1]` (outside the gamut) up to `2^16` in magnitude (N1).
   GSHSCENE_Color_Space space;  ///< The space of the components.
 } GSHSCENE_Color;
 
 /** @brief Fill @p color with the default foreground: opaque black in the target's space.  NULL is ignored. */
 GSHSCENE_API void gshscene_color_init(GSHSCENE_Color * color);
 
-/** @brief Whether @p color is valid (finite components, `a` in `[0, 1]`, a valid space); the result of the check as for a space. */
+/**
+ * @brief Whether @p color is valid (finite components, `a` in `[0, 1]`, a valid space; the result of the check as for a
+ *   space), then whether it is within N1's bound: ::GSHSCENE_ERR_LIMIT when `r`, `g` or `b` exceeds `2^16` in magnitude.
+ */
 GSHSCENE_API GSHSCENE_Result gshscene_color_check(const GSHSCENE_Color * color);
 
 /** @brief What a paint is.  The values are pinned (they are hashed). */
@@ -305,7 +329,7 @@ typedef enum GSHSCENE_Paint_Kind {
 /** @brief A paint. */
 typedef struct GSHSCENE_Paint {
   GSHSCENE_Paint_Kind kind; ///< The kind.
-  /** Solid: straight `r, g, b, a`.  Each finite; `a` in `[0, 1]`; the others may leave `[0, 1]` (a color outside the gamut).  Foreground: `0, 0, 0, a`. */
+  /** Solid: straight `r, g, b, a`.  Each finite; `a` in `[0, 1]`; the others may leave `[0, 1]` (a color outside the gamut), up to `2^16` in magnitude (N1: past it, ::GSHSCENE_ERR_LIMIT).  Foreground: `0, 0, 0, a`. */
   double rgba[4];
   /** Solid: the color space of the components (zero is the target's).  Foreground: zero. */
   GSHSCENE_Color_Space space;
@@ -426,6 +450,11 @@ GSHSCENE_API GSHSCENE_Result gshscene_gradient_resolve(const GSHSCENE_Resource *
 #define GSHSCENE_GRADIENT_STOPS_MAX ((size_t)65535)
 /** G14: the sampling domain, gradient-space coordinates in `[-2^128, 2^128]`, over which G4 to G9 stay finite. */
 #define GSHSCENE_GRADIENT_DOMAIN 0x1p128
+
+/** N1: the largest magnitude of a recorded color component, `2^16`; past it the record call is ::GSHSCENE_ERR_LIMIT. */
+#define GSHSCENE_COLOR_COMPONENT_MAX 0x1p16
+/** N1: the saturation bound, `2^64`: each value N2, N3, N5 and G4 name is clamped to `[-2^64, 2^64]` (`sat`). */
+#define GSHSCENE_COLOR_SATURATION 0x1p64
 
 #ifdef __cplusplus
 }

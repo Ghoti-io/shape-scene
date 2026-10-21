@@ -275,8 +275,8 @@ TEST(Color, ColorsAreCheckedLikePaints) {
   EXPECT_EQ(gshscene_color_check(nullptr), GSHSCENE_ERR_INVALID);
   c.rgba[0] = 2.0;
   c.rgba[1] = -0.5;
-  c.rgba[2] = 1e300;
-  EXPECT_EQ(gshscene_color_check(&c), GSHSCENE_OK) << "outside the gamut is allowed";
+  c.rgba[2] = 65536.0;
+  EXPECT_EQ(gshscene_color_check(&c), GSHSCENE_OK) << "outside the gamut is allowed, up to N1's bound";
   for (int i = 0; i < 4; i++) {
     GSHSCENE_Color bad = c;
     bad.rgba[i] = kNaN;

@@ -198,6 +198,22 @@ static inline int gshscene_finite(double x) {
   return x - x == 0.0;
 }
 
+/** N1: `sat(x)`, @p x clamped to `[-2^64, 2^64]` (an infinity to its end; a value inside is returned bit for bit). */
+static inline double gshscene_saturate(double x) {
+  return x > GSHSCENE_COLOR_SATURATION ? GSHSCENE_COLOR_SATURATION
+      : x < -GSHSCENE_COLOR_SATURATION ? -GSHSCENE_COLOR_SATURATION : x;
+}
+
+/** N1: the three color components of @p rgba (finite) within `[-2^16, 2^16]`; the alpha is the validity check's. */
+static inline int gshscene_color_bounded(const double rgba[4]) {
+  for (int i = 0; i < 3; i++) {
+    if (!(rgba[i] >= -GSHSCENE_COLOR_COMPONENT_MAX && rgba[i] <= GSHSCENE_COLOR_COMPONENT_MAX)) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
 /* --- store.c --------------------------------------------------------------- */
 
 void gshscene_store_ref(GSHSCENE_Store * store);
@@ -285,9 +301,19 @@ void gshscene_color_hash(GSHGEOM_Hash * h, const GSHSCENE_Color * color);
 /** A space as `P:T:G` in a dump (the gamma as 16 hexadecimal digits); the result of fprintf. */
 int gshscene_space_dump(FILE * out, const GSHSCENE_Color_Space * space);
 
-/** A paint by a fill's rules (list.h), for the list of @p store: a gradient must be a gradient resource of it. */
+/**
+ * A paint by a fill's rules (list.h), for the list of @p store: a gradient must be a gradient resource of it; then
+ * N1's bound on its components (::GSHSCENE_ERR_LIMIT), after every validity check.
+ */
 GSHSCENE_Result gshscene_list_canonical_paint(const GSHSCENE_Store * store, const GSHSCENE_Paint * paint,
     GSHSCENE_Paint * out);
+
+/** The validity checks of ::gshscene_list_canonical_paint alone, without N1's bound (a gradient's stops: G14). */
+GSHSCENE_Result gshscene_list_canonical_paint_valid(const GSHSCENE_Store * store, const GSHSCENE_Paint * paint,
+    GSHSCENE_Paint * out);
+
+/** The validity checks of ::gshscene_color_check alone, without N1's bound (a palette's entries, all checked first). */
+GSHSCENE_Result gshscene_color_check_valid(const GSHSCENE_Color * color);
 
 /** A map by an item's rules (list.h): valid, and only the entries a map of its dimension uses. */
 GSHSCENE_Result gshscene_list_canonical_map(const GSHGEOM_Map * map, GSHGEOM_Map * out);

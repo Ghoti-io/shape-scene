@@ -70,9 +70,9 @@ EXTRA = {
     "src/core/core.c": "bc",
 }
 TESTS_EXTRA = ["testBytes", "testCore", "testStore", "testScene_limits", "testOrder", "testList", "testColor", "testDump",
-               "testComposite", "testPaint_scene", "testEmit", "testPalette", "testGradient"]
+               "testComposite", "testPaint_scene", "testEmit", "testPalette", "testGradient", "testColor_bound"]
 TESTS_BY_FILE = {
-    "src/paint/color_space.c": ["testColor", "testList", "testNode", "testPaint_scene", "testScene_dump"],
+    "src/paint/color_space.c": ["testColor", "testColor_bound", "testList", "testNode", "testPaint_scene", "testScene_dump"],
     "src/scene/node.c": ["testNode", "testEdit", "testScene", "testScene_dump", "testVersion", "testPaint_scene", "testOrder", "testEmit", "testPalette", "testGradient"],
     "src/scene/edit.c": ["testEdit", "testScene", "testNode", "testPaint_scene", "fuzz-replay", "testPalette"],
     "src/scene/scene.c": ["testScene", "testEdit", "testScene_limits", "testDiff", "testEmit", "testPaint_scene", "fuzz-replay", "testPalette"],
@@ -82,8 +82,8 @@ TESTS_BY_FILE = {
     "src/scene/emit.c": ["testEmit", "testScene_limits", "testVersion", "testDiff", "testOrder", "testPaint_scene", "testPalette"],
     "src/scene/diff.c": ["testDiff", "testScene", "testVersion", "testPaint_scene", "testGlyph", "testPalette", "testGradient"],
     "src/list/fixed.c": ["testPalette", "testGradient", "fuzz-replay"],
-    "src/resource/gradient.c": ["testGradient", "testDump", "testDump_sink", "fuzz-replay", "fuzz-render", "probe"],
-    "src/paint/convert.c": ["testGradient", "probe"],
+    "src/resource/gradient.c": ["testGradient", "testColor_bound", "testDump", "testDump_sink", "fuzz-replay", "fuzz-render", "probe"],
+    "src/paint/convert.c": ["testGradient", "testColor_bound", "probe"],
 }
 
 SINK_FILES = {
