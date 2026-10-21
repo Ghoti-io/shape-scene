@@ -1594,6 +1594,19 @@ TEST(GradientFixed, AFillOfAGradientRecordsItsAlphaAndMap) {
 
 // --- the evaluator against the oracle (G4 to G12) ---------------------------------------------------------------------
 
+TEST(GradientVectors, TheEvaluatorTakesTheLastOfEqualOffsetsAtThatOffset) {
+  // G4 on the discontinuity itself, which the vectors leave out (no sample lies within 1e-30 of one).
+  std::vector<refc::GStop> stops = {{0.0, {1, 0, 0, 1}}, {0.5, {0, 1, 0, 1}}, {0.5, {0, 0, 1, 1}}, {1.0, {1, 1, 1, 1}}};
+  const double line[6] = {0, 0, 8, 0, 0, 0};
+  std::vector<refc::GMap> chain = {refc::GMap{{1, 0, 0, 1, 0, 0}}};
+  refc::GPoint at = refc::gradient_at(GSHSCENE_GRADIENT_LINEAR, line, 0, GSHSCENE_EXTEND_PAD, 0, stops, chain, 4, 0, 1);
+  EXPECT_EQ(at.rgba[2], 1.0) << "the last of the stops at 0.5";
+  EXPECT_EQ(at.rgba[1], 0.0);
+  refc::GPoint below = refc::gradient_at(GSHSCENE_GRADIENT_LINEAR, line, 0, GSHSCENE_EXTEND_PAD, 0, stops, chain,
+      3.9999999999999996, 0, 1);
+  EXPECT_GT(below.rgba[1], 0.99) << "the first just below";
+}
+
 TEST(GradientVectors, TheEvaluatorAgreesWithTheOracleAndTheLibraryResolvesItsStops) {
   StoreHolder s;
   GSHSCENE_Color fg{};

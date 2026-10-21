@@ -166,8 +166,32 @@ changes no result, cannot be seen by any test:
                gradient oracle (``gorc``: its selftest or the vectors it writes)
                and the evaluator (``gtst``).  src/resource/gradient.c and
                src/paint/convert.c are also mutated by the generator (``bg-``,
-               ``bv-``), and the files the story changed were swept again; what
-               survived is listed with the sweep below
+               ``bv-``), and the files the story changed were swept again on its
+               tree in ghoti-build:gcc16 (2026-10-21): 3278 candidates of
+               src/list/list.c and fixed.c, src/resource/resource.c and
+               gradient.c, src/paint/convert.c, src/scene/node.c, version.c and
+               diff.c, src/sink/sink.c, dump_sink.c and report.c; 2472 caught
+               (they replace those files' entries in scene-plants.json and
+               sink-plants.json), 516 that do not compile dropped, 290 survivors.
+               The survivors on the story's own lines are of the kinds listed for
+               the earlier stories: a loop bound moved one past an array's end
+               (the sort's passes, the geometry and matrix loops of convert.c),
+               which ASan sees and a result does not; a free or a release deleted
+               (``gshscene_gradient_free``, a node's gradient, the fixed
+               constructor's scratch), a leak; the per-call checks of a dump that
+               the final ``ferror`` makes redundant, and a width of a double's
+               bits that no fixture has a leading zero in; the ``SIZE_MAX``
+               overflow guards and ``gk >= 32`` (a kind is 1 to 3); terms of the
+               test sink's workspace smaller than its slack; ``x < 0`` against
+               ``x <= 0`` in the signed power (zero returns first) and ``entry + 1
+               > need`` against ``>=`` (the same assignment); ``&&`` against
+               ``||`` where only a fill can name a gradient; and the sRGB knees'
+               ``<=`` against ``<`` (no vector lies exactly on a knee).  Hand
+               plants dropped as nothing can see them: the resolve tolerance and
+               the fixed sweep's constant (no library code reads them where a test
+               can tell), the fixed fill's alpha range (the list's own check
+               refuses the same values) and the vectors' rejection margin (no
+               sample lies between 1e-300 and 1e-30 of a discontinuity)
 
   sk-, rp-, ds-, cn-, rule-, and the sink's hdr- and core- plants (story 13a)
                the sink contract: one named plant per S-rule (``rule-S1`` to
@@ -1819,14 +1843,14 @@ PLANTS += [
     ('gtst-repeat', 'tst', RC, '      t = o0 + (t - o0 - std::floor((t - o0) / period) * period);', '      t = o0 + (t - o0 - std::floor((t - o0) / period));', GT),
     ('gtst-pad', 'tst', RC, '      g_interpolant(t < o0 ? stops.front() : stops.back(), premul, out);\n      return true;\n    }\n    if (extend == GSHSCENE_EXTEND_REPEAT) {', '      g_interpolant(t < o0 ? stops.back() : stops.front(), premul, out);\n      return true;\n    }\n    if (extend == GSHSCENE_EXTEND_REPEAT) {', GT),
     ('gtst-equal-offsets', 'tst', RC, '  while (j < stops.size() && !(t < stops[j].offset)) {', '  while (j < stops.size() && stops[j].offset < t) {', GT),
-    ('gtst-premul', 'tst', RC, '    out[k] = premul ? s.rgba[k] * a : s.rgba[k];', '    out[k] = s.rgba[k];', GT),
+    ('gtst-premul', 'tst', RC, '    out[k] = premul ? s.rgba[k] * a : s.rgba[k];', '    out[k] = premul ? s.rgba[k] : s.rgba[k] * a;', GT),
     ('gtst-normal', 'tst', RC, '      nx = -geom[5];', '      nx = geom[5];', GT),
     ('gtst-root', 'tst', RC, '        if (hi < lo) {\n          std::swap(hi, lo);', '        if (hi > lo) {\n          std::swap(hi, lo);', GT),
     ('gtst-radius', 'tst', RC, '      if (r0 + w[i] * dr > 0.0) {', '      if (r0 + w[i] * dr >= -1.0) {', GT),
     ('gtst-sweep-unit', 'tst', RC, '    double per_turn = unit == GSHGEOM_ANGLE_DEGREES ? 360.0 : unit == GSHGEOM_ANGLE_GRADIANS ? 400.0', '    double per_turn = unit == GSHGEOM_ANGLE_DEGREES ? 360.0 : unit == GSHGEOM_ANGLE_GRADIANS ? 360.0', GT),
     ('gtst-sweep-wrap', 'tst', RC, '      if (rad < 0) {\n        rad += two_pi;', '      if (rad < 0) {\n        rad += two_pi / 2;', GT),
     ('gtst-unmap', 'tst', RC, '  x = (d * u - b * v) / det / s;', '  x = (d * u - c * v) / det / s;', GT),
-    ('gtst-alpha', 'tst', RC, '  r.rgba[3] = r.rgba[3] * alpha;', '  r.rgba[3] = r.rgba[3];', GT),
+    ('gtst-alpha', 'tst', RC, '  r.rgba[3] = r.rgba[3] * alpha;', '  r.rgba[3] = r.rgba[3] * (alpha > 2.0 ? alpha : 1.0);', GT),
 ]
 
 # The generated plants (tools/gen-scene-plants.py): the mutations of src/scene
