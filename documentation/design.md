@@ -10,7 +10,9 @@ conversion of their stops at draw time, the notices of what draws nothing) are i
 them in story P2. Blend modes (color-paint story P3: the fifteen modes of W3C Compositing and Blending Level 1 as
 composite operators 13 to 27, B1 to B14) are implemented scene-side: the scene names, validates, hashes and plans them,
 and a sink composites them. Strokes (strokes story S1: a centerline plus an interned style, SK1 to SK14, below) are being
-added to the waist; the style resource, the stroke item, the stroke node and their bounds and damage are implemented.
+added to the waist: the style resource, the stroke item and node, their bounds and damage, the sinks' capabilities for
+them and the planning pass are implemented, and the test sink records them; shape-cpu refuses every stroke until it
+draws them (strokes story S4).
 
 The shape family waist: resources and lists, and the versioned scene above them.
 
@@ -298,7 +300,7 @@ the style with a stated default; a front end sets each field to match its format
 **SK1 The style.** `{width, width_space, join, miter_limit, cap, degenerate, dashes, dash_offset, dash_scope,
 alignment, alignment_rule, width_profile}`, with pinned values (they are hashed): width space `LOCAL 0`, `DEVICE 1`;
 join `MITER 0`, `ROUND 1`, `BEVEL 2` (PDF's `j`, so its lowering is the identity), `MITER_CLIP 3`, `ARCS 4`; cap `BUTT
-0`, `ROUND 1`, `SQUARE 2` (PDF's `J`); degenerate subpath `DRAW 0` (SVG 2's shape, along local `+x`), `OMIT 1`; dash
+0`, `ROUND 1`, `SQUARE 2` (PDF's `J`); degenerate subpath `DRAW 0` (SVG 2's shape, its square along SVG 2's effective tangent there, the direction of the nearest segment with extent, and along local `+x` only when the whole path has zero length), `OMIT 1`; dash
 scope `PER_SUBPATH 0` (SVG 2), `PATH 1`; alignment `CENTER 0`, `INSIDE 1`, `OUTSIDE 2`; the alignment rule a
 `GSHGEOM_Fill_Rule` (nonzero by default, D10). `gshscene_stroke_style_init` writes the defaults: width 1, local, miter,
 miter limit 4 (SVG's), butt, draw, no dashes, offset 0, per subpath, center, nonzero, no width profile. A zero-filled
@@ -352,11 +354,24 @@ into `G`, as it does for a fill.
 not route it, writes no `HINT_STATUS` for it and never refuses it for hinting (a `FONT_STRICT` run included). A run from
 a font needs `GLYPHS_FROM_FONT`, as a fill does.
 
+**SK8 Width 0 and hairlines.** Width 0 has no special meaning: the region is empty and nothing is drawn, and the
+planning pass writes a `NOTICE`, reason `STROKE_ZERO_WIDTH`, as G10 does for a degenerate gradient. A hairline is device
+width 1 (on a stream, one CSS pixel in its unit). No cap, flag or reason names a hairline: a sink whose native thin
+line departs from exact area beyond its tolerance expands the stroke or reports `APPROXIMATED`, and a PDF writer that
+writes `0 w` for it reports `APPROXIMATED`; neither fails strict.
+
+**SK9 Not invertible.** A stroke draws nothing, with a `NOTICE`, reason `MAP_NOT_INVERTIBLE`, exactly when some map of
+its chain (`T`, `I_1` to `I_k`, `M`, and `G` for a gradient paint) has a 2x2 linear part whose determinant is exactly
+zero (G11's condition), for both width spaces. It never fails strict. One predicate, `gshscene_stroke_notice`, is the
+planning pass's and every sink's: `MAP_NOT_INVERTIBLE`, then `STROKE_ZERO_WIDTH`, then `GRADIENT_DEGENERATE`. A stroke
+that draws nothing requires no feature of a sink (SK11): it is never refused for its style.
+
 **SK10 Bounds and damage.** A stroke occurrence's bounds are conservative, from the style alone: `h = width / 2 *
 max(1, f_join, f_cap) * a` with `f_join` the miter limit for a miter (its tip is `1 / sin(θ / 2)` half widths from the
 vertex, at most the limit), the miter limit plus one for miter-clip and arcs (a clipped corner is the limit's half
 widths along the bisector and up to one across it, so `sqrt(L^2 + 1) <= L + 1` away: the limit alone would be passed
-by a sharp clipped corner), and 1 otherwise; `f_cap` 3/2 for a square cap (above `sqrt 2`); `a` 2
+by a sharp clipped corner), and 1 otherwise; `f_cap` 3/2 for a square cap (above `sqrt 2`: a square cap's corner, and a degenerate subpath's square in any
+orientation its effective tangent gives it, is at most `sqrt 2` half widths from its point); `a` 2
 for inside and outside. A local width outsets the centerline's model box by `h` and maps it; a device width maps the
 box and outsets it by `h` in target units. `h` is formed with its five roundings covered (scaled by `1 + 2^-50`) and
 each outset rounded outward (TwoSum's error decides), so the bound is never below the real one; the corners' mapping is
@@ -367,6 +382,28 @@ restates where a stroke can reach from the geometry of its polyline (each segmen
 limit, a miter-clip's clipped corners, discs for round joins and caps, a square cap's corners, a cap at any point for a
 dashed stroke, twice the width inside and outside), sharing nothing with that function, and requires every pixel it
 finds drawn differently to lie inside the damage.
+
+**SK11 Sinks (S20).** A sink that draws strokes has bit `1 << 7` in its caps' `item_kinds`; without it a stroke is
+refused, `ITEM_KIND`, as any kind is (shape-cpu until strokes story S4). `GSHSCENE_Sink_Caps.stroke_native` (carved from
+`_reserved`) names one bit per feature the sink emits as a stroke: `JOIN_MITER`, `JOIN_ROUND`, `JOIN_BEVEL`,
+`JOIN_MITER_CLIP`, `JOIN_ARCS`, `CAP_BUTT`, `CAP_ROUND`, `CAP_SQUARE`, `WIDTH_LOCAL`, `WIDTH_LOCAL_ANISOTROPIC` (a
+local width under a map that is not a similarity: the elliptical pen), `WIDTH_DEVICE`, `DASH`, `DASH_PATH_SCOPE`,
+`ALIGN`, `ALIGN_EVEN_ODD`, `DEGENERATE_DRAW`; `GSHSCENE_CAP_STROKE_EXPAND` (flag bit 12) says the sink can expand a
+stroke exactly and draw it as a fill. The required features of a stroke (`gshscene_stroke_required`) are those its
+canonical style uses: its join and its cap always, because whether the centerline has a vertex or an end is not
+decided from the style; the width space, with `WIDTH_LOCAL_ANISOTROPIC` when the composed map's linear part is not a
+uniform scale times an orthogonal matrix (`[a b; -b a]` or `[a b; b -a]`, compared exactly on the map
+`gshgeom_map_compose_chain` forms, which every sink forms, so a sink and the plan agree bit for bit; a chain the
+composer cannot form requires it, which is the conservative answer); `DASH` with dashes and `DASH_PATH_SCOPE` with
+the path's scope; `ALIGN` off center and `ALIGN_EVEN_ODD` with an even-odd rule; `DEGENERATE_DRAW` for `DRAW` with a
+round or square cap (with a butt cap SVG 2 draws nothing for a subpath of zero length, so draw and omit agree). A
+stroke that draws nothing (SK8, SK9) requires nothing. `gshscene_caps_disposition`, which now takes the chain (the
+enclosing instances' maps and the target's) because anisotropy is a property of it, decides after every other refusal
+and before any approximation (an approximation returns first and would hide a refusal): every required feature native,
+the stroke is drawn as a stroke; else, with `STROKE_EXPAND`, it is drawn with no entry (the sink expands that stroke
+alone, and an exact expansion is what was asked, not an approximation); else it is `REFUSED`, reason `STROKE_STYLE`,
+the missing features in the disposition's `detail` and the entry's `second`. A run from a font still needs
+`GLYPHS_FROM_FONT`, and a gradient paint the gradient rules, before the style is decided.
 
 **SK12 Hash and dump (the style).** Every format stays 1, and no existing hash or dump changes: no resource from before
 strokes is a style. Resource kind 8, format 1: `u32` 1, `u32` 8, `f64` width, `u8` width space, `u8` join, `f64` miter
@@ -857,6 +894,12 @@ conformance suite (`tests/sink_conformance.h`) cite the rules by number.
   geometry with curves intact; nothing in `sink.h` composes, flattens or rounds. A writer emits
   curves and dedupes resources by id. The planning pass composes maps to decide (a run from a font's
   route), and never hands composed geometry to a sink.
+- **S20 Strokes** (strokes story S1; SK1 to SK14 above). A stroke reaches a sink by its centerline and style handles in
+  model space: nothing in the contract expands, flattens or offsets it. A sink reads the style with
+  `gshscene_resource_stroke_style`, decides each stroke with `gshscene_caps_disposition` (SK11) and skips by
+  `gshscene_stroke_notice` (SK9). A writer emits a native stroke as a stroke, deduped by the style's id, and expands
+  only a stroke whose required features it lacks; a toolpath sink follows the centerline and refuses what its caps
+  lack; a GPU sink later strokes natively within its tolerance or expands. A device width on a stream is in CSS pixels.
 - **S17 Gradients** (color-paint story P1). A gradient reaches a sink by handle. A kind not in the caps'
   `gradient_kinds` is refused (`GRADIENT`) by the planning pass, so strict fails before the sink is called; without
   `GRADIENT_SPACES` a stated interpolation space other than the target's is approximated; a palette stop the palette
@@ -873,7 +916,16 @@ affinity, its cancel unit and its one resource limit (`max_extent`) are configur
 path of the contract is reachable. `tests/sink_conformance.h` runs the same tests against each of its
 configurations now and against shape-cpu in 13b. A gradient fill's record carries ` grad=<id>`, and the first time a
 render meets a gradient the sink writes its record (`R <id> <hash> space=<space> stops=N` and `r <offset> <r> <g> <b>
-<a>` per resolved stop, the doubles' bits); a fill that draws nothing is an `X class=5` record and is not stamped.
+<a>` per resolved stop, the doubles' bits); a fill that draws nothing is an `X class=5` record and is not stamped. A
+stroke's record is `K res=<kind>:<hash> style=<id> map=<hash> box=<x0> <y0> <x1> <y1> expand=<bits> outline=-` (SK10's
+box; `expand` the required features the caps do not emit, 0 for a native stroke; `outline` the expansion's hash once a
+sink computes one), and the first time a render meets a style, its record `Q <id> <hash>` with the style's dump fields
+and a `d` line per dash, once per style per render as a writer emits one; strokes are stamped by their box as fills are.
+Besides its default (every stroke feature native), the conformance suite runs it in a **writer-like** configuration
+(`STROKE_EXPAND`; native: miter, round and bevel joins, every cap, a local width under any map, dashes per subpath:
+SVG 1.1's set) and a **toolpath-like** one (no expansion; native: a round join, round and butt caps, a local width
+under a similarity and a device width, dashes), and `tools/gen-sink-vectors.py` restates all three renders of one
+stroke list, SK10's box (the outward rounding in exact rationals) and SK11's features included.
 `tools/gen-sink-vectors.py` restates the report's
 and the test sink's spellings, and `tests/fuzz/fuzz_render.c` drives requests through it.
 

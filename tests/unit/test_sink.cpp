@@ -198,7 +198,9 @@ TEST(Sink, CapsThatBreakTheContractAreInternal) {
   EXPECT_EQ(gshscene_sink_caps(nullptr, &surface->target, &out), GSHSCENE_ERR_INVALID);
   GSHSCENE_Sink_Caps good = ms.mock.caps;
   std::vector<std::function<void(GSHSCENE_Sink_Caps &)>> bad = {
-      [](GSHSCENE_Sink_Caps & c) { c.flags |= 1u << 12; }, // past every flag defined (S19 took 9 to 11)
+      [](GSHSCENE_Sink_Caps & c) { c.flags |= 1u << 13; }, // past every flag defined (S19 took 9 to 11, S20 12)
+      [](GSHSCENE_Sink_Caps & c) { c.stroke_native |= 1u << 16; }, // past every stroke feature defined (S20)
+      [](GSHSCENE_Sink_Caps & c) { c.stroke_native = 0xffffffffu; },
       [](GSHSCENE_Sink_Caps & c) { c.cancel_unit = 0; },
       [](GSHSCENE_Sink_Caps & c) { c.cancel_unit = GSHSCENE_CANCEL_UNIT_COUNT; },
       [](GSHSCENE_Sink_Caps & c) { c.work_measure = nullptr; },
@@ -637,25 +639,25 @@ TEST(Sink, TheDispositionPredicate) {
   group.group.opacity = 1.0;
   GSHSCENE_Item pop{};
   pop.kind = GSHSCENE_ITEM_GROUP_POP;
-  auto d = [&](const GSHSCENE_Item & item) { return gshscene_caps_disposition(&caps, &item, &srgb, nullptr); };
+  auto d = [&](const GSHSCENE_Item & item) { return gshscene_caps_disposition(&caps, &item, nullptr, 0, nullptr, &srgb, nullptr); };
   EXPECT_EQ(d(fill).entry_class, 0);
   EXPECT_EQ(d(font).entry_class, 0);
   EXPECT_EQ(d(clip).entry_class, 0);
   EXPECT_EQ(d(group).entry_class, 0);
   EXPECT_EQ(d(pop).entry_class, 0);
-  EXPECT_EQ(gshscene_caps_disposition(nullptr, &fill, &srgb, nullptr).entry_class, 0);
-  EXPECT_EQ(gshscene_caps_disposition(&caps, nullptr, &srgb, nullptr).entry_class, 0);
+  EXPECT_EQ(gshscene_caps_disposition(nullptr, &fill, nullptr, 0, nullptr, &srgb, nullptr).entry_class, 0);
+  EXPECT_EQ(gshscene_caps_disposition(&caps, nullptr, nullptr, 0, nullptr, &srgb, nullptr).entry_class, 0);
   // Kinds.
   for (uint32_t k = GSHSCENE_ITEM_FILL; k < GSHSCENE_ITEM_KIND_COUNT; k++) {
     GSHSCENE_Sink_Caps c = caps;
     c.item_kinds &= ~(1u << k);
     GSHSCENE_Item item = fill;
     item.kind = (GSHSCENE_Item_Kind)k;
-    GSHSCENE_Disposition x = gshscene_caps_disposition(&c, &item, &srgb, nullptr);
+    GSHSCENE_Disposition x = gshscene_caps_disposition(&c, &item, nullptr, 0, nullptr, &srgb, nullptr);
     EXPECT_EQ(x.entry_class, GSHSCENE_ENTRY_REFUSED) << k;
     EXPECT_EQ(x.reason, GSHSCENE_REASON_ITEM_KIND) << k;
     item.kind = (GSHSCENE_Item_Kind)(k == GSHSCENE_ITEM_FILL ? GSHSCENE_ITEM_GROUP_POP : GSHSCENE_ITEM_FILL);
-    EXPECT_NE(gshscene_caps_disposition(&c, &item, &srgb, nullptr).reason, GSHSCENE_REASON_ITEM_KIND) << k;
+    EXPECT_NE(gshscene_caps_disposition(&c, &item, nullptr, 0, nullptr, &srgb, nullptr).reason, GSHSCENE_REASON_ITEM_KIND) << k;
   }
   GSHSCENE_Item odd = fill;
   odd.kind = (GSHSCENE_Item_Kind)40;
@@ -673,9 +675,9 @@ TEST(Sink, TheDispositionPredicate) {
     c.composites = ((1u << GSHSCENE_COMPOSITE_COUNT) - 1u) & ~(1u << op);
     GSHSCENE_Item g = group;
     g.group.composite = op;
-    EXPECT_EQ(gshscene_caps_disposition(&c, &g, &srgb, nullptr).reason, GSHSCENE_REASON_COMPOSITE) << op;
+    EXPECT_EQ(gshscene_caps_disposition(&c, &g, nullptr, 0, nullptr, &srgb, nullptr).reason, GSHSCENE_REASON_COMPOSITE) << op;
     g.group.composite = (op + 1) % GSHSCENE_COMPOSITE_COUNT;
-    EXPECT_EQ(gshscene_caps_disposition(&c, &g, &srgb, nullptr).entry_class, 0) << op;
+    EXPECT_EQ(gshscene_caps_disposition(&c, &g, nullptr, 0, nullptr, &srgb, nullptr).entry_class, 0) << op;
   }
   GSHSCENE_Item g40 = group;
   g40.group.composite = 40;
@@ -695,7 +697,7 @@ TEST(Sink, TheDispositionPredicate) {
   GSHSCENE_Item same = group;
   same.group.blend_space = srgb;
   EXPECT_EQ(d(same).entry_class, 0) << "the target's own space";
-  EXPECT_EQ(gshscene_caps_disposition(&caps, &same, nullptr, nullptr).reason, GSHSCENE_REASON_BLEND_SPACE);
+  EXPECT_EQ(gshscene_caps_disposition(&caps, &same, nullptr, 0, nullptr, nullptr, nullptr).reason, GSHSCENE_REASON_BLEND_SPACE);
   caps.flags |= GSHSCENE_CAP_BLEND_SPACES;
   EXPECT_EQ(d(lin).entry_class, 0);
 }
@@ -723,7 +725,10 @@ TEST(Sink, PixelKinds) {
   EXPECT_EQ(GSHSCENE_CAP_GROUP_NON_ISOLATED, 0x200u);
   EXPECT_EQ(GSHSCENE_CAP_GROUP_KNOCKOUT, 0x400u);
   EXPECT_EQ(GSHSCENE_CAP_GROUP_SOFT_MASK, 0x800u);
-  EXPECT_EQ(GSHSCENE_CAP_FLAGS_ALL, 0xfffu);
+  EXPECT_EQ(GSHSCENE_CAP_STROKE_EXPAND, 0x1000u);
+  EXPECT_EQ(GSHSCENE_CAP_FLAGS_ALL, 0x1fffu);
+  EXPECT_EQ(GSHSCENE_STROKE_NATIVE_ALL, 0xffffu);
+  EXPECT_EQ(sizeof(GSHSCENE_Sink_Caps) % sizeof(void *), 0u);
   EXPECT_EQ((int)GSHSCENE_CANCEL_BETWEEN_UNITS, 1);
   EXPECT_EQ((int)GSHSCENE_CANCEL_BEFORE_SUBMIT, 2);
 }
@@ -829,16 +834,16 @@ TEST(Sink, TheShiftBoundsOfThePredicate) {
   GSHSCENE_Item item{};
   item.kind = (GSHSCENE_Item_Kind)32;
   item.resource = s.sq(0, 0, 1);
-  EXPECT_EQ(gshscene_caps_disposition(&caps, &item, nullptr, nullptr).reason, GSHSCENE_REASON_ITEM_KIND);
+  EXPECT_EQ(gshscene_caps_disposition(&caps, &item, nullptr, 0, nullptr, nullptr, nullptr).reason, GSHSCENE_REASON_ITEM_KIND);
   item.kind = (GSHSCENE_Item_Kind)31;
-  EXPECT_EQ(gshscene_caps_disposition(&caps, &item, nullptr, nullptr).entry_class, 0);
+  EXPECT_EQ(gshscene_caps_disposition(&caps, &item, nullptr, 0, nullptr, nullptr, nullptr).entry_class, 0);
   GSHSCENE_Item g{};
   g.kind = GSHSCENE_ITEM_GROUP_PUSH;
   g.group.opacity = 1.0;
   g.group.composite = 32;
-  EXPECT_EQ(gshscene_caps_disposition(&caps, &g, nullptr, nullptr).reason, GSHSCENE_REASON_COMPOSITE);
+  EXPECT_EQ(gshscene_caps_disposition(&caps, &g, nullptr, 0, nullptr, nullptr, nullptr).reason, GSHSCENE_REASON_COMPOSITE);
   g.group.composite = 31;
-  EXPECT_EQ(gshscene_caps_disposition(&caps, &g, nullptr, nullptr).entry_class, 0);
+  EXPECT_EQ(gshscene_caps_disposition(&caps, &g, nullptr, 0, nullptr, nullptr, nullptr).entry_class, 0);
 }
 
 // A map is the identity only when every field is zero; explicit extents at the surface's edges are in it.

@@ -493,3 +493,113 @@ GSHSCENE_Result gshscene_centerline_box(const GSHSCENE_Resource * resource, GSHG
   *out = box;
   return GSHSCENE_OK;
 }
+
+/* --- SK8, SK9: what draws nothing ----------------------------------------------------------- */
+
+/** The gradient a stroke paints with, or NULL. */
+static const GSHSCENE_Resource * paint_gradient(const GSHSCENE_Item * item) {
+  const GSHSCENE_Resource * g = item->paint.kind == GSHSCENE_PAINT_GRADIENT ? item->paint.gradient : NULL;
+  return g && g->kind == GSHSCENE_RESOURCE_GRADIENT ? g : NULL;
+}
+
+/** Whether @p item is a stroke whose style is one, with its instance maps given when counted. */
+static int stroke_item(const GSHSCENE_Item * item, const GSHGEOM_Map * instance_maps, size_t instance_count) {
+  return item && item->kind == GSHSCENE_ITEM_STROKE && item->style &&
+      item->style->kind == GSHSCENE_RESOURCE_STROKE_STYLE && (instance_count == 0 || instance_maps);
+}
+
+GSHSCENE_Reason gshscene_stroke_notice(const GSHSCENE_Item * item, const GSHGEOM_Map * instance_maps,
+    size_t instance_count, const GSHGEOM_Map * target_map) {
+  if (!stroke_item(item, instance_maps, instance_count)) {
+    return (GSHSCENE_Reason)0;
+  }
+  const GSHSCENE_Resource * gradient = paint_gradient(item);
+  /* SK9: G11's condition on each map of the chain, for both width spaces; no composition is formed. */
+  int not_invertible = (target_map && gshscene_map_singular(target_map)) || gshscene_map_singular(&item->map) ||
+      (gradient && gshscene_map_singular(&gradient->u.gradient.g.map));
+  for (size_t i = 0; i < instance_count && !not_invertible; i++) {
+    not_invertible = gshscene_map_singular(&instance_maps[i]);
+  }
+  if (not_invertible) {
+    return GSHSCENE_REASON_MAP_NOT_INVERTIBLE;
+  }
+  if (item->style->u.stroke.s.width == 0.0) {
+    return GSHSCENE_REASON_STROKE_ZERO_WIDTH; /* SK8 */
+  }
+  return gradient && gshscene_gradient_degenerate(&gradient->u.gradient.g) ? GSHSCENE_REASON_GRADIENT_DEGENERATE
+                                                                         : (GSHSCENE_Reason)0;
+}
+
+/* --- SK11: the features a stroke requires ---------------------------------------------------- */
+
+/**
+ * The composed map as `gshgeom_map_compose_chain` forms it for the chain (the instances' maps root to leaf, then the
+ * item's) and the target, one composition at a time and in the same order, so the result is the same bits whatever
+ * the chain's length.  A zero-filled target map is the identity (S4).
+ */
+static GSHGEOM_Result compose_item(const GSHGEOM_Map * instance_maps, size_t instance_count, const GSHGEOM_Map * item_map,
+    const GSHGEOM_Map * target_map, GSHGEOM_Map * out) {
+  GSHGEOM_Map acc = instance_count ? instance_maps[0] : *item_map;
+  GSHGEOM_Result r = gshgeom_map_check(&acc);
+  for (size_t i = 1; r == GSHGEOM_OK && i <= instance_count; i++) {
+    r = gshgeom_map_compose(&acc, i < instance_count ? &instance_maps[i] : item_map, &acc);
+  }
+  if (r == GSHGEOM_OK && target_map && target_map->dim != 0) {
+    r = gshgeom_map_compose(target_map, &acc, &acc);
+  }
+  if (r == GSHGEOM_OK) {
+    *out = acc;
+  }
+  return r;
+}
+
+/** Whether a 2D map's linear part is a uniform scale times an orthogonal matrix, exactly: `[a b; -b a]` or `[a b; b -a]`. */
+static int similarity(const GSHGEOM_Map * m) {
+  double a = m->m[0][0];
+  double b = m->m[0][1];
+  double c = m->m[1][0];
+  double d = m->m[1][1];
+  return (a == d && b == -c) || (a == -d && b == c);
+}
+
+uint32_t gshscene_stroke_required(const GSHSCENE_Item * item, const GSHGEOM_Map * instance_maps, size_t instance_count,
+    const GSHGEOM_Map * target_map) {
+  if (!stroke_item(item, instance_maps, instance_count) ||
+      gshscene_stroke_notice(item, instance_maps, instance_count, target_map)) {
+    return 0; /* not a stroke, or one that draws nothing (SK8, SK9) */
+  }
+  const GSHSCENE_Stroke_Style * s = &item->style->u.stroke.s;
+  static const uint32_t joins[GSHSCENE_STROKE_JOIN_COUNT] = {GSHSCENE_STROKE_NATIVE_JOIN_MITER,
+      GSHSCENE_STROKE_NATIVE_JOIN_ROUND, GSHSCENE_STROKE_NATIVE_JOIN_BEVEL, GSHSCENE_STROKE_NATIVE_JOIN_MITER_CLIP,
+      GSHSCENE_STROKE_NATIVE_JOIN_ARCS};
+  static const uint32_t caps[GSHSCENE_STROKE_CAP_COUNT] = {GSHSCENE_STROKE_NATIVE_CAP_BUTT,
+      GSHSCENE_STROKE_NATIVE_CAP_ROUND, GSHSCENE_STROKE_NATIVE_CAP_SQUARE};
+  /* The join and the cap always: whether the centerline has a vertex or an end is not decided from the style. */
+  uint32_t need = joins[s->join] | caps[s->cap];
+  if (s->width_space == (uint32_t)GSHSCENE_STROKE_WIDTH_DEVICE) {
+    need |= GSHSCENE_STROKE_NATIVE_WIDTH_DEVICE;
+  } else {
+    need |= GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL;
+    GSHGEOM_Map composed;
+    if (compose_item(instance_maps, instance_count, &item->map, target_map, &composed) != GSHGEOM_OK ||
+        !similarity(&composed)) {
+      need |= GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL_ANISOTROPIC; /* an elliptical pen, or a map that cannot be formed */
+    }
+  }
+  if (s->dash_count) {
+    need |= GSHSCENE_STROKE_NATIVE_DASH;
+    if (s->dash_scope == (uint32_t)GSHSCENE_STROKE_DASH_PATH) {
+      need |= GSHSCENE_STROKE_NATIVE_DASH_PATH_SCOPE;
+    }
+  }
+  if (s->alignment != (uint32_t)GSHSCENE_STROKE_ALIGN_CENTER) {
+    need |= GSHSCENE_STROKE_NATIVE_ALIGN;
+    if (s->alignment_rule == GSHGEOM_FILL_EVEN_ODD) {
+      need |= GSHSCENE_STROKE_NATIVE_ALIGN_EVEN_ODD;
+    }
+  }
+  if (s->degenerate == (uint32_t)GSHSCENE_STROKE_DEGENERATE_DRAW && s->cap != (uint32_t)GSHSCENE_STROKE_CAP_BUTT) {
+    need |= GSHSCENE_STROKE_NATIVE_DEGENERATE_DRAW; /* with a butt cap a degenerate subpath draws nothing either way */
+  }
+  return need;
+}

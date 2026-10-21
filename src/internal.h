@@ -254,6 +254,12 @@ void gshscene_gradient_free(GSHSCENE_Resource * resource);
 /** The payload of a gradient's dump (resource.h); the result of the writes, negative on failure. */
 int gshscene_gradient_dump(const GSHSCENE_Resource * resource, FILE * out);
 
+/** G11's condition on one map: its 2x2 linear part's determinant is exactly zero (a zero-filled map is the identity). */
+int gshscene_map_singular(const GSHGEOM_Map * map);
+
+/** G10: whether a gradient draws nothing wherever it is. */
+int gshscene_gradient_degenerate(const GSHSCENE_Gradient * g);
+
 /* --- stroke.c ---------------------------------------------------------------- */
 
 /** Whether a stroke style resource has the canonical content @p source (a GSHSCENE_Stroke_Style). */

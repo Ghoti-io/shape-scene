@@ -27,7 +27,7 @@
  * every backend the family will have: the CPU reference (shape-cpu), GPU sinks
  * (Vulkan, WebGPU, WebGL), and writers whose target is a document (SVG and PDF
  * export, a plotter's or a machine's program).  The rules are numbered S1 to
- * S17; tests, plants and the conformance suite cite them, and
+ * S20; tests, plants and the conformance suite cite them, and
  * documentation/design.md has the same text.
  *
  * ### The rules (normative)
@@ -86,8 +86,8 @@
  * (::gshscene_caps_disposition is the one predicate, and a sink decides each item
  * with it too), the entry of each run from a font's route (::gshscene_glyph_route:
  * a run-level `HINT_STATUS`, or a refusal, D6), the `NOTICE` of each gradient
- * fill that draws nothing (S17), and every depth tie of the list as
- * `RESOLVED_AMBIGUITY`.  A
+ * fill that draws nothing (S17) and of each stroke that draws nothing (S20), and
+ * every depth tie of the list as `RESOLVED_AMBIGUITY`.  A
  * refused push or instance skips its whole block.  Best effort returns
  * ::GSHSCENE_OK.  With ::GSHSCENE_RENDER_STRICT a planned refusal is
  * ::GSHSCENE_ERR_REFUSED before the sink is called, so the target is untouched; a
@@ -209,12 +209,33 @@
  * defaults are N5 to N9 exactly (T6), so a sink without the caps draws every
  * group that does not set them.
  *
+ * **S20 Strokes (stroke.h, SK1 to SK14; strokes story S1).**  A stroke reaches a
+ * sink by its centerline and style handles in model space (S16): nothing in the
+ * contract expands, flattens or offsets it.  A sink that draws strokes has bit
+ * `1 << 7` in `item_kinds` (else every stroke is refused, `ITEM_KIND`), names in
+ * `stroke_native` each feature it emits as a stroke, and says with
+ * ::GSHSCENE_CAP_STROKE_EXPAND that it can expand a stroke exactly
+ * (`shape-geometry`'s expansion) and draw it as a fill.  A stroke whose required
+ * features (::gshscene_stroke_required) are all native is drawn as a stroke; else,
+ * with `STROKE_EXPAND`, it is expanded and drawn with no entry (it is drawn as
+ * defined); else it is refused by the planning pass, `STROKE_STYLE`, the missing
+ * features in the entry's `second`.  A sink reads the style with
+ * ::gshscene_resource_stroke_style, decides each stroke with
+ * ::gshscene_caps_disposition and skips by ::gshscene_stroke_notice (the planning
+ * pass wrote the `NOTICE`: width 0, a chain that is not invertible, a degenerate
+ * gradient paint), and never routes a run it strokes (SK7).  A writer emits a
+ * native stroke as a stroke, deduped by the style's id, and expands only a stroke
+ * whose required features it lacks; a toolpath sink follows the centerline and
+ * refuses what its caps lack.  A device width on a stream is in CSS pixels, 1/96
+ * inch in the target's unit (::gshscene_stroke_pixel_size).
+ *
  * ### For sink implementations
  *
  * A sink library fills a ::GSHSCENE_Sink_Ops and calls ::gshscene_sink_create
  * from its own constructor.  Its `begin` reads the job's request
  * (::gshscene_job_request; the target there is the job's copy), walks the list
- * (::GSHSCENE_Expansion), decides each item with ::gshscene_caps_disposition (and a
+ * (::GSHSCENE_Expansion), decides each item with ::gshscene_caps_disposition, given the maps of the enclosing
+ * instances and the target's (and a
  * run from a font with ::gshscene_glyph_route, skipping a run it refuses: the plan
  * reported it), adds the entries only it can find (::gshscene_job_report, and
  * ::gshscene_job_report_glyph for one glyph of a run), reports progress and
@@ -235,6 +256,7 @@
 #include <ghoti.io/shape-scene/macros.h>
 #include <ghoti.io/shape-scene/paint.h>
 #include <ghoti.io/shape-scene/report.h>
+#include <ghoti.io/shape-scene/stroke.h>
 #include <ghoti.io/shape-scene/types.h>
 
 #include <ghoti.io/cutil/atomic.h>
@@ -337,7 +359,9 @@ typedef struct GSHSCENE_Target {
 #define GSHSCENE_CAP_GROUP_NON_ISOLATED (UINT32_C(1) << 9) ///< Non-isolated groups are composited as T4 and T5 say (else refused, S19).
 #define GSHSCENE_CAP_GROUP_KNOCKOUT (UINT32_C(1) << 10)  ///< Knockout groups are composited as T3 says (else refused, S19).
 #define GSHSCENE_CAP_GROUP_SOFT_MASK (UINT32_C(1) << 11) ///< A group's soft mask is applied (T7; else refused, S19).
-#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 12) - 1) ///< Every flag defined.
+/** A stroke whose required features are not all native is expanded exactly and drawn as a fill (S20, SK11); else refused. */
+#define GSHSCENE_CAP_STROKE_EXPAND (UINT32_C(1) << 12)
+#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 13) - 1) ///< Every flag defined.
 /** @} */
 
 /** @brief Where a sink checks its cancel token (S7).  The values are pinned. */
@@ -358,7 +382,9 @@ typedef struct GSHSCENE_Sink_Caps {
   const char * work_measure;  ///< A static string naming the measure ("units", "cells+points+pixels"); not NULL.
   /** Bit `1 << kind` for each ::GSHSCENE_Gradient_Kind drawn (S17); 0, a sink that draws no gradient. */
   uint32_t gradient_kinds;
-  uint8_t _reserved[12];      ///< Zero.
+  /** The `GSHSCENE_STROKE_NATIVE_*` features a sink emits as a stroke (S20, stroke.h SK11); 0, none. */
+  uint32_t stroke_native;
+  uint8_t _reserved[8];       ///< Zero.
 } GSHSCENE_Sink_Caps;
 
 /* --- the request (S1) and the job (S3) -------------------------------------------- */
@@ -665,26 +691,37 @@ GSHSCENE_API void gshscene_job_complete(GSHSCENE_Job * job, GSHSCENE_Result resu
 typedef struct GSHSCENE_Disposition {
   GSHSCENE_Entry_Class entry_class; ///< 0 to draw as stated, `REFUSED` or `APPROXIMATED`.
   GSHSCENE_Reason reason;           ///< Why, when not 0.
+  /** `STROKE_STYLE`: the `GSHSCENE_STROKE_NATIVE_*` bits of the features the sink lacks (the entry's `second`).  Else 0. */
+  uint64_t detail;
 } GSHSCENE_Disposition;
 
 /**
- * @brief The one predicate of the planning pass (S6): what @p caps make of @p item on a target whose resolved blend
- *   space is @p target_space, under the palette @p palette (the request's list's, or NULL for none; N14).
+ * @brief The one predicate of the planning pass (S6): what @p caps make of @p item, reached through the instances whose
+ *   maps are @p instance_maps on a target of map @p target_map whose resolved blend space is @p target_space, under
+ *   the palette @p palette (the request's list's, or NULL for none; N14).
  *
- * In this order: a kind the caps do not draw is refused (`ITEM_KIND`); a fill or clip of a glyph run from a font
- * without `GLYPHS_FROM_FONT` is refused (`GLYPH_SOURCE`); a gradient fill of a kind not in `gradient_kinds` is refused
- * (`GRADIENT`); a fill whose palette paint, or a stop of whose gradient, names an entry @p palette does not have
- * (::gshscene_paint_resolve, G3) is refused (`PALETTE_ENTRY`); a group whose operator the caps do not composite is
- * refused (`COMPOSITE`); a non-isolated group without `GROUP_NON_ISOLATED`, a knockout group without `GROUP_KNOCKOUT`
- * and a group with a soft mask without `GROUP_SOFT_MASK` are refused, in that order (`GROUP_ISOLATION`,
- * `GROUP_KNOCKOUT`, `SOFT_MASK`, S19); a clip push without `CLIP_AA` is approximated (`CLIP_ALIASED`); a group whose own blend space
- * is stated and differs from @p target_space, without `BLEND_SPACES`, is approximated (`BLEND_SPACE`); a gradient
- * fill whose interpolation space is stated and differs from @p target_space, without `GRADIENT_SPACES`, is
+ * In this order: a kind the caps do not draw is refused (`ITEM_KIND`); a fill, clip or stroke of a glyph run from a
+ * font without `GLYPHS_FROM_FONT` is refused (`GLYPH_SOURCE`); a gradient fill or stroke of a kind not in
+ * `gradient_kinds` is refused (`GRADIENT`); a fill or stroke whose palette paint, or a stop of whose gradient, names an
+ * entry @p palette does not have (::gshscene_paint_resolve, G3) is refused (`PALETTE_ENTRY`); a group whose operator
+ * the caps do not composite is refused (`COMPOSITE`); a non-isolated group without `GROUP_NON_ISOLATED`, a knockout
+ * group without `GROUP_KNOCKOUT` and a group with a soft mask without `GROUP_SOFT_MASK` are refused, in that order
+ * (`GROUP_ISOLATION`, `GROUP_KNOCKOUT`, `SOFT_MASK`, S19); a stroke with a required feature
+ * (::gshscene_stroke_required, which reads the chain) that `stroke_native` lacks, without `STROKE_EXPAND`, is refused
+ * (`STROKE_STYLE`, the missing features in `detail`; S20, SK11), after every other refusal and before any
+ * approximation; a clip push without `CLIP_AA` is approximated (`CLIP_ALIASED`); a group whose own blend space is
+ * stated and differs from @p target_space, without `BLEND_SPACES`, is approximated (`BLEND_SPACE`); a gradient fill or
+ * stroke whose interpolation space is stated and differs from @p target_space, without `GRADIENT_SPACES`, is
  * approximated (`INTERPOLATION_SPACE`).  A pop is drawn as its push was decided (the walk tells).  Anything else is
  * drawn.
+ *
+ * @param instance_maps The maps of the enclosing instances, root to leaf (as ::gshscene_stroke_notice takes them); may
+ *   be NULL when @p instance_count is 0.  Only a stroke reads them.
+ * @param target_map The target's map, or NULL for the identity.
  */
 GSHSCENE_API GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps,
-    const GSHSCENE_Item * item, const GSHSCENE_Color_Space * target_space, const GSHSCENE_Resource * palette);
+    const GSHSCENE_Item * item, const GSHGEOM_Map * instance_maps, size_t instance_count, const GSHGEOM_Map * target_map,
+    const GSHSCENE_Color_Space * target_space, const GSHSCENE_Resource * palette);
 
 /**
  * @brief Whether a gradient fill draws nothing (S17; paint.h, G10 and G11), and why.

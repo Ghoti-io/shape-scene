@@ -1,7 +1,7 @@
 /**
  * @file
  *
- * The sink conformance suite (story 13a, S1 to S17 of sink.h): one set of tests
+ * The sink conformance suite (story 13a, S1 to S20 of sink.h): one set of tests
  * that every sink passes, run unchanged against each configuration of the test
  * sink now, and against shape-cpu (13b) and the GPU sinks later.  It knows a
  * sink only through the contract: a fixture says how to make one, which target
@@ -2448,6 +2448,228 @@ TEST_P(SinkConformance, S19_PdfGroupFieldsAreRefusedWithoutTheirCaps) {
   }
   if (checked == 0) {
     GTEST_SKIP() << "the sink draws no source-over group";
+  }
+}
+
+/* --- S20: strokes (stroke.h, SK1 to SK14; strokes story S1) ------------------------------------------------------ */
+
+namespace sinkconf {
+
+/** One stroke case of the suite: what it is, its style and map, and the features SK11 says it requires. */
+struct StrokeCase {
+  const char * name;
+  GSHSCENE_Stroke_Style style;
+  std::vector<double> dashes;
+  GSHGEOM_Map map;
+  uint32_t required;      // the features it requires, stated by the suite from SK11's text
+  GSHSCENE_Reason notice; // what draws nothing (SK8, SK9), or 0
+};
+
+inline GSHGEOM_Map stroke_map(double a, double b, double c, double d) {
+  const double m[4] = {a, b, c, d};
+  const double t[2] = {0.0, 0.0};
+  GSHGEOM_Map out;
+  EXPECT_EQ(gshgeom_map_from_matrix(2, m, t, &out), GSHGEOM_OK);
+  return out;
+}
+
+/** The suite's stroke cases: each feature of SK11 alone, the maps of the anisotropy test, and what draws nothing. */
+inline std::vector<StrokeCase> stroke_cases() {
+  const uint32_t J_MITER = GSHSCENE_STROKE_NATIVE_JOIN_MITER, J_ROUND = GSHSCENE_STROKE_NATIVE_JOIN_ROUND,
+                 J_BEVEL = GSHSCENE_STROKE_NATIVE_JOIN_BEVEL, J_CLIP = GSHSCENE_STROKE_NATIVE_JOIN_MITER_CLIP,
+                 J_ARCS = GSHSCENE_STROKE_NATIVE_JOIN_ARCS, C_BUTT = GSHSCENE_STROKE_NATIVE_CAP_BUTT,
+                 C_ROUND = GSHSCENE_STROKE_NATIVE_CAP_ROUND, C_SQUARE = GSHSCENE_STROKE_NATIVE_CAP_SQUARE,
+                 LOCAL = GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL, ANISO = GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL_ANISOTROPIC,
+                 DEVICE = GSHSCENE_STROKE_NATIVE_WIDTH_DEVICE, DASH = GSHSCENE_STROKE_NATIVE_DASH,
+                 PATH = GSHSCENE_STROKE_NATIVE_DASH_PATH_SCOPE, ALIGN = GSHSCENE_STROKE_NATIVE_ALIGN,
+                 EVEN_ODD = GSHSCENE_STROKE_NATIVE_ALIGN_EVEN_ODD, DOT = GSHSCENE_STROKE_NATIVE_DEGENERATE_DRAW;
+  GSHSCENE_Stroke_Style base;
+  gshscene_stroke_style_init(&base);
+  base.width = 2.0;
+  GSHGEOM_Map id = stroke_map(1, 0, 0, 1);
+  std::vector<StrokeCase> out;
+  auto add = [&](const char * name, auto set, uint32_t required, GSHGEOM_Map map, std::vector<double> dashes = {},
+                 GSHSCENE_Reason notice = (GSHSCENE_Reason)0) {
+    StrokeCase c{name, base, dashes, map, required, notice};
+    set(c.style);
+    out.push_back(c);
+  };
+  auto none = [](GSHSCENE_Stroke_Style &) {};
+  add("the default: a miter join, a butt cap", none, J_MITER | C_BUTT | LOCAL, id);
+  add("a round join and cap", [](GSHSCENE_Stroke_Style & s) {
+    s.join = GSHSCENE_STROKE_JOIN_ROUND;
+    s.cap = GSHSCENE_STROKE_CAP_ROUND;
+  }, J_ROUND | C_ROUND | LOCAL | DOT, id);
+  add("a round join and cap, degenerate subpaths omitted", [](GSHSCENE_Stroke_Style & s) {
+    s.join = GSHSCENE_STROKE_JOIN_ROUND;
+    s.cap = GSHSCENE_STROKE_CAP_ROUND;
+    s.degenerate = GSHSCENE_STROKE_DEGENERATE_OMIT;
+  }, J_ROUND | C_ROUND | LOCAL, id);
+  add("a bevel join, a square cap", [](GSHSCENE_Stroke_Style & s) {
+    s.join = GSHSCENE_STROKE_JOIN_BEVEL;
+    s.cap = GSHSCENE_STROKE_CAP_SQUARE;
+  }, J_BEVEL | C_SQUARE | LOCAL | DOT, id);
+  add("a miter-clip join", [](GSHSCENE_Stroke_Style & s) { s.join = GSHSCENE_STROKE_JOIN_MITER_CLIP; },
+      J_CLIP | C_BUTT | LOCAL, id);
+  add("an arcs join", [](GSHSCENE_Stroke_Style & s) { s.join = GSHSCENE_STROKE_JOIN_ARCS; }, J_ARCS | C_BUTT | LOCAL, id);
+  add("a device width", [](GSHSCENE_Stroke_Style & s) { s.width_space = GSHSCENE_STROKE_WIDTH_DEVICE; },
+      J_MITER | C_BUTT | DEVICE, id);
+  add("a device width under scale(2, 1): no anisotropy", [](GSHSCENE_Stroke_Style & s) {
+    s.width_space = GSHSCENE_STROKE_WIDTH_DEVICE;
+  }, J_MITER | C_BUTT | DEVICE, stroke_map(2, 0, 0, 1));
+  add("a local width under scale(2, 1): the elliptical pen", none, J_MITER | C_BUTT | LOCAL | ANISO,
+      stroke_map(2, 0, 0, 1));
+  add("a local width under a rotation", none, J_MITER | C_BUTT | LOCAL, stroke_map(0, -1, 1, 0));
+  add("a local width under a reflection", none, J_MITER | C_BUTT | LOCAL, stroke_map(-1, 0, 0, 1));
+  add("a local width under a uniform scale", none, J_MITER | C_BUTT | LOCAL, stroke_map(3, 0, 0, 3));
+  add("a local width under a skew", none, J_MITER | C_BUTT | LOCAL | ANISO, stroke_map(1, 1, 0, 1));
+  add("dashes", none, J_MITER | C_BUTT | LOCAL | DASH, id, {3.0, 2.0});
+  add("dashes along the path", [](GSHSCENE_Stroke_Style & s) { s.dash_scope = GSHSCENE_STROKE_DASH_PATH; },
+      J_MITER | C_BUTT | LOCAL | DASH | PATH, id, {3.0, 2.0});
+  add("an all-zero dash array: solid, its scope unread", [](GSHSCENE_Stroke_Style & s) {
+    s.dash_scope = GSHSCENE_STROKE_DASH_PATH;
+  }, J_MITER | C_BUTT | LOCAL, id, {0.0, 0.0});
+  add("inside", [](GSHSCENE_Stroke_Style & s) { s.alignment = GSHSCENE_STROKE_ALIGN_INSIDE; },
+      J_MITER | C_BUTT | LOCAL | ALIGN, id);
+  add("outside by even-odd", [](GSHSCENE_Stroke_Style & s) {
+    s.alignment = GSHSCENE_STROKE_ALIGN_OUTSIDE;
+    s.alignment_rule = GSHGEOM_FILL_EVEN_ODD;
+  }, J_MITER | C_BUTT | LOCAL | ALIGN | EVEN_ODD, id);
+  add("centered by even-odd: the rule unread", [](GSHSCENE_Stroke_Style & s) { s.alignment_rule = GSHGEOM_FILL_EVEN_ODD; },
+      J_MITER | C_BUTT | LOCAL, id);
+  add("width 0 (SK8)", [](GSHSCENE_Stroke_Style & s) { s.width = 0.0; }, 0, id, {}, GSHSCENE_REASON_STROKE_ZERO_WIDTH);
+  add("a map of zero scale (SK9)", none, 0, stroke_map(0, 0, 0, 1), {}, GSHSCENE_REASON_MAP_NOT_INVERTIBLE);
+  add("a device width under a map of zero scale (SK9)", [](GSHSCENE_Stroke_Style & s) {
+    s.width_space = GSHSCENE_STROKE_WIDTH_DEVICE;
+  }, 0, stroke_map(1, 2, 2, 4), {}, GSHSCENE_REASON_MAP_NOT_INVERTIBLE);
+  return out;
+}
+
+/** The disposition the suite expects of a stroke case on a sink with @p caps, from the caps and SK11 alone. */
+inline void expect_stroke_entries(const GSHSCENE_Sink_Caps & caps, const StrokeCase & c,
+    const std::vector<GSHSCENE_Report_Entry> & got, bool * refused) {
+  bool drawn_kind = (caps.item_kinds & (1u << GSHSCENE_ITEM_STROKE)) != 0;
+  uint32_t missing = c.required & ~caps.stroke_native;
+  bool expands = (caps.flags & GSHSCENE_CAP_STROKE_EXPAND) != 0;
+  *refused = false;
+  if (!drawn_kind) {
+    ASSERT_EQ(got.size(), 1u) << c.name << ": a sink without the stroke kind refuses every stroke";
+    EXPECT_EQ(got[0].entry_class, GSHSCENE_ENTRY_REFUSED) << c.name;
+    EXPECT_EQ(got[0].reason, GSHSCENE_REASON_ITEM_KIND) << c.name;
+    *refused = true;
+    return;
+  }
+  if (c.notice) {
+    ASSERT_EQ(got.size(), 1u) << c.name << ": a stroke that draws nothing is noticed, never refused";
+    EXPECT_EQ(got[0].entry_class, GSHSCENE_ENTRY_NOTICE) << c.name;
+    EXPECT_EQ(got[0].reason, c.notice) << c.name;
+    return;
+  }
+  if (missing && !expands) {
+    ASSERT_EQ(got.size(), 1u) << c.name;
+    EXPECT_EQ(got[0].entry_class, GSHSCENE_ENTRY_REFUSED) << c.name;
+    EXPECT_EQ(got[0].reason, GSHSCENE_REASON_STROKE_STYLE) << c.name;
+    EXPECT_EQ(got[0].second, (size_t)missing) << c.name << ": the entry names the features the sink lacks";
+    *refused = true;
+    return;
+  }
+  EXPECT_EQ(got.size(), 0u) << c.name << ": drawn as a stroke, or expanded and drawn as defined";
+}
+
+} // namespace sinkconf
+
+// S20: each stroke is drawn as a stroke, expanded or refused as the caps say, and what draws nothing is noticed.
+TEST_P(SinkConformance, S20_EachStrokeIsDrawnExpandedOrRefusedAsTheCapsSay) {
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    for (const StrokeCase & c : stroke_cases()) {
+      GSHSCENE_Stroke_Style st = c.style;
+      st.dash_count = c.dashes.size();
+      st.dashes = c.dashes.empty() ? nullptr : c.dashes.data();
+      const GSHSCENE_Resource * style = nullptr;
+      ASSERT_EQ(gshscene_store_intern_stroke_style(s.store, &st, &style), GSHSCENE_OK) << c.name;
+      s.held.push_back(style);
+      // Its required features as the library states them agree with the suite's reading of SK11.
+      GSHSCENE_List * l = s.open();
+      GSHSCENE_Paint red = solid(1, 0, 0);
+      ASSERT_EQ(gshscene_list_stroke(l, s.sq(4, 4, 10), style, &c.map, &red, 0, 0.0), GSHSCENE_OK) << c.name;
+      ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+      const GSHSCENE_Item * item = nullptr;
+      ASSERT_EQ(gshscene_list_item(l, 0, &item), GSHSCENE_OK);
+      EXPECT_EQ(gshscene_stroke_required(item, nullptr, 0, nullptr), c.required) << c.name;
+      EXPECT_EQ(gshscene_stroke_notice(item, nullptr, 0, nullptr), c.notice) << c.name;
+      auto out = make_surface(kind);
+      ReportRef r;
+      EXPECT_EQ(run(f(), sink.sink, request_for(l, *out, r.report)).result, GSHSCENE_OK) << c.name;
+      bool refused = false;
+      expect_stroke_entries(caps, c, entries(r.report), &refused);
+      // Strict fails before the sink is called exactly where a refusal is planned; a notice never fails it (SK8, SK9).
+      auto strict = make_surface(kind);
+      uint64_t before = strict->snapshot();
+      ReportRef sr;
+      GSHSCENE_Render_Request req = request_for(l, *strict, sr.report);
+      req.flags = GSHSCENE_RENDER_STRICT;
+      Outcome o = run(f(), sink.sink, req);
+      EXPECT_EQ(o.result, refused ? GSHSCENE_ERR_REFUSED : GSHSCENE_OK) << c.name;
+      if (refused) {
+        EXPECT_EQ(strict->snapshot(), before) << c.name << ": strict touched the target";
+      }
+    }
+  }
+}
+
+// SK7, S20: a stroke of a run takes no route, so a strict-hinted run at a hinting size gets no hint entry and is
+// never refused for hinting; a run from a font still needs GLYPHS_FROM_FONT.
+TEST_P(SinkConformance, S20_AStrokedRunIsNeverRefusedForHinting) {
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    GSHSCENE_Stroke_Style st;
+    gshscene_stroke_style_init(&st);
+    st.join = GSHSCENE_STROKE_JOIN_ROUND;
+    st.cap = GSHSCENE_STROKE_CAP_ROUND;
+    st.degenerate = GSHSCENE_STROKE_DEGENERATE_OMIT;
+    const GSHSCENE_Resource * style = nullptr;
+    ASSERT_EQ(gshscene_store_intern_stroke_style(s.store, &st, &style), GSHSCENE_OK);
+    s.held.push_back(style);
+    // A strict run at 16 ppem under the identity: a fill of it would take the fast tier or be refused (D6).
+    const GSHSCENE_Resource * run_res = s.glyphs(s.face(), {1, 2}, 16.0, GSHSCENE_HINT_FONT_STRICT);
+    GSHSCENE_Paint red = solid(1, 0, 0);
+    GSHSCENE_List * l = s.open();
+    GSHGEOM_Map quarter = rotated(90.0, 60.0, 0.0); // a map that sends a fill of the run to the general route
+    ASSERT_EQ(gshscene_list_stroke(l, run_res, style, &quarter, &red, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+    auto out = make_surface(kind);
+    ReportRef r;
+    EXPECT_EQ(run(f(), sink.sink, request_for(l, *out, r.report)).result, GSHSCENE_OK);
+    auto got = entries(r.report);
+    for (const GSHSCENE_Report_Entry & e : got) {
+      EXPECT_NE(e.entry_class, GSHSCENE_ENTRY_HINT_STATUS) << "a stroke has no hint status";
+      EXPECT_NE(e.reason, GSHSCENE_REASON_HINT_STRICT_ROUTE) << "a stroke is never refused for hinting";
+    }
+    bool drawn_kind = (caps.item_kinds & (1u << GSHSCENE_ITEM_STROKE)) != 0;
+    uint32_t need = GSHSCENE_STROKE_NATIVE_JOIN_ROUND | GSHSCENE_STROKE_NATIVE_CAP_ROUND |
+        GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL;
+    bool styled = (need & ~caps.stroke_native) == 0 || (caps.flags & GSHSCENE_CAP_STROKE_EXPAND);
+    if (!drawn_kind) {
+      ASSERT_EQ(got.size(), 1u);
+      EXPECT_EQ(got[0].reason, GSHSCENE_REASON_ITEM_KIND);
+    } else if (!(caps.flags & GSHSCENE_CAP_GLYPHS_FROM_FONT)) {
+      ASSERT_EQ(got.size(), 1u);
+      EXPECT_EQ(got[0].reason, GSHSCENE_REASON_GLYPH_SOURCE) << "a run from a font needs the provider, stroked or not";
+    } else if (styled) {
+      EXPECT_EQ(got.size(), 0u);
+      ReportRef sr;
+      auto strict = make_surface(kind);
+      GSHSCENE_Render_Request req = request_for(l, *strict, sr.report);
+      req.flags = GSHSCENE_RENDER_STRICT;
+      EXPECT_EQ(run(f(), sink.sink, req).result, GSHSCENE_OK) << "strict hinting does not apply to a stroke (D7)";
+    }
   }
 }
 

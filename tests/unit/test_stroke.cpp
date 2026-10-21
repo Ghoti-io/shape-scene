@@ -5,7 +5,9 @@
  * resource (its defaults, its validity in SK2's order, each bound at both sides, SK3's canonical form, interning,
  * hash and dump against the independent generator, a planted collision, the store's accounting); the stroke item
  * (SK4: what it records and refuses, its references, equality, hash and dump, its place in an order); the stroke node
- * (SK13: its rules, hash and dump, emission, the visitor, re-lowering); SK10's bounds and the damage of strokes.
+ * (SK13: its rules, hash and dump, emission, the visitor, re-lowering); SK10's bounds and the damage of strokes; the
+ * notice of what draws nothing (SK8, SK9), the features a stroke requires (SK11) and the disposition and planning pass
+ * (S20).  The test sink's records and the conformance suite's stroke cases are in test_dump_sink.cpp.
  *
  * Copyright 2026 by Corey Pennycuff
  */
@@ -1096,6 +1098,55 @@ TEST(StrokeBounds, EachFactorOfSk10) {
   }
 }
 
+TEST(StrokeBounds, ADegenerateSquareInAnyOrientationIsCovered) {
+  // D4 as amended: a degenerate subpath's square points along SVG 2's effective tangent, so it can lie at any angle;
+  // its corners are h sqrt 2 from its point, the most (at 45 degrees) h sqrt 2 along an axis.  SK10's square-cap factor
+  // 3/2 covers that before any mapping, so the bound of a point holds every orientation of the square, in local width
+  // (also under a rotation, the square then built in model space) and in device width.
+  StoreHolder s;
+  for (uint32_t space : {GSHSCENE_STROKE_WIDTH_LOCAL, GSHSCENE_STROKE_WIDTH_DEVICE}) {
+    for (uint32_t join : {GSHSCENE_STROKE_JOIN_ROUND, GSHSCENE_STROKE_JOIN_BEVEL, GSHSCENE_STROKE_JOIN_MITER}) {
+      Style st;
+      st.s.width = 4.0; // h = 2
+      st.s.width_space = space;
+      st.s.join = join;
+      st.s.miter_limit = 1.0;
+      st.s.cap = GSHSCENE_STROKE_CAP_SQUARE;
+      for (double degrees : {0.0, 30.0, 45.0, 60.0, 90.0, 135.0}) {
+        double a = degrees * 3.14159265358979323846 / 180.0;
+        // The real square's corners about the point (5, 7): (+-h, +-h) rotated by a.
+        double c = std::cos(a), sn = std::sin(a);
+        GSHGEOM_Bounds b = bound_of(s.store, st, 5.0, 7.0, 5.0, 7.0, translate(0, 0));
+        for (double u : {-2.0, 2.0}) {
+          for (double v : {-2.0, 2.0}) {
+            double x = 5.0 + c * u - sn * v;
+            double y = 7.0 + sn * u + c * v;
+            EXPECT_LE(b.min.x, x) << degrees;
+            EXPECT_GE(b.max.x, x) << degrees;
+            EXPECT_LE(b.min.y, y) << degrees;
+            EXPECT_GE(b.max.y, y) << degrees;
+          }
+        }
+        if (space == GSHSCENE_STROKE_WIDTH_LOCAL) {
+          // Under a rotation map the square is built in model space and mapped: the mapped bound still holds it.
+          GSHGEOM_Map rot = map_of(c, -sn, sn, c);
+          GSHGEOM_Bounds rb = bound_of(s.store, st, 5.0, 7.0, 5.0, 7.0, rot);
+          for (double u : {-2.0, 2.0}) {
+            for (double v : {-2.0, 2.0}) {
+              GSHGEOM_Point q;
+              ASSERT_EQ(gshgeom_map_apply_point(&rot, P(5.0 + u, 7.0 + v), &q), GSHGEOM_OK);
+              EXPECT_LE(rb.min.x, q.x + 1e-12) << degrees;
+              EXPECT_GE(rb.max.x, q.x - 1e-12) << degrees;
+              EXPECT_LE(rb.min.y, q.y + 1e-12) << degrees;
+              EXPECT_GE(rb.max.y, q.y - 1e-12) << degrees;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 TEST(StrokeBounds, LocalWidthIsMappedAndDeviceWidthIsNot) {
   StoreHolder s;
   Style local;
@@ -1350,6 +1401,350 @@ TEST(StrokeDamage, AStrokeOfARunFromAnUnboundFaceIsUnbounded) {
     publish(s, e, &v2);
   }
   EXPECT_EQ(damage_of(v1.get(), v2.get()).unbounded, 1);
+}
+
+/* --- SK8, SK9, SK11, S20: the notice, the required features and the disposition ------------------------------------ */
+
+namespace {
+
+GSHSCENE_Sink_Caps all_caps() {
+  GSHSCENE_Sink_Caps c{};
+  c.item_kinds = 0xfeu;
+  c.composites = 0x0fffffffu;
+  c.flags = GSHSCENE_CAP_CAN_BLOCK | GSHSCENE_CAP_GLYPHS_FROM_FONT | GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_BLEND_SPACES |
+      GSHSCENE_CAP_GRADIENT_SPACES;
+  c.gradient_kinds = 0xeu;
+  c.stroke_native = GSHSCENE_STROKE_NATIVE_ALL;
+  c.cancel_unit = GSHSCENE_CANCEL_BETWEEN_UNITS;
+  c.work_measure = "units";
+  return c;
+}
+
+/** A stroke item of @p style over the square, under @p map, painted with @p paint. */
+GSHSCENE_Item stroke_item(const Kit & k, const GSHSCENE_Resource * style, GSHGEOM_Map map, GSHSCENE_Paint paint) {
+  GSHSCENE_Item item{};
+  item.kind = GSHSCENE_ITEM_STROKE;
+  item.resource = k.square.get();
+  item.style = style;
+  item.map = map;
+  item.fill_rule = GSHGEOM_FILL_NONZERO;
+  item.paint = paint;
+  return item;
+}
+
+}  // namespace
+
+TEST(StrokeNotice, TheOrderIsMapThenWidthThenGradient) {
+  Kit k;
+  Ref zero;
+  Style z;
+  z.s.width = 0.0;
+  ASSERT_EQ(intern(k.s.store, z, &zero), GSHSCENE_OK);
+  GSHSCENE_Paint black = solid(0, 0, 0, 1);
+  GSHGEOM_Map id = translate(0, 0);
+  GSHGEOM_Map flat = map_of(0, 0, 0, 1);
+  GSHGEOM_Map rank1 = map_of(1, 2, 2, 4);
+  // A degenerate gradient: a linear one from a point to itself.
+  GSHSCENE_Gradient_Stop stops[2] = {{0.0, solid(0, 0, 0, 1)}, {1.0, solid(1, 1, 1, 1)}};
+  GSHSCENE_Gradient g{};
+  g.kind = GSHSCENE_GRADIENT_LINEAR;
+  gshgeom_map_identity(2, &g.map);
+  g.stop_count = 2;
+  g.stops = stops;
+  const GSHSCENE_Resource * dr = nullptr;
+  ASSERT_EQ(gshscene_store_intern_gradient(k.s.store, &g, &dr), GSHSCENE_OK);
+  Ref degenerate(dr);
+  g.map = flat;
+  g.p1[0] = 1.0;
+  ASSERT_EQ(gshscene_store_intern_gradient(k.s.store, &g, &dr), GSHSCENE_OK);
+  Ref singular_map(dr);
+  GSHSCENE_Paint dg = paint_of(GSHSCENE_PAINT_GRADIENT, 1.0, 0, degenerate.get());
+  GSHSCENE_Paint sg = paint_of(GSHSCENE_PAINT_GRADIENT, 1.0, 0, singular_map.get());
+  struct Case {
+    const char * what;
+    GSHSCENE_Item item;
+    const GSHGEOM_Map * instances;
+    size_t count;
+    const GSHGEOM_Map * target;
+    GSHSCENE_Reason want;
+  } cases[] = {
+      {"drawn", stroke_item(k, k.style.get(), id, black), nullptr, 0, nullptr, (GSHSCENE_Reason)0},
+      {"width 0", stroke_item(k, zero.get(), id, black), nullptr, 0, nullptr, GSHSCENE_REASON_STROKE_ZERO_WIDTH},
+      {"a flat item map", stroke_item(k, k.style.get(), flat, black), nullptr, 0, nullptr, GSHSCENE_REASON_MAP_NOT_INVERTIBLE},
+      {"a flat target map", stroke_item(k, k.style.get(), id, black), nullptr, 0, &flat, GSHSCENE_REASON_MAP_NOT_INVERTIBLE},
+      {"a flat instance map", stroke_item(k, k.style.get(), id, black), &rank1, 1, nullptr, GSHSCENE_REASON_MAP_NOT_INVERTIBLE},
+      {"a flat gradient map", stroke_item(k, k.style.get(), id, sg), nullptr, 0, nullptr, GSHSCENE_REASON_MAP_NOT_INVERTIBLE},
+      {"a degenerate gradient", stroke_item(k, k.style.get(), id, dg), nullptr, 0, nullptr, GSHSCENE_REASON_GRADIENT_DEGENERATE},
+      {"width 0 before a degenerate gradient", stroke_item(k, zero.get(), id, dg), nullptr, 0, nullptr,
+          GSHSCENE_REASON_STROKE_ZERO_WIDTH},
+      {"the map before width 0", stroke_item(k, zero.get(), flat, dg), nullptr, 0, nullptr, GSHSCENE_REASON_MAP_NOT_INVERTIBLE},
+      {"a device width under a flat map too (SK9)", stroke_item(k, k.device.get(), rank1, black), nullptr, 0, nullptr,
+          GSHSCENE_REASON_MAP_NOT_INVERTIBLE},
+  };
+  for (const Case & c : cases) {
+    EXPECT_EQ(gshscene_stroke_notice(&c.item, c.instances, c.count, c.target), c.want) << c.what;
+    if (c.want) {
+      EXPECT_EQ(gshscene_stroke_required(&c.item, c.instances, c.count, c.target), 0u)
+          << c.what << ": what draws nothing requires nothing";
+    }
+  }
+  // Anything that is not a stroke draws as stated; a zero-filled target map is the identity.
+  GSHSCENE_Item fill = stroke_item(k, k.style.get(), flat, black);
+  fill.kind = GSHSCENE_ITEM_FILL;
+  EXPECT_EQ(gshscene_stroke_notice(&fill, nullptr, 0, nullptr), 0);
+  EXPECT_EQ(gshscene_stroke_required(&fill, nullptr, 0, nullptr), 0u);
+  EXPECT_EQ(gshscene_stroke_notice(nullptr, nullptr, 0, nullptr), 0);
+  GSHGEOM_Map zero_filled;
+  std::memset(&zero_filled, 0, sizeof zero_filled);
+  GSHSCENE_Item ok = stroke_item(k, k.style.get(), id, black);
+  EXPECT_EQ(gshscene_stroke_notice(&ok, nullptr, 0, &zero_filled), 0);
+  EXPECT_EQ(gshscene_stroke_notice(&ok, nullptr, 2, nullptr), 0) << "instances counted and not given: not decided";
+}
+
+TEST(StrokeRequired, AnisotropyIsDecidedOnTheComposedChain) {
+  Kit k;
+  GSHSCENE_Paint black = solid(0, 0, 0, 1);
+  GSHGEOM_Map id = translate(0, 0);
+  const uint32_t base = GSHSCENE_STROKE_NATIVE_JOIN_MITER | GSHSCENE_STROKE_NATIVE_CAP_BUTT |
+      GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL;
+  const uint32_t aniso = base | GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL_ANISOTROPIC;
+  GSHGEOM_Map wide = map_of(2, 0, 0, 1);
+  GSHGEOM_Map tall = map_of(1, 0, 0, 2);
+  GSHGEOM_Map rot = map_of(0, -1, 1, 0);
+  GSHGEOM_Map uni = map_of(3, 0, 0, 3, 7, -2);
+  GSHGEOM_Map refl = map_of(0, 2, 2, 0);
+  GSHSCENE_Item item = stroke_item(k, k.style.get(), id, black);
+  EXPECT_EQ(gshscene_stroke_required(&item, nullptr, 0, nullptr), base);
+  item.map = wide;
+  EXPECT_EQ(gshscene_stroke_required(&item, nullptr, 0, nullptr), aniso) << "scale(2, 1)";
+  item.map = rot;
+  EXPECT_EQ(gshscene_stroke_required(&item, nullptr, 0, nullptr), base) << "a rotation";
+  item.map = uni;
+  EXPECT_EQ(gshscene_stroke_required(&item, nullptr, 0, nullptr), base) << "a uniform scale";
+  item.map = refl;
+  EXPECT_EQ(gshscene_stroke_required(&item, nullptr, 0, nullptr), base) << "a scaled reflection";
+  // The chain: an instance's scale(2, 1) and the item's scale(1, 2) compose to a uniform scale; the target's own
+  // scale(2, 1) after them makes it anisotropic again; a device width is never anisotropic.
+  item.map = tall;
+  EXPECT_EQ(gshscene_stroke_required(&item, &wide, 1, nullptr), base) << "anisotropic factors, a uniform product";
+  EXPECT_EQ(gshscene_stroke_required(&item, &wide, 1, &wide), aniso) << "the target's map is in the chain";
+  EXPECT_EQ(gshscene_stroke_required(&item, nullptr, 0, &wide), base) << "tall then wide is uniform";
+  GSHSCENE_Item dev = stroke_item(k, k.device.get(), wide, black);
+  EXPECT_EQ(gshscene_stroke_required(&dev, nullptr, 0, nullptr) & GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL_ANISOTROPIC, 0u);
+  EXPECT_NE(gshscene_stroke_required(&dev, nullptr, 0, nullptr) & GSHSCENE_STROKE_NATIVE_WIDTH_DEVICE, 0u);
+  // A chain the composer cannot form (an entry of the product past the map bound) is taken as anisotropic: the
+  // conservative answer.
+  GSHGEOM_Map big = map_of(std::ldexp(1.0, 60), 0, 0, std::ldexp(1.0, 60));
+  item.map = big;
+  EXPECT_EQ(gshscene_stroke_required(&item, &big, 1, nullptr), aniso) << "2^120 per entry, past the bound";
+}
+
+TEST(StrokeRequired, EachFieldOfTheStyleRequiresItsFeature) {
+  Kit k;
+  GSHSCENE_Paint black = solid(0, 0, 0, 1);
+  GSHGEOM_Map id = translate(0, 0);
+  struct Case {
+    const char * what;
+    std::function<void(Style &)> set;
+    uint32_t want;
+  };
+  const uint32_t L = GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL;
+  std::vector<Case> cases = {
+      {"miter, butt", [](Style &) {}, GSHSCENE_STROKE_NATIVE_JOIN_MITER | GSHSCENE_STROKE_NATIVE_CAP_BUTT | L},
+      {"round, round: the dot", [](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_ROUND; t.s.cap = GSHSCENE_STROKE_CAP_ROUND; },
+          GSHSCENE_STROKE_NATIVE_JOIN_ROUND | GSHSCENE_STROKE_NATIVE_CAP_ROUND | L | GSHSCENE_STROKE_NATIVE_DEGENERATE_DRAW},
+      {"bevel, square: the square dot", [](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_BEVEL; t.s.cap = GSHSCENE_STROKE_CAP_SQUARE; },
+          GSHSCENE_STROKE_NATIVE_JOIN_BEVEL | GSHSCENE_STROKE_NATIVE_CAP_SQUARE | L | GSHSCENE_STROKE_NATIVE_DEGENERATE_DRAW},
+      {"square, omitted", [](Style & t) { t.s.cap = GSHSCENE_STROKE_CAP_SQUARE; t.s.degenerate = GSHSCENE_STROKE_DEGENERATE_OMIT; },
+          GSHSCENE_STROKE_NATIVE_JOIN_MITER | GSHSCENE_STROKE_NATIVE_CAP_SQUARE | L},
+      {"butt, omitted", [](Style & t) { t.s.degenerate = GSHSCENE_STROKE_DEGENERATE_OMIT; },
+          GSHSCENE_STROKE_NATIVE_JOIN_MITER | GSHSCENE_STROKE_NATIVE_CAP_BUTT | L},
+      {"miter-clip", [](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_MITER_CLIP; },
+          GSHSCENE_STROKE_NATIVE_JOIN_MITER_CLIP | GSHSCENE_STROKE_NATIVE_CAP_BUTT | L},
+      {"arcs", [](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_ARCS; },
+          GSHSCENE_STROKE_NATIVE_JOIN_ARCS | GSHSCENE_STROKE_NATIVE_CAP_BUTT | L},
+      {"device", [](Style & t) { t.s.width_space = GSHSCENE_STROKE_WIDTH_DEVICE; },
+          GSHSCENE_STROKE_NATIVE_JOIN_MITER | GSHSCENE_STROKE_NATIVE_CAP_BUTT | GSHSCENE_STROKE_NATIVE_WIDTH_DEVICE},
+      {"dashes", [](Style & t) { t.dash({1.0, 1.0}); },
+          GSHSCENE_STROKE_NATIVE_JOIN_MITER | GSHSCENE_STROKE_NATIVE_CAP_BUTT | L | GSHSCENE_STROKE_NATIVE_DASH},
+      {"dashes along the path", [](Style & t) { t.dash({1.0, 1.0}).s.dash_scope = GSHSCENE_STROKE_DASH_PATH; },
+          GSHSCENE_STROKE_NATIVE_JOIN_MITER | GSHSCENE_STROKE_NATIVE_CAP_BUTT | L | GSHSCENE_STROKE_NATIVE_DASH |
+              GSHSCENE_STROKE_NATIVE_DASH_PATH_SCOPE},
+      {"inside", [](Style & t) { t.s.alignment = GSHSCENE_STROKE_ALIGN_INSIDE; },
+          GSHSCENE_STROKE_NATIVE_JOIN_MITER | GSHSCENE_STROKE_NATIVE_CAP_BUTT | L | GSHSCENE_STROKE_NATIVE_ALIGN},
+      {"outside, even-odd", [](Style & t) { t.s.alignment = GSHSCENE_STROKE_ALIGN_OUTSIDE; t.s.alignment_rule = GSHGEOM_FILL_EVEN_ODD; },
+          GSHSCENE_STROKE_NATIVE_JOIN_MITER | GSHSCENE_STROKE_NATIVE_CAP_BUTT | L | GSHSCENE_STROKE_NATIVE_ALIGN |
+              GSHSCENE_STROKE_NATIVE_ALIGN_EVEN_ODD},
+  };
+  for (const Case & c : cases) {
+    Style st;
+    c.set(st);
+    Ref r;
+    ASSERT_EQ(intern(k.s.store, st, &r), GSHSCENE_OK) << c.what;
+    GSHSCENE_Item item = stroke_item(k, r.get(), id, black);
+    EXPECT_EQ(gshscene_stroke_required(&item, nullptr, 0, nullptr), c.want) << c.what;
+  }
+}
+
+TEST(StrokeDisposition, StrokeStyleIsDecidedAfterTheOtherRefusalsAndBeforeAnyApproximation) {
+  Kit k;
+  GSHSCENE_Paint black = solid(0, 0, 0, 1);
+  GSHGEOM_Map id = translate(0, 0);
+  GSHSCENE_Color_Space srgb = srgb_space();
+  GSHSCENE_Item item = stroke_item(k, k.style.get(), id, black);
+  GSHSCENE_Sink_Caps caps = all_caps();
+  auto d = [&](const GSHSCENE_Sink_Caps & c, const GSHSCENE_Item & it, const GSHGEOM_Map * inst = nullptr,
+               size_t n = 0, const GSHGEOM_Map * target = nullptr, const GSHSCENE_Resource * pal = nullptr) {
+    return gshscene_caps_disposition(&c, &it, inst, n, target, &srgb, pal);
+  };
+  EXPECT_EQ(d(caps, item).entry_class, 0) << "every feature native: drawn as a stroke";
+  // A feature the sink lacks: refused, the missing features in detail; with STROKE_EXPAND, drawn.
+  GSHSCENE_Sink_Caps lacks = caps;
+  lacks.stroke_native &= ~(GSHSCENE_STROKE_NATIVE_JOIN_MITER | GSHSCENE_STROKE_NATIVE_DASH);
+  GSHSCENE_Disposition x = d(lacks, item);
+  EXPECT_EQ(x.entry_class, GSHSCENE_ENTRY_REFUSED);
+  EXPECT_EQ(x.reason, GSHSCENE_REASON_STROKE_STYLE);
+  EXPECT_EQ(x.detail, (uint64_t)GSHSCENE_STROKE_NATIVE_JOIN_MITER) << "only what this stroke requires";
+  GSHSCENE_Sink_Caps expands = lacks;
+  expands.flags |= GSHSCENE_CAP_STROKE_EXPAND;
+  x = d(expands, item);
+  EXPECT_EQ(x.entry_class, 0) << "expanded exactly: no entry";
+  EXPECT_EQ(x.detail, 0u);
+  // The chain decides anisotropy: a target map of scale(2, 1) makes the default style need the elliptical pen.
+  GSHSCENE_Sink_Caps round_pen = caps;
+  round_pen.stroke_native &= ~GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL_ANISOTROPIC;
+  GSHGEOM_Map wide = map_of(2, 0, 0, 1);
+  EXPECT_EQ(d(round_pen, item).entry_class, 0);
+  x = d(round_pen, item, nullptr, 0, &wide);
+  EXPECT_EQ(x.reason, GSHSCENE_REASON_STROKE_STYLE);
+  EXPECT_EQ(x.detail, (uint64_t)GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL_ANISOTROPIC);
+  x = d(round_pen, item, &wide, 1, nullptr);
+  EXPECT_EQ(x.detail, (uint64_t)GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL_ANISOTROPIC) << "an instance's map too";
+  // What draws nothing requires nothing: a zero-width stroke on a sink that lacks every feature is not refused.
+  Ref zero;
+  Style z;
+  z.s.width = 0.0;
+  ASSERT_EQ(intern(k.s.store, z, &zero), GSHSCENE_OK);
+  GSHSCENE_Sink_Caps bare = caps;
+  bare.stroke_native = 0;
+  EXPECT_EQ(d(bare, stroke_item(k, zero.get(), id, black)).entry_class, 0);
+  EXPECT_EQ(d(bare, item).detail, (uint64_t)(GSHSCENE_STROKE_NATIVE_JOIN_MITER | GSHSCENE_STROKE_NATIVE_CAP_BUTT |
+      GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL));
+  // The kind first: a sink without the stroke kind refuses ITEM_KIND, whatever the style.
+  GSHSCENE_Sink_Caps no_kind = bare;
+  no_kind.item_kinds &= ~(1u << GSHSCENE_ITEM_STROKE);
+  EXPECT_EQ(d(no_kind, item).reason, GSHSCENE_REASON_ITEM_KIND);
+  EXPECT_EQ(d(no_kind, stroke_item(k, zero.get(), id, black)).reason, GSHSCENE_REASON_ITEM_KIND);
+  // A run from a font needs GLYPHS_FROM_FONT (SK7), before the style.
+  GSHSCENE_Item font = item;
+  font.resource = k.font_run.get();
+  GSHSCENE_Sink_Caps no_font = bare;
+  no_font.flags &= ~GSHSCENE_CAP_GLYPHS_FROM_FONT;
+  EXPECT_EQ(d(no_font, font).reason, GSHSCENE_REASON_GLYPH_SOURCE);
+  EXPECT_EQ(d(bare, font).reason, GSHSCENE_REASON_STROKE_STYLE);
+  // A gradient paint: its kind, then its palette, before the style; its interpolation space is approximated only when
+  // the stroke is drawn.
+  GSHSCENE_Item grad = stroke_item(k, k.style.get(), id, paint_of(GSHSCENE_PAINT_GRADIENT, 1.0, 0, k.gradient.get()));
+  GSHSCENE_Sink_Caps no_radial = bare;
+  no_radial.gradient_kinds &= ~(1u << GSHSCENE_GRADIENT_RADIAL);
+  EXPECT_EQ(d(no_radial, grad).reason, GSHSCENE_REASON_GRADIENT);
+  GSHSCENE_Item entry = stroke_item(k, k.style.get(), id, paint_of(GSHSCENE_PAINT_PALETTE, 1.0, 5));
+  EXPECT_EQ(d(bare, entry).reason, GSHSCENE_REASON_PALETTE_ENTRY) << "a missing entry, before the style";
+  EXPECT_EQ(d(caps, entry).reason, GSHSCENE_REASON_PALETTE_ENTRY);
+  // An approximation never hides the style's refusal: a stated interpolation space on a sink without GRADIENT_SPACES.
+  GSHSCENE_Gradient_Stop stops[2] = {{0.0, solid(0, 0, 0, 1)}, {1.0, solid(1, 1, 1, 1)}};
+  stops[0].color.space = srgb_space(); // G3: a stated interpolation space takes stops in stated spaces
+  stops[1].color.space = srgb_space();
+  GSHSCENE_Gradient g{};
+  g.kind = GSHSCENE_GRADIENT_LINEAR;
+  g.p1[0] = 4.0;
+  gshgeom_map_identity(2, &g.map);
+  g.space = linear_srgb_space();
+  g.stop_count = 2;
+  g.stops = stops;
+  const GSHSCENE_Resource * sr = nullptr;
+  ASSERT_EQ(gshscene_store_intern_gradient(k.s.store, &g, &sr), GSHSCENE_OK);
+  Ref spaced(sr);
+  GSHSCENE_Item interp = stroke_item(k, k.style.get(), id, paint_of(GSHSCENE_PAINT_GRADIENT, 1.0, 0, spaced.get()));
+  GSHSCENE_Sink_Caps no_spaces = caps;
+  no_spaces.flags &= ~GSHSCENE_CAP_GRADIENT_SPACES;
+  EXPECT_EQ(d(no_spaces, interp).entry_class, GSHSCENE_ENTRY_APPROXIMATED);
+  EXPECT_EQ(d(no_spaces, interp).reason, GSHSCENE_REASON_INTERPOLATION_SPACE);
+  GSHSCENE_Sink_Caps both = no_spaces;
+  both.stroke_native = 0;
+  EXPECT_EQ(d(both, interp).entry_class, GSHSCENE_ENTRY_REFUSED);
+  EXPECT_EQ(d(both, interp).reason, GSHSCENE_REASON_STROKE_STYLE);
+  // A fill is never decided by stroke features.
+  GSHSCENE_Item fill = item;
+  fill.kind = GSHSCENE_ITEM_FILL;
+  fill.style = nullptr;
+  EXPECT_EQ(d(bare, fill).entry_class, 0);
+}
+
+TEST(StrokePlan, ThePlanningPassRefusesAndNoticesStrokesBeforeTheSinkIsCalled) {
+  Kit k;
+  // A list with a stroke the caps refuse inside an instance, a zero-width stroke and a drawn one.
+  Ref zero;
+  Style z;
+  z.s.width = 0.0;
+  ASSERT_EQ(intern(k.s.store, z, &zero), GSHSCENE_OK);
+  GSHSCENE_Paint black = solid(0, 0, 0, 1);
+  ListHolder pl(k.s.store);
+  ASSERT_EQ(gshscene_list_stroke(pl.list, k.square.get(), k.style.get(), nullptr, &black, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(pl.list), GSHSCENE_OK);
+  const GSHSCENE_Resource * pr = nullptr;
+  ASSERT_EQ(gshscene_store_intern_picture(k.s.store, pl.list, &pr), GSHSCENE_OK);
+  Ref pic(pr);
+  ListHolder l(k.s.store);
+  GSHGEOM_Map wide = map_of(2, 0, 0, 1);
+  ASSERT_EQ(gshscene_list_instance(l.list, pic.get(), &wide, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_stroke(l.list, k.square.get(), zero.get(), nullptr, &black, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_stroke(l.list, k.square.get(), k.style.get(), nullptr, &black, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
+  // A sink whose pen is round: the instance's scale(2, 1) makes the picture's stroke need the elliptical pen.
+  GSHSCENE_Dump_Sink_Config c;
+  gshscene_dump_sink_config_default(&c);
+  c.stream_caps.stroke_native &= ~GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL_ANISOTROPIC;
+  GSHSCENE_Sink * sink = nullptr;
+  ASSERT_EQ(gshscene_dump_sink_create(nullptr, nullptr, &c, &sink), GSHSCENE_OK);
+  std::string bytes;
+  GSHSCENE_Writer w{[](void * ctx, const void * data, size_t n) {
+    ((std::string *)ctx)->append((const char *)data, n);
+    return GSHSCENE_OK;
+  }, &bytes};
+  GSHSCENE_Target t{};
+  t.kind = GSHSCENE_TARGET_STREAM;
+  t.surface = &w;
+  t.unit = GSHSCENE_UNIT_POINT;
+  GSHSCENE_Report * report = nullptr;
+  ASSERT_EQ(gshscene_report_create(nullptr, nullptr, &report), GSHSCENE_OK);
+  GSHSCENE_Render_Request req{};
+  req.list = l.list;
+  req.target = &t;
+  req.report = report;
+  ASSERT_EQ(gshscene_sink_render(sink, &req), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_report_count(report), 2u);
+  GSHSCENE_Report_Entry e;
+  ASSERT_EQ(gshscene_report_entry(report, 0, &e), GSHSCENE_OK);
+  EXPECT_EQ(e.entry_class, GSHSCENE_ENTRY_REFUSED);
+  EXPECT_EQ(e.reason, GSHSCENE_REASON_STROKE_STYLE);
+  ASSERT_EQ(e.chain_count, 2u) << "the picture's stroke, keyed through its instance";
+  EXPECT_EQ(e.second, (size_t)GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL_ANISOTROPIC);
+  ASSERT_EQ(gshscene_report_entry(report, 1, &e), GSHSCENE_OK);
+  EXPECT_EQ(e.entry_class, GSHSCENE_ENTRY_NOTICE);
+  EXPECT_EQ(e.reason, GSHSCENE_REASON_STROKE_ZERO_WIDTH);
+  EXPECT_EQ(e.chain[0], 1u);
+  EXPECT_NE(bytes.find("U 0.0 X class=1 reason=28"), std::string::npos) << bytes;
+  EXPECT_NE(bytes.find("U 1 X class=5 reason=29"), std::string::npos) << bytes;
+  EXPECT_NE(bytes.find("U 2 K res=path:"), std::string::npos) << bytes;
+  EXPECT_NE(bytes.find("expand=0 outline=-"), std::string::npos) << bytes;
+  // Strict: the planned refusal fails the render and nothing is written.
+  bytes.clear();
+  req.flags = GSHSCENE_RENDER_STRICT;
+  EXPECT_EQ(gshscene_sink_render(sink, &req), GSHSCENE_ERR_REFUSED);
+  EXPECT_TRUE(bytes.empty());
+  gshscene_report_destroy(report);
+  EXPECT_EQ(gshscene_sink_destroy(sink), GSHSCENE_OK);
 }
 
 int main(int argc, char ** argv) {

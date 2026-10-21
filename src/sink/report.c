@@ -117,6 +117,10 @@ const char * gshscene_reason_string(GSHSCENE_Reason reason) {
       return "group-knockout";
     case GSHSCENE_REASON_SOFT_MASK:
       return "soft-mask";
+    case GSHSCENE_REASON_STROKE_STYLE:
+      return "stroke-style";
+    case GSHSCENE_REASON_STROKE_ZERO_WIDTH:
+      return "stroke-zero-width";
     case GSHSCENE_REASON_COUNT:
       break;
   }

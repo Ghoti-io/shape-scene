@@ -121,9 +121,10 @@ static int glyphs_from_font(const GSHSCENE_Resource * resource) {
   return gshscene_resource_glyph_run(resource, &run) == GSHSCENE_OK && run.source == GSHSCENE_GLYPHS_FROM_FONT;
 }
 
-GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps,
-    const GSHSCENE_Item * item, const GSHSCENE_Color_Space * target_space, const GSHSCENE_Resource * palette) {
-  GSHSCENE_Disposition d = {(GSHSCENE_Entry_Class)0, (GSHSCENE_Reason)0};
+GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps, const GSHSCENE_Item * item,
+    const GSHGEOM_Map * instance_maps, size_t instance_count, const GSHGEOM_Map * target_map,
+    const GSHSCENE_Color_Space * target_space, const GSHSCENE_Resource * palette) {
+  GSHSCENE_Disposition d = {(GSHSCENE_Entry_Class)0, (GSHSCENE_Reason)0, 0};
   if (!caps || !item) {
     return d;
   }
@@ -133,14 +134,15 @@ GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps,
     d.reason = GSHSCENE_REASON_ITEM_KIND;
     return d;
   }
-  if ((item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_CLIP_PUSH) &&
-      !(caps->flags & GSHSCENE_CAP_GLYPHS_FROM_FONT) && glyphs_from_font(item->resource)) {
+  /* A stroke's paint and centerline are a fill's: the same refusals (SK4, SK7). */
+  int painted = item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE;
+  if ((painted || item->kind == GSHSCENE_ITEM_CLIP_PUSH) && !(caps->flags & GSHSCENE_CAP_GLYPHS_FROM_FONT) &&
+      glyphs_from_font(item->resource)) {
     d.entry_class = GSHSCENE_ENTRY_REFUSED;
     d.reason = GSHSCENE_REASON_GLYPH_SOURCE;
     return d;
   }
-  const GSHSCENE_Resource * gradient =
-      item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT ? item->paint.gradient : NULL;
+  const GSHSCENE_Resource * gradient = painted && item->paint.kind == GSHSCENE_PAINT_GRADIENT ? item->paint.gradient : NULL;
   if (gradient) {
     /* S17: a kind the sink does not draw is refused, never drawn wrong. */
     uint32_t gk = gradient->u.gradient.g.kind;
@@ -157,7 +159,7 @@ GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps,
       return d;
     }
   }
-  if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_PALETTE) {
+  if (painted && item->paint.kind == GSHSCENE_PAINT_PALETTE) {
     /* N14: the one resolution decides; the foreground is not read for a palette paint. */
     GSHSCENE_Color unused;
     GSHSCENE_Color resolved;
@@ -187,6 +189,18 @@ GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps,
     if (refused) {
       d.entry_class = GSHSCENE_ENTRY_REFUSED;
       d.reason = refused;
+      return d;
+    }
+  }
+  /* S20, SK11: the features the stroke requires and the sink does not emit, unless it expands; after every other
+   * refusal and before any approximation, which would otherwise hide it. */
+  if (item->kind == GSHSCENE_ITEM_STROKE && !(caps->flags & GSHSCENE_CAP_STROKE_EXPAND)) {
+    uint32_t missing =
+        gshscene_stroke_required(item, instance_maps, instance_count, target_map) & ~caps->stroke_native;
+    if (missing) {
+      d.entry_class = GSHSCENE_ENTRY_REFUSED;
+      d.reason = GSHSCENE_REASON_STROKE_STYLE;
+      d.detail = missing;
       return d;
     }
   }
@@ -379,7 +393,8 @@ static GSHSCENE_Result caps_for(const GSHSCENE_Sink * sink, const GSHSCENE_Targe
   if (result != GSHSCENE_OK) {
     return result;
   }
-  if ((c.flags & ~GSHSCENE_CAP_FLAGS_ALL) || c.cancel_unit == 0 || c.cancel_unit >= GSHSCENE_CANCEL_UNIT_COUNT ||
+  if ((c.flags & ~GSHSCENE_CAP_FLAGS_ALL) || (c.stroke_native & ~GSHSCENE_STROKE_NATIVE_ALL) || c.cancel_unit == 0 ||
+      c.cancel_unit >= GSHSCENE_CANCEL_UNIT_COUNT ||
       !c.work_measure || !(c.flags & GSHSCENE_CAP_THREAD_AFFINE) != !sink->ops.thread_affine) {
     return GSHSCENE_ERR_INTERNAL;
   }
@@ -670,7 +685,8 @@ static int plan_route(const GSHSCENE_Job * job, const GSHSCENE_Item * item, GSHG
 
 /**
  * Walk the list against the caps: every refusal and approximation the caps decide, the notice of each gradient fill
- * that draws nothing (S17), the entry of each run from a font's route, every tie.  @p refused is set to the refusals found.
+ * and each stroke that draws nothing (S17, S20), the entry of each run from a font's route (never a stroke's, SK7),
+ * every tie.  @p refused is set to the refusals found.
  */
 static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
   GSHSCENE_Report * report = job->request.report;
@@ -705,9 +721,11 @@ static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
     if (gshscene_skip_step(&skip, item, count)) {
       continue;
     }
-    GSHSCENE_Disposition d = gshscene_caps_disposition(&job->caps, item, &job->target_space, gshscene_list_palette(list));
+    GSHSCENE_Disposition d = gshscene_caps_disposition(
+        &job->caps, item, maps, count - 1, &job->target.map, &job->target_space, gshscene_list_palette(list));
     if (d.entry_class) {
-      result = gshscene_report_add(report, d.entry_class, d.reason, chain, count, 0, 0.0);
+      /* A stroke refused for its style names the missing features (SK11); every other entry's second is 0. */
+      result = gshscene_report_add(report, d.entry_class, d.reason, chain, count, (size_t)d.detail, 0.0);
       if (result != GSHSCENE_OK) {
         return result;
       }
@@ -717,8 +735,10 @@ static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
       gshscene_skip_begin(&skip, item, count);
       continue;
     }
-    /* S17: a gradient fill that draws nothing is drawn as defined, and the report says so. */
-    GSHSCENE_Reason notice = gshscene_gradient_notice(item, maps, count - 1, &job->target.map);
+    /* S17, S20: a gradient fill or a stroke that draws nothing is drawn as defined, and the report says so. */
+    GSHSCENE_Reason notice = item->kind == GSHSCENE_ITEM_STROKE
+        ? gshscene_stroke_notice(item, maps, count - 1, &job->target.map)
+        : gshscene_gradient_notice(item, maps, count - 1, &job->target.map);
     if (notice) {
       result = gshscene_report_add(report, GSHSCENE_ENTRY_NOTICE, notice, chain, count, 0, 0.0);
       if (result != GSHSCENE_OK) {

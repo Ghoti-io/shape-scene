@@ -425,31 +425,31 @@ TEST(PalettePaint, TheDispositionRefusesAMissingEntryAndOnlyThat) {
   fill.kind = GSHSCENE_ITEM_FILL;
   fill.resource = sq.get();
   fill.paint = entry_paint(1);
-  EXPECT_EQ(gshscene_caps_disposition(&caps, &fill, nullptr, p.get()).entry_class, 0);
+  EXPECT_EQ(gshscene_caps_disposition(&caps, &fill, nullptr, 0, nullptr, nullptr, p.get()).entry_class, 0);
   fill.paint = entry_paint(2);
-  GSHSCENE_Disposition d = gshscene_caps_disposition(&caps, &fill, nullptr, p.get());
+  GSHSCENE_Disposition d = gshscene_caps_disposition(&caps, &fill, nullptr, 0, nullptr, nullptr, p.get());
   EXPECT_EQ(d.entry_class, GSHSCENE_ENTRY_REFUSED);
   EXPECT_EQ(d.reason, GSHSCENE_REASON_PALETTE_ENTRY);
   fill.paint = entry_paint(0);
-  EXPECT_EQ(gshscene_caps_disposition(&caps, &fill, nullptr, nullptr).reason, GSHSCENE_REASON_PALETTE_ENTRY)
+  EXPECT_EQ(gshscene_caps_disposition(&caps, &fill, nullptr, 0, nullptr, nullptr, nullptr).reason, GSHSCENE_REASON_PALETTE_ENTRY)
       << "no palette: every entry is missing";
   // Only a palette paint of a fill is read: a solid or foreground fill and a clip push under no palette are drawn.
   fill.paint = solid(1, 0, 0, 1);
-  EXPECT_EQ(gshscene_caps_disposition(&caps, &fill, nullptr, nullptr).entry_class, 0);
+  EXPECT_EQ(gshscene_caps_disposition(&caps, &fill, nullptr, 0, nullptr, nullptr, nullptr).entry_class, 0);
   fill.paint.kind = GSHSCENE_PAINT_FOREGROUND;
-  EXPECT_EQ(gshscene_caps_disposition(&caps, &fill, nullptr, nullptr).entry_class, 0);
+  EXPECT_EQ(gshscene_caps_disposition(&caps, &fill, nullptr, 0, nullptr, nullptr, nullptr).entry_class, 0);
   // ...and the palette argument is not read for them, even one that is no palette.
-  EXPECT_EQ(gshscene_caps_disposition(&caps, &fill, nullptr, sq.get()).entry_class, 0);
+  EXPECT_EQ(gshscene_caps_disposition(&caps, &fill, nullptr, 0, nullptr, nullptr, sq.get()).entry_class, 0);
   fill.paint = solid(1, 0, 0, 1);
-  EXPECT_EQ(gshscene_caps_disposition(&caps, &fill, nullptr, sq.get()).entry_class, 0);
+  EXPECT_EQ(gshscene_caps_disposition(&caps, &fill, nullptr, 0, nullptr, nullptr, sq.get()).entry_class, 0);
   GSHSCENE_Item clip = fill;
   clip.kind = GSHSCENE_ITEM_CLIP_PUSH;
   clip.paint = entry_paint(9); // a clip has no paint; whatever its field says is not read
-  EXPECT_EQ(gshscene_caps_disposition(&caps, &clip, nullptr, nullptr).entry_class, 0);
+  EXPECT_EQ(gshscene_caps_disposition(&caps, &clip, nullptr, 0, nullptr, nullptr, nullptr).entry_class, 0);
   // A kind the caps do not draw is refused for that first.
   caps.item_kinds = 0;
   fill.paint = entry_paint(5);
-  EXPECT_EQ(gshscene_caps_disposition(&caps, &fill, nullptr, p.get()).reason, GSHSCENE_REASON_ITEM_KIND);
+  EXPECT_EQ(gshscene_caps_disposition(&caps, &fill, nullptr, 0, nullptr, nullptr, p.get()).reason, GSHSCENE_REASON_ITEM_KIND);
 }
 
 // --- the palette parameter of a list ----------------------------------------------------------------------------------

@@ -43,7 +43,9 @@
  * `ROUND 1`, `BEVEL 2` (PDF's `j`, so a PDF lowering is the identity), `MITER_CLIP
  * 3`, `ARCS 4`; ::GSHSCENE_Cap `BUTT 0`, `ROUND 1`, `SQUARE 2` (PDF's `J`);
  * ::GSHSCENE_Degenerate `DRAW 0` (SVG 2's shape for a subpath of zero length,
- * oriented along local `+x`), `OMIT 1`; ::GSHSCENE_Dash_Scope `PER_SUBPATH 0`
+ * its square oriented along SVG 2's effective tangent there, the direction of the
+ * nearest segment of the path that has extent, and along local `+x` only when the
+ * whole path has zero length), `OMIT 1`; ::GSHSCENE_Dash_Scope `PER_SUBPATH 0`
  * (the pattern restarts at each subpath, SVG 2), `PATH 1`; ::GSHSCENE_Alignment
  * `CENTER 0`, `INSIDE 1`, `OUTSIDE 2`; `alignment_rule` a `GSHGEOM_Fill_Rule`
  * (nonzero 0 by default).  ::gshscene_stroke_style_init writes the defaults: width
@@ -78,7 +80,7 @@
  * `MITER`, `MITER_CLIP` and `ARCS`, `miter_limit` 4; with `CENTER` alignment,
  * `alignment_rule` nonzero.  (c) Nothing else is rewritten: the offset is kept as
  * given (not reduced modulo the period, which is the dash arithmetic's), and width
- * 0 is kept: it draws nothing.
+ * 0 is kept (SK8).
  *
  * **SK4 The stroke item.**  ::gshscene_list_stroke records ::GSHSCENE_ITEM_STROKE
  * (7): a centerline, a path or a glyph run of the list's store (a 3D path, or a run
@@ -118,14 +120,28 @@
  * `FONT_STRICT` run included).  A run from a font needs `GLYPHS_FROM_FONT` as a
  * fill does (`GLYPH_SOURCE`).
  *
+ * **SK8 Width 0 and hairlines.**  Width 0 has no special meaning: `R` is empty and
+ * nothing is drawn, and the planning pass writes a `NOTICE`, reason
+ * `STROKE_ZERO_WIDTH`, as G10 does for a degenerate gradient.  A hairline is
+ * device width 1.  No cap, flag or reason names a hairline.
+ *
+ * **SK9 Not invertible.**  A stroke draws nothing, with a `NOTICE`, reason
+ * `MAP_NOT_INVERTIBLE`, exactly when some map of its chain (`T`, `I_1` to `I_k`,
+ * `M`, and `G` for a gradient paint) has a 2x2 linear part whose determinant is
+ * exactly zero (G11's condition, `gshgeom_orient2d`'s exact sign), for both width
+ * spaces.  It never fails strict.  One predicate, ::gshscene_stroke_notice, is the
+ * planning pass's and every sink's: `MAP_NOT_INVERTIBLE`, then `STROKE_ZERO_WIDTH`,
+ * then `GRADIENT_DEGENERATE` (G10 of the paint).
+ *
  * **SK10 Bounds and damage.**  A stroke occurrence's bounds are conservative:
  * with `h = width / 2 * max(1, f_join, f_cap) * a`, where `f_join` is
  * `miter_limit` for `MITER` (the miter's tip is at most that far, in half widths,
  * from its vertex), `miter_limit + 1` for `MITER_CLIP` and `ARCS` (a clipped
  * corner lies `miter_limit` half widths along the bisector and up to one half
  * width across it, so at most `sqrt(miter_limit^2 + 1)` half widths away), and 1
- * otherwise; `f_cap` is `3/2` for `SQUARE` (a rational bound above `sqrt 2`) and
- * 1 otherwise; and `a` is 2 for `INSIDE` and `OUTSIDE` and 1 for `CENTER`:
+ * otherwise; `f_cap` is `3/2` for `SQUARE` (a rational bound above `sqrt 2`, so a
+ * square cap's corner, and a degenerate subpath's square in whatever orientation
+ * its effective tangent gives it, lies within it) and 1 otherwise; and `a` is 2 for `INSIDE` and `OUTSIDE` and 1 for `CENTER`:
  * **local** width outsets the centerline's model box by `h` and maps it by the
  * composed map; **device** width maps the box and outsets it by `h` in target
  * units (`h` times ::gshscene_stroke_pixel_size).  The damage then adds N13's AA
@@ -136,6 +152,28 @@
  * extended: a changed stroke node damages its bounds in both versions, and a
  * changed foreground or palette damages the strokes that paint with it.
  * ::gshscene_stroke_bounds is the one evaluation.
+ *
+ * **SK11 Sinks (S20).**  A sink that draws strokes has bit `1 << 7` in its caps'
+ * `item_kinds`; without it a stroke is refused, `ITEM_KIND`, as any kind is.  The
+ * caps' `stroke_native` has one bit per feature the sink emits **as a stroke**
+ * (`GSHSCENE_STROKE_NATIVE_*`), and ::GSHSCENE_CAP_STROKE_EXPAND says the sink can
+ * expand a stroke exactly (`shape-geometry`'s expansion) and draw it as a fill.  The
+ * **required features** of a stroke (::gshscene_stroke_required) are the ones its
+ * canonical style uses: its join and its cap always (whether the centerline has a
+ * vertex or an end is not decided from the style); the width space; for local
+ * width, `WIDTH_LOCAL_ANISOTROPIC` when the composed map's 2x2 linear part is not a
+ * uniform scale times an orthogonal matrix (decided exactly on the map
+ * `gshgeom_map_compose_chain` forms, which every sink forms); `DASH` with dashes,
+ * and `DASH_PATH_SCOPE` with dashes whose scope is the path; `ALIGN` for inside and
+ * outside, and `ALIGN_EVEN_ODD` with an even-odd alignment rule; `DEGENERATE_DRAW`
+ * for `DRAW` with a round or square cap (with a butt cap a degenerate subpath draws
+ * nothing either way, SVG 2).  A stroke that draws nothing (SK8, SK9: its notice)
+ * requires nothing.  ::gshscene_caps_disposition decides, after the other
+ * refusals and before any approximation: every required feature native, the stroke
+ * is drawn as a stroke; else, with `STROKE_EXPAND`, it is drawn (the sink expands
+ * this stroke alone; there is no entry, because it is drawn as defined); else it is
+ * `REFUSED`, reason `STROKE_STYLE`, with the missing features in the disposition's
+ * `detail` and the entry's `second`.
  *
  * **SK12 Hash and dump.**  Every format stays 1, and every existing hash and dump
  * is unchanged: no list, version or resource from before strokes holds one.  The
@@ -158,6 +196,13 @@
  * items of their own).  A front end that needs them composited as one (an
  * element's opacity) wraps them in a group, as now.
  *
+ * **S20 Sinks (sink.h).**  A stroke reaches a sink by its centerline and style
+ * handles in model space (S16): nothing in the contract expands, flattens or
+ * offsets it.  A sink reads the style with ::gshscene_resource_stroke_style,
+ * decides each stroke with ::gshscene_caps_disposition (SK11) and skips by
+ * ::gshscene_stroke_notice (SK9).  A writer emits a native stroke as a stroke,
+ * deduped by the style's id, and expands only a stroke whose required features it
+ * lacks; a toolpath sink follows the centerline and refuses what its caps lack.
  */
 
 #ifndef GHOTI_IO_GSHSCENE_STROKE_H
@@ -166,6 +211,7 @@
 #include <ghoti.io/shape-scene/core.h>
 #include <ghoti.io/shape-scene/list.h>
 #include <ghoti.io/shape-scene/macros.h>
+#include <ghoti.io/shape-scene/report.h>
 #include <ghoti.io/shape-scene/resource.h>
 #include <ghoti.io/shape-scene/types.h>
 
@@ -207,7 +253,7 @@ typedef enum GSHSCENE_Cap {
 
 /** @brief What a subpath of zero length draws (SK1, D4).  The values are pinned. */
 typedef enum GSHSCENE_Degenerate {
-  GSHSCENE_STROKE_DEGENERATE_DRAW = 0, ///< SVG 2's shape: the cap's dot, along local `+x` (nothing with a butt cap).
+  GSHSCENE_STROKE_DEGENERATE_DRAW = 0, ///< SVG 2's shape: the cap's dot along SVG 2's effective tangent, local `+x` when the whole path has zero length (nothing with a butt cap).
   GSHSCENE_STROKE_DEGENERATE_OMIT = 1, ///< Nothing.
   GSHSCENE_STROKE_DEGENERATE_COUNT     ///< Closes the enum.
 } GSHSCENE_Degenerate;
@@ -257,6 +303,27 @@ typedef struct GSHSCENE_Stroke_Style {
 #define GSHSCENE_STROKE_DASHES_MAX ((size_t)65535) ///< The most dashes after an odd array is doubled (also the store's `max_resource_elements`).
 /** @} */
 
+/** @name The features a sink emits as a stroke (SK11): `GSHSCENE_Sink_Caps.stroke_native`
+ * @{ */
+#define GSHSCENE_STROKE_NATIVE_JOIN_MITER (UINT32_C(1) << 0)          ///< A miter join.
+#define GSHSCENE_STROKE_NATIVE_JOIN_ROUND (UINT32_C(1) << 1)          ///< A round join.
+#define GSHSCENE_STROKE_NATIVE_JOIN_BEVEL (UINT32_C(1) << 2)          ///< A bevel join.
+#define GSHSCENE_STROKE_NATIVE_JOIN_MITER_CLIP (UINT32_C(1) << 3)     ///< A miter-clip join.
+#define GSHSCENE_STROKE_NATIVE_JOIN_ARCS (UINT32_C(1) << 4)           ///< An arcs join.
+#define GSHSCENE_STROKE_NATIVE_CAP_BUTT (UINT32_C(1) << 5)            ///< A butt cap.
+#define GSHSCENE_STROKE_NATIVE_CAP_ROUND (UINT32_C(1) << 6)           ///< A round cap.
+#define GSHSCENE_STROKE_NATIVE_CAP_SQUARE (UINT32_C(1) << 7)          ///< A square cap.
+#define GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL (UINT32_C(1) << 8)         ///< A local width under a similarity.
+#define GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL_ANISOTROPIC (UINT32_C(1) << 9) ///< A local width under any other map: the elliptical pen.
+#define GSHSCENE_STROKE_NATIVE_WIDTH_DEVICE (UINT32_C(1) << 10)       ///< A device width.
+#define GSHSCENE_STROKE_NATIVE_DASH (UINT32_C(1) << 11)               ///< Dashes, restarting per subpath.
+#define GSHSCENE_STROKE_NATIVE_DASH_PATH_SCOPE (UINT32_C(1) << 12)    ///< Dashes continuing across subpaths.
+#define GSHSCENE_STROKE_NATIVE_ALIGN (UINT32_C(1) << 13)              ///< Inside and outside alignment, by nonzero.
+#define GSHSCENE_STROKE_NATIVE_ALIGN_EVEN_ODD (UINT32_C(1) << 14)     ///< Alignment by even-odd.
+#define GSHSCENE_STROKE_NATIVE_DEGENERATE_DRAW (UINT32_C(1) << 15)    ///< A subpath of zero length drawn as SVG 2's dot.
+#define GSHSCENE_STROKE_NATIVE_ALL ((UINT32_C(1) << 16) - 1)          ///< Every feature defined.
+/** @} */
+
 /** @brief Fill @p style with SK1's defaults.  NULL is ignored. */
 GSHSCENE_API void gshscene_stroke_style_init(GSHSCENE_Stroke_Style * style);
 
@@ -281,6 +348,34 @@ GSHSCENE_API GSHSCENE_Result gshscene_store_intern_stroke_style(GSHSCENE_Store *
  */
 GSHSCENE_API GSHSCENE_Result gshscene_resource_stroke_style(const GSHSCENE_Resource * resource,
     GSHSCENE_Stroke_Style * out);
+
+/**
+ * @brief Whether a stroke draws nothing (SK8, SK9), and why: the one predicate of the planning pass's `NOTICE` and
+ *   of every sink's skip.
+ *
+ * `MAP_NOT_INVERTIBLE` when a map of the chain (@p target_map, @p instance_maps root to leaf, the item's map, and a
+ * gradient paint's map) has a 2x2 linear part of determinant exactly zero; then `STROKE_ZERO_WIDTH` for width 0; then
+ * `GRADIENT_DEGENERATE` for a degenerate gradient paint (G10).
+ *
+ * @param item A stroke; anything else draws as stated (0).
+ * @param instance_maps The maps of the enclosing instances, root to leaf; NULL only when @p instance_count is 0.
+ * @param target_map The target's map, or NULL for the identity (a zero-filled map is the identity too).
+ * @return 0, ::GSHSCENE_REASON_MAP_NOT_INVERTIBLE, ::GSHSCENE_REASON_STROKE_ZERO_WIDTH or
+ *   ::GSHSCENE_REASON_GRADIENT_DEGENERATE.
+ */
+GSHSCENE_API GSHSCENE_Reason gshscene_stroke_notice(const GSHSCENE_Item * item, const GSHGEOM_Map * instance_maps,
+    size_t instance_count, const GSHGEOM_Map * target_map);
+
+/**
+ * @brief The features a stroke requires of a sink (SK11): `GSHSCENE_STROKE_NATIVE_*` bits.
+ *
+ * Its join and its cap always; the width space (with `WIDTH_LOCAL_ANISOTROPIC` for a local width whose composed map,
+ * as `gshgeom_map_compose_chain` forms it, is not a uniform scale times an orthogonal matrix, or cannot be formed);
+ * dashes and their path scope; alignment and its even-odd rule; `DEGENERATE_DRAW` for `DRAW` with a round or square
+ * cap.  0 for a stroke that draws nothing (::gshscene_stroke_notice) and for anything that is not a stroke.
+ */
+GSHSCENE_API uint32_t gshscene_stroke_required(const GSHSCENE_Item * item, const GSHGEOM_Map * instance_maps,
+    size_t instance_count, const GSHGEOM_Map * target_map);
 
 /**
  * @brief The target units in one device pixel for a target of unit @p unit (SK5, K8): 1 for a pixel kind's (0) and

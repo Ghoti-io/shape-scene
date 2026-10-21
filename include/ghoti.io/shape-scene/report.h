@@ -52,10 +52,12 @@
  * | `APPROXIMATED` | the item was drawn, differently from the definition (a clip without antialiasing, a group blended in another space) |
  * | `RESOLVED_AMBIGUITY` | a depth tie of the list (N11): `second` is the first item of the unit painted after, in the same list, `depth` the depth they share |
  * | `HINT_STATUS` | a run from a font not hinted as it asked (glyph.h, D7): one entry per run for a run-level cause, `second` 0; one per glyph for a glyph-level cause, `second` the glyph's index in the run |
- * | `NOTICE` | the item was drawn as defined, and the definition draws nothing there: a gradient fill whose chain is not invertible or whose gradient is degenerate (paint.h, G10, G11).  It never fails a render, strict or not |
+ * | `NOTICE` | the item was drawn as defined, and the definition draws nothing there: a gradient fill whose chain is not invertible or whose gradient is degenerate (paint.h, G10, G11); a stroke whose chain is not invertible, whose width is 0 or whose gradient paint is degenerate (stroke.h, SK8, SK9).  It never fails a render, strict or not |
  *
  * A `REFUSED` entry of one glyph of a run (glyph.h) likewise has the glyph's
- * index in `second`; the rest of the run was drawn.
+ * index in `second`; the rest of the run was drawn.  A `REFUSED` entry of a
+ * stroke for its style (`STROKE_STYLE`, stroke.h, SK11) has in `second` the
+ * `GSHSCENE_STROKE_NATIVE_*` bits of the features the sink lacks.
  *
  * **Order** (normative): entries are sorted by chain (element by element, a
  * prefix before its extensions, so render-level entries come first), then
@@ -124,7 +126,7 @@ typedef enum GSHSCENE_Entry_Class {
   GSHSCENE_ENTRY_APPROXIMATED = 2,       ///< Drawn, not as the definition says.
   GSHSCENE_ENTRY_RESOLVED_AMBIGUITY = 3, ///< A depth tie the list resolved (N11).
   GSHSCENE_ENTRY_HINT_STATUS = 4,        ///< A run from a font not hinted as it asked (glyph.h).
-  GSHSCENE_ENTRY_NOTICE = 5,             ///< Drawn as defined, and the definition draws nothing there (paint.h, G10, G11).
+  GSHSCENE_ENTRY_NOTICE = 5,             ///< Drawn as defined, and the definition draws nothing there (paint.h, G10, G11; stroke.h, SK8, SK9).
   GSHSCENE_ENTRY_CLASS_COUNT             ///< Closes the enum.
 } GSHSCENE_Entry_Class;
 
@@ -157,6 +159,8 @@ typedef enum GSHSCENE_Reason {
   GSHSCENE_REASON_GROUP_ISOLATION = 25, ///< Refused, per group: a non-isolated group, which the sink does not composite (T4, S19).
   GSHSCENE_REASON_GROUP_KNOCKOUT = 26,  ///< Refused, per group: a knockout group, which the sink does not composite (T3, S19).
   GSHSCENE_REASON_SOFT_MASK = 27,       ///< Refused, per group: a group with a soft mask, which the sink does not apply (T7, S19).
+  GSHSCENE_REASON_STROKE_STYLE = 28,    ///< Refused, per stroke: a feature of its style the sink neither emits nor expands; `second` names the missing ones (stroke.h, SK11).
+  GSHSCENE_REASON_STROKE_ZERO_WIDTH = 29, ///< Notice, per stroke: its width is 0, so it draws nothing (stroke.h, SK8).
   GSHSCENE_REASON_COUNT               ///< Closes the enum.
 } GSHSCENE_Reason;
 
@@ -172,7 +176,7 @@ typedef struct GSHSCENE_Report_Entry {
   GSHSCENE_Reason reason;           ///< The reason.
   const size_t * chain;             ///< The key (see the file comment); valid until the report is reset or destroyed.  NULL when empty.
   size_t chain_count;               ///< Its length; 0 for a render-level entry.
-  size_t second;                    ///< Ambiguity: the first item of the unit painted after, in the list of the chain's last index.  A glyph's entry: its index in the run.  Else 0.
+  size_t second;                    ///< Ambiguity: the first item of the unit painted after, in the list of the chain's last index.  A glyph's entry: its index in the run.  A stroke refused for its style: the missing features' bits (SK11).  Else 0.
   double depth;                     ///< Ambiguity: the depth the two units share.  Else 0.
 } GSHSCENE_Report_Entry;
 

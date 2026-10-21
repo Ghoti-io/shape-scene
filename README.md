@@ -12,8 +12,12 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
   content gets one reference-counted handle. Kinds: a model path, a glyph run (glyphs named by
   a face resource and glyph id, or given as path outlines), a face (a font's face and instance,
   bound to a glyph path provider), a palette (a table of colors), a gradient (linear, two-circle
-  radial or sweep, with a color line, an extend, an interpolation space and a gradient map), and a
-  picture (a closed list, frozen, which an instance draws under a map). Images are named and reserved.
+  radial or sweep, with a color line, an extend, an interpolation space and a gradient map), a
+  stroke style (`stroke.h`: a width in local or device space, a join and its miter limit, a cap,
+  what a subpath of zero length draws, dashes with their offset and scope, an alignment and its fill
+  rule, interned in a canonical form so one drawing is one handle), and a picture (a closed list,
+  frozen, which an instance draws under a map). Images are named and reserved, and so is a stroke
+  style's width profile.
 - **Recording without floats** (`fixed.h`). Integer-only calls, for a front end whose headers
   name no floating type: fills and clips of glyph runs under a design map of fixed-point ops,
   palette and foreground paints, groups by operator, a palette from 8-bit entries, a gradient from
@@ -21,7 +25,9 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
   so that a lowering is all or nothing. Each handle has a
   64-bit id that is never reused, and a release-listener API lets a sink's cache drop an entry
   when the last reference goes. A store and its handles are thread-safe.
-- **Lists** (`list.h`). An arena-backed sequence of fills, clips, groups and instances, with a
+- **Lists** (`list.h`). An arena-backed sequence of fills, strokes (a path or glyph run as
+  centerline, a stroke style and a paint: no mode flag, every format's stroke is fields of the
+  style), clips, groups and instances, with a
   map, a fill rule, a paint and a declared layer and depth on the items that take them. Closing
   a list puts it in paint order (flat, overlay or depth groups) and records every resolved depth
   tie. The maker owns it and frees it in one call; `reset` reuses the arena for the next frame.
@@ -44,7 +50,7 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
 
 The retained scene (`version.h`, `edit.h`, `scene.h`, `diff.h`):
 
-- **Versions** are immutable and shareable: a tree of groups, shapes and instances with 64-bit IDs,
+- **Versions** are immutable and shareable: a tree of groups, shapes, strokes and instances with 64-bit IDs,
   a key map from a front-end's keys to nodes, hidden nodes (definitions) and instances (`use`), each
   occurrence keyed by its instance path. A version emits a list over interned resources, where an
   instanced node is one picture, and hashes and dumps in the same spelling as the waist.
@@ -56,7 +62,7 @@ The retained scene (`version.h`, `edit.h`, `scene.h`, `diff.h`):
 - Structural limits (nodes, depth, occurrences, list items, push and picture nesting) are enforced
   at publish; `make fuzz-replay` replays a committed corpus through the recording API.
 
-The sink contract (`sink.h`, `report.h`, `cancel.h`; the normative text, S1 to S17, is in
+The sink contract (`sink.h`, `report.h`, `cancel.h`; the normative text, S1 to S20, is in
 `documentation/design.md`):
 
 - **A render** is a request (a closed list, a described target, a report, an optional cancel token,
@@ -65,19 +71,23 @@ The sink contract (`sink.h`, `report.h`, `cancel.h`; the normative text, S1 to S
   Capabilities are asked per sink and target. Targets are rasters or streams (a document a writer
   sink emits, in units it states); GPU kinds are reserved.
 - **The report** is the caller's, reused across frames: what was refused, approximated, resolved
-  (depth ties) or noticed (a gradient that draws nothing), keyed by list entry and resolvable to node IDs and instance paths for a version's
+  (depth ties) or noticed (a gradient or a stroke that draws nothing), keyed by list entry and resolvable to node IDs and instance paths for a version's
   list, with a summary and a failure record; a dump and a hash in the family's spelling.
 - **Strict, cancel, conflation, caller memory**: a planning pass in the contract layer finds every
   refusal the caps decide before the target is touched; cancel is cooperative at points each sink
   declares, within a bound it declares; the reserved seam-free flag is refused; a caller-supplied
   workspace makes a frame allocate nothing.
+- **Strokes at a sink**: a sink names the stroke features it emits as strokes and whether it can
+  expand a stroke exactly; a stroke whose features it lacks is expanded, or refused with an entry
+  naming them, so a writer keeps the centerline and a toolpath refuses what a pen cannot do.
 - **The test sink** (`dump_sink.h`) writes a dump of every unit and stamps marker rectangles, with
   configurable capabilities; one conformance suite (`tests/sink_conformance.h`) runs against it now
-  and against every later sink.
+  (as a full sink, a writer and a toolpath among others) and against every later sink.
 
 `examples/frame.c` records a frame in immediate mode; `examples/retained.c` is an application, a
 front-end and a driver; `examples/sink.c` renders a list through the sink contract with the test
-sink; `examples/gradient.c` interns, resolves and renders gradients.
+sink; `examples/gradient.c` interns, resolves and renders gradients; `examples/stroke.c` strokes an
+element after its fill and shows what a writer and a toolpath make of the strokes.
 
 ## Building
 

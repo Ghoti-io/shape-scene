@@ -43,7 +43,7 @@ TEST(Report, EveryClassAndReasonHasItsOwnString) {
       "seamless", "caller-memory", "tie-layer", "tie-path", "tie-declared", "hint-route", "hint-size",
       "hint-no-program", "hint-program-failed", "hint-with-errors", "hint-strict-route", "glyph-unavailable",
       "face-unbound", "palette-entry", "gradient", "interpolation-space", "map-not-invertible", "gradient-degenerate",
-      "group-isolation", "group-knockout", "soft-mask"};
+      "group-isolation", "group-knockout", "soft-mask", "stroke-style", "stroke-zero-width"};
   ASSERT_EQ(sizeof names / sizeof names[0], (size_t)GSHSCENE_REASON_COUNT - 1);
   for (int r = GSHSCENE_REASON_ITEM_KIND; r < GSHSCENE_REASON_COUNT; r++) {
     EXPECT_STREQ(gshscene_reason_string((GSHSCENE_Reason)r), names[r - 1]) << r;
@@ -80,7 +80,9 @@ TEST(Report, ThePinnedValuesArePinned) {
   EXPECT_EQ((int)GSHSCENE_REASON_GROUP_ISOLATION, 25);
   EXPECT_EQ((int)GSHSCENE_REASON_GROUP_KNOCKOUT, 26);
   EXPECT_EQ((int)GSHSCENE_REASON_SOFT_MASK, 27);
-  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 28);
+  EXPECT_EQ((int)GSHSCENE_REASON_STROKE_STYLE, 28);
+  EXPECT_EQ((int)GSHSCENE_REASON_STROKE_ZERO_WIDTH, 29);
+  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 30);
 }
 
 TEST(Report, CreateDestroyAndTheEmptyReport) {

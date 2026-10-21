@@ -119,6 +119,8 @@ typedef struct Run {
   Glyph_Arena glyphs;     /* the scratch of one glyph's provider paths */
   uint64_t * gradients;   /* the ids of the gradients written so far (S17: once per gradient per render) */
   size_t gradient_count;
+  uint64_t * styles;      /* the ids of the stroke styles written so far (S20: once per style per render) */
+  size_t style_count;
   GSHSCENE_Resolved_Stop * stops; /* room for the most stops of a gradient the list names */
   size_t stop_capacity;
 } Run;
@@ -140,10 +142,11 @@ struct Dump_Sink {
 
 /** Fill @p caps, which the caller has zero-filled. */
 static void caps_full(GSHSCENE_Sink_Caps * caps, int readback) {
-  /* The kinds it records; a stroke (SK4) is recorded once the sink knows its record. */
-  for (uint32_t k = GSHSCENE_ITEM_FILL; k <= GSHSCENE_ITEM_INSTANCE; k++) {
+  /* Every kind: it records each, a stroke included (S20). */
+  for (uint32_t k = GSHSCENE_ITEM_FILL; k < GSHSCENE_ITEM_KIND_COUNT; k++) {
     caps->item_kinds |= UINT32_C(1) << k;
   }
+  caps->stroke_native = GSHSCENE_STROKE_NATIVE_ALL; /* every stroke feature, recorded as a stroke */
   for (uint32_t c = 0; c < GSHSCENE_COMPOSITE_COUNT; c++) {
     caps->composites |= UINT32_C(1) << c;
   }
@@ -177,6 +180,7 @@ static int caps_valid(const GSHSCENE_Sink_Caps * caps) {
   }
   const uint32_t kinds = ((UINT32_C(1) << GSHSCENE_GRADIENT_KIND_COUNT) - 1u) & ~UINT32_C(1);
   return !(caps->flags & ~GSHSCENE_CAP_FLAGS_ALL) && !(caps->gradient_kinds & ~kinds) &&
+      !(caps->stroke_native & ~GSHSCENE_STROKE_NATIVE_ALL) &&
       caps->cancel_unit >= GSHSCENE_CANCEL_BETWEEN_UNITS &&
       caps->cancel_unit < GSHSCENE_CANCEL_UNIT_COUNT && caps->work_measure != NULL;
 }
@@ -230,20 +234,27 @@ static size_t nesting(const GSHSCENE_List * list) {
   return most;
 }
 
-/** The gradient fills of @p list's expansion (@p fills, saturating) and the most stops one of their gradients has. */
-static void gradient_need(const GSHSCENE_List * list, size_t * fills, size_t * stops) {
+/**
+ * The gradient fills and strokes of @p list's expansion (@p fills, saturating), the most stops one of their gradients
+ * has, and the strokes (@p strokes, saturating).
+ */
+static void gradient_need(const GSHSCENE_List * list, size_t * fills, size_t * stops, size_t * strokes) {
   size_t count = gshscene_list_count(list);
   for (size_t i = 0; i < count; i++) {
     const GSHSCENE_Item * item = NULL;
     if (gshscene_list_item(list, i, &item) != GSHSCENE_OK) {
       break;
     }
-    if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
+    if (item->kind == GSHSCENE_ITEM_STROKE) {
+      *strokes = gshscene_sat_add(*strokes, 1);
+    }
+    if ((item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE) &&
+        item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
       *fills = gshscene_sat_add(*fills, 1);
       size_t n = item->paint.gradient->u.gradient.g.stop_count;
       *stops = n > *stops ? n : *stops;
     } else if (item->kind == GSHSCENE_ITEM_INSTANCE) {
-      gradient_need(gshscene_resource_picture(item->resource), fills, stops);
+      gradient_need(gshscene_resource_picture(item->resource), fills, stops, strokes);
     }
   }
 }
@@ -253,12 +264,14 @@ static size_t align_up(size_t n) {
 }
 
 /** The bytes a run of @p list needs, the slack for an unaligned workspace included. */
-static size_t run_bytes(const GSHSCENE_List * list, size_t * levels, size_t * blocks, size_t * fills, size_t * stops) {
+static size_t run_bytes(const GSHSCENE_List * list, size_t * levels, size_t * blocks, size_t * fills, size_t * stops,
+    size_t * strokes) {
   *levels = gshscene_sat_add(gshscene_list_picture_depth(list), 1);
   *blocks = gshscene_sat_add(nesting(list), 1);
   *fills = 0;
   *stops = 0;
-  gradient_need(list, fills, stops);
+  *strokes = 0;
+  gradient_need(list, fills, stops, strokes);
   size_t n = CARVE_ALIGN - 1;
   n = gshscene_sat_add(n, align_up(sizeof(Run)));
   n = gshscene_sat_add(n, align_up(gshscene_expansion_bytes(list)));
@@ -268,6 +281,7 @@ static size_t run_bytes(const GSHSCENE_List * list, size_t * levels, size_t * bl
   n = gshscene_sat_add(n, align_up(LINE_BYTES));
   n = gshscene_sat_add(n, align_up(gshscene_sat_mul(*fills, sizeof(uint64_t))));
   n = gshscene_sat_add(n, align_up(gshscene_sat_mul(*stops, sizeof(GSHSCENE_Resolved_Stop))));
+  n = gshscene_sat_add(n, align_up(gshscene_sat_mul(*strokes, sizeof(uint64_t))));
   n = gshscene_sat_add(n, GLYPH_BYTES);
   return n;
 }
@@ -340,7 +354,8 @@ static GSHSCENE_Result op_workspace_bytes(void * impl, const GSHSCENE_Render_Req
   size_t blocks;
   size_t fills;
   size_t stops;
-  *out = run_bytes(request->list, &levels, &blocks, &fills, &stops);
+  size_t strokes;
+  *out = run_bytes(request->list, &levels, &blocks, &fills, &stops, &strokes);
   return GSHSCENE_OK;
 }
 
@@ -594,14 +609,22 @@ static void draw_rect(Run * run, GSHSCENE_Rect r, uint32_t mark, GSHSCENE_Result
 
 /* --- one unit ----------------------------------------------------------------------- */
 
-/** The composed map of the unit: the instances' maps, the item's, the target's last (AD-24). */
-static int unit_map(Run * run, const GSHSCENE_Item * item, size_t count, GSHGEOM_Map * out) {
+/** The maps of the instances that enclose the unit, root to leaf, in @p run->maps[0] to [count - 2]. */
+static int instance_maps(Run * run, size_t count) {
   for (size_t i = 0; i + 1 < count; i++) {
     const GSHSCENE_Item * instance = NULL;
     if (gshscene_list_item(run->walk.lists[i], run->walk.chain[i], &instance) != GSHSCENE_OK) {
       return 1;
     }
     run->maps[i] = instance->map;
+  }
+  return 0;
+}
+
+/** The composed map of the unit: the instances' maps, the item's, the target's last (AD-24). */
+static int unit_map(Run * run, const GSHSCENE_Item * item, size_t count, GSHGEOM_Map * out) {
+  if (instance_maps(run, count)) {
+    return 1;
   }
   run->maps[count - 1] = item->map;
   return gshgeom_map_compose_chain(run->maps, count, &run->job->target.map, out) != GSHGEOM_OK;
@@ -729,6 +752,128 @@ static GSHSCENE_Result gradient_record(Run * run, const GSHSCENE_Resource * grad
 }
 
 /**
+ * The style's record (dump_sink.h), the first time a render meets its id (S20): `Q <id> <hash>` and its fields as
+ * the style's dump spells them, then a `d` line per dash, as a writer emits a style once.
+ */
+static GSHSCENE_Result style_record(Run * run, const GSHSCENE_Resource * style, GSHSCENE_Result * failed) {
+  uint64_t id = gshscene_resource_id(style);
+  for (size_t i = 0; i < run->style_count; i++) {
+    if (run->styles[i] == id) {
+      return GSHSCENE_OK;
+    }
+  }
+  GSHSCENE_Stroke_Style s;
+  if (gshscene_resource_stroke_style(style, &s) != GSHSCENE_OK) {
+    return GSHSCENE_ERR_INTERNAL;
+  }
+  run->styles[run->style_count++] = id;
+  snprintf(run->line, LINE_BYTES,
+      "Q %" PRIu64 " %016" PRIx64 " width=%016" PRIx64 " space=%u join=%u miter=%016" PRIx64 " cap=%u degenerate=%u "
+      "align=%u rule=%u scope=%u offset=%016" PRIx64 " dashes=%" PRIu64 " profile=%016" PRIx64 "\n",
+      id, gshscene_resource_hash(style), gshgeom_f64_bits(s.width), (unsigned)s.width_space, (unsigned)s.join,
+      gshgeom_f64_bits(s.miter_limit), (unsigned)s.cap, (unsigned)s.degenerate, (unsigned)s.alignment,
+      (unsigned)s.alignment_rule, (unsigned)s.dash_scope, gshgeom_f64_bits(s.dash_offset), (uint64_t)s.dash_count,
+      (uint64_t)0);
+  emit_text(run, run->line, failed);
+  for (size_t i = 0; i < s.dash_count; i++) {
+    snprintf(run->line, LINE_BYTES, "d %016" PRIx64 "\n", gshgeom_f64_bits(s.dashes[i]));
+    emit_text(run, run->line, failed);
+  }
+  return GSHSCENE_OK;
+}
+
+/** Refused while drawing (S6), for @p reason: the record and the entry; under strict the render stops here. */
+static GSHSCENE_Result refuse_here(Run * run, const GSHSCENE_Item * item, const size_t * chain, size_t count,
+    GSHSCENE_Reason reason, GSHSCENE_Result failed) {
+  snprintf(run->line, LINE_BYTES, " X class=%d reason=%d\n", (int)GSHSCENE_ENTRY_REFUSED, (int)reason);
+  emit_text(run, run->line, &failed);
+  GSHSCENE_Result r = gshscene_job_report(run->job, GSHSCENE_ENTRY_REFUSED, reason, chain, count);
+  if (r != GSHSCENE_OK) {
+    return r;
+  }
+  if (run->job->request.flags & GSHSCENE_RENDER_STRICT) {
+    return stop_here(run, chain, count, failed);
+  }
+  gshscene_skip_begin(&run->skip, item, count);
+  run->skip_reason = reason;
+  return failed;
+}
+
+/**
+ * A stroke (S20): its notice (SK8, SK9: an `X` record, not stamped); its box, SK10's bound of its centerline's box
+ * (the model box a fill of it would have) under the composed map, in target units; the features it requires that the
+ * caps do not emit (expanded, since the plan let it through); then its record, the style's record and the gradient's
+ * the first time the render meets them, and its stamp.  A run from an unbound face has no geometry: refused
+ * (`FACE_UNBOUND`) while drawing, since the plan routes no stroke (SK7).
+ */
+static GSHSCENE_Result stroke_unit(Run * run, const GSHSCENE_Item * item, const size_t * chain, size_t count,
+    GSHSCENE_Result failed) {
+  GSHSCENE_Reason notice = gshscene_stroke_notice(item, run->maps, count - 1, &run->job->target.map);
+  if (notice) {
+    snprintf(run->line, LINE_BYTES, " X class=%d reason=%d\n", (int)GSHSCENE_ENTRY_NOTICE, (int)notice);
+    emit_text(run, run->line, &failed);
+    return failed;
+  }
+  GSHSCENE_Glyph_Run glyphs;
+  GSHSCENE_Face_Info info;
+  if (gshscene_resource_glyph_run(item->resource, &glyphs) == GSHSCENE_OK && glyphs.source == GSHSCENE_GLYPHS_FROM_FONT &&
+      gshscene_face_info(glyphs.face, &info) != GSHSCENE_OK) {
+    return refuse_here(run, item, chain, count, GSHSCENE_REASON_FACE_UNBOUND, failed);
+  }
+  GSHGEOM_Map map;
+  Box model;
+  GSHGEOM_Bounds b;
+  memset(&b, 0, sizeof b);
+  int bad = unit_map(run, item, count, &map) || resource_box(item->resource, &model);
+  if (!bad) {
+    GSHGEOM_Bounds centerline;
+    memset(&centerline, 0, sizeof centerline);
+    centerline.empty = model.empty;
+    centerline.min.x = model.x0;
+    centerline.min.y = model.y0;
+    centerline.max.x = model.x1;
+    centerline.max.y = model.y1;
+    bad = gshscene_stroke_bounds(item->style, &centerline, &map, run->job->target.unit, &b) != GSHSCENE_OK;
+  }
+  double limit = run->sink->config.max_extent;
+  if (bad || (limit > 0.0 && !b.empty && (b.max.x - b.min.x > limit || b.max.y - b.min.y > limit))) {
+    return refuse_here(run, item, chain, count, GSHSCENE_REASON_RESOURCE_LIMIT, failed);
+  }
+  uint32_t expand =
+      gshscene_stroke_required(item, run->maps, count - 1, &run->job->target.map) & ~run->job->caps.stroke_native;
+  snprintf(run->line, LINE_BYTES, " K res=%s:%016" PRIx64 " style=%" PRIu64 " map=%016" PRIx64,
+      gshscene_resource_kind_string(gshscene_resource_kind(item->resource)), gshscene_resource_hash(item->resource),
+      gshscene_resource_id(item->style), gshgeom_map_hash(&map));
+  emit_text(run, run->line, &failed);
+  if (item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
+    snprintf(run->line, LINE_BYTES, " grad=%" PRIu64, gshscene_resource_id(item->paint.gradient));
+    emit_text(run, run->line, &failed);
+  }
+  if (b.empty) {
+    snprintf(run->line, LINE_BYTES, " box=- expand=%u outline=-\n", (unsigned)expand);
+  } else {
+    snprintf(run->line, LINE_BYTES,
+        " box=%016" PRIx64 " %016" PRIx64 " %016" PRIx64 " %016" PRIx64 " expand=%u outline=-\n",
+        gshgeom_f64_bits(b.min.x), gshgeom_f64_bits(b.min.y), gshgeom_f64_bits(b.max.x), gshgeom_f64_bits(b.max.y),
+        (unsigned)expand);
+  }
+  emit_text(run, run->line, &failed);
+  GSHSCENE_Result r = style_record(run, item->style, &failed);
+  if (r == GSHSCENE_OK && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
+    r = gradient_record(run, item->paint.gradient, &failed);
+  }
+  if (r != GSHSCENE_OK) {
+    return r;
+  }
+  if (run->raster) {
+    Box box = {b.empty, b.min.x, b.min.y, b.max.x, b.max.y};
+    GSHSCENE_Rect zero = {0, 0, 0, 0};
+    draw_rect(run, box.empty ? zero : box_pixels(&box), mark_of(chain, count), &failed);
+  }
+  return failed;
+}
+
+/**
  * Go through one unit.  @return 0 to go on; a result to stop with (::GSHSCENE_ERR_REFUSED for a strict refusal while
  * drawing, an I/O error from the stream).
  */
@@ -743,8 +888,11 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
     emit_text(run, run->line, &failed);
     return failed;
   }
-  GSHSCENE_Disposition d = gshscene_caps_disposition(
-      &run->job->caps, item, &run->job->target_space, gshscene_list_palette(run->job->request.list));
+  if (instance_maps(run, count)) {
+    return GSHSCENE_ERR_INTERNAL; /* the walk's own lists: unreachable */
+  }
+  GSHSCENE_Disposition d = gshscene_caps_disposition(&run->job->caps, item, run->maps, count - 1, &run->job->target.map,
+      &run->job->target_space, gshscene_list_palette(run->job->request.list));
   if (d.entry_class == GSHSCENE_ENTRY_REFUSED) {
     snprintf(run->line, LINE_BYTES, " X class=%d reason=%d\n", (int)d.entry_class, (int)d.reason);
     emit_text(run, run->line, &failed);
@@ -886,6 +1034,8 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
       hex(run, " I res=picture:", gshscene_resource_hash(item->resource), &failed);
       emit_text(run, "\n", &failed);
       break;
+    case GSHSCENE_ITEM_STROKE:
+      return stroke_unit(run, item, chain, count, failed);
     default:
       return GSHSCENE_ERR_INTERNAL;
   }
@@ -979,7 +1129,8 @@ static GSHSCENE_Result op_begin(void * impl, GSHSCENE_Job * job) {
   size_t blocks;
   size_t fills;
   size_t stops;
-  size_t need = run_bytes(request->list, &levels, &blocks, &fills, &stops);
+  size_t strokes;
+  size_t need = run_bytes(request->list, &levels, &blocks, &fills, &stops, &strokes);
   unsigned char * memory = NULL;
   unsigned char * base;
   if (request->flags & GSHSCENE_RENDER_CALLER_MEMORY) {
@@ -1002,6 +1153,7 @@ static GSHSCENE_Result op_begin(void * impl, GSHSCENE_Job * job) {
   run->gradients = carve(&cursor, fills * sizeof(uint64_t));
   run->stops = carve(&cursor, stops * sizeof(GSHSCENE_Resolved_Stop));
   run->stop_capacity = stops;
+  run->styles = carve(&cursor, strokes * sizeof(uint64_t));
   arena_init(&run->glyphs, carve(&cursor, GLYPH_BYTES), GLYPH_BYTES);
   run->sink = ds;
   run->job = job;

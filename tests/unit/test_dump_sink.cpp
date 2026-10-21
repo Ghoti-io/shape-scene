@@ -120,6 +120,42 @@ GSHSCENE_Sink * make_writer(const GSHSCENE_Allocator * alloc, const GSHSCENE_Lim
   return make_with(c, alloc, limits);
 }
 
+/**
+ * A writer's stroke caps (S20, strokes story S1; the SVG 1.1 set): miter, round and bevel joins, every cap, a local
+ * width under any map (SVG transforms a stroke), dashes restarting per subpath, natively; everything else expanded.
+ */
+GSHSCENE_Dump_Sink_Config config_writer_like() {
+  GSHSCENE_Dump_Sink_Config c = config_default();
+  for (GSHSCENE_Sink_Caps * caps : {&c.raster_caps, &c.stream_caps}) {
+    caps->flags |= GSHSCENE_CAP_STROKE_EXPAND;
+    caps->stroke_native = GSHSCENE_STROKE_NATIVE_JOIN_MITER | GSHSCENE_STROKE_NATIVE_JOIN_ROUND |
+        GSHSCENE_STROKE_NATIVE_JOIN_BEVEL | GSHSCENE_STROKE_NATIVE_CAP_BUTT | GSHSCENE_STROKE_NATIVE_CAP_ROUND |
+        GSHSCENE_STROKE_NATIVE_CAP_SQUARE | GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL |
+        GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL_ANISOTROPIC | GSHSCENE_STROKE_NATIVE_DASH;
+  }
+  return c;
+}
+GSHSCENE_Sink * make_writer_like(const GSHSCENE_Allocator * alloc, const GSHSCENE_Limits * limits) {
+  return make_with(config_writer_like(), alloc, limits);
+}
+
+/**
+ * A toolpath's stroke caps (S20; a pen or a needle follows the centerline): a round join, round and butt caps, a
+ * local width under a similarity and a device width, dashes; no expansion, so anything else is refused.
+ */
+GSHSCENE_Dump_Sink_Config config_toolpath_like() {
+  GSHSCENE_Dump_Sink_Config c = config_default();
+  for (GSHSCENE_Sink_Caps * caps : {&c.raster_caps, &c.stream_caps}) {
+    caps->stroke_native = GSHSCENE_STROKE_NATIVE_JOIN_ROUND | GSHSCENE_STROKE_NATIVE_CAP_ROUND |
+        GSHSCENE_STROKE_NATIVE_CAP_BUTT | GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL | GSHSCENE_STROKE_NATIVE_WIDTH_DEVICE |
+        GSHSCENE_STROKE_NATIVE_DASH;
+  }
+  return c;
+}
+GSHSCENE_Sink * make_toolpath_like(const GSHSCENE_Allocator * alloc, const GSHSCENE_Limits * limits) {
+  return make_with(config_toolpath_like(), alloc, limits);
+}
+
 void step(GSHSCENE_Sink * sink) {
   EXPECT_EQ(gshscene_dump_sink_step(sink, nullptr), GSHSCENE_OK);
 }
@@ -132,11 +168,14 @@ const Fixture kAffine{"affine", make_affine, {GSHSCENE_TARGET_RASTER, GSHSCENE_T
 const Fixture kAffineDeferred{"affine_deferred", make_affine_deferred, {GSHSCENE_TARGET_RASTER}, step};
 const Fixture kBeforeSubmit{"before_submit", make_before_submit, {GSHSCENE_TARGET_RASTER, GSHSCENE_TARGET_STREAM}, nullptr};
 const Fixture kWriter{"writer", make_writer, {GSHSCENE_TARGET_STREAM}, nullptr};
+const Fixture kWriterLike{"writer_like", make_writer_like, {GSHSCENE_TARGET_RASTER, GSHSCENE_TARGET_STREAM}, nullptr};
+const Fixture kToolpathLike{"toolpath_like", make_toolpath_like, {GSHSCENE_TARGET_RASTER, GSHSCENE_TARGET_STREAM}, nullptr};
 
 } // namespace
 
 INSTANTIATE_TEST_SUITE_P(DumpSink, SinkConformance,
-    ::testing::Values(&kFull, &kNarrow, &kNoXor, &kDeferred, &kAffine, &kAffineDeferred, &kBeforeSubmit, &kWriter),
+    ::testing::Values(&kFull, &kNarrow, &kNoXor, &kDeferred, &kAffine, &kAffineDeferred, &kBeforeSubmit, &kWriter,
+        &kWriterLike, &kToolpathLike),
     [](const ::testing::TestParamInfo<const Fixture *> & info) { return std::string(info.param->name); });
 
 /* --- the fixture of tools/gen-sink-vectors.py ----------------------------------------------------------- */
@@ -482,6 +521,164 @@ TEST(DumpSink, TheGradientRecordsOnAStreamAreTheGenerators) {
   EXPECT_EQ(report_dump(report.report), with_bytes(sink_known::kGradientStreamReportDump, report.report));
 }
 
+// Strokes story S1 (S20): the stroke records in the test sink's three configurations, restated by
+// tools/gen-sink-vectors.py.  The fixture interns, into a fresh store and in this order, styles A, B, Z and C, so that
+// their ids are the generator's.
+namespace {
+
+const GSHSCENE_List * stroke_list(Scene & s) {
+  auto intern_style = [&](GSHSCENE_Stroke_Style st, std::vector<double> dashes = {}) {
+    st.dash_count = dashes.size();
+    st.dashes = dashes.empty() ? nullptr : dashes.data();
+    const GSHSCENE_Resource * r = nullptr;
+    EXPECT_EQ(gshscene_store_intern_stroke_style(s.store, &st, &r), GSHSCENE_OK);
+    s.held.push_back(r);
+    return r;
+  };
+  GSHSCENE_Stroke_Style a;
+  gshscene_stroke_style_init(&a);
+  GSHSCENE_Stroke_Style b = a;
+  b.width = 2.0;
+  b.width_space = GSHSCENE_STROKE_WIDTH_DEVICE;
+  b.join = GSHSCENE_STROKE_JOIN_ROUND;
+  b.cap = GSHSCENE_STROKE_CAP_ROUND;
+  GSHSCENE_Stroke_Style z = a;
+  z.width = 0.0;
+  GSHSCENE_Stroke_Style c = a;
+  c.width = 1.5;
+  c.join = GSHSCENE_STROKE_JOIN_BEVEL;
+  c.cap = GSHSCENE_STROKE_CAP_SQUARE;
+  c.degenerate = GSHSCENE_STROKE_DEGENERATE_OMIT;
+  c.dash_offset = -0.5;
+  c.dash_scope = GSHSCENE_STROKE_DASH_PATH;
+  c.alignment = GSHSCENE_STROKE_ALIGN_INSIDE;
+  c.alignment_rule = GSHGEOM_FILL_EVEN_ODD;
+  const GSHSCENE_Resource * sa = intern_style(a);
+  const GSHSCENE_Resource * sb = intern_style(b);
+  const GSHSCENE_Resource * sz = intern_style(z);
+  const GSHSCENE_Resource * sc = intern_style(c, {1.0, 2.0, 3.0});
+  EXPECT_EQ(gshscene_resource_id(sa), 1u) << "the generator's ids: a fresh store, in this order";
+  EXPECT_EQ(gshscene_resource_id(sc), 4u);
+  GSHSCENE_Paint red = solid(1, 0, 0);
+  GSHSCENE_Paint blue = solid(0, 0, 1, 0.5);
+  GSHSCENE_List * l = s.open();
+  EXPECT_EQ(gshscene_list_stroke(l, s.sq(2, 2, 8), sa, nullptr, &red, 0, 0.0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_stroke(l, s.sq(10, 4, 6), sb, nullptr, &blue, 0, 0.0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_stroke(l, s.sq(20, 20, 6), sa, nullptr, &red, 0, 0.0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_stroke(l, s.sq(30, 2, 4), sz, nullptr, &red, 0, 0.0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_stroke(l, s.sq(40, 40, 4), sc, nullptr, &red, 0, 0.0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  return l;
+}
+
+}  // namespace
+
+TEST(DumpSink, TheStrokeRecordsAreTheGeneratorsInEachConfiguration) {
+  struct Case {
+    const char * what;
+    GSHSCENE_Dump_Sink_Config config;
+    const char * dump;
+    uint64_t output;
+    uint64_t report;
+  } cases[] = {
+      {"every feature native", config_default(), sink_known::kStrokeStreamDump, sink_known::kStrokeStreamOutputHash,
+          sink_known::kStrokeStreamReportHash},
+      {"a writer's set, the rest expanded", config_writer_like(), sink_known::kStrokeWriterDump,
+          sink_known::kStrokeWriterOutputHash, sink_known::kStrokeWriterReportHash},
+      {"a toolpath's set, the rest refused", config_toolpath_like(), sink_known::kStrokeToolpathDump,
+          sink_known::kStrokeToolpathOutputHash, sink_known::kStrokeToolpathReportHash},
+  };
+  EXPECT_EQ(config_writer_like().stream_caps.stroke_native, sink_known::kStrokeWriterNative);
+  EXPECT_EQ(config_toolpath_like().stream_caps.stroke_native, sink_known::kStrokeToolpathNative);
+  for (const Case & c : cases) {
+    Scene s;
+    const GSHSCENE_List * list = stroke_list(s);
+    EXPECT_EQ(gshscene_list_hash(list), sink_known::kStrokeListHash) << c.what;
+    SinkRef sink(make_with(c.config, nullptr, nullptr));
+    auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+    gshgeom_map_scale(2, 0.5, 0.5, 1.0, &stream->target.map);
+    ReportRef report;
+    Rendered r = render_job(sink.sink, request_for(list, *stream, report.report));
+    ASSERT_EQ(r.result, GSHSCENE_OK) << c.what;
+    EXPECT_EQ(stream->bytes, c.dump) << c.what;
+    EXPECT_EQ(r.output, c.output) << c.what;
+    EXPECT_EQ(gshscene_report_hash(report.report), c.report) << c.what;
+  }
+  // The toolpath's report, in full: each refusal names the features the pen lacks.
+  Scene s;
+  const GSHSCENE_List * list = stroke_list(s);
+  SinkRef sink(make_with(config_toolpath_like(), nullptr, nullptr));
+  auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+  gshgeom_map_scale(2, 0.5, 0.5, 1.0, &stream->target.map);
+  ReportRef report;
+  ASSERT_EQ(render_job(sink.sink, request_for(list, *stream, report.report)).result, GSHSCENE_OK);
+  EXPECT_EQ(report_dump(report.report), with_bytes(sink_known::kStrokeToolpathReportDump, report.report));
+  // Under strict the toolpath's planned refusals fail the render before the sink is called.
+  auto strict_stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+  GSHSCENE_Render_Request strict = request_for(list, *strict_stream, report.report);
+  strict.flags = GSHSCENE_RENDER_STRICT;
+  EXPECT_EQ(render_job(sink.sink, strict).result, GSHSCENE_ERR_REFUSED);
+  EXPECT_TRUE(strict_stream->bytes.empty()) << "the target is untouched";
+}
+
+TEST(DumpSink, TheStrokeRecordsOnARasterAreTheGenerators) {
+  Scene s;
+  const GSHSCENE_List * list = stroke_list(s);
+  Log log;
+  GSHSCENE_Dump_Sink_Config c = config_default();
+  c.log = &log.writer;
+  SinkRef sink(make_with(c, nullptr, nullptr));
+  auto raster = make_raster();
+  ReportRef report;
+  Rendered r = render_job(sink.sink, request_for(list, *raster, report.report));
+  ASSERT_EQ(r.result, GSHSCENE_OK);
+  EXPECT_EQ(log.text, sink_known::kStrokeRasterDump);
+  EXPECT_EQ(r.output, sink_known::kStrokeRasterOutputHash);
+  EXPECT_EQ(raster->snapshot(), sink_known::kStrokeRasterPixelsHash);
+}
+
+TEST(DumpSink, AStrokePastTheExtentAndAStrokeOfAnUnboundFaceAreRefusedWhileDrawing) {
+  Scene s;
+  const GSHSCENE_List * list = stroke_list(s);
+  GSHSCENE_Dump_Sink_Config c = config_default();
+  c.max_extent = 9.0; // the first stroke's box is about 12 wide; the second's (device, round) is about 7
+  SinkRef sink(make_with(c, nullptr, nullptr));
+  auto raster = make_raster();
+  ReportRef report;
+  ASSERT_EQ(render_job(sink.sink, request_for(list, *raster, report.report)).result, GSHSCENE_OK);
+  auto es = entries(report.report);
+  ASSERT_GE(es.size(), 1u);
+  EXPECT_EQ(es[0].entry_class, GSHSCENE_ENTRY_REFUSED);
+  EXPECT_EQ(es[0].reason, GSHSCENE_REASON_RESOURCE_LIMIT);
+  EXPECT_EQ(es[0].chain[0], 0u);
+  bool second_refused = false;
+  for (const GSHSCENE_Report_Entry & e : es) {
+    second_refused = second_refused || (e.chain[0] == 1u && e.entry_class == GSHSCENE_ENTRY_REFUSED);
+  }
+  EXPECT_FALSE(second_refused);
+  // A run from an unbound face: the plan routes no stroke (SK7), so the sink refuses it, FACE_UNBOUND.
+  Scene t;
+  GSHSCENE_Stroke_Style st;
+  gshscene_stroke_style_init(&st);
+  st.join = GSHSCENE_STROKE_JOIN_ROUND;
+  const GSHSCENE_Resource * style = nullptr;
+  ASSERT_EQ(gshscene_store_intern_stroke_style(t.store, &st, &style), GSHSCENE_OK);
+  t.held.push_back(style);
+  GSHSCENE_List * l = t.open();
+  GSHSCENE_Paint red = solid(1, 0, 0);
+  ASSERT_EQ(gshscene_list_stroke(l, t.glyphs(t.face(1, 0), {1}, 8.0, GSHSCENE_HINT_FONT), style, nullptr, &red, 0, 0.0),
+      GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  SinkRef full(make_full(nullptr, nullptr));
+  auto r2 = make_raster();
+  ReportRef rep2;
+  ASSERT_EQ(render_job(full.sink, request_for(l, *r2, rep2.report)).result, GSHSCENE_OK);
+  auto e2 = entries(rep2.report);
+  ASSERT_EQ(e2.size(), 1u);
+  EXPECT_EQ(e2[0].entry_class, GSHSCENE_ENTRY_REFUSED);
+  EXPECT_EQ(e2[0].reason, GSHSCENE_REASON_FACE_UNBOUND);
+}
+
 TEST(DumpSink, AGlyphPastTheScratchIsRefusedAsTheSinksOwnLimit) {
   // Glyph 8's 3000 lines do not fit the 64 KiB of a glyph's scratch, on either route: refused, the rest drawn.
   for (uint32_t kind : {(uint32_t)GSHSCENE_TARGET_RASTER, (uint32_t)GSHSCENE_TARGET_STREAM}) {
@@ -750,6 +947,7 @@ TEST(DumpSink, TheConfigurationIsValidated) {
       [](GSHSCENE_Dump_Sink_Config & c) { c.stream_caps.cancel_unit = GSHSCENE_CANCEL_UNIT_COUNT; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.raster_caps.work_measure = nullptr; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.raster_caps._reserved[2] = 1; },
+      [](GSHSCENE_Dump_Sink_Config & c) { c.stream_caps.stroke_native |= 1u << 16; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.raster_caps.flags |= GSHSCENE_CAP_THREAD_AFFINE; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.stream_caps.flags &= ~GSHSCENE_CAP_CAN_BLOCK; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.targets |= 1u << GSHSCENE_TARGET_GPU_TEXTURE; },
@@ -788,7 +986,8 @@ TEST(DumpSink, TheConfigurationIsValidated) {
     EXPECT_EQ(b, 0);
   }
   for (const GSHSCENE_Sink_Caps * caps : {&d.raster_caps, &d.stream_caps}) {
-    EXPECT_EQ(caps->item_kinds, 0x7eu);
+    EXPECT_EQ(caps->item_kinds, 0xfeu) << "every kind, the stroke included (S20)";
+    EXPECT_EQ(caps->stroke_native, (uint32_t)GSHSCENE_STROKE_NATIVE_ALL) << "every stroke feature, as a stroke";
     EXPECT_EQ(caps->composites, 0x0fffffffu) << "every operator and blend mode: it records the number (B13)";
     EXPECT_EQ(caps->cancel_unit, (uint32_t)GSHSCENE_CANCEL_BETWEEN_UNITS);
     EXPECT_EQ(caps->cancel_work_bound, 1u);

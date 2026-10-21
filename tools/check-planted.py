@@ -1571,7 +1571,7 @@ PLANTS += [
     ('pal-plan-kind', 'src', SK, '  if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_PALETTE) {', '  if (item->kind == GSHSCENE_ITEM_FILL) {', PT + ["testDump_sink"]),
     ('pal-plan-reason', 'src', SK, 'palette, &resolved) != GSHSCENE_OK) {\n      d.entry_class = GSHSCENE_ENTRY_REFUSED;\n      d.reason = GSHSCENE_REASON_PALETTE_ENTRY;', 'palette, &resolved) != GSHSCENE_OK) {\n      d.entry_class = GSHSCENE_ENTRY_REFUSED;\n      d.reason = GSHSCENE_REASON_ITEM_KIND;', PT + ["testDump_sink"]),
     ('pal-plan-refuse', 'src', SK, '    if (gshscene_paint_resolve(&item->paint, &unused, palette, &resolved) != GSHSCENE_OK) {', '    if (0 && gshscene_paint_resolve(&item->paint, &unused, palette, &resolved) != GSHSCENE_OK) {', PT + ["testDump_sink"]),
-    ('pal-plan-list', 'src', SK, 'gshscene_caps_disposition(&job->caps, item, &job->target_space, gshscene_list_palette(list));', 'gshscene_caps_disposition(&job->caps, item, &job->target_space, NULL);', ["testDump_sink"]),
+    ('pal-plan-list', 'src', SK, '&job->caps, item, maps, count - 1, &job->target.map, &job->target_space, gshscene_list_palette(list));', '&job->caps, item, maps, count - 1, &job->target.map, &job->target_space, NULL);', ["testDump_sink"]),
     ('pal-test-sink-list', 'src', DS, '&run->job->caps, item, &run->job->target_space, gshscene_list_palette(run->job->request.list));', '&run->job->caps, item, &run->job->target_space, NULL);', ["testDump_sink"]),
     # truncate
     ('tr-closed', 'src', LS, '  if (!list || list->closed || count > list->count) {', '  if (!list || count > list->count) {', PT),

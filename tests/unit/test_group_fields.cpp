@@ -392,7 +392,7 @@ TEST(GroupFields, ThePlanningPassRefusesEachWithoutItsCap) {
   item.group = make_group(1.0);
   auto decide = [&](const GSHSCENE_Group & g) {
     item.group = g;
-    return gshscene_caps_disposition(&caps, &item, nullptr, nullptr);
+    return gshscene_caps_disposition(&caps, &item, nullptr, 0, nullptr, nullptr, nullptr);
   };
   EXPECT_EQ(decide(pdf_group(1.0, 0, 0, nullptr)).entry_class, 0) << "the default group is drawn";
   EXPECT_EQ(decide(pdf_group(1.0, 1, 0, nullptr)).reason, GSHSCENE_REASON_GROUP_ISOLATION);

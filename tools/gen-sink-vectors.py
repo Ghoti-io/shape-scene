@@ -56,6 +56,12 @@ Since color-paint story P2, a third fixture: four gradient fills on the stream (
 solid, a foreground and a palette stop, interpolated in linear sRGB; a radial one in the target's space; and a
 degenerate one, a notice), and the test sink's gradient records restated: each fill's ` grad=<id>`, and once per
 gradient its `R` line and the `r` line of each stop as the one resolve gives it.
+
+Since strokes story S1, a fourth fixture: five strokes of squares (a default style; a device width with round joins
+and caps; the default again, whose style's record is not written twice; width 0, a notice; a beveled, square-capped,
+dashed, inside-aligned style), rendered by the test sink in its three configurations (every feature native, a
+writer's set with STROKE_EXPAND, a toolpath's set without it), on the stream and, natively, on the raster.  SK10's box
+and SK11's required features are restated from stroke.h's text; the outward rounding is exact rational arithmetic.
 """
 import importlib.util
 import os
@@ -585,6 +591,173 @@ def gradient_render(target_map):
 GRAD_STREAM_TEXT, GRAD_STREAM_HASH, GRAD_STREAM_ENTRIES = gradient_render(scale(0.5))
 GRAD_STREAM_REPORT_HASH, GRAD_STREAM_REPORT_DUMP = report(OK, (4, 4, 4), GRAD_STREAM_ENTRIES)
 
+# --- strokes (strokes story S1, S20): the test sink's stroke records in its three configurations ----------------------
+#
+# The test interns, into a fresh store and in this order, styles A, B, Z and C (ids 1 to 4), then the squares.  SK10's
+# box and SK11's required features are restated here from stroke.h's text, sharing nothing with the library.
+from fractions import Fraction
+import math
+
+NATIVE = {"JOIN_MITER": 1 << 0, "JOIN_ROUND": 1 << 1, "JOIN_BEVEL": 1 << 2, "JOIN_MITER_CLIP": 1 << 3, "JOIN_ARCS": 1 << 4,
+          "CAP_BUTT": 1 << 5, "CAP_ROUND": 1 << 6, "CAP_SQUARE": 1 << 7, "WIDTH_LOCAL": 1 << 8,
+          "WIDTH_LOCAL_ANISOTROPIC": 1 << 9, "WIDTH_DEVICE": 1 << 10, "DASH": 1 << 11, "DASH_PATH_SCOPE": 1 << 12,
+          "ALIGN": 1 << 13, "ALIGN_EVEN_ODD": 1 << 14, "DEGENERATE_DRAW": 1 << 15}
+NATIVE_ALL = (1 << 16) - 1
+# The three configurations of the test sink (dump_sink.h): every feature; a writer's (SVG 1.1's set, everything else
+# expanded); a toolpath's (what a pen does, nothing expanded).
+WRITER_NATIVE = (NATIVE["JOIN_MITER"] | NATIVE["JOIN_ROUND"] | NATIVE["JOIN_BEVEL"] | NATIVE["CAP_BUTT"] |
+                 NATIVE["CAP_ROUND"] | NATIVE["CAP_SQUARE"] | NATIVE["WIDTH_LOCAL"] | NATIVE["WIDTH_LOCAL_ANISOTROPIC"] |
+                 NATIVE["DASH"])
+TOOLPATH_NATIVE = (NATIVE["JOIN_ROUND"] | NATIVE["CAP_ROUND"] | NATIVE["CAP_BUTT"] | NATIVE["WIDTH_LOCAL"] |
+                   NATIVE["WIDTH_DEVICE"] | NATIVE["DASH"])
+R_STROKE_STYLE, R_STROKE_ZERO_WIDTH = 28, 29
+JOIN_NAMES = ["JOIN_MITER", "JOIN_ROUND", "JOIN_BEVEL", "JOIN_MITER_CLIP", "JOIN_ARCS"]
+CAP_NAMES = ["CAP_BUTT", "CAP_ROUND", "CAP_SQUARE"]
+
+STYLE_A = sv.style()
+STYLE_B = sv.style(width=2.0, space=sv.WIDTH_DEVICE, join=sv.JOIN_ROUND, cap=sv.CAP_ROUND)
+STYLE_Z = sv.style(width=0.0)
+STYLE_C = sv.style(width=1.5, join=sv.JOIN_BEVEL, cap=sv.CAP_SQUARE, degenerate=sv.DEGENERATE_OMIT,
+                   dashes=(1.0, 2.0, 3.0), offset=-0.5, scope=sv.DASH_PATH, align=sv.ALIGN_INSIDE,
+                   rule=sv.RULE_EVEN_ODD)
+STYLE_IDS = {"A": 1, "B": 2, "Z": 3, "C": 4}
+STYLES = {"A": STYLE_A, "B": STYLE_B, "Z": STYLE_Z, "C": STYLE_C}
+STROKE_SQUARES = [(2, 2, 8, "A", RED), (10, 4, 6, "B", BLUE), (20, 20, 6, "A", RED), (30, 2, 4, "Z", RED),
+                  (40, 40, 4, "C", RED)]
+STROKE_LIST_ITEMS = [sv.stroke(sv.KIND_PATH, rhash(x, y, sz), sv.style_hash(STYLES[k]), ID, rgba)
+                     for x, y, sz, k, rgba in STROKE_SQUARES]
+STROKE_LIST_HASH = sv.list_hash(STROKE_LIST_ITEMS)
+
+
+def required(st, composed):
+    """SK11: the features a stroke of style st under the composed map requires (it draws something here)."""
+    need = NATIVE[JOIN_NAMES[st["join"]]] | NATIVE[CAP_NAMES[st["cap"]]]
+    if st["space"] == sv.WIDTH_DEVICE:
+        need |= NATIVE["WIDTH_DEVICE"]
+    else:
+        need |= NATIVE["WIDTH_LOCAL"]
+        a, b, c, d = composed[0]
+        if not ((a == d and b == -c) or (a == -d and b == c)):
+            need |= NATIVE["WIDTH_LOCAL_ANISOTROPIC"]
+    if st["dashes"]:
+        need |= NATIVE["DASH"] | (NATIVE["DASH_PATH_SCOPE"] if st["scope"] == sv.DASH_PATH else 0)
+    if st["align"] != sv.ALIGN_CENTER:
+        need |= NATIVE["ALIGN"] | (NATIVE["ALIGN_EVEN_ODD"] if st["rule"] == sv.RULE_EVEN_ODD else 0)
+    if st["degenerate"] == sv.DEGENERATE_DRAW and st["cap"] != sv.CAP_BUTT:
+        need |= NATIVE["DEGENERATE_DRAW"]
+    return need
+
+
+def double_up(q):
+    """The least double at or above the rational q (the outward rounding SK10 says an outset gets)."""
+    x = float(q)  # nearest
+    if Fraction(x) < q:
+        x = math.nextafter(x, math.inf)
+    return x
+
+
+def double_down(q):
+    x = float(q)
+    if Fraction(x) > q:
+        x = math.nextafter(x, -math.inf)
+    return x
+
+
+PIXEL = {UNIT_DEFAULT: 1.0, UNIT_MM: 25.4 / 96.0}
+
+
+def stroke_box(st, square, composed, unit):
+    """SK10: h from the style, formed in the stated order and covered by 1 + 2^-50; the outsets rounded outward."""
+    if st["width"] == 0:
+        return None
+    f = 1.0
+    if st["join"] == sv.JOIN_MITER:
+        f = st["miter"]
+    elif st["join"] in (sv.JOIN_MITER_CLIP, sv.JOIN_ARCS):
+        f = st["miter"] + 1.0
+    if st["cap"] == sv.CAP_SQUARE and f < 1.5:
+        f = 1.5
+    a = 1.0 if st["align"] == sv.ALIGN_CENTER else 2.0
+    device = st["space"] == sv.WIDTH_DEVICE
+    h = st["width"] * 0.5 * f * a * (PIXEL[unit] if device else 1.0) * (1.0 + 2.0 ** -50)
+    x0, y0, x1, y1 = sq_box(*square)
+    if not device:
+        x0, y0 = double_down(Fraction(x0) - Fraction(h)), double_down(Fraction(y0) - Fraction(h))
+        x1, y1 = double_up(Fraction(x1) + Fraction(h)), double_up(Fraction(y1) + Fraction(h))
+    corners = [apply(composed, px, py) for px in (x0, x1) for py in (y0, y1)]
+    box = [min(p[0] for p in corners), min(p[1] for p in corners), max(p[0] for p in corners), max(p[1] for p in corners)]
+    if device:
+        box = [double_down(Fraction(box[0]) - Fraction(h)), double_down(Fraction(box[1]) - Fraction(h)),
+               double_up(Fraction(box[2]) + Fraction(h)), double_up(Fraction(box[3]) + Fraction(h))]
+    return tuple(box)
+
+
+def style_record(k):
+    st = STYLES[k]
+    hx = lambda v: "%016x" % bits(v)
+    lines = ["Q %d %016x width=%s space=%d join=%d miter=%s cap=%d degenerate=%d align=%d rule=%d scope=%d offset=%s "
+             "dashes=%d profile=%016x" % (STYLE_IDS[k], sv.style_hash(st), hx(st["width"]), st["space"], st["join"],
+                                         hx(st["miter"]), st["cap"], st["degenerate"], st["align"], st["rule"],
+                                         st["scope"], hx(st["offset"]), len(st["dashes"]), 0)]
+    lines += ["d %s" % hx(d) for d in st["dashes"]]
+    return lines
+
+
+def stroke_render(kind, unit, target_map, native, expand, area=None):
+    """The test sink's dump of the stroke fixture under caps with these native features (and STROKE_EXPAND or not),
+    the stamps on a pixel target, and the report's entries."""
+    n = len(STROKE_SQUARES)
+    lines = ["gshscene.dump-sink 1 kind=%d unit=%d units=%d list=%016x" % (kind, unit, n, STROKE_LIST_HASH)]
+    seen = set()
+    entries = []
+    stamps = []
+    for i, (x, y, sz, k, _) in enumerate(STROKE_SQUARES):
+        head = "U %d" % i
+        st = STYLES[k]
+        composed = chain([ident()], target_map)
+        if st["width"] == 0:
+            lines.append("%s X class=%d reason=%d" % (head, NOTICE, R_STROKE_ZERO_WIDTH))
+            entries.append((NOTICE, R_STROKE_ZERO_WIDTH, (i,), 0, 0.0))
+            continue
+        missing = required(st, composed) & ~native
+        if missing and not expand:
+            lines.append("%s X class=%d reason=%d" % (head, REFUSED, R_STROKE_STYLE))
+            entries.append((REFUSED, R_STROKE_STYLE, (i,), missing, 0.0))
+            continue
+        box = stroke_box(st, (x, y, sz), composed, unit)
+        lines.append("%s K res=path:%016x style=%d map=%016x box=%s expand=%d outline=-" % (
+            head, rhash(x, y, sz), STYLE_IDS[k], mhash(composed), " ".join("%016x" % bits(v) for v in box), missing))
+        if k not in seen:
+            seen.add(k)
+            lines += style_record(k)
+        if area is not None:
+            r = meet((floor(box[0]), floor(box[1]), ceil(box[2]), ceil(box[3])), area)
+            if not empty(r):
+                m = mark((i,))
+                stamps.append((r, m))
+                lines.append("S %d %d %d %d %08x" % (r[0], r[1], r[2], r[3], m))
+    lines.append("E result=0 processed=%d done=%d" % (n, n))
+    text = "\n".join(lines) + "\n"
+    return text, fnv(text.encode()), entries, stamps
+
+
+STROKE_STREAM_TEXT, STROKE_STREAM_HASH, STROKE_STREAM_ENTRIES, _ = stroke_render(KIND_STREAM, UNIT_MM, scale(0.5),
+                                                                                 NATIVE_ALL, False)
+STROKE_RASTER_TEXT, STROKE_RASTER_HASH, _, STROKE_RASTER_STAMPS = stroke_render(KIND_RASTER, UNIT_DEFAULT, ident(),
+                                                                                 NATIVE_ALL, False, (0, 0, 64, 64))
+STROKE_RASTER_PIXELS = pixels_hash(STROKE_RASTER_STAMPS)
+STROKE_WRITER_TEXT, STROKE_WRITER_HASH, STROKE_WRITER_ENTRIES, _ = stroke_render(KIND_STREAM, UNIT_MM, scale(0.5),
+                                                                                 WRITER_NATIVE, True)
+STROKE_TOOLPATH_TEXT, STROKE_TOOLPATH_HASH, STROKE_TOOLPATH_ENTRIES, _ = stroke_render(
+    KIND_STREAM, UNIT_MM, scale(0.5), TOOLPATH_NATIVE, False)
+STROKE_STREAM_REPORT_HASH, STROKE_STREAM_REPORT_DUMP = report(OK, (5, 5, 5), STROKE_STREAM_ENTRIES)
+STROKE_WRITER_REPORT_HASH, STROKE_WRITER_REPORT_DUMP = report(OK, (5, 5, 5), STROKE_WRITER_ENTRIES)
+STROKE_TOOLPATH_REPORT_HASH, STROKE_TOOLPATH_REPORT_DUMP = report(OK, (5, 5, 5), STROKE_TOOLPATH_ENTRIES)
+assert STROKE_WRITER_ENTRIES == STROKE_STREAM_ENTRIES, "a writer expands what it lacks: no entry but the notice"
+assert [e[3] for e in STROKE_TOOLPATH_ENTRIES if e[0] == REFUSED] == [
+    NATIVE["JOIN_MITER"], NATIVE["DEGENERATE_DRAW"], NATIVE["JOIN_MITER"],
+    NATIVE["JOIN_BEVEL"] | NATIVE["CAP_SQUARE"] | NATIVE["DASH_PATH_SCOPE"] | NATIVE["ALIGN"] | NATIVE["ALIGN_EVEN_ODD"]]
+
 
 def cxx_string(name, text):
     return sv.cxx_string(name, text)
@@ -605,7 +778,13 @@ def render_header():
                     ("kGlyphStreamReportHash", GLYPH_STREAM_REPORT_HASH), ("kGradientListHash", GRAD_LIST_HASH),
                     ("kGradientAHash", GRAD_HASH["A"]), ("kGradientBHash", GRAD_HASH["B"]),
                     ("kGradientStreamOutputHash", GRAD_STREAM_HASH),
-                    ("kGradientStreamReportHash", GRAD_STREAM_REPORT_HASH)):
+                    ("kGradientStreamReportHash", GRAD_STREAM_REPORT_HASH), ("kStrokeListHash", STROKE_LIST_HASH),
+                    ("kStrokeStreamOutputHash", STROKE_STREAM_HASH), ("kStrokeRasterOutputHash", STROKE_RASTER_HASH),
+                    ("kStrokeRasterPixelsHash", STROKE_RASTER_PIXELS), ("kStrokeWriterOutputHash", STROKE_WRITER_HASH),
+                    ("kStrokeToolpathOutputHash", STROKE_TOOLPATH_HASH),
+                    ("kStrokeStreamReportHash", STROKE_STREAM_REPORT_HASH),
+                    ("kStrokeWriterReportHash", STROKE_WRITER_REPORT_HASH),
+                    ("kStrokeToolpathReportHash", STROKE_TOOLPATH_REPORT_HASH)):
         o.append("static const std::uint64_t %s = UINT64_C(0x%016x);\n" % (name, v))
     o.append("\n")
     o.append(cxx_string("kRasterDump", RASTER_TEXT))
@@ -617,6 +796,13 @@ def render_header():
     o.append(cxx_string("kGlyphRasterReportDump", GLYPH_RASTER_REPORT_DUMP))
     o.append(cxx_string("kGradientStreamDump", GRAD_STREAM_TEXT))
     o.append(cxx_string("kGradientStreamReportDump", GRAD_STREAM_REPORT_DUMP))
+    o.append(cxx_string("kStrokeStreamDump", STROKE_STREAM_TEXT))
+    o.append(cxx_string("kStrokeRasterDump", STROKE_RASTER_TEXT))
+    o.append(cxx_string("kStrokeWriterDump", STROKE_WRITER_TEXT))
+    o.append(cxx_string("kStrokeToolpathDump", STROKE_TOOLPATH_TEXT))
+    o.append(cxx_string("kStrokeToolpathReportDump", STROKE_TOOLPATH_REPORT_DUMP))
+    o.append("static const std::uint32_t kStrokeWriterNative = 0x%04xu;\n" % WRITER_NATIVE)
+    o.append("static const std::uint32_t kStrokeToolpathNative = 0x%04xu;\n" % TOOLPATH_NATIVE)
     o.append("\n}  // namespace sink_known\n\n#endif\n")
     return "".join(o)
 

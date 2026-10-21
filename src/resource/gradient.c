@@ -504,7 +504,7 @@ GSHSCENE_Result gshscene_gradient_resolve(const GSHSCENE_Resource * gradient, co
 /* --- G10, G11: what draws nothing ------------------------------------------------------ */
 
 /** G11: whether the map's 2x2 linear part has a determinant of exactly zero (the columns' exact orientation). */
-static int singular(const GSHGEOM_Map * map) {
+int gshscene_map_singular(const GSHGEOM_Map * map) {
   GSHGEOM_Point o = {0.0, 0.0, 0.0};
   GSHGEOM_Point a = {map->m[0][0], map->m[1][0], 0.0};
   GSHGEOM_Point b = {map->m[0][1], map->m[1][1], 0.0};
@@ -514,7 +514,7 @@ static int singular(const GSHGEOM_Map * map) {
 }
 
 /** G10: whether the gradient draws nothing wherever it is. */
-static int degenerate(const GSHSCENE_Gradient * g) {
+int gshscene_gradient_degenerate(const GSHSCENE_Gradient * g) {
   int repeats = g->extend != GSHSCENE_EXTEND_PAD;
   switch (g->kind) {
     case GSHSCENE_GRADIENT_LINEAR: {
@@ -556,12 +556,13 @@ GSHSCENE_Reason gshscene_gradient_notice(const GSHSCENE_Item * item, const GSHGE
     return (GSHSCENE_Reason)0;
   }
   const GSHSCENE_Gradient * g = &item->paint.gradient->u.gradient.g;
-  int not_invertible = (target_map && singular(target_map)) || singular(&item->map) || singular(&g->map);
+  int not_invertible = (target_map && gshscene_map_singular(target_map)) || gshscene_map_singular(&item->map) ||
+      gshscene_map_singular(&g->map);
   for (size_t i = 0; i < instance_count && !not_invertible; i++) {
-    not_invertible = singular(&instance_maps[i]);
+    not_invertible = gshscene_map_singular(&instance_maps[i]);
   }
   if (not_invertible) {
     return GSHSCENE_REASON_MAP_NOT_INVERTIBLE;
   }
-  return degenerate(g) ? GSHSCENE_REASON_GRADIENT_DEGENERATE : (GSHSCENE_Reason)0;
+  return gshscene_gradient_degenerate(g) ? GSHSCENE_REASON_GRADIENT_DEGENERATE : (GSHSCENE_Reason)0;
 }
