@@ -758,7 +758,9 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
           break;
         }
         CHECK(request.flags & GSHSCENE_RENDER_CALLER_MEMORY);
-        CHECK(request.workspace_bytes < sum.workspace_needed);
+        /* S9: a short workspace states no need, and nothing was allocated to find one. */
+        CHECK(sum.workspace_needed == 0);
+        CHECK(counter.calls == 0);
         outcomes[OUT_LIMIT_WORKSPACE]++;
         untouched = 1;
         break;

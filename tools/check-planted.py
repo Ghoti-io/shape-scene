@@ -159,7 +159,14 @@ changes no result, cannot be seen by any test:
                ``gen-scene-plants.py --sink``: 1444 candidates on story 14a's
                final tree, 1108 caught, 220 that do not compile dropped).  The 116
                survivors are of these kinds, none a result a caller can see (those
-               on story 14a's lines of src/sink are listed with story 14a below):
+               on story 14a's lines of src/sink are listed with story 14a below).
+               Story 16's decision on S9 (2026-10-21: a short caller-memory
+               workspace refused without allocating, the query asking again for
+               an exact need) changed src/sink/sink.c, swept again: 601
+               candidates, 111 that do not compile, 462 caught (they replace
+               sink.c's in tools/sink-plants.json; the query's cleared
+               ``workspace_bytes`` was caught once the mock sink checked it), and
+               28 survivors, of the kinds below and none on the decision's lines:
 
   - the locks of the sink's busy table and of the test sink's pending runs and
     cache (``GCU_MUTEX_LOCK``/``DESTROY`` deleted), and a loop bound moved one
@@ -1328,6 +1335,13 @@ PLANTS += [
     ('rule-S9-workspace-size', 'src', SK, '    if (request->workspace_bytes < need) {', '    if (request->workspace_bytes + 1 < need) {', SINKT),
     ('rule-S9-caller-memory-cap', 'src', SK, '    if (!(caps.flags & GSHSCENE_CAP_CALLER_MEMORY) || !sink->ops.workspace_bytes) {', '    if (!sink->ops.workspace_bytes) {', SINKT),
     ('rule-S9-allocates', 'src', DS, '  if (request->flags & GSHSCENE_RENDER_CALLER_MEMORY) {\n    base = request->workspace;', '  if (0) {\n    base = request->workspace;', SINKT),
+    # 2026-10-21 (story 16's decision): a short workspace is a limit with no allocation and no need stated.  The old
+    # contract stated the need the sink measured; a query that took a sink's bound for the need; a render that sized
+    # its workspace without the flag (where a sink may allocate); and the test sink allocating to size a render.
+    ('rule-S9-short-states-need', 'src', SK, '    if (request->workspace_bytes < need) {\n      return end_early(job, GSHSCENE_ERR_LIMIT,', '    request->report->summary.workspace_needed = need;\n    if (request->workspace_bytes < need) {\n      return end_early(job, GSHSCENE_ERR_LIMIT,', SINKT),
+    ('rule-S9-query-takes-the-bound', 'src', SK, '    if (bytes <= r.workspace_bytes) {', '    if (1) {', SINKT),
+    ('rule-S9-render-sizes-freely', 'src', SK, '    result = sink->ops.workspace_bytes(sink->impl, &job->request, &need);', '    GSHSCENE_Render_Request planted = job->request;\n    planted.flags &= ~GSHSCENE_RENDER_CALLER_MEMORY;\n    result = sink->ops.workspace_bytes(sink->impl, &planted, &need);', SINKT),
+    ('rule-S9-sizing-allocates', 'src', DS, '  (void)impl;\n  size_t levels;\n  size_t blocks;', '  Dump_Sink * planted = impl;\n  gshscene_free(&planted->alloc, gshscene_alloc(&planted->alloc, 8));\n  size_t levels;\n  size_t blocks;', SINKT),
     # S4: the test sink's one limit (max_extent) met over the area drawn rather than the item's box, as shape-cpu's
     # cell cap was before 2026-10-21.
     ('rule-S4-limit-in-damage', 'src', DS, '(box.x1 - box.x0 > limit || box.y1 - box.y0 > limit)', '(run->job->target.damage ? (box.x1 < (double)run->area.x1 ? box.x1 : (double)run->area.x1) - (box.x0 > (double)run->area.x0 ? box.x0 : (double)run->area.x0) > limit : (box.x1 - box.x0 > limit || box.y1 - box.y0 > limit))', ['testDump_sink']),

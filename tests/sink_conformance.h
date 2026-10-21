@@ -28,6 +28,7 @@
 #include "alloc_tracker.h"
 #include "glyph_test_provider.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <functional>
@@ -1109,15 +1110,18 @@ TEST_P(SinkConformance, S8_TheConflationFlagIsRefusedBeforeDrawing) {
 }
 
 // S9: caller memory: the exact workspace, no allocation over a loop of frames, the same output; one byte less is a
-// limit.  A sink without the cap refuses the flag.
+// limit.  A sink without the cap refuses the flag.  The sink has an allocator of its own, so that what it takes is
+// told from the report's growth: the sink takes nothing in any frame, the first included.
 TEST_P(SinkConformance, S9_CallerMemoryAllocatesNothing) {
   for (uint32_t kind : f()->kinds) {
     tracker::Tracker t;
+    tracker::Tracker ts;
     GSHSCENE_Allocator alloc = tracker::allocator_for(&t);
+    GSHSCENE_Allocator sink_alloc = tracker::allocator_for(&ts);
     Scene s;
     const GSHSCENE_List * list = basic(s);
     {
-      SinkRef sink(make(&alloc));
+      SinkRef sink(make(&sink_alloc));
       ReportRef report(&alloc);
       auto reference = make_surface(kind);
       ASSERT_EQ(run(f(), sink.sink, request_for(list, *reference, report.report)).result, GSHSCENE_OK);
@@ -1142,22 +1146,25 @@ TEST_P(SinkConformance, S9_CallerMemoryAllocatesNothing) {
       ASSERT_GT(need, 0u);
       // The workspace at an odd address, and 4096 bytes of canary after it: a sink writes nothing outside it.
       std::vector<unsigned char> workspace(need + 1 + 4096, 0xc5);
-      // One byte less: a limit, naming the need, the target untouched.
+      // One byte less: a limit, the target untouched, nothing allocated (S9_AShortWorkspaceAllocatesNothing).
       req.workspace = workspace.data() + 1;
       req.workspace_bytes = need - 1;
       uint64_t before = surface->snapshot();
       Outcome small = run(f(), sink.sink, req);
       EXPECT_EQ(small.result, GSHSCENE_ERR_LIMIT);
-      EXPECT_EQ(summary(report.report).workspace_needed, need);
+      EXPECT_EQ(summary(report.report).workspace_needed, 0u);
       EXPECT_EQ(surface->snapshot(), before);
-      // Exactly the need, at an odd address: frames 2..n allocate nothing anywhere.
+      // Exactly the need, at an odd address: the sink allocates nothing in any frame, and frames 2..n nothing
+      // allocates anywhere.
       req.workspace_bytes = need;
       for (int frame = 0; frame < 5; frame++) {
         auto fresh = make_surface(kind);
         req.target = &fresh->target;
         long calls = t.calls;
+        long sink_calls = ts.calls;
         Outcome o = run(f(), sink.sink, req);
         EXPECT_EQ(o.result, GSHSCENE_OK);
+        EXPECT_EQ(ts.calls, sink_calls) << "frame " << frame << ": the sink allocated";
         if (frame > 0) {
           EXPECT_EQ(t.calls, calls) << "frame " << frame << " allocated";
         }
@@ -1169,6 +1176,72 @@ TEST_P(SinkConformance, S9_CallerMemoryAllocatesNothing) {
         EXPECT_EQ(sum.workspace_needed, need);
         // The report is the reference's but for the workspace it states.
         (void)reference_report;
+      }
+    }
+    EXPECT_TRUE(t.live.empty());
+    EXPECT_TRUE(ts.live.empty());
+  }
+}
+
+// S9: a workspace too small, or none, is ERR_LIMIT with no allocation at all (S9 is absolute: the render does not
+// allocate even to measure its need): the sink's and the report's allocator see no call, and one that fails every
+// call changes nothing; the target is untouched, the summary states no need and the failure's reason names the
+// query, which gives the exact need.
+TEST_P(SinkConformance, S9_AShortWorkspaceAllocatesNothing) {
+  for (uint32_t kind : f()->kinds) {
+    tracker::Tracker t;
+    GSHSCENE_Allocator alloc = tracker::allocator_for(&t);
+    Scene s;
+    const GSHSCENE_List * lists[2] = {basic(s), across_the_damage(s)};
+    {
+      SinkRef sink(make(&alloc));
+      ReportRef report(&alloc);
+      auto surface = make_surface(kind);
+      GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *surface);
+      if (!(caps.flags & GSHSCENE_CAP_CALLER_MEMORY)) {
+        continue; // S9_CallerMemoryAllocatesNothing: the flag is refused
+      }
+      for (const GSHSCENE_List * list : lists) {
+        GSHSCENE_Render_Request req = request_for(list, *surface, report.report);
+        req.flags = GSHSCENE_RENDER_CALLER_MEMORY;
+        size_t need = 0;
+        ASSERT_EQ(gshscene_sink_workspace_bytes(sink.sink, &req, &need), GSHSCENE_OK);
+        ASSERT_GT(need, 16u);
+        std::vector<unsigned char> workspace(need + 1, 0xc5);
+        for (size_t bytes : {(size_t)0, (size_t)1, (size_t)16, need / 2, need - 1}) {
+          for (int failing = 0; failing < 2; failing++) {
+            std::fill(workspace.begin(), workspace.end(), (unsigned char)0xc5);
+            req.workspace = bytes ? workspace.data() + 1 : nullptr;
+            req.workspace_bytes = bytes;
+            uint64_t before = surface->snapshot();
+            long calls = t.calls;
+            if (failing) {
+              t.fail_from = t.calls;
+              t.persistent = true;
+            }
+            Outcome o = run(f(), sink.sink, req);
+            t.fail_from = -1;
+            t.persistent = false;
+            EXPECT_EQ(o.result, GSHSCENE_ERR_LIMIT) << bytes << " bytes of " << need << (failing ? ", allocator failing" : "");
+            EXPECT_EQ(o.callbacks, 1);
+            EXPECT_EQ(t.calls, calls) << bytes << " bytes of " << need << ": a short workspace allocated";
+            EXPECT_EQ(surface->snapshot(), before) << bytes;
+            GSHSCENE_Report_Summary sum = summary(report.report);
+            EXPECT_EQ(sum.workspace_needed, 0u) << "a render does not measure what it was not given";
+            EXPECT_EQ(sum.failure.result, GSHSCENE_ERR_LIMIT);
+            EXPECT_NE(std::string(sum.failure.reason).find("gshscene_sink_workspace_bytes"), std::string::npos)
+                << sum.failure.reason;
+            EXPECT_EQ(gshscene_report_count(report.report), 0u);
+            EXPECT_EQ(workspace[0], 0xc5) << "the sink wrote before a short workspace";
+            for (size_t i = 1 + bytes; i < workspace.size(); i++) {
+              ASSERT_EQ(workspace[i], 0xc5) << bytes << " bytes given: the sink wrote past them, at byte " << i - 1;
+            }
+          }
+          // The query with the same short workspace gives the exact need (it is not a render, and may allocate).
+          size_t again = 0;
+          EXPECT_EQ(gshscene_sink_workspace_bytes(sink.sink, &req, &again), GSHSCENE_OK);
+          EXPECT_EQ(again, need) << bytes;
+        }
       }
     }
     EXPECT_TRUE(t.live.empty());

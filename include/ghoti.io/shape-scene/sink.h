@@ -110,9 +110,13 @@
  * one render-level entry (AD-29).
  *
  * **S9 Memory and static resources.**  With ::GSHSCENE_RENDER_CALLER_MEMORY the
- * sink allocates nothing during the render and takes its scratch from the
- * workspace; ::gshscene_sink_workspace_bytes gives the exact need, and a smaller
- * workspace is ::GSHSCENE_ERR_LIMIT with the need in the summary.  A sink without
+ * sink allocates nothing during the render, sizing it included, and takes its
+ * scratch from the workspace; ::gshscene_sink_workspace_bytes gives the exact
+ * need.  A smaller workspace (or none) is ::GSHSCENE_ERR_LIMIT with the target
+ * untouched and **no allocation at all**, by the sink or the report: the summary
+ * states no need (`workspace_needed` 0), because a render does not allocate to
+ * measure one, and the failure's reason names the query, which gives it (and may
+ * allocate: it is not a render).  A sink without
  * the capability (device memory) refuses the flag, ::GSHSCENE_ERR_REFUSED with a
  * render-level entry.  ::gshscene_sink_prepare lets an engine upload or cache a
  * list's static resources before frames, keyed by resource id, released by
@@ -408,6 +412,9 @@ GSHSCENE_API GSHSCENE_Result gshscene_sink_caps(
 /**
  * @brief The exact workspace a `CALLER_MEMORY` render of @p request needs (S9).
  *
+ * A workspace in @p request is sized first, without allocating; when it is too small (or there is none) the sink
+ * measures the need with its own allocator, which this call, not being a render, may use.
+ *
  * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (as `begin` validates); ::GSHSCENE_ERR_UNSUPPORTED (as for caps);
  *   ::GSHSCENE_ERR_REFUSED (the sink cannot honor the flag for this target).
  */
@@ -495,7 +502,15 @@ typedef struct GSHSCENE_Sink_Ops {
   int thread_affine;
   /** The caps for a target the contract layer has validated; ::GSHSCENE_ERR_UNSUPPORTED for a kind or format it does not draw. */
   GSHSCENE_Result (*caps)(void * impl, const GSHSCENE_Target * target, GSHSCENE_Sink_Caps * out);
-  /** The exact workspace a `CALLER_MEMORY` render needs (only called when the caps have `CALLER_MEMORY`). */
+  /**
+   * The workspace a `CALLER_MEMORY` render needs (only called when the caps have `CALLER_MEMORY`).  With
+   * ::GSHSCENE_RENDER_CALLER_MEMORY in the request's flags (a render's own sizing, and a query that brings a
+   * workspace) it **allocates nothing** (S9): it sizes the render inside `request->workspace` (`workspace_bytes` of
+   * it; none when NULL) and gives the exact need when that fits, or, when it does not, any need past
+   * `workspace_bytes` (a bound: the contract layer then fails the render with ::GSHSCENE_ERR_LIMIT and asks again
+   * for a query).  Without the flag (the query's second call, with no workspace) it gives the exact need and may
+   * allocate.
+   */
   GSHSCENE_Result (*workspace_bytes)(void * impl, const GSHSCENE_Render_Request * request, size_t * out);
   /**
    * Start the job (the contract layer has validated it, planned it and found nothing that stops it).  Complete it

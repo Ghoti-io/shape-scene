@@ -27,6 +27,9 @@ struct Mock {
   GSHSCENE_Result begin_result = GSHSCENE_OK;
   GSHSCENE_Result workspace_result = GSHSCENE_OK;
   size_t workspace = 64;
+  bool bounds = false;     // a workspace too small gives a bound past it, as a sink that cannot size it without memory
+  int sized_inside = 0;    // workspace_bytes calls with CALLER_MEMORY (no allocation allowed)
+  int sized_freely = 0;    // and without it (the query's own; allocation allowed)
   GSHSCENE_Result wait_result = GSHSCENE_OK;
   bool wait_completes = true;
   GSHSCENE_Job * pending = nullptr;
@@ -45,9 +48,20 @@ GSHSCENE_Result m_caps(void * impl, const GSHSCENE_Target *, GSHSCENE_Sink_Caps 
   *out = as(impl)->caps;
   return as(impl)->caps_result;
 }
-GSHSCENE_Result m_workspace(void * impl, const GSHSCENE_Render_Request *, size_t * out) {
-  *out = as(impl)->workspace;
-  return as(impl)->workspace_result;
+GSHSCENE_Result m_workspace(void * impl, const GSHSCENE_Render_Request * request, size_t * out) {
+  Mock * m = as(impl);
+  *out = m->workspace;
+  if (request->flags & GSHSCENE_RENDER_CALLER_MEMORY) {
+    m->sized_inside++;
+    if (m->bounds && request->workspace_bytes < m->workspace) {
+      *out = request->workspace_bytes + 1;
+    }
+  } else {
+    m->sized_freely++;
+    EXPECT_EQ(request->workspace, nullptr) << "sized freely with a workspace";
+    EXPECT_EQ(request->workspace_bytes, 0u) << "sized freely with a workspace's size";
+  }
+  return m->workspace_result;
 }
 GSHSCENE_Result m_begin(void * impl, GSHSCENE_Job * job) {
   Mock * m = as(impl);
@@ -439,6 +453,37 @@ TEST(Sink, TheWorkspaceQuery) {
   EXPECT_EQ(o.callbacks, 1);
   ms.mock.workspace_result = GSHSCENE_OK;
   EXPECT_EQ(run(nullptr, ms.sink, req).result, GSHSCENE_OK);
+  // S9: a render sizes its workspace only with the flag (allocating nothing), and a short one is a limit that states
+  // no need, whether the sink gives the need or only a bound past the workspace; the query, given a bound, asks again
+  // without the workspace for the exact need.
+  for (bool bounds : {false, true}) {
+    ms.mock.bounds = bounds;
+    for (size_t bytes : {(size_t)0, (size_t)8, (size_t)63}) {
+      req.workspace = bytes ? ws.data() : nullptr;
+      req.workspace_bytes = bytes;
+      ms.mock.sized_inside = ms.mock.sized_freely = 0;
+      o = run(nullptr, ms.sink, req);
+      EXPECT_EQ(o.result, GSHSCENE_ERR_LIMIT) << bytes;
+      EXPECT_EQ(ms.mock.sized_inside, 1) << bytes;
+      EXPECT_EQ(ms.mock.sized_freely, 0) << bytes << ": a render sized its workspace where it may allocate";
+      EXPECT_EQ(summary(report.report).workspace_needed, 0u) << bytes;
+      ms.mock.sized_inside = ms.mock.sized_freely = 0;
+      need = 0;
+      EXPECT_EQ(gshscene_sink_workspace_bytes(ms.sink, &req, &need), GSHSCENE_OK);
+      EXPECT_EQ(need, 64u) << bytes << (bounds ? " (bounded)" : "");
+      EXPECT_EQ(ms.mock.sized_inside, bytes ? 1 : 0) << bytes;
+      EXPECT_EQ(ms.mock.sized_freely, 1) << bytes << ": a need past the workspace may be a bound, so it is asked again";
+    }
+    req.workspace = ws.data();
+    req.workspace_bytes = 64;
+    ms.mock.sized_inside = ms.mock.sized_freely = 0;
+    EXPECT_EQ(run(nullptr, ms.sink, req).result, GSHSCENE_OK);
+    EXPECT_EQ(summary(report.report).workspace_needed, 64u);
+    EXPECT_EQ(gshscene_sink_workspace_bytes(ms.sink, &req, &need), GSHSCENE_OK);
+    EXPECT_EQ(need, 64u);
+    EXPECT_EQ(ms.mock.sized_freely, 0) << "a workspace that holds the need is sized inside it";
+  }
+  ms.mock.bounds = false;
   ms.mock.caps.flags &= ~GSHSCENE_CAP_CALLER_MEMORY;
   EXPECT_EQ(gshscene_sink_workspace_bytes(ms.sink, &req, &need), GSHSCENE_ERR_REFUSED);
   EXPECT_EQ(run(nullptr, ms.sink, req).result, GSHSCENE_ERR_REFUSED);
@@ -850,7 +895,7 @@ TEST(Sink, EveryFailureOfTheContractSaysWhyInWords) {
     EXPECT_EQ(reason(report), "the workspace could not be sized");
     ms.mock.workspace_result = GSHSCENE_OK;
     EXPECT_EQ(gshscene_sink_render(ms.sink, &req), GSHSCENE_ERR_LIMIT);
-    EXPECT_EQ(reason(report), "the workspace is smaller than the render needs");
+    EXPECT_EQ(reason(report), "the workspace is smaller than the render needs; gshscene_sink_workspace_bytes gives the need");
     ms.mock.caps.flags &= ~GSHSCENE_CAP_CALLER_MEMORY;
     EXPECT_EQ(gshscene_sink_render(ms.sink, &req), GSHSCENE_ERR_REFUSED);
     EXPECT_EQ(reason(report), "the sink cannot take its memory from a workspace");

@@ -392,6 +392,22 @@ GSHSCENE_Result gshscene_sink_workspace_bytes(
   }
   r.target = &copy;
   size_t bytes = 0;
+  /* A workspace the request brings is sized first, allocating nothing (the op as a render calls it); one too small
+   * gives only a bound past it, so the exact need is then asked without one, where the sink may allocate (S9). */
+  if (r.workspace) {
+    r.flags |= GSHSCENE_RENDER_CALLER_MEMORY;
+    result = sink->ops.workspace_bytes(sink->impl, &r, &bytes);
+    if (result != GSHSCENE_OK) {
+      return result;
+    }
+    if (bytes <= r.workspace_bytes) {
+      *out = bytes;
+      return GSHSCENE_OK;
+    }
+  }
+  r.flags &= ~GSHSCENE_RENDER_CALLER_MEMORY;
+  r.workspace = NULL;
+  r.workspace_bytes = 0;
   result = sink->ops.workspace_bytes(sink->impl, &r, &bytes);
   if (result == GSHSCENE_OK) {
     *out = bytes;
@@ -763,15 +779,18 @@ GSHSCENE_Result gshscene_sink_begin(GSHSCENE_Sink * sink, const GSHSCENE_Render_
       result = gshscene_report_add(request->report, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_CALLER_MEMORY, NULL, 0, 0, 0.0);
       return end_early(job, result != GSHSCENE_OK ? result : GSHSCENE_ERR_REFUSED, "the sink cannot take its memory from a workspace");
     }
+    /* Sized in the workspace, allocating nothing (S9): a need past it may be only a bound, so a short workspace is a
+     * limit with no need in the summary, and the query gives the need. */
     size_t need = 0;
     result = sink->ops.workspace_bytes(sink->impl, &job->request, &need);
     if (result != GSHSCENE_OK) {
       return end_early(job, result, "the workspace could not be sized");
     }
-    request->report->summary.workspace_needed = need;
     if (request->workspace_bytes < need) {
-      return end_early(job, GSHSCENE_ERR_LIMIT, "the workspace is smaller than the render needs");
+      return end_early(job, GSHSCENE_ERR_LIMIT,
+          "the workspace is smaller than the render needs; gshscene_sink_workspace_bytes gives the need");
     }
+    request->report->summary.workspace_needed = need;
   }
   size_t refused = 0;
   result = plan(job, &refused);

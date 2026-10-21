@@ -75,7 +75,7 @@
  * target); the entries counted and per class; whether the cap was passed; the
  * bytes the sink holds across frames (`static_bytes`, S9) and its peak scratch
  * for this render (`frame_bytes`); the workspace a `CALLER_MEMORY` render needed
- * (`workspace_needed`); the most work between two cancel checks (`work_max`,
+ * (`workspace_needed`; 0 for a workspace too small, S9); the most work between two cancel checks (`work_max`,
  * S7); and the failure, if the render did not return ::GSHSCENE_OK: its result,
  * the chain of the unit it stopped at (empty when none) and a static reason.
  *
@@ -185,7 +185,7 @@ typedef struct GSHSCENE_Report_Summary {
   int overflowed;            ///< Nonzero if an entry was not stored because of the cap.
   uint64_t static_bytes;     ///< What the sink holds across frames, by resource (S9).
   uint64_t frame_bytes;      ///< The sink's peak scratch for this render (S9).
-  uint64_t workspace_needed; ///< The workspace a `CALLER_MEMORY` render needs (S9); 0 when not asked.
+  uint64_t workspace_needed; ///< The workspace a `CALLER_MEMORY` render needed (S9); 0 when not asked, and when the workspace was too small (a render does not allocate to measure it: ::gshscene_sink_workspace_bytes gives it).
   uint64_t work_max;         ///< The most work between two cancel checks, in the sink's measure (S7).
   GSHSCENE_Failure failure;  ///< Why it failed, if it did.
 } GSHSCENE_Report_Summary;

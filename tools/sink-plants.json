@@ -5328,11 +5328,11 @@
 ]
 ],
 [
-"sk-396-eq",
+"sk-397-neg",
 "srcl",
 "src/sink/sink.c",
-"396:==",
-"!=",
+"397:(r.workspace)",
+"(!(r.workspace))",
 [
 "testDump_sink",
 "testSink",
@@ -5344,11 +5344,11 @@
 ]
 ],
 [
-"sk-396-neg",
+"sk-399-del",
 "srcl",
 "src/sink/sink.c",
-"396:(result == GSHSCENE_OK)",
-"(!(result == GSHSCENE_OK))",
+"399:result = sink->ops.workspace_bytes(sink->impl, &r, &bytes);",
+";",
 [
 "testDump_sink",
 "testSink",
@@ -5360,11 +5360,11 @@
 ]
 ],
 [
-"sk-408-eq",
+"sk-400-ne",
 "srcl",
 "src/sink/sink.c",
-"408:==",
-"!=",
+"400:!=",
+"==",
 [
 "testDump_sink",
 "testSink",
@@ -5376,11 +5376,43 @@
 ]
 ],
 [
-"sk-408-neg",
+"sk-400-neg",
 "srcl",
 "src/sink/sink.c",
-"408:(sink->busy[i] == surface)",
-"(!(sink->busy[i] == surface))",
+"400:(result != GSHSCENE_OK)",
+"(!(result != GSHSCENE_OK))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-403-le",
+"srcl",
+"src/sink/sink.c",
+"403:<=",
+"<",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-403-neg",
+"srcl",
+"src/sink/sink.c",
+"403:(bytes <= r.workspace_bytes)",
+"(!(bytes <= r.workspace_bytes))",
 [
 "testDump_sink",
 "testSink",
@@ -5395,7 +5427,7 @@
 "sk-409-del",
 "srcl",
 "src/sink/sink.c",
-"409:result = GSHSCENE_ERR_INVALID;",
+"409:r.workspace = NULL;",
 ";",
 [
 "testDump_sink",
@@ -5408,11 +5440,27 @@
 ]
 ],
 [
-"sk-412-and",
+"sk-410-del",
 "srcl",
 "src/sink/sink.c",
-"412:&&",
-"||",
+"410:r.workspace_bytes = 0;",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-411-del",
+"srcl",
+"src/sink/sink.c",
+"411:result = sink->ops.workspace_bytes(sink->impl, &r, &bytes);",
+";",
 [
 "testDump_sink",
 "testSink",
@@ -5443,55 +5491,7 @@
 "sk-412-neg",
 "srcl",
 "src/sink/sink.c",
-"412:(!sink->busy[i] && free_slot == sink->max_jobs)",
-"(!(!sink->busy[i] && free_slot == sink->max_jobs))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-413-del",
-"srcl",
-"src/sink/sink.c",
-"413:free_slot = i;",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-416-eq",
-"srcl",
-"src/sink/sink.c",
-"416:==",
-"!=",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-416-neg",
-"srcl",
-"src/sink/sink.c",
-"416:(result == GSHSCENE_OK)",
+"412:(result == GSHSCENE_OK)",
 "(!(result == GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -5504,10 +5504,10 @@
 ]
 ],
 [
-"sk-417-eq",
+"sk-424-eq",
 "srcl",
 "src/sink/sink.c",
-"417:==",
+"424:==",
 "!=",
 [
 "testDump_sink",
@@ -5520,106 +5520,10 @@
 ]
 ],
 [
-"sk-417-neg",
+"sk-424-neg",
 "srcl",
 "src/sink/sink.c",
-"417:(free_slot == sink->max_jobs)",
-"(!(free_slot == sink->max_jobs))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-418-del",
-"srcl",
-"src/sink/sink.c",
-"418:result = GSHSCENE_ERR_LIMIT;",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-420-del",
-"srcl",
-"src/sink/sink.c",
-"420:sink->busy[free_slot] = surface;",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-421-del",
-"srcl",
-"src/sink/sink.c",
-"421:sink->in_flight++;",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-424-del",
-"srcl",
-"src/sink/sink.c",
-"424:GCU_MUTEX_UNLOCK(sink->lock);",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-431-eq",
-"srcl",
-"src/sink/sink.c",
-"431:==",
-"!=",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-431-neg",
-"srcl",
-"src/sink/sink.c",
-"431:(sink->busy[i] == surface)",
+"424:(sink->busy[i] == surface)",
 "(!(sink->busy[i] == surface))",
 [
 "testDump_sink",
@@ -5632,10 +5536,10 @@
 ]
 ],
 [
-"sk-432-del",
+"sk-425-del",
 "srcl",
 "src/sink/sink.c",
-"432:sink->busy[i] = NULL;",
+"425:result = GSHSCENE_ERR_INVALID;",
 ";",
 [
 "testDump_sink",
@@ -5648,10 +5552,154 @@
 ]
 ],
 [
-"sk-433-del",
+"sk-428-and",
 "srcl",
 "src/sink/sink.c",
-"433:sink->in_flight--;",
+"428:&&",
+"||",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-428-eq",
+"srcl",
+"src/sink/sink.c",
+"428:==",
+"!=",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-428-neg",
+"srcl",
+"src/sink/sink.c",
+"428:(!sink->busy[i] && free_slot == sink->max_jobs)",
+"(!(!sink->busy[i] && free_slot == sink->max_jobs))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-429-del",
+"srcl",
+"src/sink/sink.c",
+"429:free_slot = i;",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-432-eq",
+"srcl",
+"src/sink/sink.c",
+"432:==",
+"!=",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-432-neg",
+"srcl",
+"src/sink/sink.c",
+"432:(result == GSHSCENE_OK)",
+"(!(result == GSHSCENE_OK))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-433-eq",
+"srcl",
+"src/sink/sink.c",
+"433:==",
+"!=",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-433-neg",
+"srcl",
+"src/sink/sink.c",
+"433:(free_slot == sink->max_jobs)",
+"(!(free_slot == sink->max_jobs))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-434-del",
+"srcl",
+"src/sink/sink.c",
+"434:result = GSHSCENE_ERR_LIMIT;",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-436-del",
+"srcl",
+"src/sink/sink.c",
+"436:sink->busy[free_slot] = surface;",
 ";",
 [
 "testDump_sink",
@@ -5667,7 +5715,7 @@
 "sk-437-del",
 "srcl",
 "src/sink/sink.c",
-"437:GCU_MUTEX_UNLOCK(sink->lock);",
+"437:sink->in_flight++;",
 ";",
 [
 "testDump_sink",
@@ -5680,11 +5728,11 @@
 ]
 ],
 [
-"sk-459-neg",
+"sk-440-del",
 "srcl",
 "src/sink/sink.c",
-"459:(job)",
-"(!(job))",
+"440:GCU_MUTEX_UNLOCK(sink->lock);",
+";",
 [
 "testDump_sink",
 "testSink",
@@ -5696,11 +5744,75 @@
 ]
 ],
 [
-"sk-469-neg",
+"sk-447-eq",
 "srcl",
 "src/sink/sink.c",
-"469:(job)",
-"(!(job))",
+"447:==",
+"!=",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-447-neg",
+"srcl",
+"src/sink/sink.c",
+"447:(sink->busy[i] == surface)",
+"(!(sink->busy[i] == surface))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-448-del",
+"srcl",
+"src/sink/sink.c",
+"448:sink->busy[i] = NULL;",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-449-del",
+"srcl",
+"src/sink/sink.c",
+"449:sink->in_flight--;",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-453-del",
+"srcl",
+"src/sink/sink.c",
+"453:GCU_MUTEX_UNLOCK(sink->lock);",
+";",
 [
 "testDump_sink",
 "testSink",
@@ -5728,11 +5840,11 @@
 ]
 ],
 [
-"sk-481-neg",
+"sk-485-neg",
 "srcl",
 "src/sink/sink.c",
-"481:(!job)",
-"(!(!job))",
+"485:(job)",
+"(!(job))",
 [
 "testDump_sink",
 "testSink",
@@ -5744,75 +5856,11 @@
 ]
 ],
 [
-"sk-484-neg",
+"sk-491-neg",
 "srcl",
 "src/sink/sink.c",
-"484:(job->work > job->work_max)",
-"(!(job->work > job->work_max))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-485-del",
-"srcl",
-"src/sink/sink.c",
-"485:job->work_max = job->work;",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-487-del",
-"srcl",
-"src/sink/sink.c",
-"487:job->work = 0;",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-492-neg",
-"srcl",
-"src/sink/sink.c",
-"492:(!job)",
-"(!(!job))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-495-del",
-"srcl",
-"src/sink/sink.c",
-"495:gcu_atomic_size_store(&job->units_processed, units_processed);",
-";",
+"491:(job)",
+"(!(job))",
 [
 "testDump_sink",
 "testSink",
@@ -5827,40 +5875,8 @@
 "sk-497-neg",
 "srcl",
 "src/sink/sink.c",
-"497:(job->request.progress)",
-"(!(job->request.progress))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-498-del",
-"srcl",
-"src/sink/sink.c",
-"498:job->request.progress(job->request.progress_ctx, job, units_processed);",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-500-eq",
-"srcl",
-"src/sink/sink.c",
-"500:==",
-"!=",
+"497:(!job)",
+"(!(!job))",
 [
 "testDump_sink",
 "testSink",
@@ -5875,311 +5891,7 @@
 "sk-500-neg",
 "srcl",
 "src/sink/sink.c",
-"500:(job->caps.cancel_unit == GSHSCENE_CANCEL_BETWEEN_UNITS)",
-"(!(job->caps.cancel_unit == GSHSCENE_CANCEL_BETWEEN_UNITS))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-507-and",
-"srcl",
-"src/sink/sink.c",
-"507:&&",
-"||",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-507-neg",
-"srcl",
-"src/sink/sink.c",
-"507:(job && bytes > job->frame_bytes)",
-"(!(job && bytes > job->frame_bytes))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-508-del",
-"srcl",
-"src/sink/sink.c",
-"508:job->frame_bytes = bytes;",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-514-lt",
-"srcl",
-"src/sink/sink.c",
-"514:<",
-"<=",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-515-ge",
-"srcl",
-"src/sink/sink.c",
-"515:>=",
-">",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-515-lt",
-"srcl",
-"src/sink/sink.c",
-"515:<",
-"<=",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-516-ge",
-"srcl",
-"src/sink/sink.c",
-"516:>=",
-">",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-516-and",
-"srcl",
-"src/sink/sink.c",
-"516:&&",
-"||",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-517-ret",
-"srcl",
-"src/sink/sink.c",
-"517:GSHSCENE_ERR_INVALID",
-"GSHSCENE_ERR_LIMIT",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-524-lt",
-"srcl",
-"src/sink/sink.c",
-"524:<",
-"<=",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-525-ge",
-"srcl",
-"src/sink/sink.c",
-"525:>=",
-">",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-525-lt",
-"srcl",
-"src/sink/sink.c",
-"525:<",
-"<=",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-526-ge",
-"srcl",
-"src/sink/sink.c",
-"526:>=",
-">",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-526-and",
-"srcl",
-"src/sink/sink.c",
-"526:&&",
-"||",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-527-ret",
-"srcl",
-"src/sink/sink.c",
-"527:GSHSCENE_ERR_INVALID",
-"GSHSCENE_ERR_LIMIT",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-534-or",
-"srcl",
-"src/sink/sink.c",
-"534:||",
-"&&",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-534-ne",
-"srcl",
-"src/sink/sink.c",
-"534:!=",
-"==",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-534-neg",
-"srcl",
-"src/sink/sink.c",
-"534:(!job || gcu_atomic_int_load(&job->state) != GSHSCENE_JOB_RUNNING)",
-"(!(!job || gcu_atomic_int_load(&job->state) != GSHSCENE_JOB_RUNNING))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-537-neg",
-"srcl",
-"src/sink/sink.c",
-"537:(job->work > job->work_max)",
+"500:(job->work > job->work_max)",
 "(!(job->work > job->work_max))",
 [
 "testDump_sink",
@@ -6192,10 +5904,10 @@
 ]
 ],
 [
-"sk-538-del",
+"sk-501-del",
 "srcl",
 "src/sink/sink.c",
-"538:job->work_max = job->work;",
+"501:job->work_max = job->work;",
 ";",
 [
 "testDump_sink",
@@ -6208,10 +5920,10 @@
 ]
 ],
 [
-"sk-542-del",
+"sk-503-del",
 "srcl",
 "src/sink/sink.c",
-"542:s->units_total = job->units_total;",
+"503:job->work = 0;",
 ";",
 [
 "testDump_sink",
@@ -6224,10 +5936,26 @@
 ]
 ],
 [
-"sk-543-del",
+"sk-508-neg",
 "srcl",
 "src/sink/sink.c",
-"543:s->units_processed = gcu_atomic_size_load(&job->units_processed);",
+"508:(!job)",
+"(!(!job))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-511-del",
+"srcl",
+"src/sink/sink.c",
+"511:gcu_atomic_size_store(&job->units_processed, units_processed);",
 ";",
 [
 "testDump_sink",
@@ -6240,10 +5968,26 @@
 ]
 ],
 [
-"sk-544-del",
+"sk-513-neg",
 "srcl",
 "src/sink/sink.c",
-"544:s->units_done = gcu_atomic_size_load(&job->units_done);",
+"513:(job->request.progress)",
+"(!(job->request.progress))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-514-del",
+"srcl",
+"src/sink/sink.c",
+"514:job->request.progress(job->request.progress_ctx, job, units_processed);",
 ";",
 [
 "testDump_sink",
@@ -6256,10 +6000,74 @@
 ]
 ],
 [
-"sk-545-del",
+"sk-516-eq",
 "srcl",
 "src/sink/sink.c",
-"545:s->frame_bytes = job->frame_bytes;",
+"516:==",
+"!=",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-516-neg",
+"srcl",
+"src/sink/sink.c",
+"516:(job->caps.cancel_unit == GSHSCENE_CANCEL_BETWEEN_UNITS)",
+"(!(job->caps.cancel_unit == GSHSCENE_CANCEL_BETWEEN_UNITS))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-523-and",
+"srcl",
+"src/sink/sink.c",
+"523:&&",
+"||",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-523-neg",
+"srcl",
+"src/sink/sink.c",
+"523:(job && bytes > job->frame_bytes)",
+"(!(job && bytes > job->frame_bytes))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-524-del",
+"srcl",
+"src/sink/sink.c",
+"524:job->frame_bytes = bytes;",
 ";",
 [
 "testDump_sink",
@@ -6272,11 +6080,11 @@
 ]
 ],
 [
-"sk-546-del",
+"sk-530-lt",
 "srcl",
 "src/sink/sink.c",
-"546:s->work_max = job->work_max;",
-";",
+"530:<",
+"<=",
 [
 "testDump_sink",
 "testSink",
@@ -6288,11 +6096,11 @@
 ]
 ],
 [
-"sk-547-del",
+"sk-531-ge",
 "srcl",
 "src/sink/sink.c",
-"547:s->static_bytes = job->sink->ops.static_bytes ? job->sink->ops.static_bytes(job->sink->impl) : 0;",
-";",
+"531:>=",
+">",
 [
 "testDump_sink",
 "testSink",
@@ -6304,11 +6112,11 @@
 ]
 ],
 [
-"sk-549-del",
+"sk-531-lt",
 "srcl",
 "src/sink/sink.c",
-"549:result = s->result;",
-";",
+"531:<",
+"<=",
 [
 "testDump_sink",
 "testSink",
@@ -6320,11 +6128,11 @@
 ]
 ],
 [
-"sk-550-del",
+"sk-532-ge",
 "srcl",
 "src/sink/sink.c",
-"550:job->result = (int)result;",
-";",
+"532:>=",
+">",
 [
 "testDump_sink",
 "testSink",
@@ -6336,11 +6144,11 @@
 ]
 ],
 [
-"sk-551-del",
+"sk-532-and",
 "srcl",
 "src/sink/sink.c",
-"551:gcu_atomic_int_store(&report->busy, 0);",
-";",
+"532:&&",
+"||",
 [
 "testDump_sink",
 "testSink",
@@ -6352,11 +6160,11 @@
 ]
 ],
 [
-"sk-552-neg",
+"sk-533-ret",
 "srcl",
 "src/sink/sink.c",
-"552:(job->holds_surface)",
-"(!(job->holds_surface))",
+"533:GSHSCENE_ERR_INVALID",
+"GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
 "testSink",
@@ -6368,11 +6176,11 @@
 ]
 ],
 [
-"sk-553-del",
+"sk-540-lt",
 "srcl",
 "src/sink/sink.c",
-"553:surface_give(job->sink, job->target.surface);",
-";",
+"540:<",
+"<=",
 [
 "testDump_sink",
 "testSink",
@@ -6384,11 +6192,11 @@
 ]
 ],
 [
-"sk-555-neg",
+"sk-541-ge",
 "srcl",
 "src/sink/sink.c",
-"555:(job->request.on_complete)",
-"(!(job->request.on_complete))",
+"541:>=",
+">",
 [
 "testDump_sink",
 "testSink",
@@ -6400,10 +6208,138 @@
 ]
 ],
 [
-"sk-556-del",
+"sk-541-lt",
 "srcl",
 "src/sink/sink.c",
-"556:job->request.on_complete(job->request.on_complete_ctx, job, result);",
+"541:<",
+"<=",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-542-ge",
+"srcl",
+"src/sink/sink.c",
+"542:>=",
+">",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-542-and",
+"srcl",
+"src/sink/sink.c",
+"542:&&",
+"||",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-543-ret",
+"srcl",
+"src/sink/sink.c",
+"543:GSHSCENE_ERR_INVALID",
+"GSHSCENE_ERR_LIMIT",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-550-or",
+"srcl",
+"src/sink/sink.c",
+"550:||",
+"&&",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-550-ne",
+"srcl",
+"src/sink/sink.c",
+"550:!=",
+"==",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-550-neg",
+"srcl",
+"src/sink/sink.c",
+"550:(!job || gcu_atomic_int_load(&job->state) != GSHSCENE_JOB_RUNNING)",
+"(!(!job || gcu_atomic_int_load(&job->state) != GSHSCENE_JOB_RUNNING))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-553-neg",
+"srcl",
+"src/sink/sink.c",
+"553:(job->work > job->work_max)",
+"(!(job->work > job->work_max))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-554-del",
+"srcl",
+"src/sink/sink.c",
+"554:job->work_max = job->work;",
 ";",
 [
 "testDump_sink",
@@ -6419,7 +6355,7 @@
 "sk-558-del",
 "srcl",
 "src/sink/sink.c",
-"558:gcu_atomic_int_store(&job->state, GSHSCENE_JOB_DONE);",
+"558:s->units_total = job->units_total;",
 ";",
 [
 "testDump_sink",
@@ -6432,10 +6368,218 @@
 ]
 ],
 [
-"sk-578-lt",
+"sk-559-del",
 "srcl",
 "src/sink/sink.c",
-"578:<",
+"559:s->units_processed = gcu_atomic_size_load(&job->units_processed);",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-560-del",
+"srcl",
+"src/sink/sink.c",
+"560:s->units_done = gcu_atomic_size_load(&job->units_done);",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-561-del",
+"srcl",
+"src/sink/sink.c",
+"561:s->frame_bytes = job->frame_bytes;",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-562-del",
+"srcl",
+"src/sink/sink.c",
+"562:s->work_max = job->work_max;",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-563-del",
+"srcl",
+"src/sink/sink.c",
+"563:s->static_bytes = job->sink->ops.static_bytes ? job->sink->ops.static_bytes(job->sink->impl) : 0;",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-565-del",
+"srcl",
+"src/sink/sink.c",
+"565:result = s->result;",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-566-del",
+"srcl",
+"src/sink/sink.c",
+"566:job->result = (int)result;",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-567-del",
+"srcl",
+"src/sink/sink.c",
+"567:gcu_atomic_int_store(&report->busy, 0);",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-568-neg",
+"srcl",
+"src/sink/sink.c",
+"568:(job->holds_surface)",
+"(!(job->holds_surface))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-569-del",
+"srcl",
+"src/sink/sink.c",
+"569:surface_give(job->sink, job->target.surface);",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-571-neg",
+"srcl",
+"src/sink/sink.c",
+"571:(job->request.on_complete)",
+"(!(job->request.on_complete))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-572-del",
+"srcl",
+"src/sink/sink.c",
+"572:job->request.on_complete(job->request.on_complete_ctx, job, result);",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-574-del",
+"srcl",
+"src/sink/sink.c",
+"574:gcu_atomic_int_store(&job->state, GSHSCENE_JOB_DONE);",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-594-lt",
+"srcl",
+"src/sink/sink.c",
+"594:<",
 "<=",
 [
 "testDump_sink",
@@ -6448,10 +6592,10 @@
 ]
 ],
 [
-"sk-580-ne",
+"sk-596-ne",
 "srcl",
 "src/sink/sink.c",
-"580:!=",
+"596:!=",
 "==",
 [
 "testDump_sink",
@@ -6464,10 +6608,10 @@
 ]
 ],
 [
-"sk-580-neg",
+"sk-596-neg",
 "srcl",
 "src/sink/sink.c",
-"580:(gshscene_list_tie(list, i, &tie) != GSHSCENE_OK)",
+"596:(gshscene_list_tie(list, i, &tie) != GSHSCENE_OK)",
 "(!(gshscene_list_tie(list, i, &tie) != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -6480,43 +6624,11 @@
 ]
 ],
 [
-"sk-583-del",
+"sk-599-del",
 "srcl",
 "src/sink/sink.c",
-"583:chain[count - 1] = tie->first;",
+"599:chain[count - 1] = tie->first;",
 ";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-586-ne",
-"srcl",
-"src/sink/sink.c",
-"586:!=",
-"==",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-586-neg",
-"srcl",
-"src/sink/sink.c",
-"586:(result != GSHSCENE_OK)",
-"(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
 "testSink",
@@ -6531,7 +6643,39 @@
 "sk-602-ne",
 "srcl",
 "src/sink/sink.c",
-"602:(item->kind != GSHSCENE_IT",
+"602:!=",
+"==",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-602-neg",
+"srcl",
+"src/sink/sink.c",
+"602:(result != GSHSCENE_OK)",
+"(!(result != GSHSCENE_OK))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-618-ne",
+"srcl",
+"src/sink/sink.c",
+"618:(item->kind != GSHSCENE_IT",
 "(item->kind == GSHSCENE_IT",
 [
 "testDump_sink",
@@ -6544,10 +6688,10 @@
 ]
 ],
 [
-"sk-602-and",
+"sk-618-and",
 "srcl",
 "src/sink/sink.c",
-"602:&&",
+"618:&&",
 "||",
 [
 "testDump_sink",
@@ -6560,10 +6704,10 @@
 ]
 ],
 [
-"sk-602-ne2",
+"sk-618-ne2",
 "srcl",
 "src/sink/sink.c",
-"602: item->kind != GSHSCENE_IT",
+"618: item->kind != GSHSCENE_IT",
 " item->kind == GSHSCENE_IT",
 [
 "testDump_sink",
@@ -6576,10 +6720,10 @@
 ]
 ],
 [
-"sk-603-ne",
+"sk-619-ne",
 "srcl",
 "src/sink/sink.c",
-"603:n) != GS",
+"619:n) != GS",
 "n) == GS",
 [
 "testDump_sink",
@@ -6592,10 +6736,10 @@
 ]
 ],
 [
-"sk-603-ne2",
+"sk-619-ne2",
 "srcl",
 "src/sink/sink.c",
-"603:ce != GS",
+"619:ce != GS",
 "ce == GS",
 [
 "testDump_sink",
@@ -6608,10 +6752,10 @@
 ]
 ],
 [
-"sk-606-del",
+"sk-622-del",
 "srcl",
 "src/sink/sink.c",
-"606:maps[count - 1] = item->map;",
+"622:maps[count - 1] = item->map;",
 ";",
 [
 "testDump_sink",
@@ -6624,10 +6768,10 @@
 ]
 ],
 [
-"sk-608-ne",
+"sk-624-ne",
 "srcl",
 "src/sink/sink.c",
-"608:!=",
+"624:!=",
 "==",
 [
 "testDump_sink",
@@ -6640,10 +6784,10 @@
 ]
 ],
 [
-"sk-608-neg",
+"sk-624-neg",
 "srcl",
 "src/sink/sink.c",
-"608:(gshgeom_map_compose_chain(maps, count, &job->target.map, &composed) != GSHGEOM_OK)",
+"624:(gshgeom_map_compose_chain(maps, count, &job->target.map, &composed) != GSHGEOM_OK)",
 "(!(gshgeom_map_compose_chain(maps, count, &job->target.map, &composed) != GSHGEOM_OK))",
 [
 "testDump_sink",
@@ -6656,10 +6800,10 @@
 ]
 ],
 [
-"sk-611-eq",
+"sk-627-eq",
 "srcl",
 "src/sink/sink.c",
-"611:==",
+"627:==",
 "!=",
 [
 "testDump_sink",
@@ -6672,10 +6816,10 @@
 ]
 ],
 [
-"sk-628-neg",
+"sk-644-neg",
 "srcl",
 "src/sink/sink.c",
-"628:(!memory)",
+"644:(!memory)",
 "(!(!memory))",
 [
 "testDump_sink",
@@ -6688,10 +6832,10 @@
 ]
 ],
 [
-"sk-635-ne",
+"sk-651-ne",
 "srcl",
 "src/sink/sink.c",
-"635:!=",
+"651:!=",
 "==",
 [
 "testDump_sink",
@@ -6704,10 +6848,10 @@
 ]
 ],
 [
-"sk-635-neg",
+"sk-651-neg",
 "srcl",
 "src/sink/sink.c",
-"635:(result != GSHSCENE_OK)",
+"651:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -6720,10 +6864,10 @@
 ]
 ],
 [
-"sk-639-ne",
+"sk-655-ne",
 "srcl",
 "src/sink/sink.c",
-"639:!=",
+"655:!=",
 "==",
 [
 "testDump_sink",
@@ -6736,10 +6880,10 @@
 ]
 ],
 [
-"sk-639-neg",
+"sk-655-neg",
 "srcl",
 "src/sink/sink.c",
-"639:(result != GSHSCENE_OK)",
+"655:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -6752,171 +6896,11 @@
 ]
 ],
 [
-"sk-647-neg",
+"sk-663-neg",
 "srcl",
 "src/sink/sink.c",
-"647:(gshscene_expansion_next(&walk, &item, &chain, &count))",
+"663:(gshscene_expansion_next(&walk, &item, &chain, &count))",
 "(!(gshscene_expansion_next(&walk, &item, &chain, &count)))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-648-neg",
-"srcl",
-"src/sink/sink.c",
-"648:(gshscene_skip_step(&skip, item, count))",
-"(!(gshscene_skip_step(&skip, item, count)))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-652-neg",
-"srcl",
-"src/sink/sink.c",
-"652:(d.entry_class)",
-"(!(d.entry_class))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-653-del",
-"srcl",
-"src/sink/sink.c",
-"653:result = gshscene_report_add(report, d.entry_class, d.reason, chain, count, 0, 0.0);",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-654-ne",
-"srcl",
-"src/sink/sink.c",
-"654:!=",
-"==",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-654-neg",
-"srcl",
-"src/sink/sink.c",
-"654:(result != GSHSCENE_OK)",
-"(!(result != GSHSCENE_OK))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-658-eq",
-"srcl",
-"src/sink/sink.c",
-"658:==",
-"!=",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-658-neg",
-"srcl",
-"src/sink/sink.c",
-"658:(d.entry_class == GSHSCENE_ENTRY_REFUSED)",
-"(!(d.entry_class == GSHSCENE_ENTRY_REFUSED))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-659-del",
-"srcl",
-"src/sink/sink.c",
-"659:(*refused)++;",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-660-del",
-"srcl",
-"src/sink/sink.c",
-"660:gshscene_skip_begin(&skip, item, count);",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-664-and",
-"srcl",
-"src/sink/sink.c",
-"664:&&",
-"||",
 [
 "testDump_sink",
 "testSink",
@@ -6931,24 +6915,8 @@
 "sk-664-neg",
 "srcl",
 "src/sink/sink.c",
-"664:(plan_route(job, item, maps, count, &route) && route.entry_class)",
-"(!(plan_route(job, item, maps, count, &route) && route.entry_class))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-668-ne",
-"srcl",
-"src/sink/sink.c",
-"668:!=",
-"==",
+"664:(gshscene_skip_step(&skip, item, count))",
+"(!(gshscene_skip_step(&skip, item, count)))",
 [
 "testDump_sink",
 "testSink",
@@ -6963,7 +6931,55 @@
 "sk-668-neg",
 "srcl",
 "src/sink/sink.c",
-"668:(result != GSHSCENE_OK)",
+"668:(d.entry_class)",
+"(!(d.entry_class))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-669-del",
+"srcl",
+"src/sink/sink.c",
+"669:result = gshscene_report_add(report, d.entry_class, d.reason, chain, count, 0, 0.0);",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-670-ne",
+"srcl",
+"src/sink/sink.c",
+"670:!=",
+"==",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-670-neg",
+"srcl",
+"src/sink/sink.c",
+"670:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -6976,10 +6992,10 @@
 ]
 ],
 [
-"sk-671-eq",
+"sk-674-eq",
 "srcl",
 "src/sink/sink.c",
-"671:==",
+"674:==",
 "!=",
 [
 "testDump_sink",
@@ -6992,10 +7008,138 @@
 ]
 ],
 [
-"sk-671-neg",
+"sk-674-neg",
 "srcl",
 "src/sink/sink.c",
-"671:(route.entry_class == GSHSCENE_ENTRY_REFUSED)",
+"674:(d.entry_class == GSHSCENE_ENTRY_REFUSED)",
+"(!(d.entry_class == GSHSCENE_ENTRY_REFUSED))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-675-del",
+"srcl",
+"src/sink/sink.c",
+"675:(*refused)++;",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-676-del",
+"srcl",
+"src/sink/sink.c",
+"676:gshscene_skip_begin(&skip, item, count);",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-680-and",
+"srcl",
+"src/sink/sink.c",
+"680:&&",
+"||",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-680-neg",
+"srcl",
+"src/sink/sink.c",
+"680:(plan_route(job, item, maps, count, &route) && route.entry_class)",
+"(!(plan_route(job, item, maps, count, &route) && route.entry_class))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-684-ne",
+"srcl",
+"src/sink/sink.c",
+"684:!=",
+"==",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-684-neg",
+"srcl",
+"src/sink/sink.c",
+"684:(result != GSHSCENE_OK)",
+"(!(result != GSHSCENE_OK))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-687-eq",
+"srcl",
+"src/sink/sink.c",
+"687:==",
+"!=",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-687-neg",
+"srcl",
+"src/sink/sink.c",
+"687:(route.entry_class == GSHSCENE_ENTRY_REFUSED)",
 "(!(route.entry_class == GSHSCENE_ENTRY_REFUSED))",
 [
 "testDump_sink",
@@ -7008,10 +7152,10 @@
 ]
 ],
 [
-"sk-672-del",
+"sk-688-del",
 "srcl",
 "src/sink/sink.c",
-"672:(*refused)++;",
+"688:(*refused)++;",
 ";",
 [
 "testDump_sink",
@@ -7024,10 +7168,10 @@
 ]
 ],
 [
-"sk-673-del",
+"sk-689-del",
 "srcl",
 "src/sink/sink.c",
-"673:gshscene_skip_begin(&skip, item, count);",
+"689:gshscene_skip_begin(&skip, item, count);",
 ";",
 [
 "testDump_sink",
@@ -7040,10 +7184,10 @@
 ]
 ],
 [
-"sk-677-eq",
+"sk-693-eq",
 "srcl",
 "src/sink/sink.c",
-"677:==",
+"693:==",
 "!=",
 [
 "testDump_sink",
@@ -7056,10 +7200,10 @@
 ]
 ],
 [
-"sk-677-neg",
+"sk-693-neg",
 "srcl",
 "src/sink/sink.c",
-"677:(item->kind == GSHSCENE_ITEM_INSTANCE)",
+"693:(item->kind == GSHSCENE_ITEM_INSTANCE)",
 "(!(item->kind == GSHSCENE_ITEM_INSTANCE))",
 [
 "testDump_sink",
@@ -7072,10 +7216,10 @@
 ]
 ],
 [
-"sk-678-del",
+"sk-694-del",
 "srcl",
 "src/sink/sink.c",
-"678:maps[count - 1] = item->map;",
+"694:maps[count - 1] = item->map;",
 ";",
 [
 "testDump_sink",
@@ -7088,10 +7232,10 @@
 ]
 ],
 [
-"sk-682-ne",
+"sk-698-ne",
 "srcl",
 "src/sink/sink.c",
-"682:!=",
+"698:!=",
 "==",
 [
 "testDump_sink",
@@ -7104,10 +7248,10 @@
 ]
 ],
 [
-"sk-682-neg",
+"sk-698-neg",
 "srcl",
 "src/sink/sink.c",
-"682:(result != GSHSCENE_OK)",
+"698:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -7120,10 +7264,10 @@
 ]
 ],
 [
-"sk-696-del",
+"sk-712-del",
 "srcl",
 "src/sink/sink.c",
-"696:job->request = *request;",
+"712:job->request = *request;",
 ";",
 [
 "testDump_sink",
@@ -7136,10 +7280,10 @@
 ]
 ],
 [
-"sk-698-del",
+"sk-714-del",
 "srcl",
 "src/sink/sink.c",
-"698:job->request.target = &job->target;",
+"714:job->request.target = &job->target;",
 ";",
 [
 "testDump_sink",
@@ -7152,10 +7296,10 @@
 ]
 ],
 [
-"sk-701-del",
+"sk-717-del",
 "srcl",
 "src/sink/sink.c",
-"701:gcu_atomic_size_init(&job->units_processed, 0);",
+"717:gcu_atomic_size_init(&job->units_processed, 0);",
 ";",
 [
 "testDump_sink",
@@ -7168,10 +7312,10 @@
 ]
 ],
 [
-"sk-702-del",
+"sk-718-del",
 "srcl",
 "src/sink/sink.c",
-"702:gcu_atomic_size_init(&job->units_done, 0);",
+"718:gcu_atomic_size_init(&job->units_done, 0);",
 ";",
 [
 "testDump_sink",
@@ -7184,10 +7328,10 @@
 ]
 ],
 [
-"sk-703-del",
+"sk-719-del",
 "srcl",
 "src/sink/sink.c",
-"703:job->units_total = gshscene_list_expansion(request->list);",
+"719:job->units_total = gshscene_list_expansion(request->list);",
 ";",
 [
 "testDump_sink",
@@ -7200,10 +7344,10 @@
 ]
 ],
 [
-"sk-705-del",
+"sk-721-del",
 "srcl",
 "src/sink/sink.c",
-"705:job->work_max = 0;",
+"721:job->work_max = 0;",
 ";",
 [
 "testDump_sink",
@@ -7216,10 +7360,10 @@
 ]
 ],
 [
-"sk-706-del",
+"sk-722-del",
 "srcl",
 "src/sink/sink.c",
-"706:job->frame_bytes = 0;",
+"722:job->frame_bytes = 0;",
 ";",
 [
 "testDump_sink",
@@ -7232,10 +7376,10 @@
 ]
 ],
 [
-"sk-710-del",
+"sk-726-del",
 "srcl",
 "src/sink/sink.c",
-"710:gcu_atomic_int_init(&job->state, GSHSCENE_JOB_RUNNING);",
+"726:gcu_atomic_int_init(&job->state, GSHSCENE_JOB_RUNNING);",
 ";",
 [
 "testDump_sink",
@@ -7248,10 +7392,10 @@
 ]
 ],
 [
-"sk-720-or",
+"sk-736-or",
 "srcl",
 "src/sink/sink.c",
-"720:||",
+"736:||",
 "&&",
 [
 "testDump_sink",
@@ -7264,10 +7408,10 @@
 ]
 ],
 [
-"sk-720-neg",
+"sk-736-neg",
 "srcl",
 "src/sink/sink.c",
-"720:(!sink || !job)",
+"736:(!sink || !job)",
 "(!(!sink || !job))",
 [
 "testDump_sink",
@@ -7280,10 +7424,10 @@
 ]
 ],
 [
-"sk-721-ret",
+"sk-737-ret",
 "srcl",
 "src/sink/sink.c",
-"721:GSHSCENE_ERR_INVALID",
+"737:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -7296,10 +7440,10 @@
 ]
 ],
 [
-"sk-724-ne",
+"sk-740-ne",
 "srcl",
 "src/sink/sink.c",
-"724:!=",
+"740:!=",
 "==",
 [
 "testDump_sink",
@@ -7312,10 +7456,10 @@
 ]
 ],
 [
-"sk-724-neg",
+"sk-740-neg",
 "srcl",
 "src/sink/sink.c",
-"724:(result != GSHSCENE_OK)",
+"740:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -7328,10 +7472,10 @@
 ]
 ],
 [
-"sk-731-ne",
+"sk-747-ne",
 "srcl",
 "src/sink/sink.c",
-"731:!=",
+"747:!=",
 "==",
 [
 "testDump_sink",
@@ -7344,10 +7488,10 @@
 ]
 ],
 [
-"sk-731-neg",
+"sk-747-neg",
 "srcl",
 "src/sink/sink.c",
-"731:(result != GSHSCENE_OK)",
+"747:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -7360,10 +7504,10 @@
 ]
 ],
 [
-"sk-734-neg",
+"sk-750-neg",
 "srcl",
 "src/sink/sink.c",
-"734:(!thread_ok(sink, &caps))",
+"750:(!thread_ok(sink, &caps))",
 "(!(!thread_ok(sink, &caps)))",
 [
 "testDump_sink",
@@ -7376,10 +7520,10 @@
 ]
 ],
 [
-"sk-735-ret",
+"sk-751-ret",
 "srcl",
 "src/sink/sink.c",
-"735:GSHSCENE_ERR_INVALID",
+"751:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -7392,10 +7536,10 @@
 ]
 ],
 [
-"sk-737-eq",
+"sk-753-eq",
 "srcl",
 "src/sink/sink.c",
-"737:==",
+"753:==",
 "!=",
 [
 "testDump_sink",
@@ -7408,10 +7552,10 @@
 ]
 ],
 [
-"sk-737-neg",
+"sk-753-neg",
 "srcl",
 "src/sink/sink.c",
-"737:(gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_RUNNING)",
+"753:(gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_RUNNING)",
 "(!(gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_RUNNING))",
 [
 "testDump_sink",
@@ -7424,187 +7568,11 @@
 ]
 ],
 [
-"sk-738-ret",
+"sk-754-ret",
 "srcl",
 "src/sink/sink.c",
-"738:GSHSCENE_ERR_INVALID",
+"754:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-741-neg",
-"srcl",
-"src/sink/sink.c",
-"741:(!gcu_atomic_int_compare_exchange(&request->report->busy, &idle, 1))",
-"(!(!gcu_atomic_int_compare_exchange(&request->report->busy, &idle, 1)))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-742-ret",
-"srcl",
-"src/sink/sink.c",
-"742:GSHSCENE_ERR_INVALID",
-"GSHSCENE_ERR_LIMIT",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-744-del",
-"srcl",
-"src/sink/sink.c",
-"744:result = surface_take(sink, copy.surface);",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-745-ne",
-"srcl",
-"src/sink/sink.c",
-"745:!=",
-"==",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-745-neg",
-"srcl",
-"src/sink/sink.c",
-"745:(result != GSHSCENE_OK)",
-"(!(result != GSHSCENE_OK))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-746-del",
-"srcl",
-"src/sink/sink.c",
-"746:gcu_atomic_int_store(&request->report->busy, 0);",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-749-del",
-"srcl",
-"src/sink/sink.c",
-"749:gshscene_report_clear(request->report);",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-750-del",
-"srcl",
-"src/sink/sink.c",
-"750:job_start(job, sink, request, &copy, &caps, &space);",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-751-del",
-"srcl",
-"src/sink/sink.c",
-"751:job->holds_surface = 1;",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-754-neg",
-"srcl",
-"src/sink/sink.c",
-"754:(gshscene_job_checkpoint(job))",
-"(!(gshscene_job_checkpoint(job)))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-755-str",
-"srcl",
-"src/sink/sink.c",
-"755:, \"canc",
-", \"Zanc",
 [
 "testDump_sink",
 "testSink",
@@ -7619,8 +7587,8 @@
 "sk-757-neg",
 "srcl",
 "src/sink/sink.c",
-"757:(copy.flags & GSHSCENE_TARGET_SEAMLESS)",
-"(!(copy.flags & GSHSCENE_TARGET_SEAMLESS))",
+"757:(!gcu_atomic_int_compare_exchange(&request->report->busy, &idle, 1))",
+"(!(!gcu_atomic_int_compare_exchange(&request->report->busy, &idle, 1)))",
 [
 "testDump_sink",
 "testSink",
@@ -7632,10 +7600,26 @@
 ]
 ],
 [
-"sk-758-del",
+"sk-758-ret",
 "srcl",
 "src/sink/sink.c",
-"758:result = gshscene_report_add(request->report, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_SEAMLESS, NULL, 0, 0, 0.0);",
+"758:GSHSCENE_ERR_INVALID",
+"GSHSCENE_ERR_LIMIT",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-760-del",
+"srcl",
+"src/sink/sink.c",
+"760:result = surface_take(sink, copy.surface);",
 ";",
 [
 "testDump_sink",
@@ -7648,27 +7632,11 @@
 ]
 ],
 [
-"sk-759-ne",
+"sk-761-ne",
 "srcl",
 "src/sink/sink.c",
-"759:!=",
+"761:!=",
 "==",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-759-str",
-"srcl",
-"src/sink/sink.c",
-"759:, \"the ",
-", \"Zhe ",
 [
 "testDump_sink",
 "testSink",
@@ -7683,8 +7651,8 @@
 "sk-761-neg",
 "srcl",
 "src/sink/sink.c",
-"761:(request->flags & GSHSCENE_RENDER_CALLER_MEMORY)",
-"(!(request->flags & GSHSCENE_RENDER_CALLER_MEMORY))",
+"761:(result != GSHSCENE_OK)",
+"(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
 "testSink",
@@ -7696,42 +7664,10 @@
 ]
 ],
 [
-"sk-762-or",
+"sk-762-del",
 "srcl",
 "src/sink/sink.c",
-"762:||",
-"&&",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-762-neg",
-"srcl",
-"src/sink/sink.c",
-"762:(!(caps.flags & GSHSCENE_CAP_CALLER_MEMORY) || !sink->ops.workspace_bytes)",
-"(!(!(caps.flags & GSHSCENE_CAP_CALLER_MEMORY) || !sink->ops.workspace_bytes))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-763-del",
-"srcl",
-"src/sink/sink.c",
-"763:result = gshscene_report_add(request->report, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_CALLER_MEMORY, NULL, 0, 0, 0.0);",
+"762:gcu_atomic_int_store(&request->report->busy, 0);",
 ";",
 [
 "testDump_sink",
@@ -7744,11 +7680,11 @@
 ]
 ],
 [
-"sk-764-ne",
+"sk-765-del",
 "srcl",
 "src/sink/sink.c",
-"764:!=",
-"==",
+"765:gshscene_report_clear(request->report);",
+";",
 [
 "testDump_sink",
 "testSink",
@@ -7760,11 +7696,11 @@
 ]
 ],
 [
-"sk-764-str",
+"sk-766-del",
 "srcl",
 "src/sink/sink.c",
-"764:, \"the ",
-", \"Zhe ",
+"766:job_start(job, sink, request, &copy, &caps, &space);",
+";",
 [
 "testDump_sink",
 "testSink",
@@ -7779,7 +7715,7 @@
 "sk-767-del",
 "srcl",
 "src/sink/sink.c",
-"767:result = sink->ops.workspace_bytes(sink->impl, &job->request, &need);",
+"767:job->holds_surface = 1;",
 ";",
 [
 "testDump_sink",
@@ -7792,10 +7728,74 @@
 ]
 ],
 [
-"sk-768-ne",
+"sk-770-neg",
 "srcl",
 "src/sink/sink.c",
-"768:!=",
+"770:(gshscene_job_checkpoint(job))",
+"(!(gshscene_job_checkpoint(job)))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-771-str",
+"srcl",
+"src/sink/sink.c",
+"771:, \"canc",
+", \"Zanc",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-773-neg",
+"srcl",
+"src/sink/sink.c",
+"773:(copy.flags & GSHSCENE_TARGET_SEAMLESS)",
+"(!(copy.flags & GSHSCENE_TARGET_SEAMLESS))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-774-del",
+"srcl",
+"src/sink/sink.c",
+"774:result = gshscene_report_add(request->report, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_SEAMLESS, NULL, 0, 0, 0.0);",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-775-ne",
+"srcl",
+"src/sink/sink.c",
+"775:!=",
 "==",
 [
 "testDump_sink",
@@ -7808,26 +7808,10 @@
 ]
 ],
 [
-"sk-768-neg",
+"sk-775-str",
 "srcl",
 "src/sink/sink.c",
-"768:(result != GSHSCENE_OK)",
-"(!(result != GSHSCENE_OK))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-769-str",
-"srcl",
-"src/sink/sink.c",
-"769:, \"the ",
+"775:, \"the ",
 ", \"Zhe ",
 [
 "testDump_sink",
@@ -7840,11 +7824,11 @@
 ]
 ],
 [
-"sk-771-del",
+"sk-777-neg",
 "srcl",
 "src/sink/sink.c",
-"771:request->report->summary.workspace_needed = need;",
-";",
+"777:(request->flags & GSHSCENE_RENDER_CALLER_MEMORY)",
+"(!(request->flags & GSHSCENE_RENDER_CALLER_MEMORY))",
 [
 "testDump_sink",
 "testSink",
@@ -7856,75 +7840,11 @@
 ]
 ],
 [
-"sk-772-lt",
+"sk-778-or",
 "srcl",
 "src/sink/sink.c",
-"772:<",
-"<=",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-772-neg",
-"srcl",
-"src/sink/sink.c",
-"772:(request->workspace_bytes < need)",
-"(!(request->workspace_bytes < need))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-773-str",
-"srcl",
-"src/sink/sink.c",
-"773:, \"the ",
-", \"Zhe ",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-777-del",
-"srcl",
-"src/sink/sink.c",
-"777:result = plan(job, &refused);",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-778-ne",
-"srcl",
-"src/sink/sink.c",
-"778:!=",
-"==",
+"778:||",
+"&&",
 [
 "testDump_sink",
 "testSink",
@@ -7939,8 +7859,8 @@
 "sk-778-neg",
 "srcl",
 "src/sink/sink.c",
-"778:(result != GSHSCENE_OK)",
-"(!(result != GSHSCENE_OK))",
+"778:(!(caps.flags & GSHSCENE_CAP_CALLER_MEMORY) || !sink->ops.workspace_bytes)",
+"(!(!(caps.flags & GSHSCENE_CAP_CALLER_MEMORY) || !sink->ops.workspace_bytes))",
 [
 "testDump_sink",
 "testSink",
@@ -7952,74 +7872,10 @@
 ]
 ],
 [
-"sk-779-str",
+"sk-779-del",
 "srcl",
 "src/sink/sink.c",
-"779:, \"the ",
-", \"Zhe ",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-781-and",
-"srcl",
-"src/sink/sink.c",
-"781:&&",
-"||",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-781-neg",
-"srcl",
-"src/sink/sink.c",
-"781:(refused && (request->flags & GSHSCENE_RENDER_STRICT))",
-"(!(refused && (request->flags & GSHSCENE_RENDER_STRICT)))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-782-str",
-"srcl",
-"src/sink/sink.c",
-"782:, \"stri",
-", \"Ztri",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-784-del",
-"srcl",
-"src/sink/sink.c",
-"784:result = sink->ops.begin(sink->impl, job);",
+"779:result = gshscene_report_add(request->report, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_CALLER_MEMORY, NULL, 0, 0, 0.0);",
 ";",
 [
 "testDump_sink",
@@ -8032,10 +7888,10 @@
 ]
 ],
 [
-"sk-785-ne",
+"sk-780-ne",
 "srcl",
 "src/sink/sink.c",
-"785:!=",
+"780:!=",
 "==",
 [
 "testDump_sink",
@@ -8048,58 +7904,10 @@
 ]
 ],
 [
-"sk-785-and",
+"sk-780-str",
 "srcl",
 "src/sink/sink.c",
-"785:&&",
-"||",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-785-eq",
-"srcl",
-"src/sink/sink.c",
-"785:==",
-"!=",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-785-neg",
-"srcl",
-"src/sink/sink.c",
-"785:(result != GSHSCENE_OK && gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_RUNNING)",
-"(!(result != GSHSCENE_OK && gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_RUNNING))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-786-str",
-"srcl",
-"src/sink/sink.c",
-"786:, \"the ",
+"780:, \"the ",
 ", \"Zhe ",
 [
 "testDump_sink",
@@ -8112,11 +7920,11 @@
 ]
 ],
 [
-"sk-788-eq",
+"sk-785-del",
 "srcl",
 "src/sink/sink.c",
-"788:==",
-"!=",
+"785:result = sink->ops.workspace_bytes(sink->impl, &job->request, &need);",
+";",
 [
 "testDump_sink",
 "testSink",
@@ -8128,74 +7936,10 @@
 ]
 ],
 [
-"sk-788-neg",
+"sk-786-ne",
 "srcl",
 "src/sink/sink.c",
-"788:(gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_DONE)",
-"(!(gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_DONE))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-795-or",
-"srcl",
-"src/sink/sink.c",
-"795:||",
-"&&",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-795-neg",
-"srcl",
-"src/sink/sink.c",
-"795:(!job || !out)",
-"(!(!job || !out))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-796-ret",
-"srcl",
-"src/sink/sink.c",
-"796:GSHSCENE_ERR_INVALID",
-"GSHSCENE_ERR_LIMIT",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-799-ne",
-"srcl",
-"src/sink/sink.c",
-"799:!=",
+"786:!=",
 "==",
 [
 "testDump_sink",
@@ -8208,11 +7952,11 @@
 ]
 ],
 [
-"sk-799-neg",
+"sk-786-neg",
 "srcl",
 "src/sink/sink.c",
-"799:(state != GSHSCENE_JOB_IDLE && job->sink && !thread_ok(job->sink, &job->caps))",
-"(!(state != GSHSCENE_JOB_IDLE && job->sink && !thread_ok(job->sink, &job->caps)))",
+"786:(result != GSHSCENE_OK)",
+"(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
 "testSink",
@@ -8224,11 +7968,187 @@
 ]
 ],
 [
-"sk-800-ret",
+"sk-787-str",
 "srcl",
 "src/sink/sink.c",
-"800:GSHSCENE_ERR_INVALID",
-"GSHSCENE_ERR_LIMIT",
+"787:, \"the ",
+", \"Zhe ",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-789-lt",
+"srcl",
+"src/sink/sink.c",
+"789:<",
+"<=",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-789-neg",
+"srcl",
+"src/sink/sink.c",
+"789:(request->workspace_bytes < need)",
+"(!(request->workspace_bytes < need))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-791-str",
+"srcl",
+"src/sink/sink.c",
+"791:  \"the ",
+"  \"Zhe ",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-793-del",
+"srcl",
+"src/sink/sink.c",
+"793:request->report->summary.workspace_needed = need;",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-796-del",
+"srcl",
+"src/sink/sink.c",
+"796:result = plan(job, &refused);",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-797-ne",
+"srcl",
+"src/sink/sink.c",
+"797:!=",
+"==",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-797-neg",
+"srcl",
+"src/sink/sink.c",
+"797:(result != GSHSCENE_OK)",
+"(!(result != GSHSCENE_OK))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-798-str",
+"srcl",
+"src/sink/sink.c",
+"798:, \"the ",
+", \"Zhe ",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-800-and",
+"srcl",
+"src/sink/sink.c",
+"800:&&",
+"||",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-800-neg",
+"srcl",
+"src/sink/sink.c",
+"800:(refused && (request->flags & GSHSCENE_RENDER_STRICT))",
+"(!(refused && (request->flags & GSHSCENE_RENDER_STRICT)))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-801-str",
+"srcl",
+"src/sink/sink.c",
+"801:, \"stri",
+", \"Ztri",
 [
 "testDump_sink",
 "testSink",
@@ -8243,8 +8163,40 @@
 "sk-803-del",
 "srcl",
 "src/sink/sink.c",
-"803:s.state = (GSHSCENE_Job_State)state;",
+"803:result = sink->ops.begin(sink->impl, job);",
 ";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-804-ne",
+"srcl",
+"src/sink/sink.c",
+"804:!=",
+"==",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-804-and",
+"srcl",
+"src/sink/sink.c",
+"804:&&",
+"||",
 [
 "testDump_sink",
 "testSink",
@@ -8272,394 +8224,10 @@
 ]
 ],
 [
-"sk-804-del",
+"sk-804-neg",
 "srcl",
 "src/sink/sink.c",
-"804:s.result = state == GSHSCENE_JOB_DONE ? (GSHSCENE_Result)job->result : GSHSCENE_OK;",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-805-ne",
-"srcl",
-"src/sink/sink.c",
-"805:!=",
-"==",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-805-neg",
-"srcl",
-"src/sink/sink.c",
-"805:(state != GSHSCENE_JOB_IDLE)",
-"(!(state != GSHSCENE_JOB_IDLE))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-806-del",
-"srcl",
-"src/sink/sink.c",
-"806:s.units_total = job->units_total;",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-807-del",
-"srcl",
-"src/sink/sink.c",
-"807:s.units_processed = gcu_atomic_size_load(&job->units_processed);",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-808-del",
-"srcl",
-"src/sink/sink.c",
-"808:s.units_done = gcu_atomic_size_load(&job->units_done);",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-809-del",
-"srcl",
-"src/sink/sink.c",
-"809:s.work_max = job->work_max;",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-816-or",
-"srcl",
-"src/sink/sink.c",
-"816:||",
-"&&",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-816-neg",
-"srcl",
-"src/sink/sink.c",
-"816:(!sink || !job)",
-"(!(!sink || !job))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-817-ret",
-"srcl",
-"src/sink/sink.c",
-"817:GSHSCENE_ERR_INVALID",
-"GSHSCENE_ERR_LIMIT",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-820-eq",
-"srcl",
-"src/sink/sink.c",
-"820:==",
-"!=",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-820-or",
-"srcl",
-"src/sink/sink.c",
-"820:||",
-"&&",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-820-ne",
-"srcl",
-"src/sink/sink.c",
-"820:!=",
-"==",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-820-neg",
-"srcl",
-"src/sink/sink.c",
-"820:(state == GSHSCENE_JOB_IDLE || job->sink != sink)",
-"(!(state == GSHSCENE_JOB_IDLE || job->sink != sink))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-821-ret",
-"srcl",
-"src/sink/sink.c",
-"821:GSHSCENE_ERR_INVALID",
-"GSHSCENE_ERR_LIMIT",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-823-neg",
-"srcl",
-"src/sink/sink.c",
-"823:(!(job->caps.flags & GSHSCENE_CAP_CAN_BLOCK))",
-"(!(!(job->caps.flags & GSHSCENE_CAP_CAN_BLOCK)))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-824-ret",
-"srcl",
-"src/sink/sink.c",
-"824:GSHSCENE_ERR_UNSUPPORTED",
-"GSHSCENE_ERR_INVALID",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-826-neg",
-"srcl",
-"src/sink/sink.c",
-"826:(!thread_ok(sink, &job->caps))",
-"(!(!thread_ok(sink, &job->caps)))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-827-ret",
-"srcl",
-"src/sink/sink.c",
-"827:GSHSCENE_ERR_INVALID",
-"GSHSCENE_ERR_LIMIT",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-829-eq",
-"srcl",
-"src/sink/sink.c",
-"829:==",
-"!=",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-829-neg",
-"srcl",
-"src/sink/sink.c",
-"829:(state == GSHSCENE_JOB_RUNNING)",
-"(!(state == GSHSCENE_JOB_RUNNING))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-830-neg",
-"srcl",
-"src/sink/sink.c",
-"830:(!sink->ops.wait)",
-"(!(!sink->ops.wait))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-834-ne",
-"srcl",
-"src/sink/sink.c",
-"834:!=",
-"==",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-834-eq",
-"srcl",
-"src/sink/sink.c",
-"834:==",
-"!=",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-834-neg",
-"srcl",
-"src/sink/sink.c",
-"834:(result != GSHSCENE_OK && gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_RUNNING)",
+"804:(result != GSHSCENE_OK && gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_RUNNING)",
 "(!(result != GSHSCENE_OK && gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_RUNNING))",
 [
 "testDump_sink",
@@ -8672,26 +8240,10 @@
 ]
 ],
 [
-"sk-835-del",
+"sk-805-str",
 "srcl",
 "src/sink/sink.c",
-"835:gshscene_job_complete(job, result, NULL, 0, \"the wait failed\");",
-";",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-835-str",
-"srcl",
-"src/sink/sink.c",
-"835:, \"the ",
+"805:, \"the ",
 ", \"Zhe ",
 [
 "testDump_sink",
@@ -8704,11 +8256,395 @@
 ]
 ],
 [
-"sk-842-or",
+"sk-807-eq",
 "srcl",
 "src/sink/sink.c",
-"842:||",
+"807:==",
+"!=",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-807-neg",
+"srcl",
+"src/sink/sink.c",
+"807:(gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_DONE)",
+"(!(gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_DONE))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-814-or",
+"srcl",
+"src/sink/sink.c",
+"814:||",
 "&&",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-814-neg",
+"srcl",
+"src/sink/sink.c",
+"814:(!job || !out)",
+"(!(!job || !out))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-815-ret",
+"srcl",
+"src/sink/sink.c",
+"815:GSHSCENE_ERR_INVALID",
+"GSHSCENE_ERR_LIMIT",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-818-ne",
+"srcl",
+"src/sink/sink.c",
+"818:!=",
+"==",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-818-neg",
+"srcl",
+"src/sink/sink.c",
+"818:(state != GSHSCENE_JOB_IDLE && job->sink && !thread_ok(job->sink, &job->caps))",
+"(!(state != GSHSCENE_JOB_IDLE && job->sink && !thread_ok(job->sink, &job->caps)))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-819-ret",
+"srcl",
+"src/sink/sink.c",
+"819:GSHSCENE_ERR_INVALID",
+"GSHSCENE_ERR_LIMIT",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-822-del",
+"srcl",
+"src/sink/sink.c",
+"822:s.state = (GSHSCENE_Job_State)state;",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-823-eq",
+"srcl",
+"src/sink/sink.c",
+"823:==",
+"!=",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-823-del",
+"srcl",
+"src/sink/sink.c",
+"823:s.result = state == GSHSCENE_JOB_DONE ? (GSHSCENE_Result)job->result : GSHSCENE_OK;",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-824-ne",
+"srcl",
+"src/sink/sink.c",
+"824:!=",
+"==",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-824-neg",
+"srcl",
+"src/sink/sink.c",
+"824:(state != GSHSCENE_JOB_IDLE)",
+"(!(state != GSHSCENE_JOB_IDLE))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-825-del",
+"srcl",
+"src/sink/sink.c",
+"825:s.units_total = job->units_total;",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-826-del",
+"srcl",
+"src/sink/sink.c",
+"826:s.units_processed = gcu_atomic_size_load(&job->units_processed);",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-827-del",
+"srcl",
+"src/sink/sink.c",
+"827:s.units_done = gcu_atomic_size_load(&job->units_done);",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-828-del",
+"srcl",
+"src/sink/sink.c",
+"828:s.work_max = job->work_max;",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-835-or",
+"srcl",
+"src/sink/sink.c",
+"835:||",
+"&&",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-835-neg",
+"srcl",
+"src/sink/sink.c",
+"835:(!sink || !job)",
+"(!(!sink || !job))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-836-ret",
+"srcl",
+"src/sink/sink.c",
+"836:GSHSCENE_ERR_INVALID",
+"GSHSCENE_ERR_LIMIT",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-839-eq",
+"srcl",
+"src/sink/sink.c",
+"839:==",
+"!=",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-839-or",
+"srcl",
+"src/sink/sink.c",
+"839:||",
+"&&",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-839-ne",
+"srcl",
+"src/sink/sink.c",
+"839:!=",
+"==",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-839-neg",
+"srcl",
+"src/sink/sink.c",
+"839:(state == GSHSCENE_JOB_IDLE || job->sink != sink)",
+"(!(state == GSHSCENE_JOB_IDLE || job->sink != sink))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-840-ret",
+"srcl",
+"src/sink/sink.c",
+"840:GSHSCENE_ERR_INVALID",
+"GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
 "testSink",
@@ -8723,8 +8659,8 @@
 "sk-842-neg",
 "srcl",
 "src/sink/sink.c",
-"842:(!sink || !request)",
-"(!(!sink || !request))",
+"842:(!(job->caps.flags & GSHSCENE_CAP_CAN_BLOCK))",
+"(!(!(job->caps.flags & GSHSCENE_CAP_CAN_BLOCK)))",
 [
 "testDump_sink",
 "testSink",
@@ -8739,7 +8675,39 @@
 "sk-843-ret",
 "srcl",
 "src/sink/sink.c",
-"843:GSHSCENE_ERR_INVALID",
+"843:GSHSCENE_ERR_UNSUPPORTED",
+"GSHSCENE_ERR_INVALID",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-845-neg",
+"srcl",
+"src/sink/sink.c",
+"845:(!thread_ok(sink, &job->caps))",
+"(!(!thread_ok(sink, &job->caps)))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-846-ret",
+"srcl",
+"src/sink/sink.c",
+"846:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -8752,10 +8720,58 @@
 ]
 ],
 [
-"sk-847-ne",
+"sk-848-eq",
 "srcl",
 "src/sink/sink.c",
-"847:!=",
+"848:==",
+"!=",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-848-neg",
+"srcl",
+"src/sink/sink.c",
+"848:(state == GSHSCENE_JOB_RUNNING)",
+"(!(state == GSHSCENE_JOB_RUNNING))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-849-neg",
+"srcl",
+"src/sink/sink.c",
+"849:(!sink->ops.wait)",
+"(!(!sink->ops.wait))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-853-ne",
+"srcl",
+"src/sink/sink.c",
+"853:!=",
 "==",
 [
 "testDump_sink",
@@ -8768,11 +8784,11 @@
 ]
 ],
 [
-"sk-847-neg",
+"sk-853-eq",
 "srcl",
 "src/sink/sink.c",
-"847:(result != GSHSCENE_OK)",
-"(!(result != GSHSCENE_OK))",
+"853:==",
+"!=",
 [
 "testDump_sink",
 "testSink",
@@ -8784,27 +8800,11 @@
 ]
 ],
 [
-"sk-850-neg",
+"sk-853-neg",
 "srcl",
 "src/sink/sink.c",
-"850:(!(caps.flags & GSHSCENE_CAP_CAN_BLOCK))",
-"(!(!(caps.flags & GSHSCENE_CAP_CAN_BLOCK)))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-851-ret",
-"srcl",
-"src/sink/sink.c",
-"851:GSHSCENE_ERR_UNSUPPORTED",
-"GSHSCENE_ERR_INVALID",
+"853:(result != GSHSCENE_OK && gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_RUNNING)",
+"(!(result != GSHSCENE_OK && gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_RUNNING))",
 [
 "testDump_sink",
 "testSink",
@@ -8819,7 +8819,7 @@
 "sk-854-del",
 "srcl",
 "src/sink/sink.c",
-"854:memset(&job, 0, sizeof job);",
+"854:gshscene_job_complete(job, result, NULL, 0, \"the wait failed\");",
 ";",
 [
 "testDump_sink",
@@ -8832,11 +8832,11 @@
 ]
 ],
 [
-"sk-855-del",
+"sk-854-str",
 "srcl",
 "src/sink/sink.c",
-"855:result = gshscene_sink_begin(sink, request, &job);",
-";",
+"854:, \"the ",
+", \"Zhe ",
 [
 "testDump_sink",
 "testSink",
@@ -8848,11 +8848,11 @@
 ]
 ],
 [
-"sk-856-eq",
+"sk-861-or",
 "srcl",
 "src/sink/sink.c",
-"856:==",
-"!=",
+"861:||",
+"&&",
 [
 "testDump_sink",
 "testSink",
@@ -8864,11 +8864,27 @@
 ]
 ],
 [
-"sk-856-neg",
+"sk-861-neg",
 "srcl",
 "src/sink/sink.c",
-"856:(gcu_atomic_int_load(&job.state) == GSHSCENE_JOB_IDLE)",
-"(!(gcu_atomic_int_load(&job.state) == GSHSCENE_JOB_IDLE))",
+"861:(!sink || !request)",
+"(!(!sink || !request))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-862-ret",
+"srcl",
+"src/sink/sink.c",
+"862:GSHSCENE_ERR_INVALID",
+"GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
 "testSink",
@@ -8883,103 +8899,7 @@
 "sk-866-ne",
 "srcl",
 "src/sink/sink.c",
-"866:el != b-",
-"el == b-",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-866-ne2",
-"srcl",
-"src/sink/sink.c",
-"866:pe != b-",
-"pe == b-",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-866-ne3",
-"srcl",
-"src/sink/sink.c",
-"866:ut != b-",
-"ut == b-",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-867-ne",
-"srcl",
-"src/sink/sink.c",
-"867:nt != b-",
-"nt == b-",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-867-ne2",
-"srcl",
-"src/sink/sink.c",
-"867:rm != b-",
-"rm == b-",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-870-lt",
-"srcl",
-"src/sink/sink.c",
-"870:<",
-"<=",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-871-ne",
-"srcl",
-"src/sink/sink.c",
-"871:!=",
+"866:!=",
 "==",
 [
 "testDump_sink",
@@ -8992,11 +8912,11 @@
 ]
 ],
 [
-"sk-871-neg",
+"sk-866-neg",
 "srcl",
 "src/sink/sink.c",
-"871:(a->bits_per_channel[i] != b->bits_per_channel[i])",
-"(!(a->bits_per_channel[i] != b->bits_per_channel[i]))",
+"866:(result != GSHSCENE_OK)",
+"(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
 "testSink",
@@ -9008,11 +8928,11 @@
 ]
 ],
 [
-"sk-879-ne",
+"sk-869-neg",
 "srcl",
 "src/sink/sink.c",
-"879:!=",
-"==",
+"869:(!(caps.flags & GSHSCENE_CAP_CAN_BLOCK))",
+"(!(!(caps.flags & GSHSCENE_CAP_CAN_BLOCK)))",
 [
 "testDump_sink",
 "testSink",
@@ -9024,75 +8944,75 @@
 ]
 ],
 [
-"sk-879-neg",
+"sk-870-ret",
 "srcl",
 "src/sink/sink.c",
-"879:(!sink || !job || !out || job->sink != sink)",
-"(!(!sink || !job || !out || job->sink != sink))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-880-ret",
-"srcl",
-"src/sink/sink.c",
-"880:GSHSCENE_ERR_INVALID",
-"GSHSCENE_ERR_LIMIT",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-882-or",
-"srcl",
-"src/sink/sink.c",
-"882:||",
-"&&",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-882-neg",
-"srcl",
-"src/sink/sink.c",
-"882:(!(job->caps.flags & GSHSCENE_CAP_READBACK) || !sink->ops.readback)",
-"(!(!(job->caps.flags & GSHSCENE_CAP_READBACK) || !sink->ops.readback))",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"fuzz-render",
-"probe"
-]
-],
-[
-"sk-883-ret",
-"srcl",
-"src/sink/sink.c",
-"883:GSHSCENE_ERR_UNSUPPORTED",
+"870:GSHSCENE_ERR_UNSUPPORTED",
 "GSHSCENE_ERR_INVALID",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-873-del",
+"srcl",
+"src/sink/sink.c",
+"873:memset(&job, 0, sizeof job);",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-874-del",
+"srcl",
+"src/sink/sink.c",
+"874:result = gshscene_sink_begin(sink, request, &job);",
+";",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-875-eq",
+"srcl",
+"src/sink/sink.c",
+"875:==",
+"!=",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-875-neg",
+"srcl",
+"src/sink/sink.c",
+"875:(gcu_atomic_int_load(&job.state) == GSHSCENE_JOB_IDLE)",
+"(!(gcu_atomic_int_load(&job.state) == GSHSCENE_JOB_IDLE))",
 [
 "testDump_sink",
 "testSink",
@@ -9107,7 +9027,103 @@
 "sk-885-ne",
 "srcl",
 "src/sink/sink.c",
-"885:!=",
+"885:el != b-",
+"el == b-",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-885-ne2",
+"srcl",
+"src/sink/sink.c",
+"885:pe != b-",
+"pe == b-",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-885-ne3",
+"srcl",
+"src/sink/sink.c",
+"885:ut != b-",
+"ut == b-",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-886-ne",
+"srcl",
+"src/sink/sink.c",
+"886:nt != b-",
+"nt == b-",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-886-ne2",
+"srcl",
+"src/sink/sink.c",
+"886:rm != b-",
+"rm == b-",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-889-lt",
+"srcl",
+"src/sink/sink.c",
+"889:<",
+"<=",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-890-ne",
+"srcl",
+"src/sink/sink.c",
+"890:!=",
 "==",
 [
 "testDump_sink",
@@ -9120,10 +9136,58 @@
 ]
 ],
 [
-"sk-887-ret",
+"sk-890-neg",
 "srcl",
 "src/sink/sink.c",
-"887:GSHSCENE_ERR_INVALID",
+"890:(a->bits_per_channel[i] != b->bits_per_channel[i])",
+"(!(a->bits_per_channel[i] != b->bits_per_channel[i]))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-898-ne",
+"srcl",
+"src/sink/sink.c",
+"898:!=",
+"==",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-898-neg",
+"srcl",
+"src/sink/sink.c",
+"898:(!sink || !job || !out || job->sink != sink)",
+"(!(!sink || !job || !out || job->sink != sink))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-899-ret",
+"srcl",
+"src/sink/sink.c",
+"899:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -9136,10 +9200,90 @@
 ]
 ],
 [
-"sk-892-ne",
+"sk-901-or",
 "srcl",
 "src/sink/sink.c",
-"892:(out) != e->x1",
+"901:||",
+"&&",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-901-neg",
+"srcl",
+"src/sink/sink.c",
+"901:(!(job->caps.flags & GSHSCENE_CAP_READBACK) || !sink->ops.readback)",
+"(!(!(job->caps.flags & GSHSCENE_CAP_READBACK) || !sink->ops.readback))",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-902-ret",
+"srcl",
+"src/sink/sink.c",
+"902:GSHSCENE_ERR_UNSUPPORTED",
+"GSHSCENE_ERR_INVALID",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-904-ne",
+"srcl",
+"src/sink/sink.c",
+"904:!=",
+"==",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-906-ret",
+"srcl",
+"src/sink/sink.c",
+"906:GSHSCENE_ERR_INVALID",
+"GSHSCENE_ERR_LIMIT",
+[
+"testDump_sink",
+"testSink",
+"testReport",
+"testGlyph",
+"testPalette",
+"fuzz-render",
+"probe"
+]
+],
+[
+"sk-911-ne",
+"srcl",
+"src/sink/sink.c",
+"911:(out) != e->x1",
 "(out) == e->x1",
 [
 "testDump_sink",
@@ -9152,10 +9296,10 @@
 ]
 ],
 [
-"sk-892-ne2",
+"sk-911-ne2",
 "srcl",
 "src/sink/sink.c",
-"892:(out) != e->y1",
+"911:(out) != e->y1",
 "(out) == e->y1",
 [
 "testDump_sink",
@@ -9168,10 +9312,10 @@
 ]
 ],
 [
-"sk-894-ret",
+"sk-913-ret",
 "srcl",
 "src/sink/sink.c",
-"894:GSHSCENE_ERR_INVALID",
+"913:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -9184,10 +9328,10 @@
 ]
 ],
 [
-"sk-900-neg",
+"sk-919-neg",
 "srcl",
 "src/sink/sink.c",
-"900:(!sink || !list || !target || !gshscene_list_is_closed(list))",
+"919:(!sink || !list || !target || !gshscene_list_is_closed(list))",
 "(!(!sink || !list || !target || !gshscene_list_is_closed(list)))",
 [
 "testDump_sink",
@@ -9200,10 +9344,10 @@
 ]
 ],
 [
-"sk-901-ret",
+"sk-920-ret",
 "srcl",
 "src/sink/sink.c",
-"901:GSHSCENE_ERR_INVALID",
+"920:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -9216,10 +9360,10 @@
 ]
 ],
 [
-"sk-906-ne",
+"sk-925-ne",
 "srcl",
 "src/sink/sink.c",
-"906:!=",
+"925:!=",
 "==",
 [
 "testDump_sink",
@@ -9232,10 +9376,10 @@
 ]
 ],
 [
-"sk-906-neg",
+"sk-925-neg",
 "srcl",
 "src/sink/sink.c",
-"906:(result != GSHSCENE_OK)",
+"925:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -9248,10 +9392,10 @@
 ]
 ],
 [
-"sk-909-neg",
+"sk-928-neg",
 "srcl",
 "src/sink/sink.c",
-"909:(!thread_ok(sink, &caps))",
+"928:(!thread_ok(sink, &caps))",
 "(!(!thread_ok(sink, &caps)))",
 [
 "testDump_sink",
@@ -9264,10 +9408,10 @@
 ]
 ],
 [
-"sk-910-ret",
+"sk-929-ret",
 "srcl",
 "src/sink/sink.c",
-"910:GSHSCENE_ERR_INVALID",
+"929:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -9280,10 +9424,10 @@
 ]
 ],
 [
-"sk-912-or",
+"sk-931-or",
 "srcl",
 "src/sink/sink.c",
-"912:||",
+"931:||",
 "&&",
 [
 "testDump_sink",
@@ -9296,10 +9440,10 @@
 ]
 ],
 [
-"sk-912-neg",
+"sk-931-neg",
 "srcl",
 "src/sink/sink.c",
-"912:(!(caps.flags & GSHSCENE_CAP_PREPARE) || !sink->ops.prepare)",
+"931:(!(caps.flags & GSHSCENE_CAP_PREPARE) || !sink->ops.prepare)",
 "(!(!(caps.flags & GSHSCENE_CAP_PREPARE) || !sink->ops.prepare))",
 [
 "testDump_sink",
@@ -9312,10 +9456,10 @@
 ]
 ],
 [
-"sk-920-ne",
+"sk-939-ne",
 "srcl",
 "src/sink/sink.c",
-"920:!=",
+"939:!=",
 "==",
 [
 "testDump_sink",
@@ -9328,10 +9472,10 @@
 ]
 ],
 [
-"sk-924-neg",
+"sk-943-neg",
 "srcl",
 "src/sink/sink.c",
-"924:(!sink)",
+"943:(!sink)",
 "(!(!sink))",
 [
 "testDump_sink",
@@ -9344,10 +9488,10 @@
 ]
 ],
 [
-"sk-925-ret",
+"sk-944-ret",
 "srcl",
 "src/sink/sink.c",
-"925:GSHSCENE_ERR_INVALID",
+"944:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -9360,10 +9504,10 @@
 ]
 ],
 [
-"sk-927-and",
+"sk-946-and",
 "srcl",
 "src/sink/sink.c",
-"927:&&",
+"946:&&",
 "||",
 [
 "testDump_sink",
@@ -9376,10 +9520,10 @@
 ]
 ],
 [
-"sk-927-ne",
+"sk-946-ne",
 "srcl",
 "src/sink/sink.c",
-"927:!=",
+"946:!=",
 "==",
 [
 "testDump_sink",
@@ -9392,10 +9536,10 @@
 ]
 ],
 [
-"sk-927-neg",
+"sk-946-neg",
 "srcl",
 "src/sink/sink.c",
-"927:(sink_affine(sink) && gshscene_thread_token() != sink->creator)",
+"946:(sink_affine(sink) && gshscene_thread_token() != sink->creator)",
 "(!(sink_affine(sink) && gshscene_thread_token() != sink->creator))",
 [
 "testDump_sink",
@@ -9408,10 +9552,10 @@
 ]
 ],
 [
-"sk-928-ret",
+"sk-947-ret",
 "srcl",
 "src/sink/sink.c",
-"928:GSHSCENE_ERR_INVALID",
+"947:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -9424,10 +9568,10 @@
 ]
 ],
 [
-"sk-934-or",
+"sk-953-or",
 "srcl",
 "src/sink/sink.c",
-"934:||",
+"953:||",
 "&&",
 [
 "testDump_sink",
@@ -9440,10 +9584,10 @@
 ]
 ],
 [
-"sk-934-neg",
+"sk-953-neg",
 "srcl",
 "src/sink/sink.c",
-"934:(!sink || !out)",
+"953:(!sink || !out)",
 "(!(!sink || !out))",
 [
 "testDump_sink",
@@ -9456,10 +9600,10 @@
 ]
 ],
 [
-"sk-935-ret",
+"sk-954-ret",
 "srcl",
 "src/sink/sink.c",
-"935:GSHSCENE_ERR_INVALID",
+"954:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -9472,10 +9616,10 @@
 ]
 ],
 [
-"sk-942-neg",
+"sk-961-neg",
 "srcl",
 "src/sink/sink.c",
-"942:(!sink)",
+"961:(!sink)",
 "(!(!sink))",
 [
 "testDump_sink",
@@ -9488,10 +9632,10 @@
 ]
 ],
 [
-"sk-945-and",
+"sk-964-and",
 "srcl",
 "src/sink/sink.c",
-"945:&&",
+"964:&&",
 "||",
 [
 "testDump_sink",
@@ -9504,10 +9648,10 @@
 ]
 ],
 [
-"sk-945-ne",
+"sk-964-ne",
 "srcl",
 "src/sink/sink.c",
-"945:!=",
+"964:!=",
 "==",
 [
 "testDump_sink",
@@ -9520,10 +9664,10 @@
 ]
 ],
 [
-"sk-945-neg",
+"sk-964-neg",
 "srcl",
 "src/sink/sink.c",
-"945:(sink_affine(sink) && gshscene_thread_token() != sink->creator)",
+"964:(sink_affine(sink) && gshscene_thread_token() != sink->creator)",
 "(!(sink_affine(sink) && gshscene_thread_token() != sink->creator))",
 [
 "testDump_sink",
@@ -9536,10 +9680,10 @@
 ]
 ],
 [
-"sk-946-ret",
+"sk-965-ret",
 "srcl",
 "src/sink/sink.c",
-"946:GSHSCENE_ERR_INVALID",
+"965:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -9552,10 +9696,10 @@
 ]
 ],
 [
-"sk-950-del",
+"sk-969-del",
 "srcl",
 "src/sink/sink.c",
-"950:GCU_MUTEX_UNLOCK(sink->lock);",
+"969:GCU_MUTEX_UNLOCK(sink->lock);",
 ";",
 [
 "testDump_sink",
@@ -9568,10 +9712,10 @@
 ]
 ],
 [
-"sk-951-neg",
+"sk-970-neg",
 "srcl",
 "src/sink/sink.c",
-"951:(in_flight)",
+"970:(in_flight)",
 "(!(in_flight))",
 [
 "testDump_sink",
@@ -9584,10 +9728,10 @@
 ]
 ],
 [
-"sk-952-ret",
+"sk-971-ret",
 "srcl",
 "src/sink/sink.c",
-"952:GSHSCENE_ERR_INVALID",
+"971:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -9600,10 +9744,10 @@
 ]
 ],
 [
-"sk-954-del",
+"sk-973-del",
 "srcl",
 "src/sink/sink.c",
-"954:sink->ops.destroy(sink->impl);",
+"973:sink->ops.destroy(sink->impl);",
 ";",
 [
 "testDump_sink",
@@ -9616,10 +9760,10 @@
 ]
 ],
 [
-"sk-957-del",
+"sk-976-del",
 "srcl",
 "src/sink/sink.c",
-"957:gshscene_free(&alloc, sink->busy);",
+"976:gshscene_free(&alloc, sink->busy);",
 ";",
 [
 "testDump_sink",
@@ -9632,10 +9776,10 @@
 ]
 ],
 [
-"sk-958-del",
+"sk-977-del",
 "srcl",
 "src/sink/sink.c",
-"958:gshscene_free(&alloc, sink);",
+"977:gshscene_free(&alloc, sink);",
 ";",
 [
 "testDump_sink",

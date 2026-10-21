@@ -328,9 +328,14 @@ conformance suite (`tests/sink_conformance.h`) cite the rules by number.
 - **S8 Conflation.** `GSHSCENE_TARGET_SEAMLESS` is refused with `ERR_REFUSED` before the sink is
   called, with or without strict, with one render-level entry (AD-29).
 - **S9 Memory and static resources.** With `CALLER_MEMORY` the sink allocates nothing during the
-  render and takes its scratch from the workspace, whose exact need `gshscene_sink_workspace_bytes`
-  gives; less is `ERR_LIMIT` with the need in the summary; a sink without the capability refuses the
-  flag. `prepare` uploads or caches a list's static resources by id until `evict` or destroy; the
+  render, sizing it included, and takes its scratch from the workspace, whose exact need
+  `gshscene_sink_workspace_bytes` gives. Less (or none) is `ERR_LIMIT` with the target untouched and
+  no allocation at all: the summary states no need (`workspace_needed` 0), since a render does not
+  allocate to measure it, and the failure's reason names the query, which gives it (the query is not
+  a render and may allocate). A sink's `workspace_bytes` op, called with the flag, sizes the render
+  inside the workspace without allocating and gives the exact need or, when it does not fit, a bound
+  past it; called without (the query's second call), it may allocate. A sink without the capability
+  refuses the flag. `prepare` uploads or caches a list's static resources by id until `evict` or destroy; the
   summary states the static bytes and the frame's peak scratch.
 - **S10 Lifetime with work in flight.** The caller keeps the list, its resources, the target, the
   report, the workspace and the token alive and unmodified until the job completes. A sink keeps no
