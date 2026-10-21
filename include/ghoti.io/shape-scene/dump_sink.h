@@ -77,7 +77,8 @@
  * `F res=<kind>:<hash> map=<hash> rule=N box=<x0> <y0> <x1> <y1>` (a fill; a
  * gradient fill has ` grad=<id>`, the gradient's resource id, before `box=`),
  * `C res=<kind>:<hash> map=<hash> rule=N box=<x0> <y0> <x1> <y1>` (a clip push),
- * `c` (a clip pop), `G opacity=<hex> composite=N` (a group push), `g` (a group pop),
+ * `c` (a clip pop), `G opacity=<hex> composite=N` (a group push; with ` isolation=N knockout=N mask=<hash>` when a
+ * configuration claims PDF's group fields and the group sets one, T1), `g` (a group pop),
  * `I res=picture:<hash>` (an instance), or `X class=N reason=N` (a unit not
  * drawn: refused, or inside a refused block, or a gradient fill that draws
  * nothing, class 5, `NOTICE`, which is not stamped; sink.h, S17); after a

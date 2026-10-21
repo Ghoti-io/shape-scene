@@ -35,7 +35,13 @@ whose bound passes an eighth of the tolerance (cancellation at large magnitudes:
 ClipColor's and SetSat's equal components), is refused: the grid's are left out and counted
 in the header, and a hand-written case that is refused stops the generator.
 
+tests/group_vectors.h (--groups) holds the general group of PDF's transparency model (T1 to T7):
+scenes in the four combinations of isolated and knockout.  The generator requires the general
+model to give every case of composite_vectors.h exactly (T6), so those are the default
+combination's vectors bit for bit.
+
     python3 tools/gen-composite-vectors.py > tests/composite_vectors.h
+    python3 tools/gen-composite-vectors.py --groups > tests/group_vectors.h
     python3 tools/gen-composite-vectors.py --check
 """
 import importlib.util
@@ -725,14 +731,133 @@ def render():
     return "".join(out)
 
 
+# --- T1 to T7: the four combinations of isolated and knockout (tests/group_vectors.h) ---------------------------------
+def tgroup(isolation, knockout, opacity=1.0, op="src-over", blend=TARGET):
+    g = group(opacity, op, blend)
+    g["isolation"] = isolation
+    g["knockout"] = knockout
+    return g
+
+
+GROUP_SCENES = [
+    ("two half-transparent fills that cover the pixel", lambda i, k: [tgroup(i, k), fill((1.0, 0.0, 0.0, 0.5)),
+                                                                      fill((0.0, 0.0, 1.0, 0.5)), pop()], BACKDROP, SRGB),
+    ("fills of partial shape (coverage 1/2 and 1/4)", lambda i, k: [tgroup(i, k), fill((1.0, 0.5, 0.0, 1.0), 0.5),
+                                                                     fill((0.0, 0.25, 1.0, 0.75), 0.25), pop()], BACKDROP, SRGB),
+    ("a multiply group inside sees the backdrop only when not isolated", lambda i, k: [
+        tgroup(i, k), fill((0.5, 1.0, 0.25, 0.5))] + blended("multiply", (1.0, 0.5, 0.5), 1.0) + [pop()],
+     (0.25, 0.125, 0.5, 0.5), SRGB),
+    ("a screen group of opacity 1/2 holding a difference group and a fill", lambda i, k: [
+        tgroup(i, k, 0.5, "screen"), fill((0.25, 0.75, 0.5, 0.75), 0.5)] + blended("difference", (1.0, 0.25, 0.0), 0.5, 0.5) +
+        [pop()], (0.5, 0.25, 0.125, 0.75), SRGB),
+    ("a clip inside the group weighs the shape of the fills it holds", lambda i, k: [
+        tgroup(i, k), fill((1.0, 1.0, 0.0, 1.0), 1.0), clip(0.5), fill((0.0, 0.5, 1.0, 0.5), 1.0), unclip(), pop()],
+     BACKDROP, SRGB),
+    ("a knockout child inside the group (the child's elements knock out to its own initial backdrop)", lambda i, k: [
+        tgroup(i, k), fill((0.0, 1.0, 0.0, 0.5)), tgroup(0, 1), fill((1.0, 0.0, 0.0, 0.5), 0.5),
+        fill((0.0, 0.0, 1.0, 0.5), 0.5), pop(), pop()], BACKDROP, SRGB),
+    ("a non-isolated child inside the group, blending against what the group gives it", lambda i, k: [
+        tgroup(i, k), fill((0.0, 0.5, 1.0, 0.75)), tgroup(1, 0), fill((1.0, 0.0, 0.0, 0.5))] + blended("hard-light", (0.75, 0.75, 0.25), 1.0) +
+        [pop(), pop()], (0.75, 0.25, 0.25, 1.0), SRGB),
+    ("an unbounded child (src) inside the group acts on its whole clip region", lambda i, k: [
+        tgroup(i, k), fill((1.0, 0.0, 0.0, 1.0)), group(0.5, "src"), fill((0.0, 0.0, 1.0, 0.5), 0.5), pop(), pop()],
+     BACKDROP, SRGB),
+    ("an empty group", lambda i, k: [tgroup(i, k, 0.5, "multiply"), pop()], BACKDROP, SRGB),
+    ("a non-dyadic alpha and luminosity inside", lambda i, k: [tgroup(i, k), fill((0.25, 0.75, 0.5, 0.6))] +
+        blended("luminosity", (0.9, 0.1, 0.3), 0.7) + [pop()], (0.3, 0.2, 0.1, 0.6), SRGB),
+    ("a group in linear light over an sRGB target (the initial backdrop converted in)", lambda i, k: [
+        tgroup(i, k, 1.0, "src-over", LIN), fill((1.0, 0.5, 0.25, 0.5), 1.0, SRGB)] + blended("multiply", (0.5, 0.5, 1.0), 1.0, space=SRGB) +
+        [pop()], (0.25, 0.25, 0.5, 0.5), SRGB),
+    ("out of range inside, under color-burn and color-dodge", lambda i, k: [tgroup(i, k), fill((1.5, -0.5, 0.25, 1.0), 0.5)] +
+        blended("color-burn", (-0.25, 0.5, 2.0), 1.0) + blended("color-dodge", (1.5, 0.5, -1.0), 0.5) + [pop()],
+     (0.5, 1.5, -0.25, 1.0), SRGB),
+    ("nested: the same combination twice", lambda i, k: [tgroup(i, k), fill((0.5, 0.0, 1.0, 0.5), 0.5), tgroup(i, k),
+                                                         fill((1.0, 0.5, 0.0, 0.5), 0.5)] + blended("exclusion", (0.25, 1.0, 0.5), 0.75) +
+        [pop(), pop()], BACKDROP, SRGB),
+]
+GROUP_CASES = []
+for title, build, backdrop, target in GROUP_SCENES:
+    for iso, ko in ((0, 0), (1, 0), (0, 1), (1, 1)):
+        name = "%s: %s, %s" % (title, "isolated" if iso == 0 else "non-isolated", "knockout" if ko else "not knockout")
+        GROUP_CASES.append(dict(name=name, items=build(iso, ko), target=target, backdrop=backdrop, fg=FG, palette=None))
+
+
+def evaluate_general_case(c):
+    items = [dict(it) for it in c["items"]]
+    cov = [it["cov"] for it in c["items"]]
+    return oracle.evaluate_general(items, cov, c["fg"], c["target"], c["backdrop"], c["palette"])
+
+
+def check_default_is_general():
+    """T6 over every case of tests/composite_vectors.h: the general model with every group isolated and not knockout
+    gives the same exact rationals, so the default combination's vectors are those, bit for bit."""
+    for c in CASES:
+        want, _ = evaluate_items(c)
+        got, _ = evaluate_general_case(c)
+        if want != got:
+            sys.exit("gen-composite-vectors: T6 fails on %r: %s against %s" % (c["name"], got, want))
+    for c in GROUP_CASES:
+        if all(it.get("isolation", 0) == 0 and it.get("knockout", 0) == 0 for it in c["items"]):
+            want, _ = evaluate_items(c)
+            got, _ = evaluate_general_case(c)
+            if want != got:
+                sys.exit("gen-composite-vectors: T6 fails on %r" % c["name"])
+
+
+def render_groups():
+    check_default_is_general()
+    out = []
+    out.append("// Generated by tools/gen-composite-vectors.py --groups from tools/composite-oracle.py (exact rationals).\n")
+    out.append("// Do not edit; run the generator.  Independent of the library's code.\n")
+    out.append("// The general group of PDF's transparency model (T1 to T7 of shape-scene's documentation/design.md): each\n")
+    out.append("// scene in the four combinations of isolated and knockout.  The isolated, non-knockout one is N5 to N9: the\n")
+    out.append("// generator requires the general model to give every case of composite_vectors.h exactly, so those vectors\n")
+    out.append("// are the default combination's, bit for bit.  No sink composites the other three yet (they are refused).\n")
+    out.append("#ifndef GHOTI_IO_GSHSCENE_TEST_GROUP_VECTORS_H\n#define GHOTI_IO_GSHSCENE_TEST_GROUP_VECTORS_H\n\n")
+    out.append("namespace group_vectors {\n\n")
+    out.append("struct VSpace {\n  int primaries;\n  int transfer;\n  double gamma;\n};\n\n")
+    out.append("// kind: 1 fill, 2 clip push, 3 clip pop, 4 group push, 5 group pop; a fill is solid.\n")
+    out.append("// isolation: 0 isolated, 1 non-isolated; knockout: 0 or 1 (group push only).\n")
+    out.append("struct VItem {\n  int kind;\n  double rgba[4];\n  VSpace space;\n  double opacity;\n  VSpace blend;\n"
+               "  int composite;\n  int isolation;\n  int knockout;\n  double coverage;\n};\n\n")
+    out.append("// exact: dyadic values, no conversion and no blend mode, so a double evaluator matches want bit for bit.\n")
+    out.append("struct VCase {\n  const char * name;\n  bool exact;\n  VSpace target;\n  double backdrop[4];\n  int item_count;\n"
+               "  const VItem * items;\n  double want[4];\n};\n\n")
+    exact_count = 0
+    rows = []
+    for n, c in enumerate(GROUP_CASES):
+        got, inexact = evaluate_general_case(c)
+        blends = any(it["k"] == GROUP_PUSH and it["composite"] >= 13 for it in c["items"])
+        exact = (not inexact) and not converts(c) and not blends and all(is_dyadic_double(v) for v in got)
+        exact_count += exact
+        out.append("static const VItem kItems%d[] = {\n" % n)
+        for it in c["items"]:
+            rgba = it.get("rgba", (0.0, 0.0, 0.0, 0.0))
+            out.append("    {%d, {%s, %s, %s, %s}, %s, %s, %s, %d, %d, %d, %s},\n" % (
+                it["k"], hexf(F(rgba[0])), hexf(F(rgba[1])), hexf(F(rgba[2])), hexf(F(rgba[3])),
+                space_cxx(it.get("space", TARGET)), hexf(F(it.get("opacity", 1.0))), space_cxx(it.get("blend", TARGET)),
+                it.get("composite", 0), it.get("isolation", 0), it.get("knockout", 0), hexf(F(it["cov"]))))
+        out.append("};\n")
+        rows.append("    {\"%s\", %s, %s, {%s}, %d, kItems%d, {%s}},\n" % (
+            c["name"], "true" if exact else "false", space_cxx(c["target"]), ", ".join(hexf(F(v)) for v in c["backdrop"]),
+            len(c["items"]), n, ", ".join(hexf(v) for v in got)))
+    out.append("\nstatic const VCase kCases[] = {\n")
+    out += rows
+    out.append("};\n\nstatic const int kCaseCount = %d;\nstatic const int kExactCaseCount = %d;\n\n" % (len(GROUP_CASES), exact_count))
+    out.append("}  // namespace group_vectors\n\n#endif\n")
+    return "".join(out)
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if "--check" in args:
-        for name, text in (("composite_vectors.h", render()),):
+        for name, text in (("composite_vectors.h", render()), ("group_vectors.h", render_groups())):
             path = os.path.join(HERE, "..", "tests", name)
             with open(path) as f:
                 if f.read() != text:
                     sys.exit("gen-composite-vectors: tests/%s is not what the generator writes" % name)
             print("gen-composite-vectors: tests/%s is current" % name)
+    elif "--groups" in args:
+        sys.stdout.write(render_groups())
     else:
         sys.stdout.write(render())

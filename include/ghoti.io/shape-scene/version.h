@@ -87,7 +87,8 @@
  * Each shape is a fill; a group with a clip is a clip push and pop around its
  * content (the clip push carries the group's layer and depth); a group is a group
  * push and pop when its opacity is below 1, its composite operator is not
- * source-over, its blend space is not zero, its ordering is not flat, or the
+ * source-over, its blend space is not zero, its ordering is not flat, its
+ * isolation, knockout or soft mask is not the default (T1), or the
  * sequence it is in is not flat (so that it stays one unit of that sequence and
  * carries its own context); a hidden node is skipped; an instance is an instance
  * item of the **picture** of its target (the target's own emission, placed at the
@@ -109,7 +110,8 @@
  * pinned), `u8` flags, `u64` parent (0 for the root), `u8` 1 if the node has a
  * key and then `u64` domain and `u64` value; and, by kind,
  * - **group**: `u64` the map's hash (`gshgeom_map_hash`), `f64` opacity, the blend
- *   space, `u8` composite, `u32` ordering, `i32` layer, `f64` depth, `u8` 1 if
+ *   space, `u8` composite (with PDF's fields after it as a list's group push spells
+ *   them, list.h, when one is not the default), `u32` ordering, `i32` layer, `f64` depth, `u8` 1 if
  *   there is a clip and then `u64` the clip resource's content hash, `u64` the clip
  *   map's hash and `u8` the clip's fill rule, then `u64` the number of children and
  *   each child's `u64` ID in draw order;
@@ -129,6 +131,7 @@
  * every ID, layer, flag and rule in decimal, a `<space>` as `P:T:<gamma hex>`:
  *
  * - `G id=I parent=P flags=F key=K map=H opacity=X blend=<space> composite=N order=N layer=L depth=D clip=C children=LIST`
+ *   (with ` isolation=N knockout=N mask=<hash>` after `order=N` when one of them is not the default)
  * - `S id=I parent=P flags=F key=K res=KIND:H map=H rule=R paint=PK r g b a space=<space> entry=E gradient=G layer=L depth=D`
  * - `I id=I parent=P flags=F key=K target=T map=H layer=L depth=D`
  *
@@ -203,6 +206,10 @@ typedef struct GSHSCENE_Node {
   GSHSCENE_Color_Space blend_space;  ///< Group: the space it composites in; zero inherits the enclosing group's.  Else zero.
   uint32_t composite;                ///< Group: a ::GSHSCENE_Composite (N4, B1).  Else ::GSHSCENE_COMPOSITE_SRC_OVER.
   uint32_t ordering;                 ///< Group: a ::GSHSCENE_Ordering, the context of its children.  Else ::GSHSCENE_ORDER_FLAT.
+  uint32_t isolation;                ///< Group: a ::GSHSCENE_Isolation (T1); isolated, 0, by default.  Else 0.
+  uint32_t knockout;                 ///< Group: 0 or 1, a knockout group (T1).  Else 0.
+  /** Group: the soft mask's slot (T1, T7): NULL, or a picture of the scene's store, which the node holds.  Else NULL. */
+  const GSHSCENE_Resource * soft_mask;
   const GSHSCENE_Resource * clip;    ///< Group: a path or glyph run clipping the group, or NULL.  Else NULL.
   GSHGEOM_Map clip_map;              ///< Group with a clip: the clip's placement in the group's own space.  Else the identity.
   GSHGEOM_Fill_Rule clip_rule;       ///< Group with a clip: its rule.  Else nonzero.

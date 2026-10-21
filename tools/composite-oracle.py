@@ -8,7 +8,7 @@
 # Ghoti.io Shape Scene is free software: you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public License version 3
 # as published by the Free Software Foundation.
-"""The reference of the scene's compositing definition (N1 to N11, N14 and B1 to B12 of documentation/design.md), in exact rationals.
+"""The reference of the scene's compositing definition (N1 to N11, N14, B1 to B12 and T1 to T7 of documentation/design.md), in exact rationals.
 
 This is a slow, independent statement of what a closed list *means*: the color
 spaces and their conversion (N1 to N3), the Porter-Duff operators (N4), the one
@@ -511,6 +511,145 @@ def evaluate(items, cov, fg, target, backdrop, palette=None):
     return root.layer, ex.inexact
 
 
+# --- T1 to T7: PDF's transparency groups (ISO 32000-1 section 11), of which N5 to N9 are one case ----------------------
+ISOLATED, NON_ISOLATED = 0, 1
+# T5: the operators PDF has (normal is source-over, B12), whose group element takes the group's shape.
+PDF_OPS = {"src-over"} | BLEND_INDEX
+
+
+class GFrame:
+    """A layer of the general model: its value L, its initial backdrop L0, the group alpha and the group shape."""
+
+    def __init__(self, layer, space, group=None, outer=ONE, knockout=False):
+        self.layer = list(layer)
+        self.initial = list(layer)
+        self.alpha_g = ZERO
+        self.shape_g = ZERO
+        self.space = space
+        self.clips = []
+        self.group = group
+        self.outer = outer
+        self.knockout = knockout
+
+
+def element(frame, f, op, a, ex):
+    """T3: one element of shape f into frame's layer.
+
+    For PDF's operators @p a is the element's source with its shape and its opacity both applied (A = f S, alpha
+    f q); for every other operator it is S, its opacity alone.  The element's backdrop is the layer's value before it
+    (non-knockout) or the layer's initial backdrop (knockout); the group alpha's backdrop is likewise the group alpha
+    before it, or 0.
+    """
+    bk = frame.initial if frame.knockout else frame.layer
+    agb = ZERO if frame.knockout else frame.alpha_g
+    old = frame.layer
+    if op in PDF_OPS:
+        qa = a[3]
+        if op == "src-over":
+            term = a[:3]
+        else:
+            if qa * bk[3] == 0:
+                b = [ZERO, ZERO, ZERO]
+            else:
+                b = [sat(v) for v in mix(op, straight(bk), straight(a), ex)]
+            term = [a[i] * (ONE - bk[3]) + qa * bk[3] * b[i] for i in range(3)]
+        frame.layer = [sat((ONE - f) * old[i] + (f - qa) * bk[i] + term[i]) for i in range(3)] + [
+            sat((ONE - f) * old[3] + (f - qa) * bk[3] + qa)]
+        frame.alpha_g = (ONE - f) * frame.alpha_g + (f - qa) * agb + qa
+    else:
+        o = operator(op, a, bk, ex)
+        frame.layer = [sat((ONE - f) * old[i] + f * o[i]) for i in range(4)]
+        frame.alpha_g = (ONE - f) * frame.alpha_g + f * operator(op, a, [ZERO, ZERO, ZERO, agb], ex)[3]
+    frame.shape_g = frame.shape_g + f - frame.shape_g * f
+
+
+def evaluate_general(items, cov, fg, target, backdrop, palette=None):
+    """T1 to T7: like evaluate(), with each group push's `isolation` (0 isolated, 1 not) and `knockout` (0 or 1)."""
+    ex = Exactness()
+    cov = [F(c) for c in cov]
+    root = GFrame([F(v) for v in backdrop], target)
+    stack = [root]
+    for i, it in enumerate(items):
+        top = stack[-1]
+        k = it["k"]
+        if k == FILL:
+            # N7, N10, N14 as evaluate() resolves them (the generator requires the two to agree on every default case).
+            kind = it["paint"]
+            straight_color = (fg[0] if kind == PAINT_FOREGROUND else
+                              None if kind == PAINT_PALETTE and (palette is None or it["entry"] >= len(palette)) else
+                              palette[it["entry"]][0] if kind == PAINT_PALETTE else it["rgba"])
+            if straight_color is None:
+                continue
+            given = fg[1] if kind == PAINT_FOREGROUND else palette[it["entry"]][1] if kind == PAINT_PALETTE else it["space"]
+            scale = F(straight_color[3]) * (F(it["rgba"][3]) if kind in (PAINT_FOREGROUND, PAINT_PALETTE) else ONE)
+            moved = convert([F(v) for v in straight_color[:3]], target if is_target(given) else given, top.space, ex)
+            opaque = premultiply(moved, scale)          # T2: the opacity, the paint's alpha
+            f = cov[i] * product(top.clips)             # T2: the shape, coverage and the clips in force
+            element(top, f, "src-over", [f * v for v in opaque], ex)
+        elif k == CLIP_PUSH:
+            top.clips += [cov[i]]
+        elif k == CLIP_POP:
+            del top.clips[-1]
+        elif k == GROUP_PUSH:
+            space = it["blend"] if not is_target(it["blend"]) else top.space
+            frame = GFrame([ZERO] * 4, space, group=it, outer=product(top.clips), knockout=bool(it.get("knockout", 0)))
+            if it.get("isolation", ISOLATED) == NON_ISOLATED:
+                # T4: the initial backdrop is the backdrop the group sees as an element of its parent, in its space.
+                seen = top.initial if top.knockout else top.layer
+                frame.layer = convert_premultiplied(seen, top.space, space, ex)
+                frame.initial = list(frame.layer)
+            stack.append(frame)
+        elif k == GROUP_POP:
+            done = stack.pop()
+            parent = stack[-1]
+            ag = done.alpha_g
+            # T5: the group's own result, the initial backdrop taken out (0 for an isolated group).
+            own = [sat(done.layer[i] - (ONE - ag) * done.initial[i]) for i in range(3)] + [ag]
+            moved = convert_premultiplied(own, done.space, parent.space, ex)
+            opacity = F(done.group["opacity"])
+            op = OPS[int(done.group["composite"])]
+            if op in PDF_OPS:
+                f = done.outer * done.shape_g
+                element(parent, f, op, [done.outer * opacity * v for v in moved], ex)
+            else:
+                element(parent, done.outer, op, [opacity * v for v in moved], ex)
+        else:
+            raise ValueError("an instance is not evaluated here: a picture is expanded by the caller")
+    assert len(stack) == 1
+    return root.layer, ex.inexact
+
+
+def pdf_literal(elements, isolated, knockout, backdrop):
+    """ISO 32000-1 section 11.4.8's group formulas, in straight color as PDF writes them, for one group of elements
+    (each (shape, opacity, straight rgb, blend mode)) over a straight (rgb, alpha) backdrop.  Independent of
+    element(): the self-test compares the two.  Returns the group's straight color, alpha and shape, and the backdrop
+    composited with it by the group's normal blend (when the group alpha is not 0)."""
+    def union(b, s):
+        return s + b * (1 - s)
+    cb0, ab0 = backdrop
+    c0, a0 = (list(cb0), ab0) if not isolated else ([ZERO] * 3, ZERO)
+    c, al = list(c0), a0
+    fg, ag = ZERO, ZERO
+    for fs, qs, cs, mode in elements:
+        cbi, abi = (c0, a0) if knockout else (c, al)
+        agbi = ZERO if knockout else ag
+        als = fs * qs
+        fg = union(fg, fs)
+        ag = (ONE - fs) * ag + (fs - als) * agbi + als
+        new_al = (ONE - fs) * al + (fs - als) * abi + als
+        b = mix(mode, cbi, cs, Exactness()) if mode != "src-over" else list(cs)
+        b = [sat(v) for v in b]
+        if new_al == 0:
+            c = [ZERO] * 3
+        else:
+            c = [((ONE - fs) * al * c[i] + (fs - als) * abi * cbi[i] + als * ((ONE - abi) * cs[i] + abi * b[i])) / new_al
+                 for i in range(3)]
+        al = new_al
+    if not isolated and ag != 0:
+        c = [c[i] + (c[i] - c0[i]) * (a0 / ag - a0) for i in range(3)]
+    return c, ag, fg
+
+
 # --- N11: the order of a sequence ------------------------------------------------------------------------------
 ORDER_FLAT, ORDER_DEPTH, ORDER_OVERLAY = 0, 1, 2
 
@@ -786,6 +925,104 @@ def selftest():
         normal = [s_[i] * (ONE - da) + d[i] * (ONE - sa) + sa * da * (straight(s_)[i] if sa * da else 0) for i in range(3)]
         normal += [sa + da * (ONE - sa)]
         check(normal == operator("src-over", s_, d), "B12: normal is source-over")
+
+    # T6: with every group isolated and not knockout, the general model is N5 to N9 exactly.
+    def random_list(r):
+        out, depth = [], 0
+        for _ in range(r.randint(1, 9)):
+            choice = r.random()
+            if choice < 0.45 or depth == 0 and choice >= 0.75:
+                out.append(dict(k=FILL, paint=PAINT_SOLID, rgba=(r.choice([0.0, 0.25, 1.0, -0.5, 1.5]), r.random(), 0.75,
+                                                                  r.choice([0.0, 0.5, 0.6, 1.0])), space=TARGET))
+            elif choice < 0.6:
+                out.append(dict(k=CLIP_PUSH))
+                out.append(dict(k=CLIP_POP)) if r.random() < 0.3 else depth.__add__(0)
+            elif choice < 0.75 or depth > 2:
+                if depth > 0:
+                    out.append(dict(k=GROUP_POP))
+                    depth -= 1
+            else:
+                out.append(dict(k=GROUP_PUSH, opacity=r.choice([1.0, 0.5, 0.75]), blend=r.choice([TARGET, SPACE_LINEAR_SRGB]),
+                                composite=r.randrange(len(OPS))))
+                depth += 1
+        # close whatever is open, clips and groups in order
+        stack = []
+        for it in out:
+            if it["k"] in (CLIP_PUSH, GROUP_PUSH):
+                stack.append(it["k"])
+            elif it["k"] in (CLIP_POP, GROUP_POP):
+                stack.pop()
+        for k in reversed(stack):
+            out.append(dict(k=CLIP_POP if k == CLIP_PUSH else GROUP_POP))
+        return out
+
+    for t in range(150):
+        items = random_list(rng)
+        cov = [F(rng.choice([0, 1, 1, 64, 128, 255]), 255) for _ in items]
+        backdrop = rng.choice([(0.0, 0.0, 0.0, 0.0), (0.25, 0.125, 0.5, 0.5), (0.0, 0.0, 1.0, 1.0)])
+        target = rng.choice([SPACE_SRGB, SPACE_LINEAR_SRGB])
+        want = evaluate(items, cov, (None, TARGET), target, backdrop)
+        got = evaluate_general(items, cov, (None, TARGET), target, backdrop)
+        check(want == got, "T6: the default group is N5 to N9 (case %d)" % t)
+
+    # T3 to T5 against ISO 32000's own straight-color formulas, every combination, with blend modes.
+    for t in range(120):
+        isolated, knockout = rng.random() < 0.5, rng.random() < 0.5
+        elements = []
+        for _ in range(rng.randint(1, 4)):
+            mode = rng.choice(["src-over", "multiply", "screen", "difference", "color-dodge", "hue", "luminosity"])
+            elements.append((F(rng.choice([1, 3, 4, 8]), 8), F(rng.choice([1, 3, 5, 8]), 8),
+                             [F(rng.randint(0, 8), 8) for _ in range(3)], mode))
+        cb0 = [F(rng.randint(0, 4), 4) for _ in range(3)]
+        ab0 = F(rng.choice([0, 1, 2, 4]), 4)
+        c_g, a_g, f_g = pdf_literal(elements, isolated, knockout, (cb0, ab0))
+        items = [dict(k=GROUP_PUSH, opacity=1.0, blend=TARGET, composite=0, isolation=0 if isolated else 1,
+                      knockout=1 if knockout else 0)]
+        cov = [ZERO]
+        for fs, qs, cs, mode in elements:
+            fill_ = dict(k=FILL, paint=PAINT_SOLID, rgba=tuple(float(v) for v in cs) + (float(qs),), space=TARGET)
+            if mode == "src-over":
+                items.append(fill_)
+                cov.append(fs)
+            else:
+                items += [dict(k=GROUP_PUSH, opacity=1.0, blend=TARGET, composite=OP_INDEX[mode]), fill_, dict(k=GROUP_POP)]
+                cov += [ZERO, fs, ZERO]
+        items.append(dict(k=GROUP_POP))
+        cov.append(ZERO)
+        backdrop = [cb0[i] * ab0 for i in range(3)] + [ab0]
+        got, _ = evaluate_general(items, cov, (None, TARGET), SPACE_SRGB, backdrop)
+        # The group composited onto the backdrop by normal: shape f_g, alpha a_g.
+        want = [(ONE - a_g) * backdrop[i] + a_g * c_g[i] for i in range(3)] + [backdrop[3] * (ONE - a_g) + a_g]
+        check(got == want, "T3 to T5 are ISO 32000's formulas (isolated %s, knockout %s): %s %s" % (isolated, knockout, got, want))
+    # Hand-worked: two half-transparent fills that cover the pixel; a knockout group keeps the second only.
+    red_h = dict(k=FILL, paint=PAINT_SOLID, rgba=(1.0, 0.0, 0.0, 0.5), space=TARGET)
+    blue_h = dict(k=FILL, paint=PAINT_SOLID, rgba=(0.0, 0.0, 1.0, 0.5), space=TARGET)
+    ko = dict(k=GROUP_PUSH, opacity=1.0, blend=TARGET, composite=0, isolation=0, knockout=1)
+    got, _ = evaluate_general([ko, red_h, blue_h, dict(k=GROUP_POP)], [0, 1, 1, 0], (None, TARGET), SPACE_SRGB, (0, 0, 0, 0))
+    check(got == [ZERO, ZERO, F(1, 2), F(1, 2)], "a knockout group keeps the last element: %s" % got)
+    got, _ = evaluate_general([dict(ko, knockout=0), red_h, blue_h, dict(k=GROUP_POP)], [0, 1, 1, 0], (None, TARGET),
+                              SPACE_SRGB, (0, 0, 0, 0))
+    check(got == [F(1, 4), ZERO, F(1, 2), F(3, 4)], "without knockout the two compose: %s" % got)
+    # Isolation changes nothing for content that blends only by normal (PDF 11.4.5): every combination is equal.
+    for items_ in ([red_h, blue_h], [red_h, dict(k=GROUP_PUSH, opacity=0.5, blend=TARGET, composite=0), blue_h, dict(k=GROUP_POP)]):
+        cov = [F(1)] * len(items_)
+        base = None
+        for iso in (0, 1):
+            push = dict(k=GROUP_PUSH, opacity=0.75, blend=TARGET, composite=0, isolation=iso, knockout=0)
+            got, _ = evaluate_general([push] + items_ + [dict(k=GROUP_POP)], [ZERO] + cov + [ZERO], (None, TARGET), SPACE_SRGB,
+                                      (0.25, 0.125, 0.5, 0.5))
+            base = got if base is None else base
+            check(got == base, "isolation does not change normal-only content: %s %s" % (got, base))
+    # ... and it does with a blend mode inside: the multiply sees the page under a non-isolated group.
+    mul = [dict(k=GROUP_PUSH, opacity=1.0, blend=TARGET, composite=OP_INDEX["multiply"]), dict(red_h, rgba=(1.0, 0.5, 0.5, 1.0)),
+           dict(k=GROUP_POP)]
+    a_, _ = evaluate_general([dict(ko, knockout=0, isolation=0)] + mul + [dict(k=GROUP_POP)], [0, 0, 1, 0, 0], (None, TARGET),
+                             SPACE_SRGB, (0.0, 0.0, 0.5, 0.5))
+    b_, _ = evaluate_general([dict(ko, knockout=0, isolation=1)] + mul + [dict(k=GROUP_POP)], [0, 0, 1, 0, 0], (None, TARGET),
+                             SPACE_SRGB, (0.0, 0.0, 0.5, 0.5))
+    check(a_ != b_, "a blend inside a non-isolated group sees the backdrop")
+    c_, _ = evaluate_general(mul, [0, 1, 0], (None, TARGET), SPACE_SRGB, (0.0, 0.0, 0.5, 0.5))
+    check(b_ == c_, "a non-isolated group of normal opacity 1 blends its content as if it were not there")
 
     # N11 against tools/gen-scene-vectors.py's own statement of the order.
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gen-scene-vectors.py")

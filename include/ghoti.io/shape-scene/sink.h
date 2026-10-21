@@ -199,6 +199,16 @@
  * group in a stated space other than the target's, without
  * ::GSHSCENE_CAP_BLEND_SPACES, is approximated (`BLEND_SPACE`) as any group is.
  *
+ * **S19 PDF's group fields (list.h, T1 to T7; color-paint story P3).**  A group
+ * that is non-isolated, knockout or names a soft mask is composited only by a
+ * sink whose caps say so (::GSHSCENE_CAP_GROUP_NON_ISOLATED,
+ * ::GSHSCENE_CAP_GROUP_KNOCKOUT, ::GSHSCENE_CAP_GROUP_SOFT_MASK); otherwise the
+ * planning pass refuses it (`GROUP_ISOLATION`, `GROUP_KNOCKOUT`, `SOFT_MASK`),
+ * so it is never drawn as an isolated, non-knockout or unmasked group.  A
+ * refused push skips its block, as every refused push does (S6).  The fields'
+ * defaults are N5 to N9 exactly (T6), so a sink without the caps draws every
+ * group that does not set them.
+ *
  * ### For sink implementations
  *
  * A sink library fills a ::GSHSCENE_Sink_Ops and calls ::gshscene_sink_create
@@ -324,7 +334,10 @@ typedef struct GSHSCENE_Target {
 #define GSHSCENE_CAP_BLEND_SPACES (UINT32_C(1) << 6)     ///< Groups blend in their stated space (else approximated, AD-23).
 #define GSHSCENE_CAP_PREPARE (UINT32_C(1) << 7)          ///< `prepare` holds resources across frames (S9).
 #define GSHSCENE_CAP_GRADIENT_SPACES (UINT32_C(1) << 8)  ///< Gradients interpolate in their stated space (else approximated, S17).
-#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 9) - 1)  ///< Every flag defined.
+#define GSHSCENE_CAP_GROUP_NON_ISOLATED (UINT32_C(1) << 9) ///< Non-isolated groups are composited as T4 and T5 say (else refused, S19).
+#define GSHSCENE_CAP_GROUP_KNOCKOUT (UINT32_C(1) << 10)  ///< Knockout groups are composited as T3 says (else refused, S19).
+#define GSHSCENE_CAP_GROUP_SOFT_MASK (UINT32_C(1) << 11) ///< A group's soft mask is applied (T7; else refused, S19).
+#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 12) - 1) ///< Every flag defined.
 /** @} */
 
 /** @brief Where a sink checks its cancel token (S7).  The values are pinned. */
@@ -662,7 +675,9 @@ typedef struct GSHSCENE_Disposition {
  * without `GLYPHS_FROM_FONT` is refused (`GLYPH_SOURCE`); a gradient fill of a kind not in `gradient_kinds` is refused
  * (`GRADIENT`); a fill whose palette paint, or a stop of whose gradient, names an entry @p palette does not have
  * (::gshscene_paint_resolve, G3) is refused (`PALETTE_ENTRY`); a group whose operator the caps do not composite is
- * refused (`COMPOSITE`); a clip push without `CLIP_AA` is approximated (`CLIP_ALIASED`); a group whose own blend space
+ * refused (`COMPOSITE`); a non-isolated group without `GROUP_NON_ISOLATED`, a knockout group without `GROUP_KNOCKOUT`
+ * and a group with a soft mask without `GROUP_SOFT_MASK` are refused, in that order (`GROUP_ISOLATION`,
+ * `GROUP_KNOCKOUT`, `SOFT_MASK`, S19); a clip push without `CLIP_AA` is approximated (`CLIP_ALIASED`); a group whose own blend space
  * is stated and differs from @p target_space, without `BLEND_SPACES`, is approximated (`BLEND_SPACE`); a gradient
  * fill whose interpolation space is stated and differs from @p target_space, without `GRADIENT_SPACES`, is
  * approximated (`INTERPOLATION_SPACE`).  A pop is drawn as its push was decided (the walk tells).  Anything else is

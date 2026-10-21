@@ -266,8 +266,9 @@ static int put_node(FILE * out, const GSHSCENE_Node_Rec * node) {
           fprintf(out, " map=%016llx opacity=%016llx blend=", HEX(gshgeom_map_hash(&p->map)),
               HEX(gshgeom_f64_bits(p->opacity))) < 0 ||
           gshscene_space_dump(out, &p->blend_space) < 0 ||
-          fprintf(out, " composite=%u order=%u layer=%lld depth=%016llx", (unsigned)p->composite,
-              (unsigned)p->ordering, (long long)p->layer, HEX(gshgeom_f64_bits(p->depth))) < 0) {
+          fprintf(out, " composite=%u order=%u", (unsigned)p->composite, (unsigned)p->ordering) < 0 ||
+          gshscene_group_dump_pdf(out, p->isolation, p->knockout, p->soft_mask) < 0 ||
+          fprintf(out, " layer=%lld depth=%016llx", (long long)p->layer, HEX(gshgeom_f64_bits(p->depth))) < 0) {
         return -1;
       }
       if (p->clip) {

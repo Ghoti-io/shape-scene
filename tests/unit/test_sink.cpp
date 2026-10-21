@@ -198,7 +198,7 @@ TEST(Sink, CapsThatBreakTheContractAreInternal) {
   EXPECT_EQ(gshscene_sink_caps(nullptr, &surface->target, &out), GSHSCENE_ERR_INVALID);
   GSHSCENE_Sink_Caps good = ms.mock.caps;
   std::vector<std::function<void(GSHSCENE_Sink_Caps &)>> bad = {
-      [](GSHSCENE_Sink_Caps & c) { c.flags |= 1u << 9; },
+      [](GSHSCENE_Sink_Caps & c) { c.flags |= 1u << 12; }, // past every flag defined (S19 took 9 to 11)
       [](GSHSCENE_Sink_Caps & c) { c.cancel_unit = 0; },
       [](GSHSCENE_Sink_Caps & c) { c.cancel_unit = GSHSCENE_CANCEL_UNIT_COUNT; },
       [](GSHSCENE_Sink_Caps & c) { c.work_measure = nullptr; },
@@ -720,7 +720,10 @@ TEST(Sink, PixelKinds) {
   EXPECT_EQ(GSHSCENE_RENDER_STRICT, 1u);
   EXPECT_EQ(GSHSCENE_RENDER_CALLER_MEMORY, 2u);
   EXPECT_EQ(GSHSCENE_CAP_GRADIENT_SPACES, 0x100u);
-  EXPECT_EQ(GSHSCENE_CAP_FLAGS_ALL, 0x1ffu);
+  EXPECT_EQ(GSHSCENE_CAP_GROUP_NON_ISOLATED, 0x200u);
+  EXPECT_EQ(GSHSCENE_CAP_GROUP_KNOCKOUT, 0x400u);
+  EXPECT_EQ(GSHSCENE_CAP_GROUP_SOFT_MASK, 0x800u);
+  EXPECT_EQ(GSHSCENE_CAP_FLAGS_ALL, 0xfffu);
   EXPECT_EQ((int)GSHSCENE_CANCEL_BETWEEN_UNITS, 1);
   EXPECT_EQ((int)GSHSCENE_CANCEL_BEFORE_SUBMIT, 2);
 }

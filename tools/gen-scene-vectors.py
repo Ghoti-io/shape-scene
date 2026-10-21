@@ -349,8 +349,22 @@ def clip_push(rkind, rhash, mhash, rule, layer=0, depth=0.0):
     return dict(k=CLIP_PUSH, rkind=rkind, rhash=rhash, mhash=mhash, rule=rule, layer=layer, depth=depth)
 
 
-def group_push(opacity, blend=TARGET, composite=0, order=ORDER_FLAT, layer=0, depth=0.0):
-    return dict(k=GROUP_PUSH, opacity=opacity, blend=blend, composite=composite, order=order, layer=layer, depth=depth)
+def group_push(opacity, blend=TARGET, composite=0, order=ORDER_FLAT, layer=0, depth=0.0, isolation=0, knockout=0, mask=0):
+    return dict(k=GROUP_PUSH, opacity=opacity, blend=blend, composite=composite, order=order, layer=layer, depth=depth,
+                isolation=isolation, knockout=knockout, mask=mask)
+
+
+def composite_bytes(composite, isolation=0, knockout=0, mask=0):
+    """T1 (list.h): the u8 composite, and PDF's group fields after it, bit 7 set, only when one is not the default."""
+    if not isolation and not knockout and not mask:
+        return u8(composite)
+    return u8(0x80 | composite) + u8((1 if isolation else 0) + (2 if knockout else 0)) + u64(mask)
+
+
+def pdf_fields_text(isolation=0, knockout=0, mask=0):
+    if not isolation and not knockout and not mask:
+        return ""
+    return " isolation=%d knockout=%d mask=%016x" % (isolation, knockout, mask)
 
 
 def instance(rkind, rhash, mhash, layer=0, depth=0.0):
@@ -371,8 +385,9 @@ def item_bytes(it):
     elif k == CLIP_PUSH:
         out += u64(it["rhash"]) + u64(it["mhash"]) + u8(it["rule"]) + i32(it["layer"]) + f64(it["depth"])
     elif k == GROUP_PUSH:
-        out += f64(it["opacity"]) + space_bytes(it["blend"]) + u8(it["composite"]) + u32(it["order"])
-        out += i32(it["layer"]) + f64(it["depth"])
+        out += f64(it["opacity"]) + space_bytes(it["blend"])
+        out += composite_bytes(it["composite"], it.get("isolation", 0), it.get("knockout", 0), it.get("mask", 0))
+        out += u32(it["order"]) + i32(it["layer"]) + f64(it["depth"])
     elif k == INSTANCE:
         out += u64(it["rhash"]) + u64(it["mhash"]) + i32(it["layer"]) + f64(it["depth"])
     return out
@@ -397,8 +412,9 @@ def item_line(it):
     if k == CLIP_POP:
         return "c"
     if k == GROUP_PUSH:
-        return "G opacity=%016x blend=%s composite=%d order=%d %s" % (
-            bits(it["opacity"]), space_text(it["blend"]), it["composite"], it["order"], ld)
+        return "G opacity=%016x blend=%s composite=%d order=%d%s %s" % (
+            bits(it["opacity"]), space_text(it["blend"]), it["composite"], it["order"],
+            pdf_fields_text(it.get("isolation", 0), it.get("knockout", 0), it.get("mask", 0)), ld)
     if k == GROUP_POP:
         return "g"
     return "I res=%s:%016x map=%016x %s" % (KIND_NAME[it["rkind"]], it["rhash"], it["mhash"], ld)
@@ -521,6 +537,24 @@ BLEND_LIST_ITEMS = [
 ]
 BLEND_LIST_HASH = list_hash(BLEND_LIST_ITEMS)
 
+# PDF's group fields (T1): a non-isolated group, a knockout multiply group and a group whose soft mask is the picture
+# fixture; and a default group after them, spelled as every group was before the fields.
+PDF_LIST_ITEMS = [
+    fill(KIND_PATH, SQ_RES, IDENTITY, 0, (0.25, 0.5, 0.75, 1.0)),
+    group_push(1.0, isolation=1),
+    fill(KIND_PATH, P2_RES, TRANSLATE, 1, (1.0, 0.0, 0.5, 0.75)),
+    group_push(0.5, composite=COMPOSITE["multiply"], knockout=1, layer=2, depth=1.0),
+    group_push(1.0, blend=SRGB_LINEAR, mask=PICTURE_RES),
+    GROUP_POP_ITEM,
+    GROUP_POP_ITEM,
+    GROUP_POP_ITEM,
+    group_push(0.75, isolation=1, knockout=1, mask=PICTURE_RES),
+    GROUP_POP_ITEM,
+    group_push(0.25),
+    GROUP_POP_ITEM,
+]
+PDF_LIST_HASH = list_hash(PDF_LIST_ITEMS)
+
 # The order fixture: recorded in declared order (ORDER_ITEMS_DECLARED); the generator puts it in paint order.
 # A depth group holding: a (depth 1), b (depth 2, layer 1), c (depth 2, layer 0), d (depth 2, layer 0: declared
 # after c), e (depth 3), a clip block (depth 2, layer 0) around f, an overlay group (depth 0) with fills of layers
@@ -571,8 +605,9 @@ def key_bytes(key):
 def node_bytes(n):
     out = u64(n["id"]) + u8(n["kind"]) + u8(n["flags"]) + u64(n["parent"]) + key_bytes(n["key"])
     if n["kind"] == NODE_GROUP:
-        out += u64(n["map"]) + f64(n["opacity"]) + space_bytes(n["blend"]) + u8(n["composite"]) + u32(n["order"])
-        out += i32(n["layer"]) + f64(n["depth"])
+        out += u64(n["map"]) + f64(n["opacity"]) + space_bytes(n["blend"])
+        out += composite_bytes(n["composite"], n.get("isolation", 0), n.get("knockout", 0), n.get("mask", 0))
+        out += u32(n["order"]) + i32(n["layer"]) + f64(n["depth"])
         clip = n["clip"]
         if clip is None:
             out += u8(0)
@@ -605,8 +640,9 @@ def node_line(n):
         clip = n["clip"]
         clip_text = "-" if clip is None else "%s:%016x:%016x:%d" % (KIND_NAME[clip[0]], clip[1], clip[2], clip[3])
         children = ",".join(str(c) for c in n["children"]) if n["children"] else "-"
-        return "%s map=%016x opacity=%016x blend=%s composite=%d order=%d layer=%d depth=%016x clip=%s children=%s" % (
-            head, n["map"], bits(n["opacity"]), space_text(n["blend"]), n["composite"], n["order"], n["layer"],
+        return "%s map=%016x opacity=%016x blend=%s composite=%d order=%d%s layer=%d depth=%016x clip=%s children=%s" % (
+            head, n["map"], bits(n["opacity"]), space_text(n["blend"]), n["composite"], n["order"],
+            pdf_fields_text(n.get("isolation", 0), n.get("knockout", 0), n.get("mask", 0)), n["layer"],
             bits(n["depth"]), clip_text, children)
     if n["kind"] == NODE_SHAPE:
         return "%s res=%s:%016x map=%016x rule=%d paint=%d %s space=%s entry=%d gradient=%016x layer=%d depth=%016x" % (
@@ -663,6 +699,13 @@ GRAD_SCENE_NODES = [
     shape_node(2, 1, (KIND_PATH, SQ_RES), paint=PAINT_GRADIENT, rgba=(0.0, 0.0, 0.0, 0.5), grad=GRAD_RADIAL_HASH),
 ]
 GRAD_SCENE_HASH = version_hash(GRAD_SCENE_NODES)
+PDF_SCENE_NODES = [
+    group_node(1, 0, [2, 4]),
+    group_node(2, 1, [3], isolation=1, knockout=1, mask=PICTURE_RES, opacity=0.5, layer=1, depth=2.0),
+    shape_node(3, 2, (KIND_PATH, SQ_RES), rgba=(0.25, 0.5, 0.75, 1.0)),
+    group_node(4, 1, [], knockout=1, composite=COMPOSITE["hue"]),
+]
+PDF_SCENE_HASH = version_hash(PDF_SCENE_NODES)
 EMPTY_NODES = [group_node(1, 0, [])]
 EMPTY_HASH = version_hash(EMPTY_NODES)
 
@@ -723,7 +766,8 @@ def render():
                     ("kPathKeyTwo", path_key([4, 5])), ("kPathKeyThree", path_key([7, 7, 3])),
                     ("kGradientLinearHash", GRAD_LINEAR_HASH), ("kGradientRadialHash", GRAD_RADIAL_HASH),
                     ("kGradientSweepHash", GRAD_SWEEP_HASH), ("kGradientListHash", GRAD_LIST_HASH),
-                    ("kGradientSceneHash", GRAD_SCENE_HASH), ("kBlendListHash", BLEND_LIST_HASH)):
+                    ("kGradientSceneHash", GRAD_SCENE_HASH), ("kBlendListHash", BLEND_LIST_HASH),
+                    ("kPdfGroupListHash", PDF_LIST_HASH), ("kPdfGroupSceneHash", PDF_SCENE_HASH)):
         o.append("static const std::uint64_t %s = UINT64_C(0x%016x);\n" % (name, v))
     o.append("static const int kSceneBLayer = %d;\n" % B_LAYER)
     o.append("static const double kSceneBTranslate[4][2] = {%s};\n" % ", ".join("{%r, %r}" % (t[0], t[1]) for t in B_T))
@@ -747,6 +791,8 @@ def render():
     o.append(cxx_string("kGradientListDump", list_dump(GRAD_LIST_ITEMS)))
     o.append(cxx_string("kGradientSceneDump", version_dump(GRAD_SCENE_NODES)))
     o.append(cxx_string("kBlendListDump", list_dump(BLEND_LIST_ITEMS)))
+    o.append(cxx_string("kPdfGroupListDump", list_dump(PDF_LIST_ITEMS)))
+    o.append(cxx_string("kPdfGroupSceneDump", version_dump(PDF_SCENE_NODES)))
     o.append("\n}  // namespace known\n\n#endif\n")
     return "".join(o)
 

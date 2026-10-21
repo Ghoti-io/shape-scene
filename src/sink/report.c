@@ -111,6 +111,12 @@ const char * gshscene_reason_string(GSHSCENE_Reason reason) {
       return "map-not-invertible";
     case GSHSCENE_REASON_GRADIENT_DEGENERATE:
       return "gradient-degenerate";
+    case GSHSCENE_REASON_GROUP_ISOLATION:
+      return "group-isolation";
+    case GSHSCENE_REASON_GROUP_KNOCKOUT:
+      return "group-knockout";
+    case GSHSCENE_REASON_SOFT_MASK:
+      return "soft-mask";
     case GSHSCENE_REASON_COUNT:
       break;
   }

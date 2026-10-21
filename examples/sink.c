@@ -96,7 +96,7 @@ int main(void) {
   gshscene_resource_release(face);
 
   GSHSCENE_Paint red = {GSHSCENE_PAINT_SOLID, {1, 0, 0, 1}, {0, 0, 0.0}, NULL, 0};
-  GSHSCENE_Group half = {0.5, {0, 0, 0.0}, GSHSCENE_ORDER_FLAT, GSHSCENE_COMPOSITE_SRC_OVER};
+  GSHSCENE_Group half = {.opacity = 0.5, .ordering = GSHSCENE_ORDER_FLAT, .composite = GSHSCENE_COMPOSITE_SRC_OVER};
   GSHSCENE_List * list = NULL;
   failed |= check(gshscene_list_create(NULL, NULL, store, &list), "list");
   failed |= check(gshscene_list_fill(list, a, NULL, GSHGEOM_FILL_NONZERO, &red, 0, 0.0), "fill");

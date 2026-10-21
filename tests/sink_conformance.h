@@ -2373,4 +2373,80 @@ TEST_P(SinkConformance, B7_TheIdentitiesOfTheModesHoldOnEverySink) {
   }
 }
 
+// S19 (color-paint story P3, T1): a non-isolated group, a knockout group and a group with a soft mask are refused by
+// the planning pass of a sink whose caps lack them, each with its reason; strict leaves the target untouched; a sink
+// whose caps claim one draws it with no entry.
+TEST_P(SinkConformance, S19_PdfGroupFieldsAreRefusedWithoutTheirCaps) {
+  int checked = 0;
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    if (!(caps.item_kinds & (1u << GSHSCENE_ITEM_GROUP_PUSH)) || !(caps.composites & 1u)) {
+      continue;
+    }
+    // A soft mask: a picture of one fill.
+    GSHSCENE_List * mask_list = s.open();
+    GSHSCENE_Paint white = solid(1.0, 1.0, 1.0, 1.0);
+    EXPECT_EQ(gshscene_list_fill(mask_list, s.sq(0, 0, 30), nullptr, GSHGEOM_FILL_NONZERO, &white, 0, 0.0), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_close(mask_list), GSHSCENE_OK);
+    const GSHSCENE_Resource * mask = nullptr;
+    ASSERT_EQ(gshscene_store_intern_picture(s.store, mask_list, &mask), GSHSCENE_OK);
+    s.held.push_back(mask);
+    struct Field {
+      const char * name;
+      uint32_t isolation, knockout;
+      bool masked;
+      uint32_t cap;
+      GSHSCENE_Reason reason;
+    };
+    const Field fields[] = {
+        {"non-isolated", GSHSCENE_ISOLATION_NON_ISOLATED, 0, false, GSHSCENE_CAP_GROUP_NON_ISOLATED, GSHSCENE_REASON_GROUP_ISOLATION},
+        {"knockout", GSHSCENE_ISOLATION_ISOLATED, 1, false, GSHSCENE_CAP_GROUP_KNOCKOUT, GSHSCENE_REASON_GROUP_KNOCKOUT},
+        {"soft mask", GSHSCENE_ISOLATION_ISOLATED, 0, true, GSHSCENE_CAP_GROUP_SOFT_MASK, GSHSCENE_REASON_SOFT_MASK},
+    };
+    for (const Field & fd : fields) {
+      GSHSCENE_List * l = s.open();
+      GSHSCENE_Paint red = solid(1, 0, 0), blue = solid(0, 0, 1, 0.5);
+      GSHSCENE_Group g{};
+      g.opacity = 1.0;
+      g.isolation = fd.isolation;
+      g.knockout = fd.knockout;
+      g.soft_mask = fd.masked ? mask : nullptr;
+      EXPECT_EQ(gshscene_list_fill(l, s.sq(2, 2, 12), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0), GSHSCENE_OK);
+      EXPECT_EQ(gshscene_list_group_push(l, &g, 0, 0.0), GSHSCENE_OK) << fd.name;
+      EXPECT_EQ(gshscene_list_fill(l, s.sq(6, 6, 12), nullptr, GSHGEOM_FILL_NONZERO, &blue, 0, 0.0), GSHSCENE_OK);
+      EXPECT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);
+      EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+      auto out = make_surface(kind);
+      ReportRef r;
+      EXPECT_EQ(run(f(), sink.sink, request_for(l, *out, r.report)).result, GSHSCENE_OK) << fd.name;
+      int refusals = 0;
+      for (const auto & x : entries(r.report)) {
+        if (x.entry_class == GSHSCENE_ENTRY_REFUSED && x.reason == fd.reason) {
+          refusals++;
+          ASSERT_EQ(x.chain_count, 1u);
+          EXPECT_EQ(x.chain[0], 1u) << fd.name << ": the group push is refused";
+        }
+      }
+      bool claims = (caps.flags & fd.cap) != 0;
+      EXPECT_EQ(refusals, claims ? 0 : 1) << fd.name;
+      if (!claims) {
+        auto strict = make_surface(kind);
+        uint64_t before = strict->snapshot();
+        ReportRef sr;
+        GSHSCENE_Render_Request req = request_for(l, *strict, sr.report);
+        req.flags = GSHSCENE_RENDER_STRICT;
+        EXPECT_EQ(run(f(), sink.sink, req).result, GSHSCENE_ERR_REFUSED) << fd.name;
+        EXPECT_EQ(strict->snapshot(), before) << fd.name << ": strict touched the target";
+      }
+      checked++;
+    }
+  }
+  if (checked == 0) {
+    GTEST_SKIP() << "the sink draws no source-over group";
+  }
+}
+
 #endif /* GHOTI_IO_GSHSCENE_TEST_SINK_CONFORMANCE_H */

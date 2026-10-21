@@ -34,7 +34,7 @@
  * | ::GSHSCENE_ITEM_FILL | path or glyph run | placement | yes | yes | layer, depth |
  * | ::GSHSCENE_ITEM_CLIP_PUSH | path or glyph run | placement | yes | | layer, depth |
  * | ::GSHSCENE_ITEM_CLIP_POP | | | | | |
- * | ::GSHSCENE_ITEM_GROUP_PUSH | | | | | opacity, blend space, composite, ordering, layer, depth |
+ * | ::GSHSCENE_ITEM_GROUP_PUSH | | | | | opacity, blend space, composite, ordering, isolation, knockout, soft mask, layer, depth |
  * | ::GSHSCENE_ITEM_GROUP_POP | | | | | |
  * | ::GSHSCENE_ITEM_INSTANCE | picture | placement | | | layer, depth |
  *
@@ -66,7 +66,10 @@
  * `min(1, As + Ad)`.  **B1 to B14**: a blend mode `X` (values 13 to 27) is
  * `op_X(S, D) = (cs (1 - Ad) + cd (1 - As) + As Ad sat(B_X(Cb, Cs)), As + Ad (1 - As))`
  * with `Cs`, `Cb` the un-premultiplied colors and `B_X` W3C's mixing function applied literally to every real value
- * (documentation/design.md has B1 to B14).  **N5**: `apply(D, S, m, op) = sat((1 - m) D + m op(S, D))`
+ * (documentation/design.md has B1 to B14).  **T1 to T7**: a group may be non-isolated or knockout and may name a soft
+ * mask (PDF's transparency groups, with shape and opacity kept apart); N5 to N9 below are the isolated, non-knockout
+ * case exactly, and every sink refuses the others until it composites them (documentation/design.md has T1 to T7).
+ * **N5**: `apply(D, S, m, op) = sat((1 - m) D + m op(S, D))`
  * for a coverage `m`, saturated at `2^64` (N1).  **N6**: the list's root layer is the target (its blend space is
  * the target's); a group's layer starts at `(0, 0, 0, 0)` in its own blend space
  * (its `blend_space`, or its enclosing group's if zero).  **N7**: a fill is
@@ -126,7 +129,11 @@
  * - **clip push**: `u64` resource hash, `u64` map hash, `u8` fill rule, `i32`
  *   layer, `f64` depth.
  * - **group push**: `f64` opacity, a space (the blend space), `u8` composite,
- *   `u32` ordering, `i32` layer, `f64` depth.
+ *   `u32` ordering, `i32` layer, `f64` depth.  A group whose isolation, knockout
+ *   or soft mask is not the default (T1) sets bit 7 of the composite byte and
+ *   writes, right after it, `u8` flags (1 non-isolated, 2 knockout) and `u64`
+ *   the soft mask's content hash (0 for none); a default group's spelling is
+ *   the one above, so its hash is what it was before the fields existed.
  * - **instance**: `u64` resource hash, `u64` map hash, `i32` layer, `f64` depth.
  * - **clip pop**, **group pop**: nothing.
  *
@@ -139,7 +146,8 @@
  * (the palette's content hash, 0 for none) and one line per item:
  * `F res=<kind>:<hash> map=<hash> rule=N paint=N <r> <g> <b> <a> space=<space> entry=E gradient=<hash> layer=N depth=<hex>`,
  * `C res=<kind>:<hash> map=<hash> rule=N layer=N depth=<hex>`, `c`,
- * `G opacity=<hex> blend=<space> composite=N order=N layer=N depth=<hex>`, `g`,
+ * `G opacity=<hex> blend=<space> composite=N order=N layer=N depth=<hex>` (with ` isolation=N knockout=N
+ * mask=<hash>` after `order=N` when one of them is not the default, T1), `g`,
  * `I res=<kind>:<hash> map=<hash> layer=N depth=<hex>`, then one line per tie,
  * `T first=I second=J depth=<hex> reason=N`, with every `double` as the 16
  * hexadecimal digits of its bit pattern, every hash as 16 digits and a `<space>`
@@ -245,12 +253,34 @@ GSHSCENE_API const char * gshscene_composite_string(GSHSCENE_Composite op);
  */
 GSHSCENE_API int gshscene_composite_is_unbounded(GSHSCENE_Composite op);
 
+/**
+ * @brief A group's isolation (T1, PDF's transparency groups).  The values are pinned (they are hashed).
+ *
+ * Zero is the default, so a zero-filled group is isolated: its layer starts at `(0, 0, 0, 0)` (N6).  A non-isolated
+ * group's layer starts at the backdrop it is drawn over, and its result has that backdrop taken out (T4, T5).
+ */
+typedef enum GSHSCENE_Isolation {
+  GSHSCENE_ISOLATION_ISOLATED = 0,     ///< The default: N5 to N9.
+  GSHSCENE_ISOLATION_NON_ISOLATED = 1, ///< T4: the layer starts at the backdrop; refused by a sink without ::GSHSCENE_CAP_GROUP_NON_ISOLATED.
+  GSHSCENE_ISOLATION_COUNT             ///< Closes the enum.
+} GSHSCENE_Isolation;
+
 /** @brief The properties of a group. */
 typedef struct GSHSCENE_Group {
   double opacity;                   ///< Finite, in `[0, 1]`: the group's result is scaled by it before it is composited.
   GSHSCENE_Color_Space blend_space; ///< The space the group composites in; zero inherits the enclosing group's (the root's is the target's).
   uint32_t ordering;                ///< A ::GSHSCENE_Ordering: the context of the sequence inside the group.
   uint32_t composite;               ///< A ::GSHSCENE_Composite: how the result is composited onto the enclosing layer.
+  /** A ::GSHSCENE_Isolation: isolated (0, the default) or not (T1, T4). */
+  uint32_t isolation;
+  /** 0 (the default) or 1, a knockout group: each element composites with the group's initial backdrop (T1, T3). */
+  uint32_t knockout;
+  /**
+   * The soft mask's slot (T1, T7): NULL (the default, none), or a picture of the list's store, which the list retains.
+   * What a mask means beyond being named here (PDF's alpha or luminosity mask, its backdrop, its transfer) is decided
+   * with the sink work that composites it; until then every sink refuses a group that names one.
+   */
+  const GSHSCENE_Resource * soft_mask;
 } GSHSCENE_Group;
 
 /** @brief One entry of a list, as read back. */
@@ -336,7 +366,11 @@ GSHSCENE_API GSHSCENE_Result gshscene_list_clip_pop(GSHSCENE_List * list);
 /**
  * @brief Begin a group.
  *
- * @param group Its properties, or NULL for opacity 1, the enclosing blend space, flat, source-over.
+ * ::GSHSCENE_ERR_INVALID for an opacity outside `[0, 1]`, an ordering, composite or isolation outside its enum, a
+ * knockout other than 0 or 1, or a soft mask that is not a picture of the list's store.
+ *
+ * @param group Its properties, or NULL for opacity 1, the enclosing blend space, flat, source-over, isolated, not
+ *   knockout and no soft mask.
  * @param layer The declared layer.
  * @param depth The declared depth: finite.
  */

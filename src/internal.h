@@ -319,7 +319,18 @@ GSHSCENE_Result gshscene_color_check_valid(const GSHSCENE_Color * color);
 GSHSCENE_Result gshscene_list_canonical_map(const GSHGEOM_Map * map, GSHGEOM_Map * out);
 
 /** The same checks as a record call's, for a retained scene's nodes. */
-GSHSCENE_Result gshscene_list_canonical_group(const GSHSCENE_Group * group, GSHSCENE_Group * out);
+GSHSCENE_Result gshscene_list_canonical_group(
+    const GSHSCENE_Store * store, const GSHSCENE_Group * group, GSHSCENE_Group * out);
+
+/** T1: whether a group's isolation, knockout and soft mask are the defaults (isolated, 0, none). */
+int gshscene_group_pdf_default(uint32_t isolation, uint32_t knockout, const GSHSCENE_Resource * soft_mask);
+
+/** T1: a group's `u8` composite in a hash, and after it PDF's fields when one is not the default (list.h). */
+void gshscene_group_hash_composite(GSHGEOM_Hash * h, uint32_t composite, uint32_t isolation, uint32_t knockout,
+    const GSHSCENE_Resource * soft_mask);
+
+/** T1: ` isolation=N knockout=N mask=<hash>` in a dump when one of them is not the default; else nothing.  < 0 on error. */
+int gshscene_group_dump_pdf(FILE * out, uint32_t isolation, uint32_t knockout, const GSHSCENE_Resource * soft_mask);
 GSHSCENE_Result gshscene_list_canonical_depth(double depth, double * out);
 
 #endif /* GHOTI_IO_GSHSCENE_INTERNAL_H */

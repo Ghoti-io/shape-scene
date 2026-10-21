@@ -174,6 +174,22 @@ GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps,
     d.reason = GSHSCENE_REASON_COMPOSITE;
     return d;
   }
+  /* S19: PDF's group fields, each refused without its cap, never drawn as the default group. */
+  if (item->kind == GSHSCENE_ITEM_GROUP_PUSH) {
+    GSHSCENE_Reason refused = (GSHSCENE_Reason)0;
+    if (item->group.isolation != (uint32_t)GSHSCENE_ISOLATION_ISOLATED && !(caps->flags & GSHSCENE_CAP_GROUP_NON_ISOLATED)) {
+      refused = GSHSCENE_REASON_GROUP_ISOLATION;
+    } else if (item->group.knockout && !(caps->flags & GSHSCENE_CAP_GROUP_KNOCKOUT)) {
+      refused = GSHSCENE_REASON_GROUP_KNOCKOUT;
+    } else if (item->group.soft_mask && !(caps->flags & GSHSCENE_CAP_GROUP_SOFT_MASK)) {
+      refused = GSHSCENE_REASON_SOFT_MASK;
+    }
+    if (refused) {
+      d.entry_class = GSHSCENE_ENTRY_REFUSED;
+      d.reason = refused;
+      return d;
+    }
+  }
   if (item->kind == GSHSCENE_ITEM_CLIP_PUSH && !(caps->flags & GSHSCENE_CAP_CLIP_AA)) {
     d.entry_class = GSHSCENE_ENTRY_APPROXIMATED;
     d.reason = GSHSCENE_REASON_CLIP_ALIASED;

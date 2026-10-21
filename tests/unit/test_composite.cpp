@@ -34,6 +34,7 @@
 #include <ghoti.io/shape-scene/fixed.h>
 
 #include "../composite_vectors.h"
+#include "../group_vectors.h"
 #include "../known_answers.h"
 #include "ref_composite.h"
 
@@ -359,6 +360,104 @@ TEST(Composite, TheEvaluatorsLimitsAreTheDefinitionsLimits) {
     for (int k = 0; k < 4; k++) {
       EXPECT_EQ(none.v[k], d.v[k]) << op;
       EXPECT_EQ(full.v[k], o.v[k]) << op;
+    }
+  }
+}
+
+TEST(Groups, EveryCombinationOfIsolatedAndKnockoutIsTheOraclesAnswer) {
+  // T1 to T7: the general model's vectors, each scene in the four combinations, recorded through the API (the group
+  // fields are recorded and read back) and evaluated by the test evaluator's statement of T3 to T5.
+  namespace gv = group_vectors;
+  auto space = [](const gv::VSpace & v) {
+    GSHSCENE_Color_Space out{};
+    out.primaries = (GCOL_Primaries)v.primaries;
+    out.transfer = (GCOL_Transfer)v.transfer;
+    out.gamma = v.gamma;
+    return out;
+  };
+  StoreHolder s;
+  Ref sq(intern_square(s.store));
+  int exact = 0, combos[2][2] = {{0, 0}, {0, 0}};
+  double worst = 0.0;
+  for (int n = 0; n < gv::kCaseCount; n++) {
+    const gv::VCase & c = gv::kCases[n];
+    ListHolder l(s.store);
+    std::vector<double> coverage;
+    for (int i = 0; i < c.item_count; i++) {
+      const gv::VItem & it = c.items[i];
+      coverage.push_back(it.coverage);
+      if (it.kind == 1) {
+        GSHSCENE_Paint p = solid(it.rgba[0], it.rgba[1], it.rgba[2], it.rgba[3]);
+        p.space = space(it.space);
+        ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK) << c.name;
+      } else if (it.kind == 2) {
+        ASSERT_EQ(gshscene_list_clip_push(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, 0, 0.0), GSHSCENE_OK);
+      } else if (it.kind == 3) {
+        ASSERT_EQ(gshscene_list_clip_pop(l.list), GSHSCENE_OK);
+      } else if (it.kind == 4) {
+        GSHSCENE_Group g = make_group(it.opacity, GSHSCENE_ORDER_FLAT, (uint32_t)it.composite);
+        g.blend_space = space(it.blend);
+        g.isolation = (uint32_t)it.isolation;
+        g.knockout = (uint32_t)it.knockout;
+        ASSERT_EQ(gshscene_list_group_push(l.list, &g, 0, 0.0), GSHSCENE_OK) << c.name;
+        if (i == 0) {
+          combos[it.isolation][it.knockout]++;
+        }
+      } else {
+        ASSERT_EQ(gshscene_list_group_pop(l.list), GSHSCENE_OK);
+      }
+    }
+    ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
+    refc::Px backdrop = {{c.backdrop[0], c.backdrop[1], c.backdrop[2], c.backdrop[3]}};
+    refc::Space target{c.target.primaries, c.target.transfer, c.target.gamma};
+    refc::Px got = refc::evaluate_general(l.list, coverage, target, backdrop);
+    for (int k = 0; k < 4; k++) {
+      ASSERT_TRUE(std::isfinite(got.v[k])) << c.name;
+      if (c.exact) {
+        EXPECT_EQ(got.v[k], c.want[k]) << c.name << " channel " << k << " (exact)";
+      } else {
+        double e = std::fabs(got.v[k] - c.want[k]) / std::max(1.0, std::fabs(c.want[k]));
+        worst = std::max(worst, e);
+        EXPECT_LE(e, 1e-12) << c.name << " channel " << k;
+      }
+    }
+    exact += c.exact ? 1 : 0;
+  }
+  EXPECT_EQ(exact, gv::kExactCaseCount);
+  for (auto & row : combos) {
+    for (int count : row) {
+      EXPECT_GE(count, 10) << "each combination of isolated and knockout has its scenes";
+    }
+  }
+  std::printf("group_vectors: %d cases, %d exact; worst relative error %.3g\n", gv::kCaseCount, exact, worst);
+}
+
+TEST(Groups, TheDefaultCombinationIsTheCompositeVectors) {
+  // T6: on every case of composite_vectors.h (every group isolated and not knockout), the general evaluator gives what
+  // the N-rules' evaluator gives, bit for bit; the generator requires the same of the oracle.
+  StoreHolder s;
+  Ref sq(intern_square(s.store));
+  for (int n = 0; n < cv::kCaseCount; n++) {
+    const cv::VCase & c = cv::kCases[n];
+    bool solid_only = c.palette_count < 0;
+    for (int i = 0; i < c.item_count; i++) {
+      solid_only = solid_only && !(c.items[i].kind == 1 && c.items[i].paint != 0);
+    }
+    if (!solid_only) {
+      continue; // the general evaluator states fills of solid paint only
+    }
+    ListHolder l(s.store);
+    std::vector<double> coverage;
+    build(c, s.store, sq.get(), &l, &coverage);
+    refc::Px backdrop = {{c.backdrop[0], c.backdrop[1], c.backdrop[2], c.backdrop[3]}};
+    refc::Space target{c.target.primaries, c.target.transfer, c.target.gamma};
+    refc::Px a = refc::evaluate(l.list, coverage, target, backdrop);
+    refc::Px b = refc::evaluate_general(l.list, coverage, target, backdrop);
+    for (int k = 0; k < 4; k++) {
+      EXPECT_NEAR(a.v[k], b.v[k], 1e-13 * std::max(1.0, std::fabs(a.v[k]))) << c.name;
+      if (c.exact) {
+        EXPECT_EQ(a.v[k], b.v[k]) << c.name << " (exact)";
+      }
     }
   }
 }

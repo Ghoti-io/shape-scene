@@ -60,7 +60,11 @@ LINE_FILTER = {
     # story 14c: the palette, its paint and its resolution, the entry, truncation
     r"|palette|PALETTE|entry|truncate|instance \?|picture >|list->count = count|list->depth|list->expansion =|resolve"
     # color-paint story P1: the gradient paint, its references, hash and dump
-    r"|gradient|GRADIENT",
+    r"|gradient|GRADIENT"
+    # color-paint story P3: the blend modes' names and PDF's group fields, their references, hash and dump
+    r"|soft_mask|isolation|knockout|ISOLATION|pdf_default|group_hash_composite|group_dump_pdf|item_release"
+    r"|item_picture_depth|picture_depth|0x80u|SCREEN|OVERLAY|DARKEN|LIGHTEN|DODGE|BURN|LIGHT|DIFFERENCE|EXCLUSION"
+    r"|MULTIPLY|HUE|SATURATION|COLOR:|LUMINOSITY|\"(screen|overlay|darken|lighten|color|hard|soft|difference|exclusion|multiply|hue|saturation|luminosity)",
     "src/core/core.c": r"max_bytes|max_nodes|max_node_depth|REFUSED|refused",
 }
 EXTRA = {
@@ -70,17 +74,18 @@ EXTRA = {
     "src/core/core.c": "bc",
 }
 TESTS_EXTRA = ["testBytes", "testCore", "testStore", "testScene_limits", "testOrder", "testList", "testColor", "testDump",
-               "testComposite", "testPaint_scene", "testEmit", "testPalette", "testGradient", "testColor_bound"]
+               "testComposite", "testPaint_scene", "testEmit", "testPalette", "testGradient", "testColor_bound",
+               "testGroup_fields"]
 TESTS_BY_FILE = {
     "src/paint/color_space.c": ["testColor", "testColor_bound", "testList", "testNode", "testPaint_scene", "testScene_dump"],
-    "src/scene/node.c": ["testNode", "testEdit", "testScene", "testScene_dump", "testVersion", "testPaint_scene", "testOrder", "testEmit", "testPalette", "testGradient"],
+    "src/scene/node.c": ["testNode", "testEdit", "testScene", "testScene_dump", "testVersion", "testPaint_scene", "testOrder", "testEmit", "testPalette", "testGradient", "testGroup_fields"],
     "src/scene/edit.c": ["testEdit", "testScene", "testNode", "testPaint_scene", "fuzz-replay", "testPalette"],
     "src/scene/scene.c": ["testScene", "testEdit", "testScene_limits", "testDiff", "testEmit", "testPaint_scene", "fuzz-replay", "testPalette"],
-    "src/scene/version.c": ["testVersion", "testScene_dump", "testScene", "testEmit", "testDiff", "testPaint_scene", "testOrder", "testPalette", "testGradient"],
+    "src/scene/version.c": ["testVersion", "testScene_dump", "testScene", "testEmit", "testDiff", "testPaint_scene", "testOrder", "testPalette", "testGradient", "testGroup_fields"],
     "src/scene/walk.c": ["testVersion", "testEmit", "testDiff", "testScene_limits", "testOrder"],
-    "src/scene/validate.c": ["testScene", "testScene_limits", "testEdit", "testPaint_scene", "fuzz-replay"],
-    "src/scene/emit.c": ["testEmit", "testScene_limits", "testVersion", "testDiff", "testOrder", "testPaint_scene", "testPalette"],
-    "src/scene/diff.c": ["testDiff", "testScene", "testVersion", "testPaint_scene", "testGlyph", "testPalette", "testGradient"],
+    "src/scene/validate.c": ["testScene", "testScene_limits", "testEdit", "testPaint_scene", "fuzz-replay", "testGroup_fields"],
+    "src/scene/emit.c": ["testEmit", "testScene_limits", "testVersion", "testDiff", "testOrder", "testPaint_scene", "testPalette", "testGroup_fields"],
+    "src/scene/diff.c": ["testDiff", "testScene", "testVersion", "testPaint_scene", "testGlyph", "testPalette", "testGradient", "testGroup_fields"],
     "src/list/fixed.c": ["testPalette", "testGradient", "fuzz-replay"],
     "src/resource/gradient.c": ["testGradient", "testColor_bound", "testDump", "testDump_sink", "fuzz-replay", "fuzz-render", "probe"],
     "src/paint/convert.c": ["testGradient", "testColor_bound", "probe"],
@@ -93,7 +98,8 @@ SINK_FILES = {
     "src/sink/cancel.c": "cn",
     "src/glyph/glyph.c": "gl",
 }
-SINK_TESTS = ["testDump_sink", "testSink", "testReport", "testGlyph", "testPalette", "testGradient", "fuzz-render", "probe"]
+SINK_TESTS = ["testDump_sink", "testSink", "testReport", "testGlyph", "testPalette", "testGradient", "testGroup_fields",
+              "fuzz-render", "probe"]
 
 REL = [("==", "!="), ("!=", "=="), ("<=", "<"), (">=", ">"), ("<", "<="), (">", ">=")]
 

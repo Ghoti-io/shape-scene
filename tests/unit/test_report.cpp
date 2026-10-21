@@ -42,7 +42,8 @@ TEST(Report, EveryClassAndReasonHasItsOwnString) {
   const char * names[] = {"item-kind", "composite", "glyph-source", "blend-space", "clip-aliased", "resource-limit",
       "seamless", "caller-memory", "tie-layer", "tie-path", "tie-declared", "hint-route", "hint-size",
       "hint-no-program", "hint-program-failed", "hint-with-errors", "hint-strict-route", "glyph-unavailable",
-      "face-unbound", "palette-entry", "gradient", "interpolation-space", "map-not-invertible", "gradient-degenerate"};
+      "face-unbound", "palette-entry", "gradient", "interpolation-space", "map-not-invertible", "gradient-degenerate",
+      "group-isolation", "group-knockout", "soft-mask"};
   ASSERT_EQ(sizeof names / sizeof names[0], (size_t)GSHSCENE_REASON_COUNT - 1);
   for (int r = GSHSCENE_REASON_ITEM_KIND; r < GSHSCENE_REASON_COUNT; r++) {
     EXPECT_STREQ(gshscene_reason_string((GSHSCENE_Reason)r), names[r - 1]) << r;
@@ -76,7 +77,10 @@ TEST(Report, ThePinnedValuesArePinned) {
   EXPECT_EQ((int)GSHSCENE_REASON_INTERPOLATION_SPACE, 22);
   EXPECT_EQ((int)GSHSCENE_REASON_MAP_NOT_INVERTIBLE, 23);
   EXPECT_EQ((int)GSHSCENE_REASON_GRADIENT_DEGENERATE, 24);
-  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 25);
+  EXPECT_EQ((int)GSHSCENE_REASON_GROUP_ISOLATION, 25);
+  EXPECT_EQ((int)GSHSCENE_REASON_GROUP_KNOCKOUT, 26);
+  EXPECT_EQ((int)GSHSCENE_REASON_SOFT_MASK, 27);
+  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 28);
 }
 
 TEST(Report, CreateDestroyAndTheEmptyReport) {

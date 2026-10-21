@@ -34,7 +34,8 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
   resource, whose stops (solid, foreground or palette) are converted into its interpolation space by
   one function every sink calls at draw time; a group has a blend space, an opacity, a composite
   operator (a Porter-Duff operator, or one of W3C's fifteen blend modes, numbered as COLRv1 numbers
-  them: a per-draw blend is a group of one) and an ordering context. Exact references (`tools/composite-oracle.py`,
+  them: a per-draw blend is a group of one) and an ordering context; PDF's non-isolated and knockout groups
+  and a soft-mask slot are defined on the group, and refused by every sink until it composites them. Exact references (`tools/composite-oracle.py`,
   `tools/gradient-oracle.py`) and committed known answers define what two sinks must agree on.
 - **Hash and dump** of every resource and list, in `shape-geometry`'s spelling (FNV-1a 64 over
   little-endian fields), the same on every target.

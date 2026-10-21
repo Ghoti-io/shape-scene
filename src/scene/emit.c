@@ -134,7 +134,7 @@ static GSHSCENE_Result emit_group_enter(
     }
   }
   if (gshscene_group_pushes(p, walk->context)) {
-    GSHSCENE_Group g = {p->opacity, p->blend_space, p->ordering, p->composite};
+    GSHSCENE_Group g = {p->opacity, p->blend_space, p->ordering, p->composite, p->isolation, p->knockout, p->soft_mask};
     result = gshscene_list_group_push(s->list, &g, p->layer, p->depth);
     if (result == GSHSCENE_OK) {
       result = sink_origin(s, group->id);

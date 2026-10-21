@@ -265,6 +265,43 @@ TEST(DumpSink, TheRasterDumpStampsAndOutputHashAreTheGenerators) {
   EXPECT_EQ(raster->snapshot(), sink_known::kRasterPixelsHash);
 }
 
+TEST(DumpSink, AConfigurationThatClaimsPdfsGroupFieldsRecordsThem) {
+  // T1, S19: the default caps claim none of the three, so the planning pass refuses each; a configuration that claims
+  // them has the group drawn, and its record names the fields (the default group's record is as before).
+  Scene s;
+  GSHSCENE_List * l = s.open();
+  GSHSCENE_Paint red = solid(1, 0, 0);
+  GSHSCENE_Group knockout{};
+  knockout.opacity = 1.0;
+  knockout.knockout = 1;
+  knockout.isolation = GSHSCENE_ISOLATION_NON_ISOLATED;
+  ASSERT_EQ(gshscene_list_group_push(l, &knockout, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(l, s.sq(2, 2, 6), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);
+  GSHSCENE_Group plain{};
+  plain.opacity = 0.5;
+  ASSERT_EQ(gshscene_list_group_push(l, &plain, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  for (int claims = 0; claims < 2; claims++) {
+    Log log;
+    GSHSCENE_Dump_Sink_Config c = config_default();
+    c.log = &log.writer;
+    if (claims) {
+      c.raster_caps.flags |= GSHSCENE_CAP_GROUP_NON_ISOLATED | GSHSCENE_CAP_GROUP_KNOCKOUT | GSHSCENE_CAP_GROUP_SOFT_MASK;
+    }
+    SinkRef sink(make_with(c, nullptr, nullptr));
+    auto raster = make_raster();
+    ReportRef report;
+    Rendered r = render_job(sink.sink, request_for(l, *raster, report.report));
+    ASSERT_EQ(r.result, GSHSCENE_OK);
+    bool recorded = log.text.find(" isolation=1 knockout=1 mask=0000000000000000\n") != std::string::npos;
+    EXPECT_EQ(recorded, claims == 1) << log.text;
+    EXPECT_EQ(gshscene_report_count(report.report), claims ? 0u : 1u) << "refused (GROUP_ISOLATION) without the caps";
+    EXPECT_NE(log.text.find(" G opacity=3fe0000000000000 composite=0\n"), std::string::npos) << "the default record";
+  }
+}
+
 TEST(DumpSink, TheStreamDumpInMillimetresUnderAMapIsTheGenerators) {
   Scene s;
   const GSHSCENE_List * list = answer_list(s);

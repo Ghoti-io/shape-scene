@@ -487,6 +487,133 @@ inline Px evaluate(const GSHSCENE_List * list, const std::vector<double> & cover
   return stack.back().layer;
 }
 
+/* --- T1 to T7: PDF's transparency groups, of which evaluate() above is the default case ------------------------------ */
+
+/** A layer of the general model: its value, its initial backdrop, the group alpha and the group shape (T3). */
+struct GFrame {
+  Px layer;
+  Px initial;
+  double alpha_g = 0.0;
+  double shape_g = 0.0;
+  Space space;
+  std::vector<double> clips;
+  GSHSCENE_Group group;
+  double outer = 1.0;
+};
+
+/** T5: the operators PDF has, whose group element takes the group's shape. */
+inline bool pdf_operator(int composite) {
+  return composite == GSHSCENE_COMPOSITE_SRC_OVER || is_blend(composite);
+}
+
+/**
+ * T3: one element of shape @p f into @p frame.  For PDF's operators @p a has the shape and the opacity applied (A = f
+ * S); for any other @p a is S, the opacity alone.
+ */
+inline void element(GFrame & frame, double f, int composite, const Px & a) {
+  const Px & bk = frame.group.knockout ? frame.initial : frame.layer;
+  double agb = frame.group.knockout ? 0.0 : frame.alpha_g;
+  Px old = frame.layer;
+  if (pdf_operator(composite)) {
+    double qa = a.v[3];
+    double b[3] = {0, 0, 0};
+    if (composite != GSHSCENE_COMPOSITE_SRC_OVER && qa * bk.v[3] != 0.0) {
+      double cb[3], cs[3];
+      for (int k = 0; k < 3; k++) {
+        cb[k] = unpremultiply(bk.v[k], bk.v[3]);
+        cs[k] = unpremultiply(a.v[k], qa);
+      }
+      mix(composite, cb, cs, b);
+    }
+    for (int k = 0; k < 3; k++) {
+      double term = composite == GSHSCENE_COMPOSITE_SRC_OVER ? a.v[k] : a.v[k] * (1.0 - bk.v[3]) + qa * bk.v[3] * b[k];
+      frame.layer.v[k] = sat((1.0 - f) * old.v[k] + (f - qa) * bk.v[k] + term);
+    }
+    frame.layer.v[3] = sat((1.0 - f) * old.v[3] + (f - qa) * bk.v[3] + qa);
+    frame.alpha_g = (1.0 - f) * frame.alpha_g + (f - qa) * agb + qa;
+  } else {
+    Px o = op(composite, a, bk);
+    for (int k = 0; k < 4; k++) {
+      frame.layer.v[k] = sat((1.0 - f) * old.v[k] + f * o.v[k]);
+    }
+    Px empty = {{0, 0, 0, agb}};
+    frame.alpha_g = (1.0 - f) * frame.alpha_g + f * op(composite, a, empty).v[3];
+  }
+  frame.shape_g = frame.shape_g + f - frame.shape_g * f;
+}
+
+/** T1 to T7 over a closed list of solid fills, clips and groups (each group push's isolation and knockout read). */
+inline Px evaluate_general(const GSHSCENE_List * list, const std::vector<double> & coverage, const Space & target,
+    const Px & backdrop) {
+  std::vector<GFrame> stack(1);
+  stack[0].layer = backdrop;
+  stack[0].initial = backdrop;
+  stack[0].space = target;
+  std::memset(&stack[0].group, 0, sizeof stack[0].group);
+  for (size_t i = 0; i < gshscene_list_count(list); i++) {
+    const GSHSCENE_Item * item = nullptr;
+    gshscene_list_item(list, i, &item);
+    GFrame & top = stack.back();
+    switch (item->kind) {
+      case GSHSCENE_ITEM_FILL: {
+        Space space = from(item->paint.space);
+        if (is_target(space)) {
+          space = target;
+        }
+        double c[3], a = item->paint.rgba[3];
+        convert(item->paint.rgba, space, top.space, c);
+        double f = coverage[i] * product(top.clips);
+        element(top, f, GSHSCENE_COMPOSITE_SRC_OVER, Px{{f * c[0] * a, f * c[1] * a, f * c[2] * a, f * a}});
+        break;
+      }
+      case GSHSCENE_ITEM_CLIP_PUSH:
+        top.clips.push_back(coverage[i]);
+        break;
+      case GSHSCENE_ITEM_CLIP_POP:
+        top.clips.pop_back();
+        break;
+      case GSHSCENE_ITEM_GROUP_PUSH: {
+        GFrame g;
+        Space blend = from(item->group.blend_space);
+        g.space = is_target(blend) ? top.space : blend;
+        g.group = item->group;
+        g.outer = product(top.clips);
+        g.layer = Px{{0, 0, 0, 0}};
+        if (item->group.isolation == GSHSCENE_ISOLATION_NON_ISOLATED) {
+          /* T4: the backdrop the group sees as an element of its parent, in the group's space. */
+          g.layer = convert_premultiplied(top.group.knockout ? top.initial : top.layer, top.space, g.space);
+        }
+        g.initial = g.layer;
+        stack.push_back(g);
+        break;
+      }
+      case GSHSCENE_ITEM_GROUP_POP: {
+        GFrame done = stack.back();
+        stack.pop_back();
+        GFrame & parent = stack.back();
+        Px own;
+        for (int k = 0; k < 3; k++) {
+          own.v[k] = sat(done.layer.v[k] - (1.0 - done.alpha_g) * done.initial.v[k]); /* T5 */
+        }
+        own.v[3] = done.alpha_g;
+        Px moved = convert_premultiplied(own, done.space, parent.space);
+        int composite = (int)done.group.composite;
+        double o = done.group.opacity;
+        if (pdf_operator(composite)) {
+          double k = done.outer * o;
+          element(parent, done.outer * done.shape_g, composite, Px{{k * moved.v[0], k * moved.v[1], k * moved.v[2], k * moved.v[3]}});
+        } else {
+          element(parent, done.outer, composite, Px{{o * moved.v[0], o * moved.v[1], o * moved.v[2], o * moved.v[3]}});
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+  return stack.back().layer;
+}
+
 /* --- gradients (G4 to G11; color-paint story P1) --------------------------------------------------------------------- */
 
 /** A stop of a resolved color line: its offset and straight rgba in the interpolation space. */

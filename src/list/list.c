@@ -257,11 +257,28 @@ static GSHSCENE_Item * item_at(const GSHSCENE_List * list, size_t index) {
   return &list->segments[s][index - base];
 }
 
+static void item_release(const GSHSCENE_Item * item) {
+  gshscene_resource_release(item->resource);
+  gshscene_resource_release(item->paint.gradient);
+  gshscene_resource_release(item->group.soft_mask);
+}
+
 static void items_release(GSHSCENE_List * list) {
   for (size_t i = 0; i < list->count; i++) {
-    gshscene_resource_release(item_at(list, i)->resource);
-    gshscene_resource_release(item_at(list, i)->paint.gradient);
+    item_release(item_at(list, i));
   }
+}
+
+/* The deepest picture an item names: an instance's, or a group's soft mask (T7; a sink that composites masks walks
+ * it, so it counts toward the nesting limit now). */
+static size_t item_picture_depth(const GSHSCENE_Item * item) {
+  if (item->kind == GSHSCENE_ITEM_INSTANCE) {
+    return item->resource->u.picture.depth;
+  }
+  if (item->kind == GSHSCENE_ITEM_GROUP_PUSH && item->group.soft_mask) {
+    return item->group.soft_mask->u.picture.depth;
+  }
+  return 0;
 }
 
 /* A zeroed item of a kind: the identity map, the nonzero rule, no resource. */
@@ -323,11 +340,12 @@ static GSHSCENE_Result list_append(GSHSCENE_List * list, const GSHSCENE_Item * i
   *item_at(list, list->count) = *item;
   gshscene_resource_retain(item->resource);
   gshscene_resource_retain(item->paint.gradient);
+  gshscene_resource_retain(item->group.soft_mask);
   note_item(list, item);
   list->count++;
   list->expansion = total;
-  if (item->kind == GSHSCENE_ITEM_INSTANCE && item->resource->u.picture.depth > list->picture_depth) {
-    list->picture_depth = item->resource->u.picture.depth;
+  if (item_picture_depth(item) > list->picture_depth) {
+    list->picture_depth = item_picture_depth(item);
   }
   return GSHSCENE_OK;
 }
@@ -435,7 +453,7 @@ GSHSCENE_Result gshscene_list_canonical_depth(double depth, double * out) {
   return GSHSCENE_OK;
 }
 
-static GSHSCENE_Result canonical_group(const GSHSCENE_Group * group, GSHSCENE_Group * out) {
+static GSHSCENE_Result canonical_group(const GSHSCENE_Store * store, const GSHSCENE_Group * group, GSHSCENE_Group * out) {
   memset(out, 0, sizeof *out);
   out->opacity = 1.0;
   out->ordering = GSHSCENE_ORDER_FLAT;
@@ -449,6 +467,14 @@ static GSHSCENE_Result canonical_group(const GSHSCENE_Group * group, GSHSCENE_Gr
   if (group->ordering >= (uint32_t)GSHSCENE_ORDERING_COUNT || group->composite >= (uint32_t)GSHSCENE_COMPOSITE_COUNT) {
     return GSHSCENE_ERR_INVALID;
   }
+  /* T1: PDF's group fields, their defaults zero. */
+  if (group->isolation >= (uint32_t)GSHSCENE_ISOLATION_COUNT || group->knockout > 1u) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  if (group->soft_mask &&
+      (group->soft_mask->kind != GSHSCENE_RESOURCE_PICTURE || group->soft_mask->store != store)) {
+    return GSHSCENE_ERR_INVALID;
+  }
   GSHSCENE_Result result = gshscene_color_space_check(&group->blend_space);
   if (result != GSHSCENE_OK) {
     return result;
@@ -457,7 +483,35 @@ static GSHSCENE_Result canonical_group(const GSHSCENE_Group * group, GSHSCENE_Gr
   out->blend_space = group->blend_space;
   out->ordering = group->ordering;
   out->composite = group->composite;
+  out->isolation = group->isolation;
+  out->knockout = group->knockout;
+  out->soft_mask = group->soft_mask;
   return GSHSCENE_OK;
+}
+
+/* --- T1: the spelling of PDF's group fields, shared with the retained scene's group nodes ---------------------- */
+
+int gshscene_group_pdf_default(uint32_t isolation, uint32_t knockout, const GSHSCENE_Resource * soft_mask) {
+  return isolation == (uint32_t)GSHSCENE_ISOLATION_ISOLATED && knockout == 0 && soft_mask == NULL;
+}
+
+void gshscene_group_hash_composite(GSHGEOM_Hash * h, uint32_t composite, uint32_t isolation, uint32_t knockout,
+    const GSHSCENE_Resource * soft_mask) {
+  if (gshscene_group_pdf_default(isolation, knockout, soft_mask)) {
+    gshgeom_hash_u8(h, (uint8_t)composite); /* the spelling every group had before the fields existed */
+    return;
+  }
+  gshgeom_hash_u8(h, (uint8_t)(composite | 0x80u));
+  gshgeom_hash_u8(h, (uint8_t)((isolation == (uint32_t)GSHSCENE_ISOLATION_NON_ISOLATED ? 1u : 0u) | (knockout ? 2u : 0u)));
+  gshgeom_hash_u64(h, soft_mask ? gshscene_resource_hash(soft_mask) : 0);
+}
+
+int gshscene_group_dump_pdf(FILE * out, uint32_t isolation, uint32_t knockout, const GSHSCENE_Resource * soft_mask) {
+  if (gshscene_group_pdf_default(isolation, knockout, soft_mask)) {
+    return 0;
+  }
+  return fprintf(out, " isolation=%u knockout=%u mask=%016llx", (unsigned)isolation, (unsigned)knockout,
+      (unsigned long long)(soft_mask ? gshscene_resource_hash(soft_mask) : 0));
 }
 
 /* The same checks for a retained scene's nodes (src/scene), which share the rules of a fill. */
@@ -480,8 +534,9 @@ GSHSCENE_Result gshscene_list_canonical_paint(const GSHSCENE_Store * store, cons
   return gshscene_color_bounded(out->rgba) ? GSHSCENE_OK : GSHSCENE_ERR_LIMIT;
 }
 
-GSHSCENE_Result gshscene_list_canonical_group(const GSHSCENE_Group * group, GSHSCENE_Group * out) {
-  return canonical_group(group, out);
+GSHSCENE_Result gshscene_list_canonical_group(
+    const GSHSCENE_Store * store, const GSHSCENE_Group * group, GSHSCENE_Group * out) {
+  return canonical_group(store, group, out);
 }
 
 GSHSCENE_Result gshscene_list_check_rule(GSHGEOM_Fill_Rule rule) {
@@ -603,7 +658,7 @@ GSHSCENE_Result gshscene_list_group_push(GSHSCENE_List * list, const GSHSCENE_Gr
   }
   GSHSCENE_Item item;
   item_init(&item, GSHSCENE_ITEM_GROUP_PUSH);
-  GSHSCENE_Result result = canonical_group(group, &item.group);
+  GSHSCENE_Result result = canonical_group(list->store, group, &item.group);
   if (result == GSHSCENE_OK) {
     result = gshscene_list_canonical_depth(depth, &item.depth);
   }
@@ -654,8 +709,7 @@ GSHSCENE_Result gshscene_list_truncate(GSHSCENE_List * list, size_t count) {
     return GSHSCENE_ERR_INVALID;
   }
   for (size_t i = count; i < list->count; i++) {
-    gshscene_resource_release(item_at(list, i)->resource);
-    gshscene_resource_release(item_at(list, i)->paint.gradient);
+    item_release(item_at(list, i));
   }
   list->count = count;
   /* What recording the first @p count items made, counted again: the open pushes, the expansion, the deepest
@@ -668,7 +722,7 @@ GSHSCENE_Result gshscene_list_truncate(GSHSCENE_List * list, size_t count) {
     const GSHSCENE_Item * item = item_at(list, i);
     note_item(list, item);
     int instance = item->kind == GSHSCENE_ITEM_INSTANCE;
-    size_t picture = instance ? item->resource->u.picture.depth : 0;
+    size_t picture = item_picture_depth(item);
     list->picture_depth = picture > list->picture_depth ? picture : list->picture_depth;
     list->expansion = saturating_add(list->expansion,
         instance ? saturating_add(1u, gshscene_list_expansion(gshscene_resource_picture(item->resource))) : 1u);
@@ -1246,7 +1300,9 @@ static int item_equal(const GSHSCENE_Item * a, const GSHSCENE_Item * b) {
   }
   return gshgeom_f64_bits(a->group.opacity) == gshgeom_f64_bits(b->group.opacity) &&
          gshscene_space_equal(&a->group.blend_space, &b->group.blend_space) &&
-         a->group.composite == b->group.composite && a->group.ordering == b->group.ordering;
+         a->group.composite == b->group.composite && a->group.ordering == b->group.ordering &&
+         a->group.isolation == b->group.isolation && a->group.knockout == b->group.knockout &&
+         a->group.soft_mask == b->group.soft_mask;
 }
 
 int gshscene_list_equal(const GSHSCENE_List * a, const GSHSCENE_List * b) {
@@ -1318,7 +1374,8 @@ uint64_t gshscene_list_hash(const GSHSCENE_List * list) {
       case GSHSCENE_ITEM_GROUP_PUSH:
         gshgeom_hash_f64(&h, item->group.opacity);
         gshscene_space_hash(&h, &item->group.blend_space);
-        gshgeom_hash_u8(&h, (uint8_t)item->group.composite);
+        gshscene_group_hash_composite(&h, item->group.composite, item->group.isolation, item->group.knockout,
+            item->group.soft_mask);
         gshgeom_hash_u32(&h, item->group.ordering);
         gshgeom_hash_i32(&h, item->layer);
         gshgeom_hash_f64(&h, item->depth);
@@ -1412,6 +1469,9 @@ GSHSCENE_Result gshscene_list_dump(const GSHSCENE_List * list, FILE * out) {
         }
         if (written >= 0) {
           written = fprintf(out, " composite=%u order=%u", (unsigned)item->group.composite, (unsigned)item->group.ordering);
+        }
+        if (written >= 0) {
+          written = gshscene_group_dump_pdf(out, item->group.isolation, item->group.knockout, item->group.soft_mask);
         }
         if (written >= 0) {
           written = dump_layer_depth(out, item);

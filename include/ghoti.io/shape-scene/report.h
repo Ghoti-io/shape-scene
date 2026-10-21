@@ -154,6 +154,9 @@ typedef enum GSHSCENE_Reason {
   GSHSCENE_REASON_INTERPOLATION_SPACE = 22, ///< Approximated, per fill: the gradient's stated interpolation space is not the one the sink interpolates in (G13).
   GSHSCENE_REASON_MAP_NOT_INVERTIBLE = 23,  ///< Notice, per fill: a map of the gradient fill's chain is not invertible, so it draws nothing (G11).
   GSHSCENE_REASON_GRADIENT_DEGENERATE = 24, ///< Notice, per fill: the gradient is degenerate, so it draws nothing (G10).
+  GSHSCENE_REASON_GROUP_ISOLATION = 25, ///< Refused, per group: a non-isolated group, which the sink does not composite (T4, S19).
+  GSHSCENE_REASON_GROUP_KNOCKOUT = 26,  ///< Refused, per group: a knockout group, which the sink does not composite (T3, S19).
+  GSHSCENE_REASON_SOFT_MASK = 27,       ///< Refused, per group: a group with a soft mask, which the sink does not apply (T7, S19).
   GSHSCENE_REASON_COUNT               ///< Closes the enum.
 } GSHSCENE_Reason;
 

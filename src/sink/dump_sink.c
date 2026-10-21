@@ -839,8 +839,15 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
       break;
     }
     case GSHSCENE_ITEM_GROUP_PUSH: {
-      snprintf(run->line, LINE_BYTES, " G opacity=%016" PRIx64 " composite=%u\n", gshgeom_f64_bits(item->group.opacity),
-          (unsigned)item->group.composite);
+      if (gshscene_group_pdf_default(item->group.isolation, item->group.knockout, item->group.soft_mask)) {
+        snprintf(run->line, LINE_BYTES, " G opacity=%016" PRIx64 " composite=%u\n", gshgeom_f64_bits(item->group.opacity),
+            (unsigned)item->group.composite);
+      } else {
+        /* T1: a sink whose caps claim PDF's group fields records them (a configuration can claim them). */
+        snprintf(run->line, LINE_BYTES, " G opacity=%016" PRIx64 " composite=%u isolation=%u knockout=%u mask=%016" PRIx64 "\n",
+            gshgeom_f64_bits(item->group.opacity), (unsigned)item->group.composite, (unsigned)item->group.isolation,
+            (unsigned)item->group.knockout, item->group.soft_mask ? gshscene_resource_hash(item->group.soft_mask) : 0);
+      }
       emit_text(run, run->line, &failed);
       GSHSCENE_Rect outer = clip_now(run);
       Block * b = &run->blocks[run->block_count++];

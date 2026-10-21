@@ -836,7 +836,7 @@ PKGCONFIG_INSTALL_PATH ?= $(PC_INSTALL_PATH)
 # this library's own tests run. They are C++ (GoogleTest), but for the glyph
 # provider, which is C so that a probe can use it, and only a test or a probe
 # includes them.
-TESTING_HEADERS := tests/sink_conformance.h tests/alloc_tracker.h tests/composite_vectors.h tests/glyph_test_provider.h \
+TESTING_HEADERS := tests/sink_conformance.h tests/alloc_tracker.h tests/composite_vectors.h tests/group_vectors.h tests/glyph_test_provider.h \
 	tests/gradient_vectors.h
 
 install: all ## Install the library

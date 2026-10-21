@@ -338,8 +338,9 @@ apply to the RGB components of that space as they are (encoded or linear-light, 
 another representation is made. COLRv1 blends in linear light and CSS in sRGB-encoded values; each is a blend space
 (AD-23) the front end chooses.
 
-**B6 Isolation.** Every group is an isolated group in W3C's sense: its layer starts at `(0, 0, 0, 0)` (N6), its content
-composites within it, and the group as a whole is blended with its backdrop at its pop. COLRv1's `PaintComposite` lowers
+**B6 Isolation.** A group is by default an isolated group in W3C's sense: its layer starts at `(0, 0, 0, 0)` (N6), its
+content composites within it, and the group as a whole is blended with its backdrop at its pop. (A non-isolated group,
+and a knockout group, are T1 to T7 below: defined, and refused by every sink until it composites them.) COLRv1's `PaintComposite` lowers
 to an outer group holding the backdrop's items, then an inner group with the mode holding the source's (COLRv1 renders
 source and backdrop "into bitmaps" and composites them, which is that). Every CSS stacking context, and SVG 2's
 `isolation`, lower to a group; an element that does not isolate gets no group, so its blending group composites onto
@@ -419,6 +420,77 @@ records it (its group record's `composite=N`). No new reason, class or cap flag.
 **B14 Hash and dump.** No spelling changes. The list's and version's `u8` composite holds 13 to 27, the dumps print the
 number as before, and every format stays 1. No committed hash changes: no list before the modes could hold a value
 past 12.
+
+## Transparency groups (normative; PDF's model; color-paint story P3)
+
+PDF's transparency model (ISO 32000-1, section 11) has two kinds of group the N-rules do not: a **non-isolated** group,
+whose content composites with what was painted before the group, and a **knockout** group, each of whose elements
+composites with the group's initial backdrop rather than with the elements before it; and a group may have a **soft
+mask**. They are defined here in full so that a later sink composites them without a change to the waist. Every sink
+refuses them until it does (S19). In real arithmetic, as N1 to N14. `tools/composite-oracle.py` states T1 to T7 a second
+time in exact rationals and checks them against itself and against ISO 32000's own straight-color formulas (written there
+independently, `pdf_literal`), and `tools/gen-composite-vectors.py --groups` commits known answers for the four
+combinations of isolated and knockout, in range and with blend modes, as `tests/group_vectors.h` (installed for sinks);
+`tests/ref_composite.h`'s `evaluate_general` agrees with them.
+
+**T1 The fields.** A group (`GSHSCENE_Group`, a group node) has `isolation` (`ISOLATED` 0, the default, or
+`NON_ISOLATED` 1), `knockout` (0, the default, or 1) and `soft_mask` (NULL, the default, or a picture of the list's
+store, which the list or node holds; a reserved slot, T7). The defaults are every group that existed before the fields,
+so formats stay 1: a default group's hash and dump are spelled exactly as before, and a group with a field that is not
+the default sets bit 7 of its `u8` composite and writes `u8` flags (1 non-isolated, 2 knockout) and `u64` the mask's
+content hash after it, and ` isolation=N knockout=N mask=<hash>` in its dump line (list.h, version.h). Equality compares
+them, the mask by handle. A mask's picture counts toward the picture nesting as an instance's does; the walk of a list's
+expansion does not enter it.
+
+**T2 Shape and opacity are kept separate.** Each element painted into a layer has a **shape** `f` in `[0, 1]`, how much
+of the pixel it covers: a fill's geometric coverage `k` times the clips in force (N7, N9) (and later a soft mask of
+PDF's alpha-is-shape kind); and an **opacity source** `S`, premultiplied, whose alpha `q` is in `[0, 1]`: the paint's
+alpha (N7, N10, N14, G12), a group's opacity (and later an opacity soft mask). The two are multiplied only where a formula
+below multiplies them (`f q`). **The waist never merges them**: no item, field, record call or sink interface folds a
+shape into an opacity or the reverse, because a knockout group needs the shape alone, and a later shape or opacity mask
+must reach the right one.
+
+**T3 The element step.** In a layer with value `L` and initial backdrop `L0` (T4), an element of shape `f`, operator
+`op` and source composites onto its **backdrop** `Bk`, which is `L` (the layer as the elements before it left it) in a
+group that is not knockout, and `L0` in a knockout group. For PDF's operators (source-over and the blend modes; W3C's
+`normal` is source-over, B12), with `A = (a, Aa)` the source with both its shape and its opacity applied (`A = f S`, `Aa
+= f q`):
+`L' = sat((1 - f) L + (f - Aa) Bk + T)`, with `T = a` for source-over and `T = a (1 - Ab) + Aa Ab sat(B(Cb, Ca))`
+(`Cb`, `Ca` un-premultiplied as B2 does) for a blend mode, and alpha `(1 - f) AL + (f - Aa) Ab + Aa`. For every other
+operator, `L' = sat((1 - f) L + f op(S, Bk))` with `S` the opacity source alone. The layer's **group alpha** `Ag` (the
+group's own coverage, without the initial backdrop) starts at 0 and steps alike, with 0 for its backdrop in a knockout
+group: `Ag' = (1 - f) Ag + (f - Aa) Agb + Aa` for PDF's operators and `(1 - f) Ag + f alpha(op(S, (0, 0, 0, Agb)))` for
+the others (an operator's alpha depends only on alphas), `Agb = Ag` (not knockout) or 0 (knockout). The **group shape**
+`fg` starts at 0 and is `fg + f - fg f` after each element. This is PDF's formula multiplied out on premultiplied values:
+PDF writes `Ai Ci = (1 - fs) Ai-1 Ci-1 + (fs - As) Ab Cb + As ((1 - Ab) Cs + Ab B(Cb, Cs))` and `Ai = (1 - fs) Ai-1 + (fs
+- As) Ab + As`, with `(Cb, Ab)` the element's backdrop as above.
+
+**T4 The initial backdrop.** An isolated group's layer starts at `(0, 0, 0, 0)` (N6). A non-isolated group's starts at
+the backdrop it has as an element of its parent (T3: the parent's value, or the parent's initial backdrop when the parent
+is knockout), converted (N3) from the parent's space into the group's. The root is the target and is neither.
+
+**T5 The group's result.** At the pop, the group's own result takes the initial backdrop out: `G = sat(L - (1 - Ag) L0)`
+on the color channels, with alpha `Ag` (for an isolated group `L0 = 0` and `G = L`). This is PDF's `C = Cn + (Cn - C0)
+(A0 / Agn - A0)` on premultiplied values. `G` is converted to the parent's space (N3) and is an element of the parent: for
+PDF's operators with shape `m fg` and `A = m o G` (PDF's group as an object: shape `fg`, opacity `Ag / fg`), and for every
+other operator with shape `m` and `S = o G` (it acts on its whole clip region, N8, N13), where `m` is the product of the
+clips in force at the push and `o` the opacity.
+
+**T6 The N-rules are the default case.** With every group isolated and not knockout, `L0 = 0` and `Bk = L`, so T3 is N5's
+`apply(L, S, f, op)` (for PDF's operators `(1 - f) L + (f - Aa) L + T = op(A, L)`, which is `apply` with `m = f` by B4);
+`Ag` steps exactly as the layer's alpha does from 0, so `G = L`; and T5's element is N8's composite: for PDF's operators,
+`(1 - m fg) P + (m fg - m o AG) P + T(m o G)` is `op(m o G, P)` = `apply(P, o G, m, op)` by B4, whatever `fg`; for the
+others it is N8 word for word. A fill is N7. So N5 to N9 are T1 to T7 at the defaults exactly, and the generator requires
+the general model to give every committed case of `composite_vectors.h` in exact rationals.
+
+**T7 The soft mask (reserved).** The slot names a picture. What a mask means beyond that (PDF's alpha or luminosity soft
+mask computed from a transparency group, its backdrop color, its transfer function, and whether it acts as shape or as
+opacity, PDF's alpha-is-shape) is decided with the sink work that applies it; in T3 it will multiply the group's opacity
+source (or its shape) at the group's pop. Until then no sink claims it.
+
+**S19 Sinks.** A sink claims `GSHSCENE_CAP_GROUP_NON_ISOLATED`, `_KNOCKOUT` and `_SOFT_MASK` for what it composites;
+without them the planning pass refuses the group (`GROUP_ISOLATION`, `GROUP_KNOCKOUT`, `SOFT_MASK`, in that order, after
+`COMPOSITE`), so it is never drawn as a default group. shape-cpu and the test sink claim none of the three.
 
 ## Gradients (normative; color-paint story P1)
 
