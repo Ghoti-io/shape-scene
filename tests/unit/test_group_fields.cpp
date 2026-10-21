@@ -317,6 +317,67 @@ TEST(GroupFields, AVersionEmitsTheFieldsAsAGroupPushAndAChangeDamagesTheSubtree)
   EXPECT_EQ(si.node.soft_mask, nullptr);
 }
 
+TEST(GroupFields, AGroupNodeHoldsItsSoftMaskAndReleasesItWithTheScene) {
+  // T1: a node holds the picture it names as its mask, as a list does: the caller's reference can go at once, and the
+  // last version and edit to go take the node's with them.
+  StoreHolder s;
+  Ref sq(intern_square(s.store));
+  Ref p2(intern_fixture(s.store));
+  const GSHSCENE_Resource * pic = fixture_picture(s.store, sq.get(), p2.get());
+  uint64_t with_mask = live(s.store);
+  {
+    SceneHolder sc(nullptr, nullptr, s.store);
+    uint64_t gid = 0;
+    {
+      EditHolder e(sc);
+      GSHSCENE_Node g = group_node();
+      g.soft_mask = pic;
+      gid = add(e.edit, GSHSCENE_ROOT_ID, g);
+      gshscene_resource_release(pic); /* the edit's node holds its own */
+      EXPECT_EQ(live(s.store), with_mask) << "the edit's node holds the mask";
+      VersionRef v;
+      publish(sc, e, &v);
+      GSHSCENE_Node_Info info = info_of(v.get(), gid);
+      ASSERT_EQ(info.node.soft_mask, pic);
+      EXPECT_EQ(gshscene_resource_hash(info.node.soft_mask), known::kPictureHash) << "the mask is alive, and the same";
+    }
+    EXPECT_EQ(live(s.store), with_mask) << "the scene's version holds the mask";
+  }
+  EXPECT_EQ(live(s.store), with_mask - 1) << "and with the scene gone nothing does";
+}
+
+TEST(GroupFields, ASoftMaskCountsTowardThePictureNestingAtPublish) {
+  // T1, T7: a group whose mask is a picture of depth d makes the list of any picture holding it d + 1 deep, and publish
+  // refuses (ERR_LIMIT) the version whose instanced group would be past max_picture_depth, as it does for instances.
+  for (size_t limit : {2u, 1u}) {
+    GSHSCENE_Limits l;
+    gshscene_limits_default(&l);
+    l.max_picture_depth = limit;
+    StoreHolder s;
+    Ref sq(intern_square(s.store));
+    Ref p2(intern_fixture(s.store));
+    Ref pic(fixture_picture(s.store, sq.get(), p2.get())); // depth 1
+    ASSERT_EQ(gshscene_resource_picture_depth(pic.get()), 1u);
+    SceneHolder sc(&l, nullptr, s.store);
+    EditHolder e(sc);
+    GSHSCENE_Node g = group_node();
+    g.flags = GSHSCENE_NODE_HIDDEN;
+    g.soft_mask = pic.get();
+    uint64_t def = add(e.edit, GSHSCENE_ROOT_ID, g);
+    add(e.edit, def, shape_node(sq.get()));
+    add(e.edit, GSHSCENE_ROOT_ID, instance_node(def));
+    // The instanced group becomes a picture holding a mask of depth 1: 2 deep.
+    const GSHSCENE_Version * v = nullptr;
+    GSHSCENE_Result r = gshscene_scene_publish(sc.scene, e.edit, nullptr, &v);
+    EXPECT_EQ(r, limit == 2 ? GSHSCENE_OK : GSHSCENE_ERR_LIMIT) << limit;
+    if (r == GSHSCENE_OK) {
+      const GSHSCENE_List * list = nullptr;
+      EXPECT_EQ(gshscene_version_list(v, &list), GSHSCENE_OK) << "a version publish accepted emits";
+    }
+    gshscene_version_release(v);
+  }
+}
+
 TEST(GroupFields, ThePlanningPassRefusesEachWithoutItsCap) {
   StoreHolder s;
   Ref sq(intern_square(s.store));

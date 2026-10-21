@@ -230,6 +230,35 @@ changes no result, cannot be seen by any test:
                replace those files' entries in scene-plants.json) and 55
                survive, none on a changed line, the kinds listed below.
 
+  orc-b-, tst-b-, orc-t-, tst-t-
+               Color-paint story P3: in the oracle and the test evaluator, a defect
+               in each blend mode (a branch, a constant, overlay's exchanged
+               arguments, min for max), in Lum's coefficients, in ClipColor (the
+               entry x against a recomputed one, the equal-component case, the
+               low step's factor), in SetSat's order and scale, in each
+               non-separable mode's arguments, in B9's saturation and the capped
+               quotient, in B2's As Ab term, its alpha and its boundedness, in the
+               un-premultiply and in B5's space (the oracle evaluating at the
+               group's own space); and in the general model of T1 to T7 (the
+               knockout backdrop, the group alpha's backdrop, the group shape's
+               union, the removal of the initial backdrop and its alpha, a group
+               element's shape for PDF's operators and for the others, the
+               non-isolated initial backdrop and its conversion, the blend term,
+               the alpha).  The story's library lines (the names, the group
+               fields' validation, references, hash, dump, nodes, the planning
+               pass's refusals) moved most lines of list.c, node.c, version.c,
+               validate.c, sink.c, dump_sink.c and report.c: the generated plants
+               on lines it left as they were were carried to their new numbers,
+               and the 108 candidates of the lines it changed were swept in
+               ghoti-build:gcc16: 14 do not compile, 91 are caught (added to
+               scene-plants.json and sink-plants.json; three of them, a group
+               node's soft mask not retained, not released, and not counted in
+               the picture nesting at publish, after the tests that catch them
+               were written) and 3 survive, each equivalent: two ``fprintf(...) <
+               0`` against ``<= 0`` in the version dump (the text is never empty)
+               and ``>`` against ``>=`` where the deepest picture is kept (equal
+               depths store the same number).
+
   sk-, rp-, ds-, cn-, rule-, and the sink's hdr- and core- plants (story 13a)
                the sink contract: one named plant per S-rule (``rule-S1`` to
                ``rule-S15``, each failing the conformance suite or the contract's
