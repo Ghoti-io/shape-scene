@@ -338,7 +338,14 @@ inline const GSHSCENE_List * refusable(Scene & s, const GSHSCENE_Sink_Caps & cap
       gshscene_list_fill(l, s.sq(20, 20, 5), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0);
       *reason = GSHSCENE_REASON_GRADIENT;
     } else {
-      return nullptr;
+      // N14: a palette entry the list's palette lacks (it has none) is refused by every sink, so a sink that draws
+      // every kind, operator and gradient (shape-cpu since color-paint story P2) still meets a planned refusal.
+      GSHSCENE_Paint entry{};
+      entry.kind = GSHSCENE_PAINT_PALETTE;
+      entry.entry = 3;
+      entry.rgba[3] = 1.0;
+      gshscene_list_fill(l, s.sq(20, 20, 5), nullptr, GSHGEOM_FILL_NONZERO, &entry, 0, 0.0);
+      *reason = GSHSCENE_REASON_PALETTE_ENTRY;
     }
   }
   gshscene_list_fill(l, s.sq(30, 30, 5), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0);
