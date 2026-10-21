@@ -1328,6 +1328,9 @@ PLANTS += [
     ('rule-S9-workspace-size', 'src', SK, '    if (request->workspace_bytes < need) {', '    if (request->workspace_bytes + 1 < need) {', SINKT),
     ('rule-S9-caller-memory-cap', 'src', SK, '    if (!(caps.flags & GSHSCENE_CAP_CALLER_MEMORY) || !sink->ops.workspace_bytes) {', '    if (!sink->ops.workspace_bytes) {', SINKT),
     ('rule-S9-allocates', 'src', DS, '  if (request->flags & GSHSCENE_RENDER_CALLER_MEMORY) {\n    base = request->workspace;', '  if (0) {\n    base = request->workspace;', SINKT),
+    # S4: the test sink's one limit (max_extent) met over the area drawn rather than the item's box, as shape-cpu's
+    # cell cap was before 2026-10-21.
+    ('rule-S4-limit-in-damage', 'src', DS, '(box.x1 - box.x0 > limit || box.y1 - box.y0 > limit)', '(run->job->target.damage ? (box.x1 < (double)run->area.x1 ? box.x1 : (double)run->area.x1) - (box.x0 > (double)run->area.x0 ? box.x0 : (double)run->area.x0) > limit : (box.x1 - box.x0 > limit || box.y1 - box.y0 > limit))', ['testDump_sink']),
     ('rule-S10-evict-keeps', 'src', DS, '  GCU_MUTEX_UNLOCK(ds->lock);\n  gshscene_resource_release(released);', '  GCU_MUTEX_UNLOCK(ds->lock);', SINKT),
     ('rule-S10-destroy-keeps', 'src', DS, '  for (size_t i = 0; i < ds->cache_count; i++) {\n    gshscene_resource_release(ds->cache[i].resource);\n  }', '', SINKT),
     ('rule-S13-wait-blocks', 'src', SK, '  if (!(job->caps.flags & GSHSCENE_CAP_CAN_BLOCK)) {\n    return GSHSCENE_ERR_UNSUPPORTED;\n  }\n  if (!thread_ok(sink, &job->caps))', '  if (!thread_ok(sink, &job->caps))', SINKT),

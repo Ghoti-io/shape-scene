@@ -306,7 +306,9 @@ conformance suite (`tests/sink_conformance.h`) cite the rules by number.
   takes the surface's description (an undescribed raster, and a document, are sRGB), and `encoding`
   says whether the stored values are encoded by the sink or by hardware. A sink composes maps root to
   leaf, the target's last (AD-24). Inside a damage rectangle a render equals the whole render, and
-  outside it nothing is touched.
+  outside it nothing is touched. So whether an item is refused for one of the sink's own limits does
+  not depend on the damage: a limit is met over what the whole render would draw of the item, and a
+  damage-limited render refuses (or, under strict, stops at) the same items as the whole render.
 - **S5 Report.** One report shape for every sink: `report.h`.
 - **S6 Refusal and the planning pass.** A sink never drops an effect silently: an item is drawn as
   stated, drawn approximately with an `APPROXIMATED` entry, or skipped with a `REFUSED` entry. The

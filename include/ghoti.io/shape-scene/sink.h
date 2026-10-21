@@ -70,7 +70,11 @@
  * sink or by the hardware (an sRGB-format texture written with linear values).
  * A sink composes maps root to leaf, the target map last (AD-24).  A render with
  * a damage rectangle draws exactly what a whole render draws inside it and
- * touches nothing outside.
+ * touches nothing outside.  So **whether an item is refused for one of the
+ * sink's own limits (S6) does not depend on the damage**: a limit is met over
+ * what the whole render would draw of the item, wherever the damage lies, and a
+ * damage-limited render refuses (or, under strict, stops at) the same items as
+ * the whole render.
  *
  * **S5 Report.**  One report shape for every sink; see report.h.
  *

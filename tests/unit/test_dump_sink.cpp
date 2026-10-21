@@ -36,6 +36,13 @@ GSHSCENE_Sink * make_full(const GSHSCENE_Allocator * alloc, const GSHSCENE_Limit
   return make_with(config_default(), alloc, limits);
 }
 
+/** The default with its one resource limit, `max_extent`, at @p level target units (S4's refusal rule). */
+GSHSCENE_Sink * make_full_limited(const GSHSCENE_Allocator * alloc, unsigned level) {
+  GSHSCENE_Dump_Sink_Config c = config_default();
+  c.max_extent = (double)level / 4.0;
+  return make_with(c, alloc, nullptr);
+}
+
 /** A sink that refuses glyphs from a font and XOR, clips without antialiasing, blends only in the target's space,
  *  has no readback, no caller memory and no prepare. */
 GSHSCENE_Dump_Sink_Config config_narrow() {
@@ -113,7 +120,7 @@ void step(GSHSCENE_Sink * sink) {
   EXPECT_EQ(gshscene_dump_sink_step(sink, nullptr), GSHSCENE_OK);
 }
 
-const Fixture kFull{"full", make_full, {GSHSCENE_TARGET_RASTER, GSHSCENE_TARGET_STREAM}, nullptr};
+const Fixture kFull{"full", make_full, {GSHSCENE_TARGET_RASTER, GSHSCENE_TARGET_STREAM}, nullptr, make_full_limited};
 const Fixture kNarrow{"narrow", make_narrow, {GSHSCENE_TARGET_RASTER, GSHSCENE_TARGET_STREAM}, nullptr};
 const Fixture kNoXor{"no_xor", make_no_xor, {GSHSCENE_TARGET_RASTER, GSHSCENE_TARGET_STREAM}, nullptr};
 const Fixture kDeferred{"deferred", make_deferred, {GSHSCENE_TARGET_RASTER, GSHSCENE_TARGET_STREAM}, step};

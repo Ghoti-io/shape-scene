@@ -336,6 +336,12 @@ struct Fixture {
   std::vector<uint32_t> kinds;
   /** One turn of the event loop of a sink that completes later (a deferred sink); NULL for one that never needs it. */
   void (*pump)(GSHSCENE_Sink * sink);
+  /**
+   * The same sink with its own resource limits (S6's refusals while drawing) tightened: @p level 1 the tightest, a
+   * larger level looser, in steps small enough that a limit is met by part of an item and not by the rest of it.
+   * NULL for a sink with no limit of its own to tighten (S4's refusal rule is then skipped, never passed).
+   */
+  GSHSCENE_Sink * (*make_limited)(const GSHSCENE_Allocator * alloc, unsigned level) = nullptr;
 };
 
 inline std::ostream & operator<<(std::ostream & os, const Fixture * f) {
@@ -744,6 +750,115 @@ TEST_P(SinkConformance, S4_DamageDrawsInsideAndTouchesNothingOutside) {
   if (!any) {
     GTEST_SKIP() << "no pixel target: damage is a pixel-kind field (S4)";
   }
+}
+
+namespace sinkconf {
+
+/** A report's entries, their chains copied (the report's own are gone with its next render). */
+struct Entries {
+  std::vector<std::vector<size_t>> rows; // class, reason, second, then the chain
+  GSHSCENE_Result result = GSHSCENE_ERR_INTERNAL;
+  std::vector<size_t> failure;
+  size_t limits = 0; // refusals for the sink's own limits
+  bool operator==(const Entries & o) const {
+    return rows == o.rows && result == o.result && failure == o.failure;
+  }
+};
+
+inline Entries entries_of(const GSHSCENE_Report * report) {
+  Entries out;
+  for (const GSHSCENE_Report_Entry & e : entries(report)) {
+    std::vector<size_t> row{(size_t)e.entry_class, (size_t)e.reason, e.second};
+    row.insert(row.end(), e.chain, e.chain + e.chain_count);
+    out.rows.push_back(row);
+    out.limits += e.entry_class == GSHSCENE_ENTRY_REFUSED && e.reason == GSHSCENE_REASON_RESOURCE_LIMIT;
+  }
+  GSHSCENE_Report_Summary sum = summary(report);
+  out.result = sum.result;
+  out.failure.assign(sum.failure.chain, sum.failure.chain + sum.failure.chain_count);
+  return out;
+}
+
+/**
+ * Items that a damage of (20, 20) to (44, 44) cuts: a fill across its corner, a fill wholly outside it, a clip across
+ * its edge around a fill of the whole target, a group across it, and a fill inside it.
+ */
+inline const GSHSCENE_List * across_the_damage(Scene & s) {
+  GSHSCENE_Paint red = solid(1, 0, 0);
+  GSHSCENE_Paint blue = solid(0, 0, 1, 0.5);
+  GSHSCENE_Group group{};
+  group.opacity = 0.5;
+  GSHSCENE_List * l = s.open();
+  gshscene_list_fill(l, s.sq(4, 4, 30), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0);
+  gshscene_list_fill(l, s.sq(50, 2, 10), nullptr, GSHGEOM_FILL_NONZERO, &blue, 0, 0.0);
+  gshscene_list_clip_push(l, s.sq(10, 30, 40), nullptr, GSHGEOM_FILL_NONZERO, 0, 0.0);
+  gshscene_list_fill(l, s.sq(0, 0, 64), nullptr, GSHGEOM_FILL_NONZERO, &blue, 0, 0.0);
+  gshscene_list_clip_pop(l);
+  gshscene_list_group_push(l, &group, 0, 0.0);
+  gshscene_list_fill(l, s.sq(30, 30, 20), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0);
+  gshscene_list_group_pop(l);
+  gshscene_list_fill(l, s.sq(24, 24, 8), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0);
+  gshscene_list_close(l);
+  return l;
+}
+
+} // namespace sinkconf
+
+// S4 with S6: whether an item is refused for one of the sink's own limits does not depend on the damage.  At every
+// tightness of the sink's limits, a damage-limited render refuses the same items as the whole render (best effort),
+// stops at the same item (strict), and equals it inside the damage.
+TEST_P(SinkConformance, S4_ARefusalForTheSinksOwnLimitDoesNotDependOnTheDamage) {
+  if (!f()->make_limited) {
+    GTEST_SKIP() << "the sink has no limit of its own to tighten";
+  }
+  bool any = false;
+  for (uint32_t kind : f()->kinds) {
+    any |= kind == GSHSCENE_TARGET_RASTER;
+  }
+  if (!any) {
+    GTEST_SKIP() << "no pixel target: damage is a pixel-kind field (S4)";
+  }
+  Scene s;
+  const GSHSCENE_List * list = across_the_damage(s);
+  const GSHSCENE_Rect damage{20, 20, 44, 44};
+  size_t refusing = 0;  // levels at which the whole render refuses an item for a limit
+  size_t clean = 0;     // levels at which it refuses none
+  for (unsigned level = 1; level <= 400; level++) {
+    SinkRef sink(f()->make_limited(nullptr, level));
+    ASSERT_NE(sink.sink, nullptr);
+    for (uint32_t flags : {0u, (uint32_t)GSHSCENE_RENDER_STRICT}) {
+      auto whole = make_raster();
+      auto part = make_raster();
+      auto fresh = make_raster();
+      part->target.damage = &damage;
+      ReportRef wr;
+      ReportRef pr;
+      GSHSCENE_Render_Request wq = request_for(list, *whole, wr.report);
+      GSHSCENE_Render_Request pq = request_for(list, *part, pr.report);
+      wq.flags = pq.flags = flags;
+      run(f(), sink.sink, wq);
+      run(f(), sink.sink, pq);
+      Entries we = entries_of(wr.report);
+      Entries pe = entries_of(pr.report);
+      ASSERT_TRUE(we.result == GSHSCENE_OK || we.result == GSHSCENE_ERR_REFUSED) << level << " " << we.result;
+      EXPECT_TRUE(we == pe) << "level " << level << (flags ? " strict" : "") << ": the whole render refused "
+                            << we.limits << " item(s) for the sink's limits, the damage-limited one " << pe.limits
+                            << " (results " << we.result << ", " << pe.result << ")";
+      for (uint32_t y = 0; y < 64; y++) {
+        for (uint32_t x = 0; x < 64; x++) {
+          bool inside = x >= 20 && x < 44 && y >= 20 && y < 44;
+          ASSERT_EQ(part->pixel(x, y), inside ? whole->pixel(x, y) : fresh->pixel(x, y))
+              << "level " << level << (flags ? " strict" : "") << " at " << x << "," << y;
+        }
+      }
+      if (!flags) {
+        refusing += we.limits > 0;
+        clean += we.limits == 0;
+      }
+    }
+  }
+  EXPECT_GT(refusing, 0u) << "no level met a limit on some items and not others: the test cannot see the rule";
+  EXPECT_GT(clean, 0u) << "every level met a limit";
 }
 
 // S5: the report's order and its summary agree with its entries.
