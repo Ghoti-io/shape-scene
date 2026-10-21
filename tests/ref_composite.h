@@ -259,16 +259,31 @@ inline double lum(const double c[3]) {
   return 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
 }
 
-/** B8: ClipColor, with L, n and x read once on entry; the all-equal (0/0) form, n = x, leaves C alone (B10). */
+/**
+ * B8: ClipColor, with L, n and x read once on entry, and `C - L`, `L - n = Lum(C - n)` and `x - L` formed from the
+ * differences `C - n` (B10), so a denominator is positive whenever the components are not all equal; a step is taken
+ * only when its denominator is positive, which leaves the all-equal (0/0) form alone.
+ */
 inline void clip_color(double c[3]) {
   double l = lum(c);
   double n = std::min(c[0], std::min(c[1], c[2]));
   double x = std::max(c[0], std::max(c[1], c[2]));
-  if (n < 0.0 && n != x) {
-    for (int i = 0; i < 3; i++) c[i] = l + (c[i] - l) * l / (l - n);
+  if (!(n < 0.0) && !(x > 1.0)) return;
+  double d[3] = {c[0] - n, c[1] - n, c[2] - n};
+  double ln = lum(d);
+  double xl = x - n - ln;
+  double t[3] = {d[0] - ln, d[1] - ln, d[2] - ln};
+  bool moved = false;
+  if (n < 0.0 && ln > 0.0) {
+    for (int i = 0; i < 3; i++) t[i] = t[i] * l / ln;
+    moved = true;
   }
-  if (x > 1.0 && n != x) {
-    for (int i = 0; i < 3; i++) c[i] = l + (c[i] - l) * (1.0 - l) / (x - l);
+  if (x > 1.0 && xl > 0.0) {
+    for (int i = 0; i < 3; i++) t[i] = t[i] * (1.0 - l) / xl;
+    moved = true;
+  }
+  if (moved) {
+    for (int i = 0; i < 3; i++) c[i] = l + t[i];
   }
 }
 

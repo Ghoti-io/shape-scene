@@ -338,7 +338,8 @@ def lum(c):
 def clip_color(c):
     """B8, P3-5, P3-11: L, n and x taken once, on entry; the 0/0 form (every component equal, so n = L = x) leaves C
     alone.  n = L, x = L and n = x are one condition in the reals (Lum is a convex combination with positive weights);
-    B10 states it as n = x, which a double evaluation decides exactly."""
+    B10 states it as n = x, which a double evaluation decides exactly.  This is the literal form, in exact rationals;
+    a floating-point evaluation forms the same values from the differences C - n (B10, checked in the selftest)."""
     el = lum(c)
     n = min(c)
     x = max(c)
@@ -898,6 +899,12 @@ def selftest():
         check(lum(clip_color(c)) == lum(c), "ClipColor keeps Lum: %s" % c)
         check((min(c) == lum(c)) == (min(c) == max(c)) and (max(c) == lum(c)) == (min(c) == max(c)),
               "n = L, x = L and n = x are one condition: %s" % c)
+        # B10: the differences a floating-point evaluation forms ClipColor from are the literal ones, in the reals.
+        n, x, el = min(c), max(c), lum(c)
+        d = [v - n for v in c]
+        check(lum(d) == el - n and (x - n) - lum(d) == x - el and [v - lum(d) for v in d] == [v - el for v in c],
+              "B10: L - n = Lum(C - n), x - L = (x - n) - (L - n), C - L = (C - n) - (L - n): %s" % c)
+        check((lum(d) > 0) == (n != x), "B10: Lum(C - n) is positive exactly off the ray: %s" % c)
         for sv in (F(0), F(1, 2), F(3)):
             if max(c) > min(c):
                 check(saturation(set_sat(c, sv)) == sv, "Sat(SetSat(C, s)) = s")

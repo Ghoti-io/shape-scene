@@ -397,7 +397,14 @@ the step leaves `C` unchanged, as it does for `x > 1` with `x = L`. This defines
 numerator's factor, the limit along the ray `C = L`. In the reals `n = L`, `x = L` and `n = x` are one condition, and it
 is stated as `n = x` (all components equal), which a double evaluation decides exactly: `L` computed in doubles from
 `0.3, 0.59, 0.11` can differ from an all-equal triple's components by a rounding, and a test of `n = L` would then take
-the quotient of two roundings. Off the ray the step does apply, so ClipColor is discontinuous there (out of range only):
+the quotient of two roundings. For the same reason an evaluation in floating point forms ClipColor's offsets and
+denominators from the differences `C - n`, which are exact near the ray: `L - n = Lum(C - n)`, `x - L = (x - n) - (L -
+n)` and `C - L = (C - n) - (L - n)`, equal in the reals to the literal ones. `Lum(C - n)` is a sum of terms that are
+not negative, so it is positive whenever the components are not all equal, while `Lum(C) - n` rounded can be 0 (or
+negative) a rounding away from the ray, which takes the literal step to `0 / 0` (shape-cpu's fuzzer found it); and
+the quotients `(C - L) / (L - n)`, whose real values are bounded (B9), are then quotients of accurate small numbers.
+A step is taken only when its denominator, so formed, is positive, which is also how the all-equal form is decided
+(every difference is 0). Off the ray the step does apply, so ClipColor is discontinuous there (out of range only):
 the step takes `n` to 0 however near the triple is to grey. SetSat divides only when `Cmax > Cmin`. The modes'
 discontinuities in the reals are where W3C puts them: dodge at `Cs = 1` approached from above with `Cb > 0` (out of
 range), burn at `Cs = 0` approached from below with `Cb > 1` (out of range), and ClipColor's and SetSat's quotients

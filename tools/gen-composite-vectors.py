@@ -325,6 +325,14 @@ CORNERS = [K64, -K64, 0.0, 1.0]
 TRIPLES = [(0.25, 0.5, 0.75), (1.0, 0.0, 0.0), (0.0, 1.0, 1.0), (0.5, 0.5, 0.5), (1.0, 1.0, 0.5), (0.5, 0.0, 0.0),
            (-0.5, 0.5, 1.5), (2.0, 2.0, 2.0), (-1.0, -1.0, -1.0), (65536.0, -65536.0, 0.0), (0.75, 0.75, 0.25),
            (3.0, -1.0, 0.5), (0.125, 0.875, 0.5), (K64, -K64, 0.0)]
+# B10: triples a rounding off the ray C = L, where Lum(C) - n (or x - Lum(C)) evaluated literally in doubles is 0 and
+# the literal step is 0 / 0 (shape-cpu's fuzzer found a NaN there).  The ray is a discontinuity of ClipColor, so the grid
+# refuses such samples; these are kept apart (kNearRay), each mixed with itself in every non-separable mode, which brings
+# it to ClipColor a rounding off the ray: the inputs are exact, and S11's evaluation from the differences C - n meets
+# the exact answer within the tolerance.
+NEAR_RAY = [(-0.75, -0.75, -0.75 + 2.0 ** -53), (-0.75 + 2.0 ** -53, -0.75, -0.75), (-3.0, -3.0, -3.0 + 2.0 ** -51),
+            (1.75, 1.75, 1.75 + 2.0 ** -52), (-1e10, -1e10, -1e10 + 2.0 ** -19),
+            (-0.18212577361196883, -0.18212577361196883, -0.1821257736119688)]
 MIX = []
 
 
@@ -500,12 +508,19 @@ def trace_clip(c):
     n = c[0] if c[0].v <= c[1].v and c[0].v <= c[2].v else c[1] if c[1].v <= c[2].v else c[2]
     x = c[0] if c[0].v >= c[1].v and c[0].v >= c[2].v else c[1] if c[1].v >= c[2].v else c[2]
     grey = e_eq(n, x, True)
-    out = list(c)
-    if n.v < 0 and not grey:
-        out = [e_add(el, e_div(e_mul(e_sub(v, el), el), e_sub(el, n))) for v in out]
-    if x.v > 1 and not grey:
-        out = [e_add(el, e_div(e_mul(e_sub(v, el), e_sub(ONE_E, el)), e_sub(x, el))) for v in out]
-    return out
+    if grey or (n.v >= 0 and x.v <= 1):
+        return list(c)
+    # S11 forms the offsets and both denominators from the differences C - n (B10), so that L - n is a sum of terms
+    # that are not negative: L - n = Lum(C - n), x - L = (x - n) - (L - n), C - L = (C - n) - (L - n).
+    d = [e_sub(v, n) for v in c]
+    ln = trace_lum(d)
+    xl = e_sub(e_sub(x, n), ln)
+    t = [e_sub(v, ln) for v in d]
+    if n.v < 0:
+        t = [e_div(e_mul(v, el), ln) for v in t]
+    if x.v > 1:
+        t = [e_div(e_mul(v, e_sub(ONE_E, el)), xl) for v in t]
+    return [e_add(el, v) for v in t]
 
 
 def trace_set_lum(c, el):
@@ -716,6 +731,21 @@ def render():
         out.append("    {%d, {%s}, {%s}, {%s}, %s},\n" % (oracle.OP_INDEX[mode], ", ".join(hexf(v) for v in fcb),
                    ", ".join(hexf(v) for v in fcs), ", ".join(hexf(v) for v in want), "true" if exact else "false"))
     out.append("};\n\nstatic const int kMixCount = %d;\nstatic const int kMixExactCount = %d;\n" % (len(rows), mix_exact))
+    out.append("\n// B10: ClipColor a rounding off the ray C = L, where the literal Lum(C) - n or x - Lum(C) in doubles is 0: each\n"
+               "// triple mixed with itself (cb = cs = c) in every non-separable mode.  A discontinuity the grid refuses; the\n"
+               "// inputs are exact, and an evaluation in S11's order (from the differences C - n) is within the tolerance.\n")
+    out.append("struct VNearRay {\n  int mode;\n  double c[3];\n  double want[3];\n};\n\nstatic const VNearRay kNearRay[] = {\n")
+    near = 0
+    for mode in MODES:
+        if mode in oracle.SEPARABLE:
+            continue
+        for t in NEAR_RAY:
+            ft = [F(v) for v in t]
+            want = [oracle.sat(v) for v in oracle.mix(mode, ft, ft, oracle.Exactness())]
+            out.append("    {%d, {%s}, {%s}},\n" % (oracle.OP_INDEX[mode], ", ".join(hexf(v) for v in ft),
+                       ", ".join(hexf(v) for v in want)))
+            near += 1
+    out.append("};\n\nstatic const int kNearRayCount = %d;\n" % near)
     out.append("\nstatic const VCase kCases[] = {\n")
     for n, c in enumerate(CASES):
         got, inexact = evaluate_case(c)

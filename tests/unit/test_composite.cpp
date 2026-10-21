@@ -182,6 +182,26 @@ TEST(Blend, EveryMixingFunctionValueIsTheOraclesAnswer) {
   }
 }
 
+TEST(Blend, ClipColorARoundingOffTheRayIsFiniteAndTheOraclesAnswer) {
+  // B10: a triple a rounding off C = L, where Lum(C) - n (or x - Lum(C)) in doubles is 0 and the literal step is
+  // 0 / 0; formed from the differences C - n the step is defined and accurate.
+  ASSERT_GE(cv::kNearRayCount, 20);
+  double worst = 0.0;
+  for (int n = 0; n < cv::kNearRayCount; n++) {
+    const cv::VNearRay & r = cv::kNearRay[n];
+    double got[3];
+    refc::mix(r.mode, r.c, r.c, got);
+    for (int k = 0; k < 3; k++) {
+      ASSERT_TRUE(std::isfinite(got[k])) << "kNearRay[" << n << "] channel " << k;
+      double e = std::fabs(got[k] - r.want[k]) / std::max(1.0, std::fabs(r.want[k]));
+      worst = std::max(worst, e);
+      EXPECT_LE(e, 1e-12) << "kNearRay[" << n << "] " << gshscene_composite_string((GSHSCENE_Composite)r.mode)
+                          << " channel " << k;
+    }
+  }
+  std::printf("kNearRay: %d samples; worst relative error %.3g\n", cv::kNearRayCount, worst);
+}
+
 TEST(Blend, EveryModeAtTheCornersIsFiniteAndSaturated) {
   // B9: inputs at +-2^64 (and 0, 1) on every channel, every mode: no NaN, no infinity, nothing past the saturation.
   // (The table holds the corners whose double evaluation is conditioned; where it cancels, as screen's 2^64 + 1 -
