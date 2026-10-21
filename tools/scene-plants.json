@@ -31124,7 +31124,7 @@
 "bg-340-del",
 "srcl",
 "src/resource/gradient.c",
-"340:sort_stops(stops, stops + count, count);",
+"340:sort_stops(stops, count ? stops + count : NULL, count);",
 ";",
 [
 "testGradient",

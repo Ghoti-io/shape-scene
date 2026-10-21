@@ -277,7 +277,7 @@ static int item_compare(const void * pa, const void * pb) {
 void gshscene_report_seal(GSHSCENE_Report * report, GSHSCENE_Result result, const size_t * chain,
     size_t chain_count, const char * reason) {
   for (size_t i = 0; i < report->count; i++) {
-    report->items[i].key = report->pool + report->items[i].chain;
+    report->items[i].key = report->items[i].chain_count ? report->pool + report->items[i].chain : NULL;
   }
   if (report->count > 1) {
     qsort(report->items, report->count, sizeof *report->items, item_compare);

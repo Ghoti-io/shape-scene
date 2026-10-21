@@ -12212,7 +12212,7 @@
 "rp-280-del",
 "srcl",
 "src/sink/report.c",
-"280:report->items[i].key = report->pool + report->items[i].chain;",
+"280:report->items[i].key = report->items[i].chain_count ? report->pool + report->items[i].chain : NULL;",
 ";",
 [
 "testDump_sink",

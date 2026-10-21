@@ -337,7 +337,7 @@ GSHSCENE_Result gshscene_store_intern_gradient(
   GSHSCENE_Gradient g;
   GSHSCENE_Result result = canonical(store, gradient, &g, stops);
   if (result == GSHSCENE_OK) {
-    sort_stops(stops, stops + count, count);
+    sort_stops(stops, count ? stops + count : NULL, count);
     GSHSCENE_Probe probe = {GSHSCENE_RESOURCE_GRADIENT, content_hash(&g),
         gshscene_sat_add(GSHSCENE_BYTES_BASE, gshscene_sat_mul(count, GSHSCENE_BYTES_PER_STOP)), &g, build_gradient};
     result = gshscene_store_intern(store, &probe, out);
