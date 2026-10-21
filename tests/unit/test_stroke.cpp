@@ -18,7 +18,10 @@
 #include "../known_answers.h"
 #include "../scene_fixtures.h"
 #include "../scene_helpers.h"
+#include "../glyph_test_provider.h"
 
+#include <algorithm>
+#include <cfloat>
 #include <cmath>
 #include <cstring>
 #include <functional>
@@ -202,6 +205,17 @@ TEST(StrokeStyle, HashAndDumpAreTheGeneratorsOnEveryFixture) {
     EXPECT_EQ(gshscene_resource_hash(r.get()), c.hash);
     EXPECT_EQ(dump_resource(r.get()), std::string(c.dump));
   }
+}
+
+TEST(StrokeStyle, TheDumpWritesEveryDoubleInSixteenDigits) {
+  // A zero dash among others is kept (SK3 makes only an all-zero array solid); its bits are all zero digits.
+  StoreHolder s;
+  Style st;
+  st.dash({0.0, 2.0});
+  Ref r;
+  ASSERT_EQ(intern(s.store, st, &r), GSHSCENE_OK);
+  std::string text = dump_resource(r.get());
+  EXPECT_NE(text.find("\nd 0000000000000000\nd 4000000000000000\n"), std::string::npos) << text;
 }
 
 TEST(StrokeStyle, TheAccessorReadsBackTheCanonicalForm) {
@@ -439,6 +453,9 @@ TEST(StrokeStyle, TheWidthProfileIsReservedAndDecidedAfterValidity) {
   EXPECT_EQ(gshscene_store_intern_stroke_style(s.store, st.get(), &r), GSHSCENE_ERR_UNSUPPORTED) << "D8";
   st.s.width = kNaN;
   EXPECT_EQ(gshscene_store_intern_stroke_style(s.store, st.get(), &r), GSHSCENE_ERR_INVALID) << "validity first";
+  st.s.width = -1.0;
+  EXPECT_EQ(gshscene_store_intern_stroke_style(s.store, st.get(), &r), GSHSCENE_ERR_INVALID)
+      << "a negative width is decided before the profile too";
   st.s.width = std::ldexp(1.0, 70);
   EXPECT_EQ(gshscene_store_intern_stroke_style(s.store, st.get(), &r), GSHSCENE_ERR_UNSUPPORTED)
       << "the profile before the bounds";
@@ -1221,6 +1238,15 @@ TEST(StrokeBounds, EmptyAndZeroWidthAndRefusals) {
   Ref wr;
   ASSERT_EQ(intern(s.store, wide, &wr), GSHSCENE_OK);
   EXPECT_EQ(gshscene_stroke_bounds(wr.get(), &far, &huge, 0, &out), GSHSCENE_ERR_LIMIT);
+  // A device width outset past the largest double after a mapping that succeeds: the bound is unknown too.
+  Style dv;
+  dv.s.width_space = GSHSCENE_STROKE_WIDTH_DEVICE;
+  Ref dr;
+  ASSERT_EQ(intern(s.store, dv, &dr), GSHSCENE_OK);
+  GSHGEOM_Bounds top{};
+  top.min = P(0, 0);
+  top.max = P(DBL_MAX, 1);
+  EXPECT_EQ(gshscene_stroke_bounds(dr.get(), &top, &id, 0, &out), GSHSCENE_ERR_LIMIT);
 }
 
 TEST(StrokeBounds, TheOutsetIsRoundedOutward) {
@@ -1381,6 +1407,85 @@ TEST(StrokeDamage, AForegroundChangeDamagesTheStrokesThatPaintWithIt) {
   // Only the foreground stroke (round, h = 0.5): 19.5..24.5 by -0.5..4.5; the other stroke, at 100, is not in it.
   GSHSCENE_Damage d = damage_of(v1.get(), v2.get());
   expect_covers(d, 19.5, -0.5, 24.5, 4.5, "the stroke that paints with the foreground");
+}
+
+TEST(StrokeDamage, AStrokeOfARunIsBoundedByItsGlyphsOutset) {
+  GSHSCENE_Test_Provider tp{}; // outlives the scene, which holds its face until the end
+  SceneHolder s;
+  Ref square(intern_square(s.store())); // 0..4
+  GSHGEOM_Path * nothing = new_path();
+  Ref empty(scene::intern(s.store(), nothing));
+  gshgeom_path_destroy(nothing);
+  // Outlines: squares at (120, 60) and (100, 50), the second the lower left, and an empty outline far away, which
+  // bounds nothing; and a run left of and above the origin, its second glyph the upper right.
+  GSHSCENE_Glyph glyphs[3] = {{1, 120.0, 60.0, square.get()}, {2, 500.0, 500.0, empty.get()}, {3, 100.0, 50.0, square.get()}};
+  GSHSCENE_Glyph_Run run{};
+  run.source = GSHSCENE_GLYPHS_FROM_OUTLINES;
+  run.glyph_count = 3;
+  run.glyphs = glyphs;
+  Ref outlines;
+  ASSERT_EQ(gshscene_store_intern_glyph_run(s.store(), &run, &outlines.resource), GSHSCENE_OK);
+  GSHSCENE_Glyph negative[2] = {{1, -100.0, -50.0, square.get()}, {2, -80.0, -40.0, square.get()}};
+  run.glyph_count = 2;
+  run.glyphs = negative;
+  Ref below;
+  ASSERT_EQ(gshscene_store_intern_glyph_run(s.store(), &run, &below.resource), GSHSCENE_OK);
+  // From a bound face (the test provider): glyph 1, a rectangle, at (300, 200), and glyph 0, which has no outline.
+  Ref face(gshscene_tp_face(s.store(), &tp, 0, 0x5354u, 0));
+  ASSERT_NE(face.get(), nullptr);
+  Ref text(intern_font_run(s.store(), face.get(), 20.0, {{1, 300.0, 200.0, nullptr}, {0, 900.0, 900.0, nullptr}}));
+  Ref style;
+  Style st;
+  st.s.width = 2.0;
+  st.s.join = GSHSCENE_STROKE_JOIN_ROUND;
+  ASSERT_EQ(intern(s.store(), st, &style), GSHSCENE_OK);
+  VersionRef v1, v2, v3;
+  {
+    EditHolder e(s);
+    publish(s, e, &v1);
+  }
+  {
+    EditHolder e(s);
+    add(e.edit, GSHSCENE_ROOT_ID, stroke_node(outlines.get(), style.get()));
+    publish(s, e, &v2);
+  }
+  // h = 1 around 100..124 by 50..64.
+  expect_covers(damage_of(v1.get(), v2.get()), 99, 49, 125, 65, "the outline run's glyphs");
+  VersionRef vb;
+  {
+    EditHolder e(s);
+    add(e.edit, GSHSCENE_ROOT_ID, stroke_node(below.get(), style.get()));
+    publish(s, e, &vb);
+    // h = 1 around -100..-76 by -50..-36: every corner below zero.
+    expect_covers(damage_of(v2.get(), vb.get()), -101, -51, -75, -35, "a run left of and above the origin");
+  }
+  {
+    EditHolder e(s);
+    add(e.edit, GSHSCENE_ROOT_ID, stroke_node(text.get(), style.get()));
+    publish(s, e, &v3);
+  }
+  // The font run: glyph 1's design box under its map into model space (the general route, SK7); glyph 0 is empty.
+  GSHSCENE_Glyph_Box g{};
+  ASSERT_EQ(gshscene_glyph_box(text.get(), 1, &g), GSHSCENE_OK);
+  EXPECT_EQ(g.empty, 1) << "glyph 0 has no outline";
+  ASSERT_EQ(gshscene_glyph_box(text.get(), 0, &g), GSHSCENE_OK);
+  ASSERT_EQ(g.empty, 0);
+  GSHGEOM_Map id = translate(0, 0);
+  GSHGEOM_Map gm;
+  ASSERT_EQ(gshscene_glyph_map(text.get(), &id, 0, &gm), GSHSCENE_OK);
+  double x0 = 1e300, y0 = 1e300, x1 = -1e300, y1 = -1e300;
+  for (int32_t gx : {g.x_min, g.x_max}) {
+    for (int32_t gy : {g.y_min, g.y_max}) {
+      GSHGEOM_Point q;
+      ASSERT_EQ(gshgeom_map_apply_point(&gm, P(gx / 64.0, gy / 64.0), &q), GSHGEOM_OK);
+      x0 = std::min(x0, q.x);
+      y0 = std::min(y0, q.y);
+      x1 = std::max(x1, q.x);
+      y1 = std::max(y1, q.y);
+    }
+  }
+  EXPECT_GT(x0, 290.0) << "the glyph is placed at its origin";
+  expect_covers(damage_of(vb.get(), v3.get()), x0 - 1, y0 - 1, x1 + 1, y1 + 1, "the font run's glyph");
 }
 
 TEST(StrokeDamage, AStrokeOfARunFromAnUnboundFaceIsUnbounded) {

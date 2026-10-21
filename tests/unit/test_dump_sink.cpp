@@ -642,10 +642,23 @@ TEST(DumpSink, AStrokePastTheExtentAndAStrokeOfAnUnboundFaceAreRefusedWhileDrawi
   const GSHSCENE_List * list = stroke_list(s);
   GSHSCENE_Dump_Sink_Config c = config_default();
   c.max_extent = 9.0; // the first stroke's box is about 12 wide; the second's (device, round) is about 7
+  Log log;
+  c.log = &log.writer;
   SinkRef sink(make_with(c, nullptr, nullptr));
   auto raster = make_raster();
   ReportRef report;
   ASSERT_EQ(render_job(sink.sink, request_for(list, *raster, report.report)).result, GSHSCENE_OK);
+  auto refused_record = [](GSHSCENE_Reason reason) {
+    return " X class=" + std::to_string((int)GSHSCENE_ENTRY_REFUSED) + " reason=" + std::to_string((int)reason) + "\n";
+  };
+  EXPECT_NE(log.text.find(refused_record(GSHSCENE_REASON_RESOURCE_LIMIT)), std::string::npos)
+      << "the refusal is recorded where it happened";
+  // Under strict the refusal while drawing stops the render there (S6).
+  auto strict_raster = make_raster();
+  ReportRef strict_report;
+  GSHSCENE_Render_Request strict = request_for(list, *strict_raster, strict_report.report);
+  strict.flags = GSHSCENE_RENDER_STRICT;
+  EXPECT_EQ(render_job(sink.sink, strict).result, GSHSCENE_ERR_REFUSED);
   auto es = entries(report.report);
   ASSERT_GE(es.size(), 1u);
   EXPECT_EQ(es[0].entry_class, GSHSCENE_ENTRY_REFUSED);
@@ -669,7 +682,10 @@ TEST(DumpSink, AStrokePastTheExtentAndAStrokeOfAnUnboundFaceAreRefusedWhileDrawi
   ASSERT_EQ(gshscene_list_stroke(l, t.glyphs(t.face(1, 0), {1}, 8.0, GSHSCENE_HINT_FONT), style, nullptr, &red, 0, 0.0),
       GSHSCENE_OK);
   ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
-  SinkRef full(make_full(nullptr, nullptr));
+  Log log2;
+  GSHSCENE_Dump_Sink_Config c2 = config_default();
+  c2.log = &log2.writer;
+  SinkRef full(make_with(c2, nullptr, nullptr));
   auto r2 = make_raster();
   ReportRef rep2;
   ASSERT_EQ(render_job(full.sink, request_for(l, *r2, rep2.report)).result, GSHSCENE_OK);
@@ -677,6 +693,101 @@ TEST(DumpSink, AStrokePastTheExtentAndAStrokeOfAnUnboundFaceAreRefusedWhileDrawi
   ASSERT_EQ(e2.size(), 1u);
   EXPECT_EQ(e2[0].entry_class, GSHSCENE_ENTRY_REFUSED);
   EXPECT_EQ(e2[0].reason, GSHSCENE_REASON_FACE_UNBOUND);
+  EXPECT_NE(log2.text.find(refused_record(GSHSCENE_REASON_FACE_UNBOUND)), std::string::npos);
+}
+
+TEST(DumpSink, AStrokePastTheExtentInOneDirectionAloneIsRefused) {
+  Scene s;
+  GSHSCENE_Stroke_Style st;
+  gshscene_stroke_style_init(&st);
+  st.join = GSHSCENE_STROKE_JOIN_ROUND;
+  const GSHSCENE_Resource * style = nullptr;
+  ASSERT_EQ(gshscene_store_intern_stroke_style(s.store, &st, &style), GSHSCENE_OK);
+  s.held.push_back(style);
+  // A wide, flat rectangle: 20 by 2 (with the pen 21 by 3), against an extent of 10; and its transpose.
+  for (bool tall : {false, true}) {
+    GSHGEOM_Path * p = nullptr;
+    ASSERT_EQ(gshgeom_path_create(nullptr, nullptr, 2, &p), GSHGEOM_OK);
+    double w = tall ? 2 : 20, h = tall ? 20 : 2;
+    gshgeom_path_move_to(p, GSHGEOM_Point{4, 4, 0});
+    gshgeom_path_line_to(p, GSHGEOM_Point{4 + w, 4, 0});
+    gshgeom_path_line_to(p, GSHGEOM_Point{4 + w, 4 + h, 0});
+    gshgeom_path_close(p);
+    const GSHSCENE_Resource * line = nullptr;
+    ASSERT_EQ(gshscene_store_intern_path(s.store, p, &line), GSHSCENE_OK);
+    gshgeom_path_destroy(p);
+    s.held.push_back(line);
+    GSHSCENE_List * l = s.open();
+    GSHSCENE_Paint red = solid(1, 0, 0);
+    ASSERT_EQ(gshscene_list_stroke(l, line, style, nullptr, &red, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+    GSHSCENE_Dump_Sink_Config c = config_default();
+    c.max_extent = 10.0;
+    SinkRef sink(make_with(c, nullptr, nullptr));
+    auto raster = make_raster();
+    ReportRef report;
+    ASSERT_EQ(render_job(sink.sink, request_for(l, *raster, report.report)).result, GSHSCENE_OK);
+    auto es = entries(report.report);
+    ASSERT_EQ(es.size(), 1u) << (tall ? "tall" : "wide");
+    EXPECT_EQ(es[0].reason, GSHSCENE_REASON_RESOURCE_LIMIT) << (tall ? "tall" : "wide");
+  }
+}
+
+TEST(DumpSink, AStyleIsRecordedOncePerRenderAndAnEmptyOrGradientStrokeIsSpelledAsDefined) {
+  Scene s;
+  GSHSCENE_Stroke_Style st;
+  gshscene_stroke_style_init(&st);
+  st.join = GSHSCENE_STROKE_JOIN_ROUND;
+  const double dashes[2] = {0.0, 2.0}; // a zero dash among others is kept, its bits all zero digits
+  st.dash_count = 2;
+  st.dashes = dashes;
+  const GSHSCENE_Resource * style = nullptr;
+  ASSERT_EQ(gshscene_store_intern_stroke_style(s.store, &st, &style), GSHSCENE_OK);
+  s.held.push_back(style);
+  GSHGEOM_Path * nothing = nullptr;
+  ASSERT_EQ(gshgeom_path_create(nullptr, nullptr, 2, &nothing), GSHGEOM_OK);
+  const GSHSCENE_Resource * empty = nullptr;
+  ASSERT_EQ(gshscene_store_intern_path(s.store, nothing, &empty), GSHSCENE_OK);
+  gshgeom_path_destroy(nothing);
+  s.held.push_back(empty);
+  GSHSCENE_Gradient g{};
+  g.kind = GSHSCENE_GRADIENT_LINEAR;
+  g.p1[0] = 10.0;
+  gshgeom_map_identity(2, &g.map);
+  GSHSCENE_Gradient_Stop stops[2] = {{0.0, solid(1, 0, 0)}, {1.0, solid(0, 0, 1)}};
+  g.stops = stops;
+  g.stop_count = 2;
+  const GSHSCENE_Resource * gradient = nullptr;
+  ASSERT_EQ(gshscene_store_intern_gradient(s.store, &g, &gradient), GSHSCENE_OK);
+  s.held.push_back(gradient);
+  GSHSCENE_List * l = s.open();
+  GSHSCENE_Paint red = solid(1, 0, 0);
+  GSHSCENE_Paint shaded{};
+  shaded.kind = GSHSCENE_PAINT_GRADIENT;
+  shaded.gradient = gradient;
+  shaded.rgba[3] = 1.0;
+  ASSERT_EQ(gshscene_list_stroke(l, s.sq(2, 2, 6), style, nullptr, &red, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_stroke(l, s.sq(12, 2, 6), style, nullptr, &shaded, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_stroke(l, empty, style, nullptr, &red, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  SinkRef sink(make_full(nullptr, nullptr));
+  auto stream = make_stream(GSHSCENE_UNIT_PIXEL);
+  ReportRef report;
+  ASSERT_EQ(render_job(sink.sink, request_for(l, *stream, report.report)).result, GSHSCENE_OK);
+  const std::string & out = stream->bytes;
+  auto count = [&](const std::string & what) {
+    size_t n = 0;
+    for (size_t at = out.find(what); at != std::string::npos; at = out.find(what, at + 1)) {
+      n++;
+    }
+    return n;
+  };
+  EXPECT_EQ(count("\nQ "), 1u) << "one style, three strokes: one record (S20)\n" << out;
+  EXPECT_EQ(count(" K res="), 3u) << out;
+  EXPECT_EQ(count(" grad=" + std::to_string(gshscene_resource_id(gradient)) + " box="), 1u) << out;
+  EXPECT_EQ(count("\nR " + std::to_string(gshscene_resource_id(gradient)) + " "), 1u) << "the gradient's record" << out;
+  EXPECT_EQ(count(" box=- expand=0 outline=-\n"), 1u) << "an empty centerline has an empty box" << out;
+  EXPECT_EQ(count("\nd 0000000000000000\nd 4000000000000000\n"), 1u) << "the dashes in sixteen digits" << out;
 }
 
 TEST(DumpSink, AGlyphPastTheScratchIsRefusedAsTheSinksOwnLimit) {

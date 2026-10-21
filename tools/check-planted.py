@@ -397,6 +397,56 @@ changes no result, cannot be seen by any test:
                the foreground it does not read (stores the ``memset`` made or
                nothing reads), truncation's reset of ``nonflat`` (bookkeeping,
                as for ``list_clear``) and a tie of picture depths
+
+  sk1- to sk13-, s20-, rule-S20-, ds-s20-, and the bk- plants (strokes story S1)
+               the stroke at the waist: the style's pinned values and bounds
+               (stroke.h, list.h, version.h, resource.h, report.h, sink.h), its
+               canonical form field by field (SK3: the sign of zero, an odd array
+               doubled, a negative or all-zero array made solid, each field that
+               does not apply reset), SK2's order (validity, then the profile,
+               then the bounds), the hash's format, kind and order and the bytes
+               per dash, SK5's pixel sizes, SK10's reach factor by factor (the
+               miter, the miter-clip and arcs ``L + 1``, the square cap's 3/2,
+               the half width, alignment's doubling, the pixel of a device width,
+               the outward rounding and its upward step), SK9's order and each map
+               of its chain, SK11's tables and anisotropy test (the reflection,
+               the target, the instances, a degenerate subpath under a butt cap),
+               S20 in the planning pass (the expand flag, the native bits, the
+               chain, the detail and its reason, a stroke's paint checked as a
+               fill's, the notice, the caps' validation) and in the test sink
+               (what it expands, a style recorded once per render, its default
+               caps, the notice, the unit).  ``GSHSCENE_STROKE_DASHES_MAX`` has
+               no plant: SK3 doubles every odd array, so a canonical count is
+               even and 65535 decides exactly what 65534 would.  The story's
+               lines were swept on its tree in ghoti-build:gcc16 (2026-10-21):
+               src/resource/stroke.c whole (``bk-``, new in tools/gen-scene-plants.py)
+               and the lines it changed of list.c, resource.c, node.c, version.c,
+               diff.c, emit.c, gradient.c, sink.c, dump_sink.c and report.c, 596
+               candidates: 101 do not compile, 438 are caught (added to
+               scene-plants.json and sink-plants.json; 44 of them after tests the
+               first sweep showed missing: a run's glyphs as a centerline, a
+               device outset past the largest double, a refusal while drawing
+               under strict and in the record, an extent passed in one direction,
+               a style recorded once, an empty and a gradient stroke's records,
+               a zero dash's digits, and SK11's composed map, now zeroed before it
+               is formed so that a map not written reads as no map rather than as
+               the stack), and the 57 survivors are of the kinds above:
+               stores the ``memset`` before them made (SK1's defaults that are
+               zero, the canonical form's resets, the boxes), ties (``<`` against
+               ``<=`` in a minimum, a maximum, the square cap's 3/2 and the
+               element limit at 65535), the returned kind of a centerline that
+               has no box (``UNSUPPORTED`` against ``INVALID``: every caller makes
+               either unbounded), a dump's ``< 0`` against ``<= 0``, hex widths of
+               values with no leading zero digit (a recorded style's width and
+               miter limit are at least 2^-64 and 1, a hash), a loop bound one
+               past the canonical dashes (ASan's), ``-0`` against ``0`` in an
+               absolute value, a node's style release deleted (a leak), ``&&``
+               against ``||`` where the other operand decides alike (a painted
+               item's gradient, which canonical paint leaves NULL, and
+               ``paint_gradient``'s, which the compiler folds), a leaf's skip
+               reason, and the test sink's stroke count for its styles array,
+               which precedes the glyph scratch that no stroke test fills to its
+               end
 """
 
 import concurrent.futures
@@ -2072,6 +2122,95 @@ PLANTS += [
     ('gorc-n1-matrix', 'orc', GO, '        lin = [sat(v) for v in solve3(mb, xyz)]', '        lin = solve3(mb, xyz)', ['gselftest', 'gvectors']),
     ('gorc-n1-encode', 'orc', GO, '        out.append(sat(v))', '        out.append(v)', ['gselftest', 'gvectors']),
     ('gorc-n1-g4', 'orc', GO, '[sat(vals[0] / a), sat(vals[1] / a), sat(vals[2] / a), a]', '[vals[0] / a, vals[1] / a, vals[2] / a, a]', ['gselftest', 'gvectors']),
+]
+
+# Strokes story S1: the stroke style (SK1 to SK3, SK12), the item and node (SK4, SK13), the bounds (SK5, SK10),
+# what draws nothing (SK8, SK9), the features required and the plan's refusal (SK11, S20), and the test sink's
+# records.  src/resource/stroke.c is also mutated one by one by the generator (``bk-``, tools/scene-plants.json).
+SKC = "src/resource/stroke.c"
+HSK = "include/ghoti.io/shape-scene/stroke.h"
+HVS = "include/ghoti.io/shape-scene/version.h"
+K = ["testStroke"]
+KD = ["testStroke", "testDiff"]
+KS = ["testStroke", "testDump_sink", "testSink"]
+PLANTS += [
+    # the pinned values and constants (stroke.h, list.h, version.h, resource.h, report.h, sink.h)
+    ('sk1-h-value-min', 'hdr', HSK, '#define GSHSCENE_STROKE_VALUE_MIN 0x1p-64', '#define GSHSCENE_STROKE_VALUE_MIN 0x1p-63', K),
+    ('sk1-h-value-max', 'hdr', HSK, '#define GSHSCENE_STROKE_VALUE_MAX 0x1p64', '#define GSHSCENE_STROKE_VALUE_MAX 0x1p63', K),
+    ('sk1-h-miter-max', 'hdr', HSK, '#define GSHSCENE_STROKE_MITER_LIMIT_MAX 0x1p16', '#define GSHSCENE_STROKE_MITER_LIMIT_MAX 0x1p15', K),
+    ('sk1-h-miter-default', 'hdr', HSK, '#define GSHSCENE_STROKE_MITER_LIMIT_DEFAULT 4.0', '#define GSHSCENE_STROKE_MITER_LIMIT_DEFAULT 10.0', K),
+    ('sk1-h-join-arcs', 'hdr', HSK, '  GSHSCENE_STROKE_JOIN_ARCS = 4,', '  GSHSCENE_STROKE_JOIN_ARCS = 5,', K),
+    ('sk1-h-cap-square', 'hdr', HSK, '  GSHSCENE_STROKE_CAP_SQUARE = 2,', '  GSHSCENE_STROKE_CAP_SQUARE = 3,', K),
+    ('sk1-h-width-device', 'hdr', HSK, '  GSHSCENE_STROKE_WIDTH_DEVICE = 1,', '  GSHSCENE_STROKE_WIDTH_DEVICE = 2,', K),
+    ('sk1-h-degenerate-omit', 'hdr', HSK, '  GSHSCENE_STROKE_DEGENERATE_OMIT = 1,', '  GSHSCENE_STROKE_DEGENERATE_OMIT = 2,', K),
+    ('sk1-h-dash-path', 'hdr', HSK, '  GSHSCENE_STROKE_DASH_PATH = 1,', '  GSHSCENE_STROKE_DASH_PATH = 2,', K),
+    ('sk1-h-align-outside', 'hdr', HSK, '  GSHSCENE_STROKE_ALIGN_OUTSIDE = 2,', '  GSHSCENE_STROKE_ALIGN_OUTSIDE = 3,', K),
+    ('sk11-h-native-round', 'hdr', HSK, '#define GSHSCENE_STROKE_NATIVE_JOIN_ROUND (UINT32_C(1) << 1)', '#define GSHSCENE_STROKE_NATIVE_JOIN_ROUND (UINT32_C(1) << 2)', K),
+    ('sk11-h-native-anisotropic', 'hdr', HSK, '#define GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL_ANISOTROPIC (UINT32_C(1) << 9)', '#define GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL_ANISOTROPIC (UINT32_C(1) << 8)', K),
+    ('sk11-h-native-degenerate', 'hdr', HSK, '#define GSHSCENE_STROKE_NATIVE_DEGENERATE_DRAW (UINT32_C(1) << 15)', '#define GSHSCENE_STROKE_NATIVE_DEGENERATE_DRAW (UINT32_C(1) << 14)', K),
+    ('sk11-h-native-all', 'hdr', HSK, '#define GSHSCENE_STROKE_NATIVE_ALL ((UINT32_C(1) << 16) - 1)', '#define GSHSCENE_STROKE_NATIVE_ALL ((UINT32_C(1) << 15) - 1)', ["testDump_sink", "testSink", "testStroke"]),
+    ('sk4-h-item-kind', 'hdr', HL, '  GSHSCENE_ITEM_STROKE = 7,', '  GSHSCENE_ITEM_STROKE = 8,', ["testStroke", "testList"]),
+    ('sk13-h-node-kind', 'hdr', HVS, '  GSHSCENE_NODE_STROKE = 4,', '  GSHSCENE_NODE_STROKE = 5,', ["testStroke", "testNode"]),
+    ('sk1-h-resource-kind', 'hdr', HR, '  GSHSCENE_RESOURCE_STROKE_STYLE = 8,', '  GSHSCENE_RESOURCE_STROKE_STYLE = 9,', ["testStroke", "testResource"]),
+    ('sk12-h-bytes-per-dash', 'hdr', HR, '#define GSHSCENE_BYTES_PER_DASH ((size_t)16)', '#define GSHSCENE_BYTES_PER_DASH ((size_t)8)', ["testStroke", "testBytes"]),
+    ('sk11-h-reasons-exchanged', 'hdr', HRP, '  GSHSCENE_REASON_STROKE_STYLE = 28,    ///< Refused, per stroke: a feature of its style the sink neither emits nor expands; `second` names the missing ones (stroke.h, SK11).\n  GSHSCENE_REASON_STROKE_ZERO_WIDTH = 29, ///< Notice, per stroke: its width is 0, so it draws nothing (stroke.h, SK8).', '  GSHSCENE_REASON_STROKE_ZERO_WIDTH = 28, ///< Notice, per stroke: its width is 0, so it draws nothing (stroke.h, SK8).\n  GSHSCENE_REASON_STROKE_STYLE = 29,    ///< Refused, per stroke: a feature of its style the sink neither emits nor expands; `second` names the missing ones (stroke.h, SK11).', ["testReport", "testStroke"]),
+    ('s20-h-cap-expand', 'hdr', HS, '#define GSHSCENE_CAP_STROKE_EXPAND (UINT32_C(1) << 12)', '#define GSHSCENE_CAP_STROKE_EXPAND (UINT32_C(1) << 11)', ["testSink", "testStroke"]),
+    ('s20-h-cap-flags-all', 'hdr', HS, '#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 13) - 1)', '#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 12) - 1)', ["testDump_sink", "testSink", "testStroke"]),
+    # SK1 to SK3 in the library: the format, the canonical form, the hash's order
+    ('sk12-format', 'src', SKC, '#define STROKE_FORMAT_VERSION 1u', '#define STROKE_FORMAT_VERSION 2u', K),
+    ('sk3-zero-sign', 'src', SKC, '  return x == 0.0 ? 0.0 : x;', '  return x;', K),
+    ('sk3-odd-not-doubled', 'src', SKC, '  return in->dash_count % 2u ? gshscene_sat_mul(in->dash_count, 2u) : in->dash_count;', '  return in->dash_count;', K),
+    ('sk3-miter-kept', 'src', SKC, '  out->miter_limit = join_reads_miter(in->join) ? in->miter_limit : GSHSCENE_STROKE_MITER_LIMIT_DEFAULT;', '  out->miter_limit = in->miter_limit;', K),
+    ('sk3-rule-kept', 'src', SKC, '  out->alignment_rule = in->alignment == (uint32_t)GSHSCENE_STROKE_ALIGN_CENTER ? GSHGEOM_FILL_NONZERO : in->alignment_rule;', '  out->alignment_rule = in->alignment_rule;', K),
+    ('sk3-offset-kept', 'src', SKC, '    out->dash_offset = 0.0;\n    out->dash_scope = GSHSCENE_STROKE_DASH_PER_SUBPATH;', '    out->dash_offset = canonical_zero(in->dash_offset);\n    out->dash_scope = in->dash_scope;', K),
+    ('sk3-negative-kept', 'src', SKC, '    if (in->dashes[i] < 0.0) {\n      return 0; /* a negative length: solid */\n    }', '', K),
+    ('sk3-zeros-kept', 'src', SKC, '  if (!any) {\n    return 0; /* none, or every length zero: solid */\n  }', '', K),
+    ('sk2-bounds-on-canonical', 'src', SKC, '  if (!bounded(style) || count > most) {', '  if (count > most) {', K),
+    ('sk2-limit-elements', 'src', SKC, '  size_t most = store->limits.max_resource_elements < GSHSCENE_STROKE_DASHES_MAX ? store->limits.max_resource_elements\n                                                                                 : GSHSCENE_STROKE_DASHES_MAX;', '  size_t most = GSHSCENE_STROKE_DASHES_MAX;', K),
+    ('sk2-profile-accepted', 'src', SKC, '    return GSHSCENE_ERR_UNSUPPORTED; /* D8: reserved until a profile is defined */', '    return GSHSCENE_OK; /* D8: reserved until a profile is defined */', K),
+    ('sk2-profile-first', 'src', SKC, '  if (in->width < 0.0) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  if (in->width_profile) {', '  if (in->width_profile) {\n    return GSHSCENE_ERR_UNSUPPORTED;\n  }\n  if (in->width < 0.0) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  if (in->width_profile) {', K),
+    ('sk12-hash-order', 'src', SKC, '  gshgeom_hash_u8(&h, (uint8_t)s->cap);\n  gshgeom_hash_u8(&h, (uint8_t)s->degenerate);', '  gshgeom_hash_u8(&h, (uint8_t)s->degenerate);\n  gshgeom_hash_u8(&h, (uint8_t)s->cap);', K),
+    ('sk12-hash-kind', 'src', SKC, '  gshgeom_hash_u32(&h, (uint32_t)GSHSCENE_RESOURCE_STROKE_STYLE);', '  gshgeom_hash_u32(&h, (uint32_t)GSHSCENE_RESOURCE_GRADIENT);', K),
+    ('sk12-bytes-per-dash', 'src', SKC, 'gshscene_sat_mul(count, GSHSCENE_BYTES_PER_DASH)', 'gshscene_sat_mul(count, GSHSCENE_BYTES_PER_DASH / 2)', ["testStroke", "testBytes"]),
+    # SK5 and SK10: the pixel sizes and the reach
+    ('sk5-millimetre', 'src', SKC, '      return 25.4 / 96.0;', '      return 25.4 / 72.0;', KS),
+    ('sk5-point', 'src', SKC, '      return 72.0 / 96.0;', '      return 72.0 / 72.0;', KS),
+    ('sk5-inch', 'src', SKC, '      return 1.0 / 96.0;', '      return 1.0 / 72.0;', KS),
+    ('sk10-miter-clip-plus-one', 'src', SKC, '    f = s->miter_limit + 1.0;', '    f = s->miter_limit;', KD),
+    ('sk10-miter', 'src', SKC, '    f = s->miter_limit; /* the miter', '    f = 1.0; /* the miter', KD),
+    ('sk10-square-cap', 'src', SKC, '    f = 1.5; /* a square cap', '    f = 1.0; /* a square cap', KD),
+    ('sk10-half-width', 'src', SKC, '  return (s->width * 0.5) * f * a * pixel * STROKE_ROUND_UP;', '  return (s->width * 0.25) * f * a * pixel * STROKE_ROUND_UP;', KD),
+    ('sk10-alignment-doubled', 'src', SKC, ' ? 1.0 : 2.0;\n  return (s->width', ' ? 1.0 : 1.0;\n  return (s->width', KD),
+    ('sk10-pixel', 'src', SKC, '  return (s->width * 0.5) * f * a * pixel * STROKE_ROUND_UP;', '  return (s->width * 0.5) * f * a * (pixel > 0.0 ? 1.0 : 0.0) * STROKE_ROUND_UP;', KS),
+    ('sk10-round-up', 'src', SKC, '#define STROKE_ROUND_UP (1.0 + 0x1p-50)', '#define STROKE_ROUND_UP (1.0 - 0x1p-50)', KD),
+    ('sk10-add-up-nearest', 'src', SKC, '  return e > 0.0 ? next_up(s) : s;', '  return e > 0.0 ? s : s;', KD),
+    ('sk10-next-up-sign', 'src', SKC, '  bits = x > 0.0 ? bits + 1u : bits - 1u;', '  bits = bits + 1u;', KD),
+    ('sk10-device-before-map', 'src', SKC, '  if (!device) {\n    /* Local', '  if (1) {\n    /* Local', KS),
+    # SK8, SK9, SK11: the notice's order and the features
+    ('sk9-notice-order', 'src', SKC, '  if (not_invertible) {\n    return GSHSCENE_REASON_MAP_NOT_INVERTIBLE;\n  }\n  if (item->style->u.stroke.s.width == 0.0) {\n    return GSHSCENE_REASON_STROKE_ZERO_WIDTH; /* SK8 */\n  }', '  if (item->style->u.stroke.s.width == 0.0) {\n    return GSHSCENE_REASON_STROKE_ZERO_WIDTH; /* SK8 */\n  }\n  if (not_invertible) {\n    return GSHSCENE_REASON_MAP_NOT_INVERTIBLE;\n  }', K),
+    ('sk9-notice-gradient-map', 'src', SKC, '      (gradient && gshscene_map_singular(&gradient->u.gradient.g.map));', '      0;', K),
+    ('sk9-notice-instances', 'src', SKC, '    not_invertible = gshscene_map_singular(&instance_maps[i]);', '    (void)instance_maps;', K),
+    ('sk11-joins-swapped', 'src', SKC, '{GSHSCENE_STROKE_NATIVE_JOIN_MITER,\n      GSHSCENE_STROKE_NATIVE_JOIN_ROUND,', '{GSHSCENE_STROKE_NATIVE_JOIN_ROUND,\n      GSHSCENE_STROKE_NATIVE_JOIN_MITER,', K),
+    ('sk11-caps-swapped', 'src', SKC, '{GSHSCENE_STROKE_NATIVE_CAP_BUTT,\n      GSHSCENE_STROKE_NATIVE_CAP_ROUND,', '{GSHSCENE_STROKE_NATIVE_CAP_ROUND,\n      GSHSCENE_STROKE_NATIVE_CAP_BUTT,', K),
+    ('sk11-reflection-anisotropic', 'src', SKC, '  return (a == d && b == -c) || (a == -d && b == c);', '  return a == d && b == -c;', K),
+    ('sk11-target-ignored', 'src', SKC, '  if (r == GSHGEOM_OK && target_map && target_map->dim != 0) {', '  if (0) {', K),
+    ('sk11-instances-ignored', 'src', SKC, '  GSHGEOM_Map acc = instance_count ? instance_maps[0] : *item_map;', '  GSHGEOM_Map acc = *item_map;\n  instance_count = 0;', K),
+    ('sk11-degenerate-butt', 'src', SKC, ' && s->cap != (uint32_t)GSHSCENE_STROKE_CAP_BUTT) {', ') {', K),
+    # S20 in the planning pass and the test sink
+    ('rule-S20-expand-ignored', 'src', SK, '  if (item->kind == GSHSCENE_ITEM_STROKE && !(caps->flags & GSHSCENE_CAP_STROKE_EXPAND)) {', '  if (item->kind == GSHSCENE_ITEM_STROKE) {', KS),
+    ('rule-S20-native-ignored', 'src', SK, '        gshscene_stroke_required(item, instance_maps, instance_count, target_map) & ~caps->stroke_native;', '        gshscene_stroke_required(item, instance_maps, instance_count, target_map);', KS),
+    ('rule-S20-no-chain', 'src', SK, '        gshscene_stroke_required(item, instance_maps, instance_count, target_map) & ~caps->stroke_native;', '        gshscene_stroke_required(item, instance_maps, instance_count & 0u, target_map) & ~caps->stroke_native;', KS),
+    ('rule-S20-missing-unnamed', 'src', SK, '      d.detail = missing;', '      d.detail = 1;', KS),
+    ('rule-S20-reason', 'src', SK, '      d.reason = GSHSCENE_REASON_STROKE_STYLE;', '      d.reason = GSHSCENE_REASON_ITEM_KIND;', KS),
+    ('rule-S20-paint-unchecked', 'src', SK, '  int painted = item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE;', '  int painted = item->kind == GSHSCENE_ITEM_FILL;', KS + ["testGradient", "testPalette"]),
+    ('rule-S20-notice-as-gradient', 'src', SK, '    GSHSCENE_Reason notice = item->kind == GSHSCENE_ITEM_STROKE\n', '    GSHSCENE_Reason notice = 0\n', KS),
+    ('rule-S20-detail-dropped', 'src', SK, 'chain, count, (size_t)d.detail, 0.0);', 'chain, count, 0, 0.0);', KS),
+    ('rule-S20-caps-unchecked', 'src', SK, ' || (c.stroke_native & ~GSHSCENE_STROKE_NATIVE_ALL)', '', ["testSink", "testStroke"]),
+    ('ds-s20-expand-all', 'src', DS, '      gshscene_stroke_required(item, run->maps, count - 1, &run->job->target.map) & ~run->job->caps.stroke_native;', '      gshscene_stroke_required(item, run->maps, count - 1, &run->job->target.map);', ["testDump_sink"]),
+    ('ds-s20-style-every-time', 'src', DS, '    if (run->styles[i] == id) {\n      return GSHSCENE_OK;', '    if (0 && run->styles[i] == id) {\n      return GSHSCENE_OK;', ["testDump_sink"]),
+    ('ds-s20-native-default', 'src', DS, '  caps->stroke_native = GSHSCENE_STROKE_NATIVE_ALL; /* every stroke feature', '  caps->stroke_native = 0; /* every stroke feature', ["testDump_sink", "testStroke"]),
+    ('ds-s20-no-notice', 'src', DS, '  GSHSCENE_Reason notice = gshscene_stroke_notice(item, run->maps, count - 1, &run->job->target.map);', '  GSHSCENE_Reason notice = (GSHSCENE_Reason)0;', ["testDump_sink"]),
+    ('ds-s20-unit', 'src', DS, '&map, run->job->target.unit, &b) != GSHSCENE_OK;', '&map, GSHSCENE_UNIT_PIXEL, &b) != GSHSCENE_OK;', ["testDump_sink"]),
 ]
 
 # The generated plants (tools/gen-scene-plants.py): the mutations of src/scene

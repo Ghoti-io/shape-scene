@@ -581,6 +581,7 @@ uint32_t gshscene_stroke_required(const GSHSCENE_Item * item, const GSHGEOM_Map 
   } else {
     need |= GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL;
     GSHGEOM_Map composed;
+    memset(&composed, 0, sizeof composed); /* read only once compose_item has written it */
     if (compose_item(instance_maps, instance_count, &item->map, target_map, &composed) != GSHGEOM_OK ||
         !similarity(&composed)) {
       need |= GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL_ANISOTROPIC; /* an elliptical pen, or a map that cannot be formed */

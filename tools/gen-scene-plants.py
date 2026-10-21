@@ -24,7 +24,8 @@ edit that moves a line means regenerating and re-running the sweep:
   python3 tools/gen-scene-plants.py > /tmp/candidates.json
   PLANT_EXTRA_JSON=/tmp/candidates.json make check-planted PREFIX=...
 
-then keep the lines the sweep reports as ok.
+then keep the lines the sweep reports as ok.  (Strokes story S1 added src/resource/stroke.c, its tag ``bk``, and
+the stroke lines of list.c and resource.c to the filters.)
 
 With --sink it writes the candidates of the sink contract's sources (story 13a, src/sink; and story 14a's
 src/glyph) instead, for tools/sink-plants.json:
@@ -50,10 +51,11 @@ FILES = {
     "src/list/fixed.c": "lf",
     "src/resource/gradient.c": "bg",
     "src/paint/convert.c": "bv",
+    "src/resource/stroke.c": "bk",
 }
 LINE_FILTER = {
     "src/store/store.c": r"bytes|fits\(",
-    "src/resource/resource.c": r"BYTES|bytes|sat_|palette|rgba|colors|PALETTE|gradient|GRADIENT",
+    "src/resource/resource.c": r"BYTES|bytes|sat_|palette|rgba|colors|PALETTE|gradient|GRADIENT|stroke|STROKE",
     "src/list/list.c": r"max_bytes|max_nodes|max_node_depth|NODE_DEPTH_CEILING|gshscene_list_canonical|gshscene_list_check_rule|return canonical_|return check_rule"
     # story 12: the order, the ties, the foreground, the composite helpers and the new equality
     r"|unit|frame|scratch|\btie|ties|nonflat|composite|foreground|context|space_equal|color_equal|open_n|out_n|prev_pos|closing|match\["
@@ -64,7 +66,9 @@ LINE_FILTER = {
     # color-paint story P3: the blend modes' names and PDF's group fields, their references, hash and dump
     r"|soft_mask|isolation|knockout|ISOLATION|pdf_default|group_hash_composite|group_dump_pdf|item_release"
     r"|item_picture_depth|picture_depth|0x80u|SCREEN|OVERLAY|DARKEN|LIGHTEN|DODGE|BURN|LIGHT|DIFFERENCE|EXCLUSION"
-    r"|MULTIPLY|HUE|SATURATION|COLOR:|LUMINOSITY|\"(screen|overlay|darken|lighten|color|hard|soft|difference|exclusion|multiply|hue|saturation|luminosity)",
+    r"|MULTIPLY|HUE|SATURATION|COLOR:|LUMINOSITY|\"(screen|overlay|darken|lighten|color|hard|soft|difference|exclusion|multiply|hue|saturation|luminosity)"
+    # strokes story S1: the stroke item, its style, centerline and paint helpers, hash and dump
+    r"|stroke|STROKE|style|centerline|paint_hash|dump_paint",
     "src/core/core.c": r"max_bytes|max_nodes|max_node_depth|REFUSED|refused",
 }
 EXTRA = {
@@ -75,20 +79,22 @@ EXTRA = {
 }
 TESTS_EXTRA = ["testBytes", "testCore", "testStore", "testScene_limits", "testOrder", "testList", "testColor", "testDump",
                "testComposite", "testPaint_scene", "testEmit", "testPalette", "testGradient", "testColor_bound",
-               "testGroup_fields"]
+               "testGroup_fields", "testStroke"]
 TESTS_BY_FILE = {
     "src/paint/color_space.c": ["testColor", "testColor_bound", "testList", "testNode", "testPaint_scene", "testScene_dump"],
-    "src/scene/node.c": ["testNode", "testEdit", "testScene", "testScene_dump", "testVersion", "testPaint_scene", "testOrder", "testEmit", "testPalette", "testGradient", "testGroup_fields"],
+    "src/scene/node.c": ["testNode", "testEdit", "testScene", "testScene_dump", "testVersion", "testPaint_scene", "testOrder", "testEmit", "testPalette", "testGradient", "testGroup_fields", "testStroke"],
     "src/scene/edit.c": ["testEdit", "testScene", "testNode", "testPaint_scene", "fuzz-replay", "testPalette"],
     "src/scene/scene.c": ["testScene", "testEdit", "testScene_limits", "testDiff", "testEmit", "testPaint_scene", "fuzz-replay", "testPalette"],
-    "src/scene/version.c": ["testVersion", "testScene_dump", "testScene", "testEmit", "testDiff", "testPaint_scene", "testOrder", "testPalette", "testGradient", "testGroup_fields"],
-    "src/scene/walk.c": ["testVersion", "testEmit", "testDiff", "testScene_limits", "testOrder"],
-    "src/scene/validate.c": ["testScene", "testScene_limits", "testEdit", "testPaint_scene", "fuzz-replay", "testGroup_fields"],
-    "src/scene/emit.c": ["testEmit", "testScene_limits", "testVersion", "testDiff", "testOrder", "testPaint_scene", "testPalette", "testGroup_fields"],
-    "src/scene/diff.c": ["testDiff", "testScene", "testVersion", "testPaint_scene", "testGlyph", "testPalette", "testGradient", "testGroup_fields"],
+    "src/scene/version.c": ["testVersion", "testScene_dump", "testScene", "testEmit", "testDiff", "testPaint_scene", "testOrder", "testPalette", "testGradient", "testGroup_fields", "testStroke"],
+    "src/scene/walk.c": ["testVersion", "testEmit", "testDiff", "testScene_limits", "testOrder", "testStroke"],
+    "src/scene/validate.c": ["testScene", "testScene_limits", "testEdit", "testPaint_scene", "fuzz-replay", "testGroup_fields", "testStroke"],
+    "src/scene/emit.c": ["testEmit", "testScene_limits", "testVersion", "testDiff", "testOrder", "testPaint_scene", "testPalette", "testGroup_fields", "testStroke"],
+    "src/scene/diff.c": ["testDiff", "testScene", "testVersion", "testPaint_scene", "testGlyph", "testPalette", "testGradient", "testGroup_fields", "testStroke"],
     "src/list/fixed.c": ["testPalette", "testGradient", "fuzz-replay"],
-    "src/resource/gradient.c": ["testGradient", "testColor_bound", "testDump", "testDump_sink", "fuzz-replay", "fuzz-render", "probe"],
+    "src/resource/gradient.c": ["testGradient", "testColor_bound", "testDump", "testDump_sink", "fuzz-replay", "fuzz-render", "probe", "testStroke"],
     "src/paint/convert.c": ["testGradient", "testColor_bound", "probe"],
+    "src/resource/stroke.c": ["testStroke", "testDiff", "testDump", "testDump_sink", "testResource", "testSink",
+                              "fuzz-replay", "fuzz-render", "probe"],
 }
 
 SINK_FILES = {
@@ -99,7 +105,7 @@ SINK_FILES = {
     "src/glyph/glyph.c": "gl",
 }
 SINK_TESTS = ["testDump_sink", "testSink", "testReport", "testGlyph", "testPalette", "testGradient", "testGroup_fields",
-              "fuzz-render", "probe"]
+              "testStroke", "fuzz-render", "probe"]
 
 REL = [("==", "!="), ("!=", "=="), ("<=", "<"), (">=", ">"), ("<", "<="), (">", ">=")]
 
@@ -247,7 +253,8 @@ def candidates(path):
 
 
 STRING_FILES = {"src/scene/version.c", "src/scene/validate.c", "src/scene/node.c", "src/list/list.c",
-                "src/sink/report.c", "src/sink/dump_sink.c", "src/sink/sink.c", "src/resource/gradient.c"}
+                "src/sink/report.c", "src/sink/dump_sink.c", "src/sink/sink.c", "src/resource/gradient.c",
+                "src/resource/stroke.c"}
 
 
 def main():
