@@ -265,6 +265,14 @@ void gshscene_stroke_free(GSHSCENE_Resource * resource);
 /** The payload of a stroke style's dump (resource.h, SK12); negative on failure. */
 int gshscene_stroke_dump(const GSHSCENE_Resource * resource, FILE * out);
 
+/**
+ * SK10: the box of a centerline (a path or a glyph run) in its model space: a path's bounds; a run's glyphs placed,
+ * each outline's bounds moved by the glyph's position, or (from a font, SK7's general route) each glyph's design box
+ * under its glyph map.  ::GSHSCENE_ERR_UNSUPPORTED when it cannot be had (a 3D path, an unbound face, a map past its
+ * bounds): the bound is unknown.
+ */
+GSHSCENE_Result gshscene_centerline_box(const GSHSCENE_Resource * resource, GSHGEOM_Bounds * out);
+
 /* --- convert.c -------------------------------------------------------------- */
 
 /** N2, N3: a straight color from space @p from to space @p to, both concrete (not zero); exact when they are equal. */
@@ -313,6 +321,11 @@ int gshscene_color_equal(const GSHSCENE_Color * a, const GSHSCENE_Color * b);
 /** A space, then a color, in the spelling of paint.h's N-text (hash.h's primitives): u8 primaries, u8 transfer, f64 gamma; four f64 and a space. */
 void gshscene_space_hash(GSHGEOM_Hash * h, const GSHSCENE_Color_Space * space);
 void gshscene_color_hash(GSHGEOM_Hash * h, const GSHSCENE_Color * color);
+/** SK4: whether a path or glyph run is not planar (a 3D path, or a run whose outline is one). */
+int gshscene_centerline_3d(const GSHSCENE_Resource * resource);
+
+/** A paint as a fill spells it in a hash (list.h): `u8` kind, four `f64`, a space, `u32` entry, `u64` the gradient's hash. */
+void gshscene_paint_hash(GSHGEOM_Hash * h, const GSHSCENE_Paint * paint);
 /** A space as `P:T:G` in a dump (the gamma as 16 hexadecimal digits); the result of fprintf. */
 int gshscene_space_dump(FILE * out, const GSHSCENE_Color_Space * space);
 

@@ -37,6 +37,7 @@
  * | ::GSHSCENE_ITEM_GROUP_PUSH | | | | | opacity, blend space, composite, ordering, isolation, knockout, soft mask, layer, depth |
  * | ::GSHSCENE_ITEM_GROUP_POP | | | | | |
  * | ::GSHSCENE_ITEM_INSTANCE | picture | placement | | | layer, depth |
+ * | ::GSHSCENE_ITEM_STROKE | path or glyph run (the centerline) | placement | | yes | style, layer, depth |
  *
  * The **map** places the resource's own coordinates (the model space of its
  * path) in the space of the list; the sink composes the maps of the enclosing
@@ -46,6 +47,9 @@
  * nest, and an **instance** draws the items of a picture under its map, in order,
  * as if the picture's items stood in the list at that place (a picture's own
  * pushes are balanced, so it leaves the clip and group stacks as it found them).
+ * A **stroke** draws the region its centerline covers under its style (a stroke
+ * style resource, stroke.h, SK1 to SK14) with its paint, as a fill draws its
+ * shape (SK5).
  * `layer` is the declared layer of AD-10, an `int32`, and `depth` its declared
  * distance from the viewer, a finite `double` (`-0` is stored as `+0`); they
  * order units in a group that says so (N11).
@@ -85,13 +89,14 @@
  * uses an entry of the list's palette (::gshscene_list_set_palette), and one
  * whose entry is missing is refused.  **G1 to G13** (paint.h): a
  * ::GSHSCENE_PAINT_GRADIENT fill takes its color at each point from a gradient
- * resource.  **N11, N12**: the order is made by
+ * resource.  **SK5**: a stroke is N7 with the region its centerline covers under its
+ * style (stroke.h) in place of the shape.  **N11, N12**: the order is made by
  * ::gshscene_list_close, as below.
  *
  * ### Order and ties (N11, N12)
  *
  * A **sequence** is the items directly inside the root, a group or a clip
- * block; its **units** are its fills, instances, group blocks and clip blocks
+ * block; its **units** are its fills, strokes, instances, group blocks and clip blocks
  * (push to matching pop); a unit's key is the layer and depth of its first item.
  * The context of a sequence is the ordering of the group that encloses it (the
  * root's is flat; a clip block has the context of the sequence it is in):
@@ -135,6 +140,10 @@
  *   the soft mask's content hash (0 for none); a default group's spelling is
  *   the one above, so its hash is what it was before the fields existed.
  * - **instance**: `u64` resource hash, `u64` map hash, `i32` layer, `f64` depth.
+ * - **stroke** (SK12): `u64` the centerline's content hash, `u64` the style's
+ *   content hash, `u64` the map's hash, the paint as a fill spells it (`u8` kind,
+ *   four `f64`, a space, `u32` entry, `u64` the gradient's content hash), `i32`
+ *   layer, `f64` depth.
  * - **clip pop**, **group pop**: nothing.
  *
  * A **space** is `u8` primaries, `u8` transfer, `f64` gamma.  Handles, ids, the
@@ -148,7 +157,9 @@
  * `C res=<kind>:<hash> map=<hash> rule=N layer=N depth=<hex>`, `c`,
  * `G opacity=<hex> blend=<space> composite=N order=N layer=N depth=<hex>` (with ` isolation=N knockout=N
  * mask=<hash>` after `order=N` when one of them is not the default, T1), `g`,
- * `I res=<kind>:<hash> map=<hash> layer=N depth=<hex>`, then one line per tie,
+ * `I res=<kind>:<hash> map=<hash> layer=N depth=<hex>`,
+ * `K res=<kind>:<hash> style=<hash> map=<hash> paint=N <r> <g> <b> <a> space=<space> entry=E gradient=<hash> layer=N depth=<hex>`
+ * (a stroke), then one line per tie,
  * `T first=I second=J depth=<hex> reason=N`, with every `double` as the 16
  * hexadecimal digits of its bit pattern, every hash as 16 digits and a `<space>`
  * as `P:T:<gamma hex>` (primaries and transfer in decimal).
@@ -183,6 +194,7 @@ typedef enum GSHSCENE_Item_Kind {
   GSHSCENE_ITEM_GROUP_PUSH = 4, ///< Begin an opacity group.
   GSHSCENE_ITEM_GROUP_POP = 5,  ///< End the innermost group and composite it.
   GSHSCENE_ITEM_INSTANCE = 6,   ///< Draw a picture under a map.
+  GSHSCENE_ITEM_STROKE = 7,     ///< Stroke a centerline under a map with a style and a paint (stroke.h, SK4).
   GSHSCENE_ITEM_KIND_COUNT      ///< Closes the enum.
 } GSHSCENE_Item_Kind;
 
@@ -286,13 +298,16 @@ typedef struct GSHSCENE_Group {
 /** @brief One entry of a list, as read back. */
 typedef struct GSHSCENE_Item {
   GSHSCENE_Item_Kind kind;           ///< Which item.
-  const GSHSCENE_Resource * resource; ///< Fill, clip push, instance: the resource (the list holds the reference); else NULL.
-  GSHGEOM_Map map;                   ///< Fill, clip push, instance: the placement; else the 2D identity.
+  const GSHSCENE_Resource * resource; ///< Fill, clip push, instance: the resource; stroke: the centerline (the list holds the reference); else NULL.
+  GSHGEOM_Map map;                   ///< Fill, clip push, instance, stroke: the placement; else the 2D identity.
   GSHGEOM_Fill_Rule fill_rule;       ///< Fill, clip push: the rule; else nonzero.
-  GSHSCENE_Paint paint;              ///< Fill: the paint; else solid transparent black.
+  GSHSCENE_Paint paint;              ///< Fill, stroke: the paint; else solid transparent black.
   GSHSCENE_Group group;              ///< Group push: its properties; else zero.
-  int32_t layer;                     ///< Fill, clip push, group push, instance: the declared layer; else 0.
+  int32_t layer;                     ///< Fill, clip push, group push, instance, stroke: the declared layer; else 0.
   double depth;                      ///< The same items: the declared depth, finite; else 0.
+  /** Stroke: the stroke style (stroke.h; the list holds the reference); else NULL.  A stroke's `resource` is its
+   *  centerline, its `fill_rule` nonzero and its `group` zero. */
+  const GSHSCENE_Resource * style;
 } GSHSCENE_Item;
 
 /** @brief What resolved a tie.  The values are pinned (they are dumped). */
@@ -355,6 +370,25 @@ GSHSCENE_API GSHSCENE_Result gshscene_list_reset(GSHSCENE_List * list);
  */
 GSHSCENE_API GSHSCENE_Result gshscene_list_fill(GSHSCENE_List * list, const GSHSCENE_Resource * resource,
     const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, const GSHSCENE_Paint * paint, int32_t layer, double depth);
+
+/**
+ * @brief Record a stroke (stroke.h, SK4): the region @p centerline covers under @p style, placed by @p map, painted
+ *   with @p paint.
+ *
+ * Errors as ::gshscene_list_fill's, and ::GSHSCENE_ERR_UNSUPPORTED for a 3D centerline (a 3D path, or a run whose
+ * outline is one) or a 3D map: a stroke is planar.  The list holds a reference on the centerline, the style and a
+ * gradient paint.
+ *
+ * @param centerline A path or glyph run of the list's store.
+ * @param style A stroke style of the list's store (::gshscene_store_intern_stroke_style).
+ * @param map The placement, or NULL for the 2D identity.
+ * @param paint The paint, as a fill's (solid, foreground, palette or a gradient of the list's store), or NULL for
+ *   opaque black.
+ * @param layer The declared layer.
+ * @param depth The declared depth: finite.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_list_stroke(GSHSCENE_List * list, const GSHSCENE_Resource * centerline,
+    const GSHSCENE_Resource * style, const GSHGEOM_Map * map, const GSHSCENE_Paint * paint, int32_t layer, double depth);
 
 /** @brief Begin a clip: the region of a path or glyph run, under @p map, by @p rule; its layer and depth order it as a unit (N11). */
 GSHSCENE_API GSHSCENE_Result gshscene_list_clip_push(GSHSCENE_List * list,
@@ -460,7 +494,7 @@ GSHSCENE_API size_t gshscene_list_expansion(const GSHSCENE_List * list);
 GSHSCENE_API size_t gshscene_list_bytes(const GSHSCENE_List * list);
 
 /**
- * @brief Whether two lists are the same: foreground, palette (by handle), then item for item, resources by handle, maps and doubles bit for bit (the ties are not compared).
+ * @brief Whether two lists are the same: foreground, palette (by handle), then item for item, resources (a stroke's style too) by handle, maps and doubles bit for bit (the ties are not compared).
  *
  * @return 1 if equal, 0 if not (or if either is NULL).
  */

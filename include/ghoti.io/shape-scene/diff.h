@@ -38,13 +38,13 @@
  * occurrences (version.h), in both versions:
  *
  * - a node whose own properties changed (flags, map, layer, depth, opacity, blend
- *   space, composite operator, ordering, clip, resource, rule, paint, target)
+ *   space, composite operator, ordering, clip, resource, rule, paint, target, style)
  *   damages every occurrence of its whole subtree; a changed key or a changed
  *   parent alone damages nothing by itself;
- * - a changed foreground damages every occurrence of every shape that paints with
- *   it (N10, and a gradient shape with a foreground stop, G3), and nothing else; a
- *   changed palette, every occurrence of every shape that paints from it (N14, and a
- *   gradient shape with a palette stop), and nothing else;
+ * - a changed foreground damages every occurrence of every shape and stroke that
+ *   paints with it (N10, and a gradient paint with a foreground stop, G3), and
+ *   nothing else; a changed palette, every occurrence of every shape and stroke that
+ *   paints from it (N14, and a gradient paint with a palette stop), and nothing else;
  * - an occurrence of a group whose composite operator is unbounded (N4: it changes
  *   the backdrop where it has no content) that lies in a damaged subtree makes the
  *   damage unbounded;
@@ -60,7 +60,12 @@
  *   pixel sink draws it: on the fast tier the control box of each glyph's
  *   device path from the face's provider (hinting included), on the general
  *   route each glyph's design box under its map, and nothing for a glyph the
- *   provider refuses.  The clip of a group is not intersected in.
+ *   provider refuses; the bounds of a stroke occurrence are SK10's
+ *   (stroke.h, ::gshscene_stroke_bounds): its centerline's box in model space
+ *   (a run from a font by the general route, each glyph's design box under its
+ *   map, SK7) outset by the style's conservative reach, locally or in pixels of
+ *   the map for a device width, then outset by the AA support and rounded outward.
+ *   The clip of a group is not intersected in.
  *
  * Where no bound exists the damage is **unbounded** and a sink redraws the whole
  * target: a run whose face is unbound, a 3D path, a map that cannot be applied,

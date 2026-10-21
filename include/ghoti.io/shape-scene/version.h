@@ -32,12 +32,14 @@
  * scene (scene.h); a published edit makes a new version that shares every node
  * it did not touch.  The root is a group of ID ::GSHSCENE_ROOT_ID.
  *
- * A node is one of three kinds (::GSHSCENE_Node_Kind): a **group** (children in
+ * A node is one of four kinds (::GSHSCENE_Node_Kind): a **group** (children in
  * draw order, a placement map, an opacity, a blend space, a composite operator, an
  * ordering context, a layer and a depth, an optional clip), a
  * **shape** (a path or glyph run under a map, with a fill rule, a paint, a layer
- * and a depth) and an **instance** (a node of the same version drawn again
- * under a map: what SVG `use` and `symbol` lower to).  Any node may be
+ * and a depth), a **stroke** (a path or glyph run, its centerline, under a map,
+ * with a stroke style, a paint, a layer and a depth: stroke.h, SK13) and an
+ * **instance** (a node of the same version drawn again under a map: what SVG `use`
+ * and `symbol` lower to).  Any node may be
  * **hidden** (::GSHSCENE_NODE_HIDDEN): it is not drawn in place, only where an
  * instance reaches it (what SVG `defs` lowers to).  An instance ignores the
  * hidden flag of its own target and honours the hidden flags below it.
@@ -84,7 +86,7 @@
  * children of a group in the order its ordering context gives (flat: declared;
  * overlay: by layer; depth: far to near, ties by layer and then instance path),
  * hidden children taking no part, and records every resolved depth tie in the list.
- * Each shape is a fill; a group with a clip is a clip push and pop around its
+ * Each shape is a fill and each stroke a stroke item; a group with a clip is a clip push and pop around its
  * content (the clip push carries the group's layer and depth); a group is a group
  * push and pop when its opacity is below 1, its composite operator is not
  * source-over, its blend space is not zero, its ordering is not flat, its
@@ -119,6 +121,9 @@
  *   fill rule, `u8` the paint kind, four `f64` (the straight `r, g, b, a`), the
  *   paint's space, `u32` the paint's palette entry, `u64` the paint's gradient's content hash (0 for another
  *   kind), `i32` layer, `f64` depth;
+ * - **stroke** (SK12): spelled as a shape with `u64` the style's content hash after the
+ *   resource's: `u64` the centerline's content hash, `u64` the style's, `u64` the map's
+ *   hash, `u8` the fill rule (nonzero), the paint as a shape's, `i32` layer, `f64` depth;
  * - **instance**: `u64` the target's ID, `u64` the map's hash, `i32` layer, `f64` depth.
  *
  * A **space** is `u8` primaries, `u8` transfer, `f64` gamma.
@@ -133,6 +138,8 @@
  * - `G id=I parent=P flags=F key=K map=H opacity=X blend=<space> composite=N order=N layer=L depth=D clip=C children=LIST`
  *   (with ` isolation=N knockout=N mask=<hash>` after `order=N` when one of them is not the default)
  * - `S id=I parent=P flags=F key=K res=KIND:H map=H rule=R paint=PK r g b a space=<space> entry=E gradient=G layer=L depth=D`
+ * - `K id=I parent=P flags=F key=K res=KIND:H style=H map=H rule=R paint=PK r g b a space=<space> entry=E gradient=G layer=L depth=D`
+ *   (a stroke)
  * - `I id=I parent=P flags=F key=K target=T map=H layer=L depth=D`
  *
  * where `K` is `-` or `DOMAIN:VALUE` as 16 digits each, `C` is `-` or
@@ -171,10 +178,11 @@ typedef enum GSHSCENE_Node_Kind {
   GSHSCENE_NODE_GROUP = 1,    ///< Children in draw order, with a placement, an opacity and an optional clip.
   GSHSCENE_NODE_SHAPE = 2,    ///< A path or glyph run, filled.
   GSHSCENE_NODE_INSTANCE = 3, ///< Another node of the same version, drawn again.
+  GSHSCENE_NODE_STROKE = 4,   ///< A path or glyph run, stroked with a style (stroke.h, SK13).
   GSHSCENE_NODE_KIND_COUNT    ///< Closes the enum.
 } GSHSCENE_Node_Kind;
 
-/** @brief Name a node kind: "group", "shape", "instance", or "unknown node kind". */
+/** @brief Name a node kind: "group", "shape", "instance", "stroke", or "unknown node kind". */
 GSHSCENE_API const char * gshscene_node_kind_string(GSHSCENE_Node_Kind kind);
 
 /** A node flag: the node and its subtree are not drawn in place, only through an instance that reaches them. */
@@ -198,10 +206,10 @@ typedef struct GSHSCENE_Key {
 typedef struct GSHSCENE_Node {
   GSHSCENE_Node_Kind kind;           ///< Which kind.
   uint32_t flags;                    ///< ::GSHSCENE_NODE_HIDDEN, or 0.
-  /** Group: places its children (and its clip) in its parent's space.  Shape: places the path or run.  Instance: places the target's content.  2D. */
+  /** Group: places its children (and its clip) in its parent's space.  Shape, stroke: places the path or run.  Instance: places the target's content.  2D. */
   GSHGEOM_Map map;
-  int32_t layer;                     ///< The declared layer (AD-10); group, shape and instance.
-  double depth;                      ///< The declared depth (AD-10): finite; `-0` is stored as `+0`.  Group, shape and instance.
+  int32_t layer;                     ///< The declared layer (AD-10); every kind.
+  double depth;                      ///< The declared depth (AD-10): finite; `-0` is stored as `+0`.  Every kind.
   double opacity;                    ///< Group: finite, in `[0, 1]`; below 1 the group is composited as a unit.  Else 1.
   GSHSCENE_Color_Space blend_space;  ///< Group: the space it composites in; zero inherits the enclosing group's.  Else zero.
   uint32_t composite;                ///< Group: a ::GSHSCENE_Composite (N4, B1).  Else ::GSHSCENE_COMPOSITE_SRC_OVER.
@@ -213,10 +221,12 @@ typedef struct GSHSCENE_Node {
   const GSHSCENE_Resource * clip;    ///< Group: a path or glyph run clipping the group, or NULL.  Else NULL.
   GSHGEOM_Map clip_map;              ///< Group with a clip: the clip's placement in the group's own space.  Else the identity.
   GSHGEOM_Fill_Rule clip_rule;       ///< Group with a clip: its rule.  Else nonzero.
-  const GSHSCENE_Resource * resource; ///< Shape: the path or glyph run.  Else NULL.
+  const GSHSCENE_Resource * resource; ///< Shape: the path or glyph run.  Stroke: its centerline, a 2D path or a run.  Else NULL.
   GSHGEOM_Fill_Rule fill_rule;       ///< Shape: the rule.  Else nonzero.
-  GSHSCENE_Paint paint;              ///< Shape: the paint (solid, foreground, palette or gradient).  Else as ::gshscene_node_init leaves it.
+  GSHSCENE_Paint paint;              ///< Shape, stroke: the paint (solid, foreground, palette or gradient).  Else as ::gshscene_node_init leaves it.
   uint64_t target;                   ///< Instance: the ID of the node it draws.  Else 0.
+  /** Stroke: the stroke style, a resource of the scene's store, which the node holds (stroke.h, SK13).  Else NULL. */
+  const GSHSCENE_Resource * style;
 } GSHSCENE_Node;
 
 /**
@@ -306,7 +316,7 @@ GSHSCENE_API GSHSCENE_Result gshscene_version_list(const GSHSCENE_Version * vers
  *
  * @param table 0 for the version's own list; or the ID of an instanced node, for the items of its picture.
  * @param index The item.
- * @param out_node A shape's fill names the shape; a clip push and pop name their group, a group push and pop
+ * @param out_node A shape's fill names the shape, a stroke's item the stroke; a clip push and pop name their group, a group push and pop
  *   their group; an instance item names the instance node.
  * @return ::GSHSCENE_OK, ::GSHSCENE_ERR_INVALID (NULL, a table that is not 0 or an instanced node of this
  *   version, an index out of range) or what ::gshscene_version_list returns.

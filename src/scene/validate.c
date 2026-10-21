@@ -272,6 +272,7 @@ static GSHSCENE_Result visit(Check * c, size_t index, size_t level) {
       result = visit_group(c, index, level, m);
       break;
     case GSHSCENE_NODE_SHAPE:
+    case GSHSCENE_NODE_STROKE: /* one item, as a shape */
       m->depth = 1;
       m->items = 1;
       m->occ = 1;

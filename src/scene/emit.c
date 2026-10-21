@@ -171,8 +171,11 @@ static GSHSCENE_Result emit_shape(
     void * ctx, const GSHSCENE_Walk * walk, const GSHSCENE_Node_Rec * shape, const GSHGEOM_Map * map) {
   (void)walk;
   Sink * s = ctx;
-  GSHSCENE_Result result = gshscene_list_fill(
-      s->list, shape->p.resource, map, shape->p.fill_rule, &shape->p.paint, shape->p.layer, shape->p.depth);
+  GSHSCENE_Result result = shape->p.kind == GSHSCENE_NODE_STROKE
+      ? gshscene_list_stroke(s->list, shape->p.resource, shape->p.style, map, &shape->p.paint, shape->p.layer,
+            shape->p.depth) /* SK13: one stroke item, its placement composed */
+      : gshscene_list_fill(
+            s->list, shape->p.resource, map, shape->p.fill_rule, &shape->p.paint, shape->p.layer, shape->p.depth);
   if (result == GSHSCENE_OK) {
     result = sink_origin(s, shape->id);
   }

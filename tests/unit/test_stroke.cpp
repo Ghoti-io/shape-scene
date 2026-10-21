@@ -3,7 +3,9 @@
  *
  * Strokes at the waist (strokes story S1; SK1 to SK14 of stroke.h and documentation/design.md): the stroke style
  * resource (its defaults, its validity in SK2's order, each bound at both sides, SK3's canonical form, interning,
- * hash and dump against the independent generator, a planted collision, the store's accounting).
+ * hash and dump against the independent generator, a planted collision, the store's accounting); the stroke item
+ * (SK4: what it records and refuses, its references, equality, hash and dump, its place in an order); the stroke node
+ * (SK13: its rules, hash and dump, emission, the visitor, re-lowering); SK10's bounds and the damage of strokes.
  *
  * Copyright 2026 by Corey Pennycuff
  */
@@ -12,6 +14,7 @@
 
 #include "../alloc_tracker.h"
 #include "../known_answers.h"
+#include "../scene_fixtures.h"
 #include "../scene_helpers.h"
 
 #include <cmath>
@@ -591,6 +594,762 @@ TEST(StrokeStyle, EveryAllocationOfAnInternCanFail) {
     EXPECT_TRUE(t.live.empty()) << fail_at;
     ASSERT_LT(fail_at, 64);
   }
+}
+
+/* --- SK4: the stroke item ------------------------------------------------------------------- */
+
+namespace {
+
+/** A store holding the resources a stroke list names: paths, runs, a picture, a style, a gradient. */
+struct Kit {
+  StoreHolder s;
+  Ref square, fixture, three, outline_run, font_run, face, picture, style, device, gradient, run3;
+  Kit() {
+    square = Ref(intern_square(s.store));
+    fixture = Ref(intern_fixture(s.store));
+    GSHGEOM_Path * p3 = new_path(3);
+    gshgeom_path_move_to(p3, P(0, 0, 1));
+    gshgeom_path_line_to(p3, P(1, 1, 2));
+    three = Ref(scene::intern(s.store, p3));
+    gshgeom_path_destroy(p3);
+    GSHSCENE_Glyph glyphs[2] = {{1, 0.0, 0.0, square.get()}, {2, 5.0, -3.0, fixture.get()}};
+    GSHSCENE_Glyph_Run run{};
+    run.source = GSHSCENE_GLYPHS_FROM_OUTLINES;
+    run.glyph_count = 2;
+    run.glyphs = glyphs;
+    const GSHSCENE_Resource * r = nullptr;
+    EXPECT_EQ(gshscene_store_intern_glyph_run(s.store, &run, &r), GSHSCENE_OK);
+    outline_run = Ref(r);
+    GSHSCENE_Glyph g3[1] = {{9, 0.0, 0.0, three.get()}};
+    run.glyph_count = 1;
+    run.glyphs = g3;
+    EXPECT_EQ(gshscene_store_intern_glyph_run(s.store, &run, &r), GSHSCENE_OK);
+    run3 = Ref(r);
+    face = Ref(intern_face(s.store));
+    font_run = Ref(intern_font_run(s.store, face.get(), 12.5,
+        {{36, 0.0, 0.0, nullptr}, {37, 7.5, 0.25, nullptr}, {4294967295u, -1.0, 2.0, nullptr}}, 1, 40));
+    ListHolder pl(s.store);
+    GSHSCENE_Paint black = solid(0, 0, 0, 1);
+    gshscene_list_fill(pl.list, square.get(), nullptr, GSHGEOM_FILL_NONZERO, &black, 0, 0.0);
+    gshscene_list_close(pl.list);
+    EXPECT_EQ(gshscene_store_intern_picture(s.store, pl.list, &r), GSHSCENE_OK);
+    picture = Ref(r);
+    Style st = fixture_default();
+    EXPECT_EQ(intern(s.store, st, &style), GSHSCENE_OK);
+    Style dv = fixture_device();
+    EXPECT_EQ(intern(s.store, dv, &device), GSHSCENE_OK);
+    // The generator's radial gradient (gen-scene-vectors.py's GRAD_RADIAL).
+    GSHSCENE_Gradient_Stop stops[2] = {{0.0, solid(0, 0, 0, 1)}, {1.0, solid(1, 1, 1, 0)}};
+    GSHSCENE_Gradient g{};
+    g.kind = GSHSCENE_GRADIENT_RADIAL;
+    g.c0[0] = 1.0;
+    g.c0[1] = 2.0;
+    g.r0 = -1.5;
+    g.c1[0] = 4.0;
+    g.c1[1] = 2.0;
+    g.r1 = 6.25;
+    gshgeom_map_design_to_model(2.5, 10, 20, &g.map);
+    g.stop_count = 2;
+    g.stops = stops;
+    EXPECT_EQ(gshscene_store_intern_gradient(s.store, &g, &r), GSHSCENE_OK);
+    gradient = Ref(r);
+  }
+};
+
+GSHSCENE_Paint paint_of(GSHSCENE_Paint_Kind kind, double alpha, uint32_t entry = 0, const GSHSCENE_Resource * g = nullptr) {
+  GSHSCENE_Paint p{};
+  p.kind = kind;
+  p.rgba[3] = alpha;
+  p.entry = entry;
+  p.gradient = g;
+  return p;
+}
+
+GSHGEOM_Map map_of(double a, double b, double c, double d, double e = 0, double f = 0) {
+  const double m[4] = {a, b, c, d};
+  const double t[2] = {e, f};
+  GSHGEOM_Map out;
+  EXPECT_EQ(gshgeom_map_from_matrix(2, m, t, &out), GSHGEOM_OK);
+  return out;
+}
+
+}  // namespace
+
+TEST(StrokeItem, RecordsTheGeneratorsListAndItsHashAndDump) {
+  Kit k;
+  ListHolder l(k.s.store);
+  Ref arcs, clip;
+  Style a = fixture_arcs();
+  Style c = fixture_clip();
+  ASSERT_EQ(intern(k.s.store, a, &arcs), GSHSCENE_OK);
+  ASSERT_EQ(intern(k.s.store, c, &clip), GSHSCENE_OK);
+  GSHSCENE_Paint fill_paint = solid(0.25, 0.5, 0.75, 1.0);
+  GSHSCENE_Paint black = solid(0, 0, 0, 1);
+  GSHSCENE_Paint fg = paint_of(GSHSCENE_PAINT_FOREGROUND, 0.5);
+  GSHSCENE_Paint entry = paint_of(GSHSCENE_PAINT_PALETTE, 0.75, 1);
+  GSHSCENE_Paint grad = paint_of(GSHSCENE_PAINT_GRADIENT, 1.0, 0, k.gradient.get());
+  GSHSCENE_Paint p3 = solid(2.0, -0.5, 0.25, 0.5);
+  p3.space = space_of(GCOL_PRIMARIES_DISPLAY_P3, GCOL_TRANSFER_GAMMA, 2.2);
+  GSHGEOM_Map tr = translate(1.5, -2.25);
+  GSHGEOM_Map design;
+  gshgeom_map_design_to_model(2.5, 10, 20, &design);
+  ASSERT_EQ(gshscene_list_fill(l.list, k.square.get(), nullptr, GSHGEOM_FILL_NONZERO, &fill_paint, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_stroke(l.list, k.square.get(), k.style.get(), nullptr, &black, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_stroke(l.list, k.outline_run.get(), k.device.get(), &tr, &fg, 2, 1.5), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_stroke(l.list, k.fixture.get(), arcs.get(), &design, &entry, -1, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_stroke(l.list, k.font_run.get(), clip.get(), nullptr, &grad, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_stroke(l.list, k.square.get(), k.style.get(), nullptr, &p3, 0, -3.0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_hash(l.list), known::kStrokeListHash);
+  EXPECT_EQ(dump_list(l.list), std::string(known::kStrokeListDump));
+  ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_hash(l.list), known::kStrokeListHash) << "flat: closing reorders nothing";
+  const GSHSCENE_Item * item = nullptr;
+  ASSERT_EQ(gshscene_list_item(l.list, 2, &item), GSHSCENE_OK);
+  EXPECT_EQ(item->kind, GSHSCENE_ITEM_STROKE);
+  EXPECT_EQ((int)GSHSCENE_ITEM_STROKE, 7);
+  EXPECT_EQ((int)GSHSCENE_ITEM_KIND_COUNT, 8);
+  EXPECT_EQ(item->resource, k.outline_run.get());
+  EXPECT_EQ(item->style, k.device.get());
+  EXPECT_EQ(item->fill_rule, GSHGEOM_FILL_NONZERO);
+  EXPECT_EQ(item->layer, 2);
+  EXPECT_EQ(item->depth, 1.5);
+  EXPECT_EQ(item->paint.kind, GSHSCENE_PAINT_FOREGROUND);
+  GSHSCENE_Group zero;
+  std::memset(&zero, 0, sizeof zero);
+  EXPECT_EQ(std::memcmp(&item->group, &zero, sizeof zero), 0) << "a stroke's group is zero";
+  ASSERT_EQ(gshscene_list_item(l.list, 0, &item), GSHSCENE_OK);
+  EXPECT_EQ(item->style, nullptr) << "a fill names no style";
+}
+
+TEST(StrokeItem, EveryCenterlineAndPaintIsRecordedOrRefusedAsSk4Says) {
+  Kit k;
+  StoreHolder other;
+  Ref foreign_style;
+  Style st;
+  ASSERT_EQ(intern(other.store, st, &foreign_style), GSHSCENE_OK);
+  Ref foreign_path(intern_square(other.store));
+  ListHolder l(k.s.store);
+  GSHSCENE_Paint black = solid(0, 0, 0, 1);
+  GSHGEOM_Map m3;
+  gshgeom_map_identity(3, &m3);
+  GSHGEOM_Map bad = translate(0, 0);
+  bad.m[0][0] = std::nan("");
+  struct Case {
+    const char * what;
+    const GSHSCENE_Resource * centerline;
+    const GSHSCENE_Resource * style;
+    const GSHGEOM_Map * map;
+    GSHSCENE_Paint paint;
+    double depth;
+    GSHSCENE_Result want;
+  };
+  GSHSCENE_Paint big = solid(std::ldexp(1.0, 17), 0, 0, 1);
+  GSHSCENE_Paint bad_alpha = solid(0, 0, 0, 2.0);
+  GSHSCENE_Paint foreign_grad = paint_of(GSHSCENE_PAINT_GRADIENT, 1.0, 0, k.style.get());
+  std::vector<Case> cases = {
+      {"a path", k.square.get(), k.style.get(), nullptr, black, 0.0, GSHSCENE_OK},
+      {"a run from outlines", k.outline_run.get(), k.style.get(), nullptr, black, 0.0, GSHSCENE_OK},
+      {"a run from a font", k.font_run.get(), k.style.get(), nullptr, black, 0.0, GSHSCENE_OK},
+      {"a foreground paint", k.square.get(), k.style.get(), nullptr, paint_of(GSHSCENE_PAINT_FOREGROUND, 0.5), 0.0, GSHSCENE_OK},
+      {"a palette paint", k.square.get(), k.style.get(), nullptr, paint_of(GSHSCENE_PAINT_PALETTE, 1.0, 7), 0.0, GSHSCENE_OK},
+      {"a gradient paint", k.square.get(), k.style.get(), nullptr, paint_of(GSHSCENE_PAINT_GRADIENT, 1.0, 0, k.gradient.get()), 0.0, GSHSCENE_OK},
+      {"a picture", k.picture.get(), k.style.get(), nullptr, black, 0.0, GSHSCENE_ERR_INVALID},
+      {"a style as the centerline", k.style.get(), k.style.get(), nullptr, black, 0.0, GSHSCENE_ERR_INVALID},
+      {"no centerline", nullptr, k.style.get(), nullptr, black, 0.0, GSHSCENE_ERR_INVALID},
+      {"a centerline of another store", foreign_path.get(), k.style.get(), nullptr, black, 0.0, GSHSCENE_ERR_INVALID},
+      {"no style", k.square.get(), nullptr, nullptr, black, 0.0, GSHSCENE_ERR_INVALID},
+      {"a path as the style", k.square.get(), k.fixture.get(), nullptr, black, 0.0, GSHSCENE_ERR_INVALID},
+      {"a style of another store", k.square.get(), foreign_style.get(), nullptr, black, 0.0, GSHSCENE_ERR_INVALID},
+      {"an invalid map", k.square.get(), k.style.get(), &bad, black, 0.0, GSHSCENE_ERR_INVALID},
+      {"an invalid paint", k.square.get(), k.style.get(), nullptr, bad_alpha, 0.0, GSHSCENE_ERR_INVALID},
+      {"a style named as a gradient", k.square.get(), k.style.get(), nullptr, foreign_grad, 0.0, GSHSCENE_ERR_INVALID},
+      {"a depth that is not finite", k.square.get(), k.style.get(), nullptr, black, std::nan(""), GSHSCENE_ERR_INVALID},
+      {"a 3D path", k.three.get(), k.style.get(), nullptr, black, 0.0, GSHSCENE_ERR_UNSUPPORTED},
+      {"a run whose outline is 3D", k.run3.get(), k.style.get(), nullptr, black, 0.0, GSHSCENE_ERR_UNSUPPORTED},
+      {"a 3D map", k.square.get(), k.style.get(), &m3, black, 0.0, GSHSCENE_ERR_UNSUPPORTED},
+      {"a 3D path and no style", k.three.get(), nullptr, nullptr, black, 0.0, GSHSCENE_ERR_INVALID},
+      {"N1's bound", k.square.get(), k.style.get(), nullptr, big, 0.0, GSHSCENE_ERR_LIMIT},
+      {"N1's bound and a 3D path", k.three.get(), k.style.get(), nullptr, big, 0.0, GSHSCENE_ERR_UNSUPPORTED},
+      {"N1's bound and no style", k.square.get(), nullptr, nullptr, big, 0.0, GSHSCENE_ERR_INVALID},
+  };
+  size_t count = 0;
+  for (const Case & c : cases) {
+    size_t before_centerline = c.centerline ? gshscene_resource_refcount(c.centerline) : 0;
+    size_t before_style = c.style ? gshscene_resource_refcount(c.style) : 0;
+    EXPECT_EQ(gshscene_list_stroke(l.list, c.centerline, c.style, c.map, &c.paint, 0, c.depth), c.want) << c.what;
+    if (c.want == GSHSCENE_OK) {
+      count++;
+      EXPECT_EQ(gshscene_resource_refcount(c.centerline), before_centerline + 1) << c.what << ": the list holds it";
+    } else if (c.centerline) {
+      EXPECT_EQ(gshscene_resource_refcount(c.centerline), before_centerline) << c.what << ": no reference taken";
+    }
+    if (c.want != GSHSCENE_OK && c.style) {
+      EXPECT_EQ(gshscene_resource_refcount(c.style), before_style) << c.what;
+    }
+    EXPECT_EQ(gshscene_list_count(l.list), count) << c.what << ": a failing call leaves the list as it was";
+  }
+  // A NULL paint is opaque black; a NULL map the identity.
+  ASSERT_EQ(gshscene_list_stroke(l.list, k.square.get(), k.style.get(), nullptr, nullptr, 0, -0.0), GSHSCENE_OK);
+  const GSHSCENE_Item * item = nullptr;
+  ASSERT_EQ(gshscene_list_item(l.list, count, &item), GSHSCENE_OK);
+  EXPECT_EQ(item->paint.kind, GSHSCENE_PAINT_SOLID);
+  EXPECT_EQ(item->paint.rgba[3], 1.0);
+  EXPECT_EQ(item->map.dim, 2);
+  EXPECT_EQ(bits_of(item->depth), 0u) << "-0 is stored as +0";
+  EXPECT_EQ(gshscene_list_stroke(nullptr, k.square.get(), k.style.get(), nullptr, nullptr, 0, 0.0), GSHSCENE_ERR_INVALID);
+  ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_stroke(l.list, k.square.get(), k.style.get(), nullptr, nullptr, 0, 0.0), GSHSCENE_ERR_INVALID)
+      << "a closed list";
+}
+
+TEST(StrokeItem, TheListHoldsTheCenterlineAndTheStyleUntilItIsResetOrDestroyed) {
+  Kit k;
+  size_t centerline = gshscene_resource_refcount(k.square.get());
+  size_t style = gshscene_resource_refcount(k.style.get());
+  size_t gradient = gshscene_resource_refcount(k.gradient.get());
+  GSHSCENE_Paint grad = paint_of(GSHSCENE_PAINT_GRADIENT, 1.0, 0, k.gradient.get());
+  {
+    ListHolder l(k.s.store);
+    for (int i = 0; i < 3; i++) {
+      ASSERT_EQ(gshscene_list_stroke(l.list, k.square.get(), k.style.get(), nullptr, &grad, 0, 0.0), GSHSCENE_OK);
+    }
+    EXPECT_EQ(gshscene_resource_refcount(k.square.get()), centerline + 3);
+    EXPECT_EQ(gshscene_resource_refcount(k.style.get()), style + 3);
+    EXPECT_EQ(gshscene_resource_refcount(k.gradient.get()), gradient + 3);
+    ASSERT_EQ(gshscene_list_reset(l.list), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_resource_refcount(k.style.get()), style);
+    ASSERT_EQ(gshscene_list_stroke(l.list, k.square.get(), k.style.get(), nullptr, &grad, 0, 0.0), GSHSCENE_OK);
+    // A picture of strokes copies them with their references.
+    ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
+    const GSHSCENE_Resource * pic = nullptr;
+    ASSERT_EQ(gshscene_store_intern_picture(k.s.store, l.list, &pic), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_resource_refcount(k.style.get()), style + 2);
+    gshscene_resource_release(pic);
+    EXPECT_EQ(gshscene_resource_refcount(k.style.get()), style + 1);
+  }
+  EXPECT_EQ(gshscene_resource_refcount(k.square.get()), centerline);
+  EXPECT_EQ(gshscene_resource_refcount(k.style.get()), style);
+  EXPECT_EQ(gshscene_resource_refcount(k.gradient.get()), gradient);
+}
+
+TEST(StrokeItem, EqualityComparesTheStyleByHandle) {
+  Kit k;
+  ListHolder a(k.s.store), b(k.s.store), c(k.s.store), d(k.s.store);
+  GSHSCENE_Paint black = solid(0, 0, 0, 1);
+  for (GSHSCENE_List * l : {a.list, b.list}) {
+    ASSERT_EQ(gshscene_list_stroke(l, k.square.get(), k.style.get(), nullptr, &black, 0, 0.0), GSHSCENE_OK);
+  }
+  ASSERT_EQ(gshscene_list_stroke(c.list, k.square.get(), k.device.get(), nullptr, &black, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(d.list, k.square.get(), nullptr, GSHGEOM_FILL_NONZERO, &black, 0, 0.0), GSHSCENE_OK);
+  EXPECT_TRUE(gshscene_list_equal(a.list, b.list));
+  EXPECT_FALSE(gshscene_list_equal(a.list, c.list)) << "another style";
+  EXPECT_NE(gshscene_list_hash(a.list), gshscene_list_hash(c.list));
+  EXPECT_FALSE(gshscene_list_equal(a.list, d.list)) << "a fill of the same path is not its stroke";
+  EXPECT_NE(gshscene_list_hash(a.list), gshscene_list_hash(d.list));
+}
+
+TEST(StrokeItem, AStrokeIsOneUnitOfItsSequence) {
+  // N11: in a depth group and an overlay group a stroke moves as one unit, and a depth tie between a fill and a stroke
+  // is recorded like any other (SK4).
+  Kit k;
+  GSHSCENE_Paint black = solid(0, 0, 0, 1);
+  for (uint32_t ordering : {GSHSCENE_ORDER_DEPTH, GSHSCENE_ORDER_OVERLAY}) {
+    ListHolder l(k.s.store);
+    GSHSCENE_Group g = make_group(1.0, ordering);
+    ASSERT_EQ(gshscene_list_group_push(l.list, &g, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_stroke(l.list, k.square.get(), k.style.get(), nullptr, &black, 3, 1.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_fill(l.list, k.fixture.get(), nullptr, GSHGEOM_FILL_NONZERO, &black, 1, 2.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_stroke(l.list, k.fixture.get(), k.device.get(), nullptr, &black, 2, 2.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_group_pop(l.list), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
+    std::vector<int32_t> layers;
+    for (size_t i = 1; i + 1 < gshscene_list_count(l.list); i++) {
+      const GSHSCENE_Item * item = nullptr;
+      ASSERT_EQ(gshscene_list_item(l.list, i, &item), GSHSCENE_OK);
+      layers.push_back(item->layer);
+    }
+    // Depth: far first (2, 2 tied: by layer), then 1.  Overlay: by layer.
+    EXPECT_EQ(layers, (std::vector<int32_t>{1, 2, 3})) << ordering;
+    EXPECT_EQ(gshscene_list_tie_count(l.list), ordering == GSHSCENE_ORDER_DEPTH ? 1u : 0u);
+  }
+}
+
+/* --- SK13: the stroke node ------------------------------------------------------------------- */
+
+TEST(StrokeNode, TheGeneratorsSceneHashesDumpsAndEmitsOneStrokeItemPerNode) {
+  SceneHolder s;
+  Ref square(intern_square(s.store()));
+  Ref fixture(intern_fixture(s.store()));
+  GSHSCENE_Glyph glyphs[2] = {{1, 0.0, 0.0, square.get()}, {2, 5.0, -3.0, fixture.get()}};
+  GSHSCENE_Glyph_Run run{};
+  run.source = GSHSCENE_GLYPHS_FROM_OUTLINES;
+  run.glyph_count = 2;
+  run.glyphs = glyphs;
+  const GSHSCENE_Resource * r = nullptr;
+  ASSERT_EQ(gshscene_store_intern_glyph_run(s.store(), &run, &r), GSHSCENE_OK);
+  Ref outline_run(r);
+  Ref style, device;
+  Style st = fixture_default();
+  Style dv = fixture_device();
+  ASSERT_EQ(intern(s.store(), st, &style), GSHSCENE_OK);
+  ASSERT_EQ(intern(s.store(), dv, &device), GSHSCENE_OK);
+  const uint64_t kDomain = UINT64_C(0x5356470000000001);
+  GSHSCENE_Key key = K(kDomain, 7);
+  VersionRef v1;
+  uint64_t keyed = 0;
+  {
+    EditHolder e(s);
+    GSHSCENE_Node fill = shape_node(square.get());
+    fill.paint = solid(0.25, 0.5, 0.75, 1.0);
+    EXPECT_EQ(add(e.edit, GSHSCENE_ROOT_ID, fill), 2u);
+    EXPECT_EQ(add(e.edit, GSHSCENE_ROOT_ID, stroke_node(square.get(), style.get())), 3u);
+    GSHSCENE_Node n = stroke_node(outline_run.get(), device.get(), 3);
+    n.map = translate(1.5, -2.25);
+    n.paint = paint_of(GSHSCENE_PAINT_FOREGROUND, 0.5);
+    n.depth = 1.0;
+    ASSERT_EQ(gshscene_edit_upsert(e.edit, &key, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, &n, &keyed), GSHSCENE_OK);
+    EXPECT_EQ(keyed, 4u);
+    publish(s, e, &v1);
+  }
+  EXPECT_EQ(gshscene_version_hash(v1.get()), known::kStrokeSceneHash);
+  EXPECT_EQ(dump_version(v1.get()), std::string(known::kStrokeSceneDump));
+  GSHSCENE_Node_Info info = info_of(v1.get(), 4);
+  EXPECT_EQ(info.node.kind, GSHSCENE_NODE_STROKE);
+  EXPECT_EQ(info.node.style, device.get());
+  EXPECT_EQ(info.node.resource, outline_run.get());
+  EXPECT_STREQ(gshscene_node_kind_string(GSHSCENE_NODE_STROKE), "stroke");
+  EXPECT_EQ((int)GSHSCENE_NODE_STROKE, 4);
+  EXPECT_EQ((int)GSHSCENE_NODE_KIND_COUNT, 5);
+  // The emitted list: the fill, then the strokes (SK14's order), equal to the recorded list that draws the same.
+  const GSHSCENE_List * emitted = nullptr;
+  ASSERT_EQ(gshscene_version_list(v1.get(), &emitted), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_hash(emitted), known::kStrokeSceneListHash);
+  ListHolder recorded(s.store());
+  GSHSCENE_Paint fill_paint = solid(0.25, 0.5, 0.75, 1.0);
+  GSHSCENE_Paint black = solid(0, 0, 0, 1);
+  GSHSCENE_Paint fg = paint_of(GSHSCENE_PAINT_FOREGROUND, 0.5);
+  GSHGEOM_Map tr = translate(1.5, -2.25);
+  gshscene_list_fill(recorded.list, square.get(), nullptr, GSHGEOM_FILL_NONZERO, &fill_paint, 0, 0.0);
+  gshscene_list_stroke(recorded.list, square.get(), style.get(), nullptr, &black, 0, 0.0);
+  gshscene_list_stroke(recorded.list, outline_run.get(), device.get(), &tr, &fg, 3, 1.0);
+  ASSERT_EQ(gshscene_list_close(recorded.list), GSHSCENE_OK);
+  EXPECT_TRUE(gshscene_list_equal(emitted, recorded.list));
+  for (size_t i = 0; i < 3; i++) {
+    uint64_t node = 0;
+    ASSERT_EQ(gshscene_version_item_node(v1.get(), 0, i, &node), GSHSCENE_OK);
+    EXPECT_EQ(node, 2u + i) << "item " << i << " names its node";
+  }
+  // The visitor reports the stroke's kind and its composed map.
+  int strokes = 0;
+  for (const Occurrence & o : occurrences(v1.get())) {
+    if (o.kind == GSHSCENE_NODE_STROKE) {
+      strokes++;
+      EXPECT_EQ(o.props.style, o.node == 3 ? style.get() : device.get());
+    }
+  }
+  EXPECT_EQ(strokes, 2);
+  // An identical re-lowering (an upsert of the same properties) publishes nothing.
+  VersionRef v2;
+  {
+    EditHolder e(s);
+    GSHSCENE_Node n = info.node;
+    uint64_t again = 0;
+    ASSERT_EQ(gshscene_edit_upsert(e.edit, &key, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, &n, &again), GSHSCENE_OK);
+    EXPECT_EQ(again, keyed);
+    publish(s, e, &v2);
+  }
+  EXPECT_EQ(v2.get(), v1.get());
+  // An upsert with another style changes that node, and only it.
+  VersionRef v3;
+  {
+    EditHolder e(s);
+    GSHSCENE_Node n = info.node;
+    n.style = style.get();
+    ASSERT_EQ(gshscene_edit_upsert(e.edit, &key, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, &n, nullptr), GSHSCENE_OK);
+    publish(s, e, &v3);
+  }
+  ASSERT_NE(v3.get(), v1.get());
+  GSHSCENE_Diff * diff = nullptr;
+  ASSERT_EQ(gshscene_diff(v1.get(), v3.get(), nullptr, nullptr, &diff), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_diff_count(diff), 1u);
+  uint64_t id = 0;
+  GSHSCENE_Diff_Kind kind;
+  ASSERT_EQ(gshscene_diff_get(diff, 0, &id, &kind), GSHSCENE_OK);
+  EXPECT_EQ(id, keyed);
+  EXPECT_EQ(kind, GSHSCENE_DIFF_CHANGED);
+  gshscene_diff_destroy(diff);
+  EXPECT_NE(gshscene_version_hash(v3.get()), gshscene_version_hash(v1.get()));
+}
+
+TEST(StrokeNode, ANodeTakesAStrokeItemsRulesAndHoldsItsStyle) {
+  SceneHolder s;
+  Ref square(intern_square(s.store()));
+  GSHGEOM_Path * p3 = new_path(3);
+  gshgeom_path_move_to(p3, P(0, 0, 1));
+  gshgeom_path_line_to(p3, P(1, 1, 2));
+  Ref three(scene::intern(s.store(), p3));
+  gshgeom_path_destroy(p3);
+  Ref style;
+  Style st;
+  ASSERT_EQ(intern(s.store(), st, &style), GSHSCENE_OK);
+  StoreHolder other;
+  Ref foreign;
+  ASSERT_EQ(intern(other.store, st, &foreign), GSHSCENE_OK);
+  EditHolder e(s);
+  struct Case {
+    const char * what;
+    GSHSCENE_Node node;
+    GSHSCENE_Result want;
+  };
+  GSHSCENE_Node big = stroke_node(square.get(), style.get());
+  big.paint = solid(std::ldexp(1.0, 17), 0, 0, 1);
+  GSHSCENE_Node m3 = stroke_node(square.get(), style.get());
+  gshgeom_map_identity(3, &m3.map);
+  std::vector<Case> cases = {
+      {"no style", stroke_node(square.get(), nullptr), GSHSCENE_ERR_INVALID},
+      {"a path as the style", stroke_node(square.get(), square.get()), GSHSCENE_ERR_INVALID},
+      {"a style of another store", stroke_node(square.get(), foreign.get()), GSHSCENE_ERR_INVALID},
+      {"a style as the centerline", stroke_node(style.get(), style.get()), GSHSCENE_ERR_INVALID},
+      {"a 3D centerline", stroke_node(three.get(), style.get()), GSHSCENE_ERR_UNSUPPORTED},
+      {"a 3D map", m3, GSHSCENE_ERR_UNSUPPORTED},
+      {"N1's bound", big, GSHSCENE_ERR_LIMIT},
+  };
+  for (const Case & c : cases) {
+    uint64_t id = 0;
+    EXPECT_EQ(gshscene_edit_add(e.edit, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, &c.node, nullptr, &id), c.want) << c.what;
+  }
+  size_t before = gshscene_resource_refcount(style.get());
+  uint64_t id = add(e.edit, GSHSCENE_ROOT_ID, stroke_node(square.get(), style.get()));
+  ASSERT_NE(id, 0u);
+  EXPECT_EQ(gshscene_resource_refcount(style.get()), before + 1) << "the node holds its style";
+  // A node of another kind cannot become a stroke.
+  GSHSCENE_Node shape = shape_node(square.get());
+  EXPECT_EQ(gshscene_edit_set(e.edit, id, &shape), GSHSCENE_ERR_INVALID);
+  publish(s, e);
+}
+
+/* --- SK10: bounds ------------------------------------------------------------------------------ */
+
+namespace {
+
+/** The bound of a stroke of @p style around the box (x0, y0, x1, y1) under @p map in @p unit. */
+GSHGEOM_Bounds bound_of(GSHSCENE_Store * store, Style st, double x0, double y0, double x1, double y1,
+    const GSHGEOM_Map & map, uint32_t unit = GSHSCENE_UNIT_DEFAULT, GSHSCENE_Result want = GSHSCENE_OK) {
+  Ref r;
+  EXPECT_EQ(intern(store, st, &r), GSHSCENE_OK);
+  GSHGEOM_Bounds c{};
+  c.empty = 0;
+  c.min = P(x0, y0);
+  c.max = P(x1, y1);
+  GSHGEOM_Bounds out{};
+  std::memset(&out, 0xab, sizeof out);
+  EXPECT_EQ(gshscene_stroke_bounds(r.get(), &c, &map, unit, &out), want);
+  return out;
+}
+
+/** Whether @p b holds (x0, y0, x1, y1) outset by @p h exactly, and is within a relative 2^-48 of it. */
+void expect_outset(const GSHGEOM_Bounds & b, double x0, double y0, double x1, double y1, long double h, const char * what) {
+  ASSERT_EQ(b.empty, 0) << what;
+  long double lo_x = (long double)x0 - h, lo_y = (long double)y0 - h, hi_x = (long double)x1 + h, hi_y = (long double)y1 + h;
+  EXPECT_LE((long double)b.min.x, lo_x) << what << ": the bound is below the real one";
+  EXPECT_LE((long double)b.min.y, lo_y) << what;
+  EXPECT_GE((long double)b.max.x, hi_x) << what;
+  EXPECT_GE((long double)b.max.y, hi_y) << what;
+  long double slack = (h + 64.0L) * std::ldexp(1.0L, -48);
+  EXPECT_GE((long double)b.min.x, lo_x - slack) << what << ": not conservative but loose";
+  EXPECT_LE((long double)b.max.x, hi_x + slack) << what;
+}
+
+}  // namespace
+
+TEST(StrokeBounds, EachFactorOfSk10) {
+  StoreHolder s;
+  GSHGEOM_Map id = translate(0, 0);
+  struct Case {
+    const char * what;
+    std::function<void(Style &)> set;
+    long double h; // in half widths times the width
+  };
+  // Width 2 throughout, so h is f * a.
+  std::vector<Case> cases = {
+      {"miter, its limit", [](Style &) {}, 4.0L},
+      {"miter limit 10", [](Style & t) { t.s.miter_limit = 10.0; }, 10.0L},
+      {"miter limit 1, a square cap", [](Style & t) { t.s.miter_limit = 1.0; t.s.cap = GSHSCENE_STROKE_CAP_SQUARE; }, 1.5L},
+      {"miter-clip: the limit and one more", [](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_MITER_CLIP; }, 5.0L},
+      {"arcs: the limit and one more", [](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_ARCS; t.s.miter_limit = 1.5; }, 2.5L},
+      {"round", [](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_ROUND; }, 1.0L},
+      {"bevel", [](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_BEVEL; }, 1.0L},
+      {"round join, square cap", [](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_ROUND; t.s.cap = GSHSCENE_STROKE_CAP_SQUARE; }, 1.5L},
+      {"round join, round cap", [](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_ROUND; t.s.cap = GSHSCENE_STROKE_CAP_ROUND; }, 1.0L},
+      {"inside: twice", [](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_ROUND; t.s.alignment = GSHSCENE_STROKE_ALIGN_INSIDE; }, 2.0L},
+      {"outside: twice", [](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_BEVEL; t.s.alignment = GSHSCENE_STROKE_ALIGN_OUTSIDE; }, 2.0L},
+      {"miter-clip outside", [](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_MITER_CLIP; t.s.alignment = GSHSCENE_STROKE_ALIGN_OUTSIDE; }, 10.0L},
+      {"dashes never enlarge it", [](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_ROUND; t.dash({0.0, 1.0}); t.s.cap = GSHSCENE_STROKE_CAP_ROUND; }, 1.0L},
+      {"a limit past 2^16 / 2 plus one", [](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_MITER_CLIP; t.s.miter_limit = 65536.0; }, 65537.0L},
+  };
+  for (const Case & c : cases) {
+    Style st;
+    st.s.width = 2.0;
+    c.set(st);
+    GSHGEOM_Bounds b = bound_of(s.store, st, 1.0, 2.0, 5.0, 3.0, id);
+    expect_outset(b, 1.0, 2.0, 5.0, 3.0, c.h, c.what);
+  }
+}
+
+TEST(StrokeBounds, LocalWidthIsMappedAndDeviceWidthIsNot) {
+  StoreHolder s;
+  Style local;
+  local.s.width = 2.0;
+  local.s.join = GSHSCENE_STROKE_JOIN_ROUND;
+  Style device = local;
+  device.s.width_space = GSHSCENE_STROKE_WIDTH_DEVICE;
+  // A scale of (4, 0.5) and a translation: local width outsets in model space and is mapped, so the pen is 8 by 1;
+  // device width outsets the mapped box by 1 pixel in each direction.
+  GSHGEOM_Map m = map_of(4.0, 0.0, 0.0, 0.5, 10.0, 20.0);
+  GSHGEOM_Bounds lb = bound_of(s.store, local, 0.0, 0.0, 2.0, 4.0, m);
+  expect_outset(lb, 10.0 - 4.0, 20.0 - 0.5, 18.0 + 4.0, 22.0 + 0.5, 0.0L, "local");
+  GSHGEOM_Bounds db = bound_of(s.store, device, 0.0, 0.0, 2.0, 4.0, m);
+  expect_outset(db, 10.0, 20.0, 18.0, 22.0, 1.0L, "device");
+  // A rotation by a quarter turn exchanges the axes.
+  GSHGEOM_Map q = map_of(0.0, -1.0, 1.0, 0.0);
+  GSHGEOM_Bounds rb = bound_of(s.store, local, 0.0, 0.0, 2.0, 4.0, q);
+  expect_outset(rb, -4.0, 0.0, 0.0, 2.0, 1.0L, "rotated");
+  // A stream's device pixel is 1/96 inch in its unit (K8): millimetres, points, inches.
+  struct U {
+    uint32_t unit;
+    long double size;
+  } units[] = {{GSHSCENE_UNIT_PIXEL, 1.0L}, {GSHSCENE_UNIT_MILLIMETER, 25.4L / 96.0L}, {GSHSCENE_UNIT_POINT, 0.75L},
+      {GSHSCENE_UNIT_INCH, 1.0L / 96.0L}};
+  for (const U & u : units) {
+    GSHGEOM_Bounds ub = bound_of(s.store, device, 0.0, 0.0, 2.0, 4.0, m, u.unit);
+    expect_outset(ub, 10.0, 20.0, 18.0, 22.0, u.size, "a device pixel in a stream's unit");
+    GSHGEOM_Bounds lu = bound_of(s.store, local, 0.0, 0.0, 2.0, 4.0, m, u.unit);
+    EXPECT_EQ(std::memcmp(&lu, &lb, sizeof lu), 0) << "a local width ignores the unit";
+  }
+  EXPECT_EQ(gshscene_stroke_pixel_size(GSHSCENE_UNIT_DEFAULT), 1.0);
+  EXPECT_EQ(gshscene_stroke_pixel_size(GSHSCENE_UNIT_PIXEL), 1.0);
+  EXPECT_EQ(gshscene_stroke_pixel_size(GSHSCENE_UNIT_MILLIMETER), 25.4 / 96.0);
+  EXPECT_EQ(gshscene_stroke_pixel_size(GSHSCENE_UNIT_POINT), 0.75);
+  EXPECT_EQ(gshscene_stroke_pixel_size(GSHSCENE_UNIT_INCH), 1.0 / 96.0);
+  EXPECT_EQ(gshscene_stroke_pixel_size(GSHSCENE_UNIT_COUNT), 0.0);
+}
+
+TEST(StrokeBounds, EmptyAndZeroWidthAndRefusals) {
+  StoreHolder s;
+  GSHGEOM_Map id = translate(0, 0);
+  Style zero;
+  zero.s.width = 0.0;
+  GSHGEOM_Bounds b = bound_of(s.store, zero, 0, 0, 4, 4, id);
+  EXPECT_EQ(b.empty, 1) << "SK8: width 0 covers nothing";
+  Ref style;
+  Style st;
+  ASSERT_EQ(intern(s.store, st, &style), GSHSCENE_OK);
+  GSHGEOM_Bounds empty{};
+  empty.empty = 1;
+  GSHGEOM_Bounds out;
+  ASSERT_EQ(gshscene_stroke_bounds(style.get(), &empty, &id, GSHSCENE_UNIT_DEFAULT, &out), GSHSCENE_OK);
+  EXPECT_EQ(out.empty, 1);
+  GSHGEOM_Bounds box{};
+  box.max = P(1, 1);
+  Ref path(intern_square(s.store));
+  GSHGEOM_Map m3;
+  gshgeom_map_identity(3, &m3);
+  EXPECT_EQ(gshscene_stroke_bounds(path.get(), &box, &id, 0, &out), GSHSCENE_ERR_INVALID) << "not a style";
+  EXPECT_EQ(gshscene_stroke_bounds(nullptr, &box, &id, 0, &out), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_stroke_bounds(style.get(), nullptr, &id, 0, &out), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_stroke_bounds(style.get(), &box, nullptr, 0, &out), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_stroke_bounds(style.get(), &box, &id, 0, nullptr), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_stroke_bounds(style.get(), &box, &m3, 0, &out), GSHSCENE_ERR_INVALID) << "a 3D map";
+  EXPECT_EQ(gshscene_stroke_bounds(style.get(), &box, &id, GSHSCENE_UNIT_COUNT, &out), GSHSCENE_ERR_INVALID);
+  // A box the map takes past the doubles: the bound is unknown.
+  GSHGEOM_Bounds far{};
+  far.max = P(1e300, 1);
+  GSHGEOM_Map huge = map_of(1e29, 0, 0, 1);
+  Style wide;
+  wide.s.width = std::ldexp(1.0, 64);
+  Ref wr;
+  ASSERT_EQ(intern(s.store, wide, &wr), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_stroke_bounds(wr.get(), &far, &huge, 0, &out), GSHSCENE_ERR_LIMIT);
+}
+
+TEST(StrokeBounds, TheOutsetIsRoundedOutward) {
+  // A box at 1e16 (where a double's spacing is 2) outset by a quarter: rounding to nearest would give the box back.
+  StoreHolder s;
+  Style st;
+  st.s.width = 0.5;
+  st.s.join = GSHSCENE_STROKE_JOIN_ROUND;
+  GSHGEOM_Map id = translate(0, 0);
+  GSHGEOM_Bounds b = bound_of(s.store, st, 1e16, -1e16, 1e16, -1e16, id);
+  EXPECT_LT(b.min.x, 1e16);
+  EXPECT_GT(b.max.x, 1e16);
+  EXPECT_LT(b.min.y, -1e16);
+  EXPECT_GT(b.max.y, -1e16);
+  Style dv = st;
+  dv.s.width_space = GSHSCENE_STROKE_WIDTH_DEVICE;
+  b = bound_of(s.store, dv, 1e16, 0.0, 1e16, 0.0, id);
+  EXPECT_LT(b.min.x, 1e16);
+  EXPECT_GT(b.max.x, 1e16);
+  EXPECT_LT(b.min.y, 0.0);
+  EXPECT_GT(b.max.y, 0.0);
+  // At zero the outward step from 0 is not lost either.
+  Style tiny;
+  tiny.s.width = std::ldexp(1.0, -64);
+  b = bound_of(s.store, tiny, 0.0, 0.0, 0.0, 0.0, id);
+  EXPECT_LT(b.min.x, 0.0);
+  EXPECT_GT(b.max.x, 0.0);
+}
+
+/* --- SK10, N13: the damage of strokes ---------------------------------------------------------------- */
+
+namespace {
+
+GSHSCENE_Damage damage_of(const GSHSCENE_Version * a, const GSHSCENE_Version * b, const GSHGEOM_Map * map = nullptr) {
+  GSHSCENE_Diff * d = nullptr;
+  GSHSCENE_Damage out{};
+  EXPECT_EQ(gshscene_diff(a, b, map, nullptr, &d), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_diff_damage(d, &out), GSHSCENE_OK);
+  gshscene_diff_destroy(d);
+  return out;
+}
+
+/**
+ * Whether the damage covers the real region (x0, y0, x1, y1) in pixels, outset by the AA support (1) and rounded
+ * outward, and is at most one pixel larger on each side (SK10's cover and the mapping's rounding).
+ */
+void expect_covers(const GSHSCENE_Damage & d, double x0, double y0, double x1, double y1, const char * what) {
+  ASSERT_EQ(d.unbounded, 0) << what;
+  ASSERT_EQ(d.empty, 0) << what;
+  const int64_t want[4] = {(int64_t)std::floor(x0 - 1.0), (int64_t)std::floor(y0 - 1.0), (int64_t)std::ceil(x1 + 1.0),
+      (int64_t)std::ceil(y1 + 1.0)};
+  EXPECT_LE(d.rect.x0, want[0]) << what;
+  EXPECT_LE(d.rect.y0, want[1]) << what;
+  EXPECT_GE(d.rect.x1, want[2]) << what;
+  EXPECT_GE(d.rect.y1, want[3]) << what;
+  EXPECT_GE(d.rect.x0, want[0] - 1) << what << ": loose";
+  EXPECT_GE(d.rect.y0, want[1] - 1) << what;
+  EXPECT_LE(d.rect.x1, want[2] + 1) << what;
+  EXPECT_LE(d.rect.y1, want[3] + 1) << what;
+}
+
+}  // namespace
+
+TEST(StrokeDamage, AChangedStrokeDamagesItsBoundsInBothVersions) {
+  SceneHolder s;
+  Ref square(intern_square(s.store())); // 0..4
+  Ref miter, round, inside, device;
+  Style m;
+  m.s.width = 2.0;
+  Style r = m;
+  r.s.join = GSHSCENE_STROKE_JOIN_ROUND;
+  Style in = r;
+  in.s.alignment = GSHSCENE_STROKE_ALIGN_INSIDE;
+  Style dv = r;
+  dv.s.width_space = GSHSCENE_STROKE_WIDTH_DEVICE;
+  ASSERT_EQ(intern(s.store(), m, &miter), GSHSCENE_OK);
+  ASSERT_EQ(intern(s.store(), r, &round), GSHSCENE_OK);
+  ASSERT_EQ(intern(s.store(), in, &inside), GSHSCENE_OK);
+  ASSERT_EQ(intern(s.store(), dv, &device), GSHSCENE_OK);
+  VersionRef v0, v1, v2, v3, v4;
+  uint64_t id = 0;
+  {
+    EditHolder e(s);
+    v0.reset(nullptr);
+    publish(s, e, &v0);
+  }
+  {
+    EditHolder e(s);
+    GSHSCENE_Node n = stroke_node(square.get(), round.get());
+    n.map = translate(10, 10);
+    id = add(e.edit, GSHSCENE_ROOT_ID, n);
+    publish(s, e, &v1);
+  }
+  // Round: h = 1: the square 10..14 outset to 9..15.
+  expect_covers(damage_of(v0.get(), v1.get()), 9, 9, 15, 15, "an added round stroke");
+  {
+    EditHolder e(s);
+    GSHSCENE_Node n = info_of(v1.get(), id).node;
+    n.style = miter.get();
+    ASSERT_EQ(gshscene_edit_set(e.edit, id, &n), GSHSCENE_OK);
+    publish(s, e, &v2);
+  }
+  // Miter (limit 4): h = 4: 6..18, and the round version inside it.
+  expect_covers(damage_of(v1.get(), v2.get()), 6, 6, 18, 18, "round to miter");
+  expect_covers(damage_of(v2.get(), v1.get()), 6, 6, 18, 18, "miter to round");
+  {
+    EditHolder e(s);
+    GSHSCENE_Node n = info_of(v2.get(), id).node;
+    n.style = inside.get();
+    ASSERT_EQ(gshscene_edit_set(e.edit, id, &n), GSHSCENE_OK);
+    publish(s, e, &v3);
+  }
+  // Inside (round): twice the width, h = 2: 8..16.
+  expect_covers(damage_of(v1.get(), v3.get()), 8, 8, 16, 16, "round to inside");
+  {
+    EditHolder e(s);
+    GSHSCENE_Node n = info_of(v1.get(), id).node;
+    n.style = device.get();
+    ASSERT_EQ(gshscene_edit_set(e.edit, id, &n), GSHSCENE_OK);
+    publish(s, e, &v4);
+  }
+  // Device width under a zoom of 4: the local stroke's pen is mapped (h = 4 pixels), the device stroke's is not (1).
+  GSHGEOM_Map zoom = map_of(4, 0, 0, 4);
+  GSHSCENE_Damage dz = damage_of(v1.get(), v4.get(), &zoom);
+  // Local: (10 - 1) * 4 to (14 + 1) * 4, 36..60.  Device: 40..56 outset by 1 pixel, 39..57, inside it.
+  expect_covers(dz, 36, 36, 60, 60, "local and device under a zoom");
+  GSHSCENE_Damage only_device = damage_of(v0.get(), v4.get(), &zoom);
+  expect_covers(only_device, 39, 39, 57, 57, "a device stroke's pen is not zoomed");
+}
+
+TEST(StrokeDamage, AForegroundChangeDamagesTheStrokesThatPaintWithIt) {
+  SceneHolder s;
+  Ref a(intern_square(s.store(), 0.0));
+  Ref style;
+  Style st;
+  st.s.join = GSHSCENE_STROKE_JOIN_ROUND;
+  ASSERT_EQ(intern(s.store(), st, &style), GSHSCENE_OK);
+  VersionRef v1, v2;
+  {
+    EditHolder e(s);
+    GSHSCENE_Node fg = stroke_node(a.get(), style.get());
+    fg.paint = paint_of(GSHSCENE_PAINT_FOREGROUND, 1.0);
+    fg.map = translate(20, 0);
+    add(e.edit, GSHSCENE_ROOT_ID, fg);
+    GSHSCENE_Node plain = stroke_node(a.get(), style.get());
+    plain.map = translate(100, 100);
+    add(e.edit, GSHSCENE_ROOT_ID, plain);
+    publish(s, e, &v1);
+  }
+  {
+    EditHolder e(s);
+    GSHSCENE_Color red;
+    gshscene_color_init(&red);
+    red.rgba[0] = 1.0;
+    ASSERT_EQ(gshscene_edit_set_foreground(e.edit, &red), GSHSCENE_OK);
+    publish(s, e, &v2);
+  }
+  // Only the foreground stroke (round, h = 0.5): 19.5..24.5 by -0.5..4.5; the other stroke, at 100, is not in it.
+  GSHSCENE_Damage d = damage_of(v1.get(), v2.get());
+  expect_covers(d, 19.5, -0.5, 24.5, 4.5, "the stroke that paints with the foreground");
+}
+
+TEST(StrokeDamage, AStrokeOfARunFromAnUnboundFaceIsUnbounded) {
+  SceneHolder s;
+  Ref face(intern_face(s.store()));
+  Ref run(intern_font_run(s.store(), face.get(), 12.0, {{1, 0.0, 0.0, nullptr}}));
+  Ref style;
+  Style st;
+  ASSERT_EQ(intern(s.store(), st, &style), GSHSCENE_OK);
+  VersionRef v1, v2;
+  {
+    EditHolder e(s);
+    publish(s, e, &v1);
+  }
+  {
+    EditHolder e(s);
+    add(e.edit, GSHSCENE_ROOT_ID, stroke_node(run.get(), style.get()));
+    publish(s, e, &v2);
+  }
+  EXPECT_EQ(damage_of(v1.get(), v2.get()).unbounded, 1);
 }
 
 int main(int argc, char ** argv) {

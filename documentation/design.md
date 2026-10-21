@@ -10,7 +10,7 @@ conversion of their stops at draw time, the notices of what draws nothing) are i
 them in story P2. Blend modes (color-paint story P3: the fifteen modes of W3C Compositing and Blending Level 1 as
 composite operators 13 to 27, B1 to B14) are implemented scene-side: the scene names, validates, hashes and plans them,
 and a sink composites them. Strokes (strokes story S1: a centerline plus an interned style, SK1 to SK14, below) are being
-added to the waist; the style resource is implemented.
+added to the waist; the style resource, the stroke item, the stroke node and their bounds and damage are implemented.
 
 The shape family waist: resources and lists, and the versioned scene above them.
 
@@ -326,13 +326,69 @@ reduced modulo the period, which is the dash arithmetic's) and width 0 is kept (
 meaning becomes one spelling: if the store kept the arrays as given, a writer, a cache keyed by hash and the diff would
 all see two strokes where the drawing has one.
 
+**SK4 The stroke item.** `gshscene_list_stroke(list, centerline, style, map, paint, layer, depth)` records
+`GSHSCENE_ITEM_STROKE` (7): a centerline that is a path or a glyph run of the list's store (a 3D path, or a run whose
+outline is one, is `ERR_UNSUPPORTED`: the stroke is planar, and a 3D map likewise, as 3D node maps are); a style of the
+list's store; a map and a paint as a fill's (any paint kind, N1's bound, the palette and gradient rules unchanged); a
+layer and a depth. The item's `fill_rule` is nonzero and its `group` zero (the alignment rule is the style's), and its
+`style` names the style (NULL on every other kind). The list holds a reference on the centerline and on the style. A
+stroke is one unit of its sequence (N11) and one element of a knockout group (T3), because its region is one union.
+
+**SK5 What a stroke draws.** N7 with the stroke's covered region `R` in place of the shape: `apply(L, S, k * c,
+SRC_OVER)` with `k` the coverage of `R` (exact area for a raster sink, AD-12) and `S` the paint as N7, N10, N14 and
+G12 give it. `R` is defined once, by `shape-geometry`: the body within half the width of the centerline with joins and
+caps; a local width built in the centerline's model space and then mapped; a device width built in target space around
+the mapped centerline (a pixel kind's pixels; on a stream the CSS reference pixel, 1/96 inch, in the target's stated
+unit, `gshscene_stroke_pixel_size`, so a hairline means one pixel on a raster and in a PDF alike); dashes cut before
+the body; inside and outside alignment a centered stroke of twice the width clipped to the centerline's fill region
+under the alignment rule, or to its complement, closed subpaths only; one union over the item. Orientation is AD-6's,
+stated by `shape-geometry` and never here.
+
+**SK6 Paint.** A stroke's paint is sampled in the item's local space for both width spaces: G6's chain unchanged. A
+front end that wants SVG's `objectBoundingBox` on a stroke folds the geometry's box (without the stroke, as SVG says)
+into `G`, as it does for a fill.
+
+**SK7 A glyph run as centerline.** A stroke of a run always takes the general, unhinted route: the planning pass does
+not route it, writes no `HINT_STATUS` for it and never refuses it for hinting (a `FONT_STRICT` run included). A run from
+a font needs `GLYPHS_FROM_FONT`, as a fill does.
+
+**SK10 Bounds and damage.** A stroke occurrence's bounds are conservative, from the style alone: `h = width / 2 *
+max(1, f_join, f_cap) * a` with `f_join` the miter limit for a miter (its tip is `1 / sin(θ / 2)` half widths from the
+vertex, at most the limit), the miter limit plus one for miter-clip and arcs (a clipped corner is the limit's half
+widths along the bisector and up to one across it, so `sqrt(L^2 + 1) <= L + 1` away: the limit alone would be passed
+by a sharp clipped corner), and 1 otherwise; `f_cap` 3/2 for a square cap (above `sqrt 2`); `a` 2
+for inside and outside. A local width outsets the centerline's model box by `h` and maps it; a device width maps the
+box and outsets it by `h` in target units. `h` is formed with its five roundings covered (scaled by `1 + 2^-50`) and
+each outset rounded outward (TwoSum's error decides), so the bound is never below the real one; the corners' mapping is
+a fill's. Dashes never enlarge it, and width 0 bounds nothing. `gshscene_stroke_bounds` is the one evaluation. N13 is
+extended: a changed stroke node damages its bounds in both versions, and a changed foreground or palette damages the
+strokes that paint with it; a stroke of a run from an unbound face is unbounded. `tests/unit/test_diff.cpp`'s oracle
+restates where a stroke can reach from the geometry of its polyline (each segment's body, a miter's tip within its
+limit, a miter-clip's clipped corners, discs for round joins and caps, a square cap's corners, a cap at any point for a
+dashed stroke, twice the width inside and outside), sharing nothing with that function, and requires every pixel it
+finds drawn differently to lie inside the damage.
+
 **SK12 Hash and dump (the style).** Every format stays 1, and no existing hash or dump changes: no resource from before
 strokes is a style. Resource kind 8, format 1: `u32` 1, `u32` 8, `f64` width, `u8` width space, `u8` join, `f64` miter
 limit, `u8` cap, `u8` degenerate, `u8` alignment, `u8` alignment rule, `u8` dash scope, `f64` dash offset, `u64` the
 dash count, `f64` each dash (canonical), `u64` the width profile's content hash (0 for none). The dump's payload is
 `stroke width=<hex> space=N join=N miter=<hex> cap=N degenerate=N align=N rule=N scope=N offset=<hex> dashes=N
 profile=<hash>` and a line `d <hex>` per dash. A style costs `GSHSCENE_BYTES_PER_DASH` (16) accounted bytes a dash.
-`tools/gen-scene-vectors.py` restates the canonical form, the hash and the dump from this text alone.
+`tools/gen-scene-vectors.py` restates the canonical form, the hash and the dump from this text alone. The **list item**:
+`u8` 7, `u64` the centerline's content hash, `u64` the style's, `u64` the map's hash, the paint as a fill spells it,
+`i32` layer, `f64` depth; its dump line `K res=<kind>:<hash> style=<hash> map=<hash> paint=N <r> <g> <b> <a>
+space=<space> entry=E gradient=<hash> layer=N depth=<hex>`. The **version node** (kind 4) is spelled as a shape with
+`u64` the style's hash after the resource's, and its dump line is a shape's with `K` for `S` and ` style=<hash>` after
+the resource.
+
+**SK13 The retained scene.** `GSHSCENE_NODE_STROKE` (4): a centerline, a style, a map, a paint, a layer and a depth,
+set by an edit like any node (an upsert by key as for a shape, so a re-lowering keeps its ID and an identical one
+publishes nothing), emitted as one stroke item with its placement composed, visited, diffed and damaged (SK10). The
+walk hands a stroke to the same leaf callback as a shape, which reads the kind.
+
+**SK14 Fill and stroke of one element.** Two items, or two nodes: the fill, then the stroke, in the order the format's
+paint order gives (SVG's `paint-order`; markers are items of their own). A front end that needs them composited as one
+(an element's opacity) wraps them in a group, as now. Nothing new is defined: it is SVG's and PDF's semantics exactly.
 
 ## Blend modes (normative; color-paint story P3)
 
@@ -673,7 +729,8 @@ and, for the numbers, `core.h`.
 nodes are shared between versions by reference count and the index is the version's own. A node is a
 group (children in draw order, a map, an opacity, a blend space, a composite operator, an ordering context, a
 layer and a depth, an optional clip), a shape (a path or glyph run under a map, a rule, a paint, a layer and a
-depth) or an instance (another node of the version, drawn again).
+depth), a stroke (a centerline under a map with a stroke style, a paint, a layer and a depth; SK13) or an instance
+(another node of the version, drawn again).
 Any node may be hidden, which is how a definition is written: drawn only through an instance. The hash of
 a version is over the foreground and the nodes in ID order and nothing else, so it does not depend on the version's number,
 the allocator, a handle or the history that made it; `version.h` states the spelling and
@@ -704,7 +761,8 @@ thousand items; an origin table says which node each item came from, which is wh
 **Damage** is computed over occurrences in both versions: a node whose own properties changed damages its
 whole subtree, a group whose children changed damages the children added and removed (and all of them if
 their order changed), and an instance of a changed node is reached by the walk. Each shape occurrence's
-bounds are its path's exact bounds mapped by the composed map, outset by the AA support and rounded outward.
+bounds are its path's exact bounds mapped by the composed map, outset by the AA support and rounded outward; a
+stroke occurrence's are SK10's.
 Where bounds are unknowable (a glyph run named by a font, a 3D path, a map that cannot be applied) the
 damage says unbounded. `tests/unit/test_diff.cpp` checks it against an oracle that shares none of its
 structure: for random scenes and edits it requires every pixel whose ordered drawing records differ to lie

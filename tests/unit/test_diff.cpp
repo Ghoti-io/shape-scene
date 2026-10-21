@@ -747,6 +747,181 @@ struct Rng {
   unsigned below(unsigned n) { return (unsigned)(next() % n); }
 };
 
+/**
+ * Where a stroke occurrence can touch (strokes story S1), restated from the geometry and not from SK10's formula: the
+ * extreme points of its body, joins and caps, built for the polyline centerlines the oracle uses.  For each segment
+ * the corners of its body; at each vertex the join's own points (a miter's tip within its limit, else the bevel's
+ * corners; a miter-clip's clipped corners past it; a round join's disc); at each end of an open subpath its cap (a
+ * square's corners, a round cap's disc); with dashes a cap may stand at any point, so each segment gets its cap at both
+ * ends in both directions.  Inside and outside alignment are within a centered stroke of twice the width (closed
+ * subpaths; an open one is centered).  A local width builds in model space and maps every point (a disc as the
+ * ellipse's box); a device width maps the centerline and builds in pixels.  Shares nothing with gshscene_stroke_bounds.
+ */
+struct Reach {
+  bool any = false;
+  double x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+  void add(double x, double y) {
+    if (!any) {
+      x0 = x1 = x;
+      y0 = y1 = y;
+      any = true;
+      return;
+    }
+    x0 = std::min(x0, x);
+    x1 = std::max(x1, x);
+    y0 = std::min(y0, y);
+    y1 = std::max(y1, y);
+  }
+};
+
+struct V2 {
+  double x, y;
+};
+
+inline V2 operator+(V2 a, V2 b) { return {a.x + b.x, a.y + b.y}; }
+inline V2 operator-(V2 a, V2 b) { return {a.x - b.x, a.y - b.y}; }
+inline V2 operator*(double k, V2 a) { return {k * a.x, k * a.y}; }
+inline double dot(V2 a, V2 b) { return a.x * b.x + a.y * b.y; }
+inline V2 unit(V2 a) {
+  double n = std::sqrt(dot(a, a));
+  return {a.x / n, a.y / n};
+}
+inline V2 left(V2 a) { return {-a.y, a.x}; }
+
+void stroke_reach(const GSHGEOM_Path * path, const GSHSCENE_Stroke_Style & st, const GSHGEOM_Map & map, Reach * out) {
+  // The subpaths, as point lists, mapped first for a device width.
+  bool device = st.width_space == GSHSCENE_STROKE_WIDTH_DEVICE;
+  std::vector<std::pair<std::vector<V2>, bool>> subpaths;
+  for (size_t i = 0; i < gshgeom_path_element_count(path); i++) {
+    GSHGEOM_Element e;
+    EXPECT_EQ(gshgeom_path_element(path, i, &e), GSHGEOM_OK);
+    V2 q = {e.curve.p[1].x, e.curve.p[1].y};
+    if (device) {
+      GSHGEOM_Point m;
+      EXPECT_EQ(gshgeom_map_apply_point(&map, P(q.x, q.y), &m), GSHGEOM_OK);
+      q = {m.x, m.y};
+    }
+    if (e.verb == GSHGEOM_VERB_MOVE) {
+      subpaths.push_back({{q}, false});
+    } else if (e.verb == GSHGEOM_VERB_LINE) {
+      subpaths.back().first.push_back(q);
+    } else if (e.verb == GSHGEOM_VERB_CLOSE) {
+      subpaths.back().second = true;
+    } else {
+      ADD_FAILURE() << "the oracle's centerlines are polylines";
+    }
+  }
+  bool dashed = st.dash_count > 0;
+  double L = st.miter_limit;
+  // Points of the region, and discs (center, radius), in the space the stroke is built in.
+  std::vector<V2> points;
+  std::vector<std::pair<V2, double>> discs;
+  for (auto & sp : subpaths) {
+    std::vector<V2> pts = sp.first;
+    bool closed = sp.second;
+    if (closed && pts.size() > 1) {
+      pts.push_back(pts.front()); // the closing line
+    }
+    double h = st.width / 2 * (closed && st.alignment != GSHSCENE_STROKE_ALIGN_CENTER ? 2.0 : 1.0);
+    size_t n = pts.size();
+    for (size_t k = 0; k + 1 < n; k++) {
+      V2 d = unit(pts[k + 1] - pts[k]);
+      V2 m = left(d);
+      for (V2 c : {pts[k], pts[k + 1]}) {
+        points.push_back(c + h * m);
+        points.push_back(c - h * m);
+      }
+      if (dashed) {
+        // A dash may end at any point: a cap at each end of the segment, each way.
+        for (V2 c : {pts[k], pts[k + 1]}) {
+          if (st.cap == GSHSCENE_STROKE_CAP_SQUARE) {
+            for (double sgn : {1.0, -1.0}) {
+              points.push_back(c + h * m + sgn * h * d);
+              points.push_back(c - h * m + sgn * h * d);
+            }
+          } else if (st.cap == GSHSCENE_STROKE_CAP_ROUND) {
+            discs.push_back({c, h});
+          }
+        }
+      }
+    }
+    // Vertices: the interior points, and a closed subpath's start.
+    size_t vertices = closed ? n - 1 : (n >= 2 ? n - 2 : 0);
+    for (size_t v = 0; v < vertices; v++) {
+      size_t at = closed ? v : v + 1;
+      V2 V = pts[at];
+      V2 prev = closed ? (at == 0 ? pts[n - 2] : pts[at - 1]) : pts[at - 1];
+      V2 next = pts[at + 1];
+      V2 a = unit(V - prev);
+      V2 b = unit(next - V);
+      double turn = dot(b, left(a));
+      if (st.join == GSHSCENE_STROKE_JOIN_ROUND) {
+        discs.push_back({V, h});
+        continue;
+      }
+      if (turn == 0.0) {
+        continue; // straight on, or a reversal (none in the oracle's paths)
+      }
+      double side = turn > 0 ? -1.0 : 1.0; // the outer side is away from the turn
+      V2 oa = side * left(a);
+      V2 ob = side * left(b);
+      V2 u = unit(oa + ob);
+      double c = dot(oa, u); // sin of half the angle between the segments
+      bool within = 1.0 / c <= L * (1.0 + 1e-12);
+      if (st.join == GSHSCENE_STROKE_JOIN_MITER && within) {
+        points.push_back(V + (h / c) * u);
+      } else if (st.join == GSHSCENE_STROKE_JOIN_MITER_CLIP) {
+        if (within) {
+          points.push_back(V + (h / c) * u);
+        } else {
+          V2 A = V + h * oa;
+          V2 B = V + h * ob;
+          // Where the outer edges cross the line at L h along the bisector.
+          double la = (L * h - dot(A - V, u)) / dot(a, u);
+          double lb = (L * h - dot(B - V, u)) / dot(b, u);
+          points.push_back(A + la * a);
+          points.push_back(B + lb * b);
+        }
+      }
+    }
+    if (!closed && n >= 2) {
+      V2 ends[2] = {pts[0], pts[n - 1]};
+      V2 outs[2] = {unit(pts[0] - pts[1]), unit(pts[n - 1] - pts[n - 2])};
+      for (int e = 0; e < 2; e++) {
+        V2 m = left(outs[e]);
+        if (st.cap == GSHSCENE_STROKE_CAP_SQUARE) {
+          points.push_back(ends[e] + h * m + h * outs[e]);
+          points.push_back(ends[e] - h * m + h * outs[e]);
+        } else if (st.cap == GSHSCENE_STROKE_CAP_ROUND) {
+          discs.push_back({ends[e], h});
+        }
+      }
+    }
+  }
+  for (V2 p : points) {
+    if (device) {
+      out->add(p.x, p.y);
+    } else {
+      GSHGEOM_Point q;
+      EXPECT_EQ(gshgeom_map_apply_point(&map, P(p.x, p.y), &q), GSHGEOM_OK);
+      out->add(q.x, q.y);
+    }
+  }
+  for (auto & dc : discs) {
+    double ex = dc.second, ey = dc.second;
+    V2 c = dc.first;
+    if (!device) {
+      GSHGEOM_Point q;
+      EXPECT_EQ(gshgeom_map_apply_point(&map, P(c.x, c.y), &q), GSHGEOM_OK);
+      c = {q.x, q.y};
+      ex = dc.second * std::sqrt(map.m[0][0] * map.m[0][0] + map.m[0][1] * map.m[0][1]);
+      ey = dc.second * std::sqrt(map.m[1][0] * map.m[1][0] + map.m[1][1] * map.m[1][1]);
+    }
+    out->add(c.x - ex, c.y - ey);
+    out->add(c.x + ex, c.y + ey);
+  }
+}
+
 /** One drawing record of an occurrence of a shape: where it can touch, and everything that decides what it draws. */
 struct Op {
   double x0, y0, x1, y1;
@@ -759,6 +934,7 @@ uint64_t signature_of(const GSHSCENE_Version * v, const Occurrence & o) {
   gshgeom_hash_init(&h);
   GSHSCENE_Node_Info shape = info_of(v, o.node);
   gshgeom_hash_u64(&h, gshscene_resource_hash(shape.node.resource));
+  gshgeom_hash_u64(&h, shape.node.style ? gshscene_resource_hash(shape.node.style) : 0);
   gshgeom_hash_u8(&h, (uint8_t)shape.node.fill_rule);
   gshgeom_hash_i32(&h, shape.node.layer);
   gshgeom_hash_f64(&h, shape.node.depth);
@@ -820,6 +996,17 @@ std::vector<Op> ops_of(const GSHSCENE_Version * v, bool * unbounded) {
       ops.push_back(everywhere);
       continue;
     }
+    if (o.kind == GSHSCENE_NODE_STROKE) {
+      GSHSCENE_Node_Info stroke = info_of(v, o.node);
+      GSHSCENE_Stroke_Style st;
+      EXPECT_EQ(gshscene_resource_stroke_style(stroke.node.style, &st), GSHSCENE_OK);
+      Reach reach;
+      stroke_reach(gshscene_resource_path(stroke.node.resource), st, o.map, &reach);
+      if (reach.any && st.width > 0) {
+        ops.push_back(Op{reach.x0, reach.y0, reach.x1, reach.y1, signature_of(v, o)});
+      }
+      continue;
+    }
     if (o.kind != GSHSCENE_NODE_SHAPE) {
       continue;
     }
@@ -873,7 +1060,9 @@ std::vector<uint64_t> column(const std::vector<Op> & ops, int px, int py) {
 struct Case {
   SceneHolder s;
   std::vector<Ref> paths;
-  Ids groups, defs, shapes, instances;
+  std::vector<Ref> open_paths; // polylines with sharp turns, and a closed one with an acute corner
+  std::vector<Ref> styles;
+  Ids groups, defs, shapes, instances, strokes;
   Rng rng;
   explicit Case(uint64_t seed) : rng(seed) {
     for (int i = 0; i < 6; i++) {
@@ -887,6 +1076,60 @@ struct Case {
       paths.emplace_back(intern(s.store(), p));
       gshgeom_path_destroy(p);
     }
+    const std::vector<std::vector<std::pair<double, double>>> polylines = {
+        {{0, 0}, {6, 1}, {0, 2}, {5, 4}}, {{0, 0}, {9, 0}, {9, 7}}, {{0, 3}, {4, 0}, {8, 3}, {12, 0}}};
+    for (const auto & pl : polylines) {
+      GSHGEOM_Path * p = new_path();
+      gshgeom_path_move_to(p, P(pl[0].first, pl[0].second));
+      for (size_t i = 1; i < pl.size(); i++) {
+        gshgeom_path_line_to(p, P(pl[i].first, pl[i].second));
+      }
+      open_paths.emplace_back(intern(s.store(), p));
+      gshgeom_path_destroy(p);
+    }
+    GSHGEOM_Path * t = new_path();
+    gshgeom_path_move_to(t, P(0, 0));
+    gshgeom_path_line_to(t, P(10, 1));
+    gshgeom_path_line_to(t, P(0, 3));
+    gshgeom_path_close(t);
+    open_paths.emplace_back(intern(s.store(), t));
+    gshgeom_path_destroy(t);
+    // Styles that reach the factors of SK10: miter limits from 1 to 10, miter-clip past its limit, square and round
+    // caps, inside and outside alignment, dashes, local and device width, widths to 8.
+    const uint32_t joins[4] = {GSHSCENE_STROKE_JOIN_MITER, GSHSCENE_STROKE_JOIN_ROUND, GSHSCENE_STROKE_JOIN_BEVEL,
+        GSHSCENE_STROKE_JOIN_MITER_CLIP};
+    const double limits[4] = {1.0, 1.5, 4.0, 10.0};
+    const double dashes[2] = {2.0, 1.0};
+    for (int i = 0; i < 24; i++) {
+      GSHSCENE_Stroke_Style st;
+      gshscene_stroke_style_init(&st);
+      st.width = 0.5 + 0.5 * (double)rng.below(16);
+      st.join = joins[rng.below(4)];
+      st.miter_limit = limits[rng.below(4)];
+      st.cap = rng.below(3);
+      st.alignment = rng.below(4) == 0 ? 1 + rng.below(2) : 0;
+      st.width_space = rng.below(4) == 0 ? GSHSCENE_STROKE_WIDTH_DEVICE : GSHSCENE_STROKE_WIDTH_LOCAL;
+      if (rng.below(4) == 0) {
+        st.dash_count = 2;
+        st.dashes = dashes;
+      }
+      const GSHSCENE_Resource * r = nullptr;
+      EXPECT_EQ(gshscene_store_intern_stroke_style(s.store(), &st, &r), GSHSCENE_OK);
+      styles.emplace_back(r);
+    }
+  }
+  const GSHSCENE_Resource * style() { return styles[rng.below((unsigned)styles.size())].get(); }
+  GSHSCENE_Node stroke() {
+    GSHSCENE_Node n = stroke_node(rng.below(3) == 0 ? path() : open_paths[rng.below((unsigned)open_paths.size())].get(),
+        style(), (int32_t)rng.below(4));
+    n.map = map();
+    n.paint = solid(rng.below(3) / 2.0, rng.below(2), 0.25, 1.0 - rng.below(2) * 0.5);
+    n.depth = (double)rng.below(3) * 0.5;
+    if (rng.below(4) == 0) {
+      n.paint = solid(0, 0, 0, 1.0 - rng.below(2) * 0.5);
+      n.paint.kind = GSHSCENE_PAINT_FOREGROUND;
+    }
+    return n;
   }
   const GSHSCENE_Resource * path() { return paths[rng.below((unsigned)paths.size())].get(); }
   GSHGEOM_Map map() {
@@ -948,10 +1191,17 @@ struct Case {
       for (unsigned k = 0; k < 1 + rng.below(3); k++) {
         shapes.push_back(add(e.edit, id, shape()));
       }
+      if (rng.below(2) == 0) {
+        strokes.push_back(add(e.edit, id, stroke()));
+      }
     }
     unsigned ns = 3 + rng.below(6);
     for (unsigned i = 0; i < ns; i++) {
       shapes.push_back(add(e.edit, any(groups), shape()));
+    }
+    unsigned nk = 1 + rng.below(4);
+    for (unsigned i = 0; i < nk; i++) {
+      strokes.push_back(add(e.edit, any(groups), stroke()));
     }
     unsigned ni = 1 + rng.below(4);
     for (unsigned i = 0; i < ni; i++) {
@@ -965,7 +1215,28 @@ struct Case {
   void mutate(EditHolder & e) {
     unsigned n = 1 + rng.below(3);
     for (unsigned i = 0; i < n; i++) {
-      switch (rng.below(9)) {
+      switch (rng.below(12)) {
+        case 9: {
+          // A stroke's style, width or join changed; or its map.
+          uint64_t id = any(strokes);
+          GSHSCENE_Node_Info info;
+          if (id != 0 && gshscene_edit_node(e.edit, id, &info) == GSHSCENE_OK) {
+            GSHSCENE_Node k = info.node;
+            if (rng.below(2) == 0) {
+              k.style = style();
+            } else {
+              k.map = map();
+            }
+            gshscene_edit_set(e.edit, id, &k);
+          }
+          break;
+        }
+        case 10:
+          strokes.push_back(add(e.edit, any(groups), stroke()));
+          break;
+        case 11:
+          gshscene_edit_remove(e.edit, any(strokes));
+          break;
         case 0: {
           GSHSCENE_Node s = shape();
           gshscene_edit_set(e.edit, any(shapes), &s);

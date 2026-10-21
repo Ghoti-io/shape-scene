@@ -133,6 +133,16 @@ inline GSHSCENE_Node shape_node(const GSHSCENE_Resource * resource, int32_t laye
   return n;
 }
 
+/** A stroke node (stroke.h, SK13): a centerline under a style, opaque black. */
+inline GSHSCENE_Node stroke_node(const GSHSCENE_Resource * centerline, const GSHSCENE_Resource * style, int32_t layer = 0) {
+  GSHSCENE_Node n;
+  gshscene_node_init(GSHSCENE_NODE_STROKE, &n);
+  n.resource = centerline;
+  n.style = style;
+  n.layer = layer;
+  return n;
+}
+
 inline GSHSCENE_Node instance_node(uint64_t target, int32_t layer = 0) {
   GSHSCENE_Node n;
   gshscene_node_init(GSHSCENE_NODE_INSTANCE, &n);

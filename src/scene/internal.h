@@ -273,7 +273,7 @@ typedef struct GSHSCENE_Walk_Ops {
   GSHSCENE_Result (*group_enter)(void * ctx, const struct GSHSCENE_Walk * walk, const GSHSCENE_Node_Rec * group,
       const GSHGEOM_Map * base);
   GSHSCENE_Result (*group_leave)(void * ctx, const struct GSHSCENE_Walk * walk, const GSHSCENE_Node_Rec * group);
-  /** A shape: @p map is its parent's placement composed with its own. */
+  /** A shape or a stroke (a leaf; the callback reads the node's kind): @p map is its parent's placement composed with its own. */
   GSHSCENE_Result (*shape)(void * ctx, const struct GSHSCENE_Walk * walk, const GSHSCENE_Node_Rec * shape,
       const GSHGEOM_Map * map);
   /** An instance: @p map likewise.  Set *descend to walk the target's content with this instance on the path. */

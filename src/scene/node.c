@@ -166,6 +166,8 @@ const char * gshscene_node_kind_string(GSHSCENE_Node_Kind kind) {
       return "shape";
     case GSHSCENE_NODE_INSTANCE:
       return "instance";
+    case GSHSCENE_NODE_STROKE:
+      return "stroke";
     case GSHSCENE_NODE_KIND_COUNT:
       break;
   }
@@ -261,6 +263,27 @@ GSHSCENE_Result gshscene_node_canonical(const GSHSCENE_Store * store, const GSHS
       node.resource = in->resource;
       node.fill_rule = in->fill_rule;
       break;
+    case GSHSCENE_NODE_STROKE: /* SK13: a stroke item's rules (list.h, SK4), so a node and its emitted item agree */
+      result = check_region(store, in->resource);
+      if (result == GSHSCENE_OK &&
+          (!in->style || in->style->store != store || in->style->kind != GSHSCENE_RESOURCE_STROKE_STYLE)) {
+        result = GSHSCENE_ERR_INVALID;
+      }
+      if (result == GSHSCENE_OK) {
+        result = gshscene_list_canonical_paint_valid(store, &in->paint, &node.paint);
+      }
+      if (result == GSHSCENE_OK && gshscene_centerline_3d(in->resource)) {
+        result = GSHSCENE_ERR_UNSUPPORTED; /* a stroke is planar */
+      }
+      if (result == GSHSCENE_OK && !gshscene_color_bounded(node.paint.rgba)) {
+        result = GSHSCENE_ERR_LIMIT; /* N1, after every other check */
+      }
+      if (result != GSHSCENE_OK) {
+        return result;
+      }
+      node.resource = in->resource;
+      node.style = in->style;
+      break;
     default: /* GSHSCENE_NODE_INSTANCE */
       if (in->target == 0) {
         return GSHSCENE_ERR_INVALID;
@@ -304,7 +327,8 @@ int gshscene_props_equal(const GSHSCENE_Node * a, const GSHSCENE_Node * b) {
       }
       return a->clip == NULL || (a->clip_rule == b->clip_rule && map_equal(&a->clip_map, &b->clip_map));
     case GSHSCENE_NODE_SHAPE:
-      if (a->resource != b->resource || a->fill_rule != b->fill_rule || a->paint.kind != b->paint.kind ||
+    case GSHSCENE_NODE_STROKE:
+      if (a->resource != b->resource || a->style != b->style || a->fill_rule != b->fill_rule || a->paint.kind != b->paint.kind ||
           !gshscene_space_equal(&a->paint.space, &b->paint.space) || a->paint.gradient != b->paint.gradient ||
           a->paint.entry != b->paint.entry) {
         return 0;
@@ -340,6 +364,7 @@ static void props_retain(const GSHSCENE_Node * p) {
   gshscene_resource_retain(p->resource);
   gshscene_resource_retain(p->paint.gradient);
   gshscene_resource_retain(p->soft_mask);
+  gshscene_resource_retain(p->style);
 }
 
 static void props_release(const GSHSCENE_Node * p) {
@@ -347,6 +372,7 @@ static void props_release(const GSHSCENE_Node * p) {
   gshscene_resource_release(p->resource);
   gshscene_resource_release(p->paint.gradient);
   gshscene_resource_release(p->soft_mask);
+  gshscene_resource_release(p->style);
 }
 
 GSHSCENE_Node_Rec * gshscene_node_new(
@@ -487,16 +513,14 @@ void gshscene_node_hash(GSHGEOM_Hash * h, const GSHSCENE_Node_Rec * node) {
       }
       break;
     case GSHSCENE_NODE_SHAPE:
+    case GSHSCENE_NODE_STROKE:
       gshgeom_hash_u64(h, gshscene_resource_hash(p->resource));
+      if (p->kind == GSHSCENE_NODE_STROKE) {
+        gshgeom_hash_u64(h, gshscene_resource_hash(p->style)); /* SK12: a shape's spelling, the style after the resource */
+      }
       gshgeom_hash_u64(h, gshgeom_map_hash(&p->map));
       gshgeom_hash_u8(h, (uint8_t)p->fill_rule);
-      gshgeom_hash_u8(h, (uint8_t)p->paint.kind);
-      for (int k = 0; k < 4; k++) {
-        gshgeom_hash_f64(h, p->paint.rgba[k]);
-      }
-      gshscene_space_hash(h, &p->paint.space);
-      gshgeom_hash_u32(h, p->paint.entry);
-      gshgeom_hash_u64(h, p->paint.gradient ? gshscene_resource_hash(p->paint.gradient) : 0);
+      gshscene_paint_hash(h, &p->paint);
       gshgeom_hash_i32(h, p->layer);
       gshgeom_hash_f64(h, p->depth);
       break;

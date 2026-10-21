@@ -24,7 +24,8 @@
  * The diff of two versions: the changed IDs, and conservative damage (diff.h).
  *
  * The damage is found by walking both versions' occurrences with the one walk
- * (walk.c) and adding the bounds of every shape occurrence that lies inside a
+ * (walk.c) and adding the bounds of every shape and stroke occurrence (a stroke's
+ * by SK10's conservative outset of its centerline) that lies inside a
  * marked subtree.  A node is marked in a version when its own properties differ
  * from the other version's (then its whole subtree is suspect), or when it is a
  * child that the other version's list for the same parent lacks, or when the
@@ -381,7 +382,23 @@ static GSHSCENE_Result add_font_run(Damage_Walk * d, const GSHSCENE_Resource * r
   return GSHSCENE_OK;
 }
 
-/* A shape occurrence's bounds. */
+/* A stroke occurrence's bounds (SK10): its centerline's model box through the style's conservative outset, in pixels
+ * of the damage's map. */
+static void add_stroke(Damage_Walk * d, const GSHSCENE_Node_Rec * stroke, const GSHGEOM_Map * composed) {
+  GSHGEOM_Bounds centerline;
+  GSHGEOM_Bounds b;
+  if (gshscene_centerline_box(stroke->p.resource, &centerline) != GSHSCENE_OK ||
+      gshscene_stroke_bounds(stroke->p.style, &centerline, composed, GSHSCENE_UNIT_PIXEL, &b) != GSHSCENE_OK) {
+    d->unbounded = 1; /* an unbound face, or a box the map cannot take: nothing can be said of it */
+    return;
+  }
+  if (!b.empty) {
+    add_point(d, b.min.x, b.min.y);
+    add_point(d, b.max.x, b.max.y);
+  }
+}
+
+/* A shape or stroke occurrence's bounds. */
 static GSHSCENE_Result add_shape(Damage_Walk * d, const GSHSCENE_Walk * walk, const GSHSCENE_Node_Rec * shape,
     const GSHGEOM_Map * item_map) {
   GSHGEOM_Map composed;
@@ -392,6 +409,10 @@ static GSHSCENE_Result add_shape(Damage_Walk * d, const GSHSCENE_Walk * walk, co
   }
   if (result != GSHSCENE_OK) {
     return result;
+  }
+  if (shape->p.kind == GSHSCENE_NODE_STROKE) {
+    add_stroke(d, shape, &composed);
+    return GSHSCENE_OK;
   }
   const GSHSCENE_Resource * resource = shape->p.resource;
   if (gshscene_resource_kind(resource) == GSHSCENE_RESOURCE_PATH) {

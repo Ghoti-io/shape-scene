@@ -78,27 +78,100 @@
  * `MITER`, `MITER_CLIP` and `ARCS`, `miter_limit` 4; with `CENTER` alignment,
  * `alignment_rule` nonzero.  (c) Nothing else is rewritten: the offset is kept as
  * given (not reduced modulo the period, which is the dash arithmetic's), and width
- * 0 is kept (SK8).
+ * 0 is kept: it draws nothing.
+ *
+ * **SK4 The stroke item.**  ::gshscene_list_stroke records ::GSHSCENE_ITEM_STROKE
+ * (7): a centerline, a path or a glyph run of the list's store (a 3D path, or a run
+ * whose outline is a 3D path, is ::GSHSCENE_ERR_UNSUPPORTED: the stroke is planar,
+ * and so a 3D item map is unsupported too, as 3D node maps are); a style of the
+ * list's store; a map and a paint as a fill's (any paint kind, with N1's bound and
+ * the palette and gradient rules unchanged); a layer and a depth.  Its `fill_rule`
+ * is nonzero and its `group` zero (the alignment rule is the style's).  The item's
+ * `style` names the style (NULL for every other kind), and the list holds a
+ * reference on the centerline and on the style.  A stroke is **one unit** of its
+ * sequence (N11) and **one element** of a knockout group (T3): its region is one
+ * union.
+ *
+ * **SK5 What a stroke draws.**  N7 with the stroke's **covered region** `R` in
+ * place of the shape: `apply(L, S, k * c, SRC_OVER)` with `k` the coverage of `R`
+ * (exact area for a raster sink, AD-12) and `S` the paint as N7, N10, N14 and G12
+ * give it.  `R` is defined once, by `shape-geometry`: the body within half the
+ * width of the centerline, with joins and caps; local width built in the
+ * centerline's model space and then mapped; device width built in **target
+ * space** around the mapped centerline (a pixel kind's pixels; for a stream the
+ * CSS reference pixel, 1/96 inch, in the target's stated unit:
+ * ::gshscene_stroke_pixel_size); dashes cut before the body; inside and outside
+ * alignment a centered stroke of twice the width clipped to the centerline's fill
+ * region under `alignment_rule`, or to its complement, closed subpaths only (an
+ * open subpath is centered); one union over the item.  Orientation (which side is
+ * left) is AD-6's, stated by `shape-geometry`, never here.
+ *
+ * **SK6 Paint.**  A stroke's paint is sampled in the item's **local space** for
+ * both width spaces: G6's chain `(T I_1 ... I_k M G)^-1`, unchanged.  A front end
+ * that wants SVG's `objectBoundingBox` on a stroke folds the geometry's box
+ * (without the stroke, as SVG states) into `G`, as it does for a fill.  Every
+ * G-rule applies with `R` as the shape.
+ *
+ * **SK7 A glyph run as centerline.**  A stroke of a run always takes the general,
+ * unhinted route: the planning pass does not call ::gshscene_glyph_route for a
+ * stroke, writes no `HINT_STATUS` entry for it and never refuses it for hinting (a
+ * `FONT_STRICT` run included).  A run from a font needs `GLYPHS_FROM_FONT` as a
+ * fill does (`GLYPH_SOURCE`).
+ *
+ * **SK10 Bounds and damage.**  A stroke occurrence's bounds are conservative:
+ * with `h = width / 2 * max(1, f_join, f_cap) * a`, where `f_join` is
+ * `miter_limit` for `MITER` (the miter's tip is at most that far, in half widths,
+ * from its vertex), `miter_limit + 1` for `MITER_CLIP` and `ARCS` (a clipped
+ * corner lies `miter_limit` half widths along the bisector and up to one half
+ * width across it, so at most `sqrt(miter_limit^2 + 1)` half widths away), and 1
+ * otherwise; `f_cap` is `3/2` for `SQUARE` (a rational bound above `sqrt 2`) and
+ * 1 otherwise; and `a` is 2 for `INSIDE` and `OUTSIDE` and 1 for `CENTER`:
+ * **local** width outsets the centerline's model box by `h` and maps it by the
+ * composed map; **device** width maps the box and outsets it by `h` in target
+ * units (`h` times ::gshscene_stroke_pixel_size).  The damage then adds N13's AA
+ * support and rounds outward, as for a fill.  Dashes never enlarge it.  A run from
+ * an unbound face is unbounded.  `h` is formed with its roundings covered (the
+ * product scaled by `1 + 2^-50`) and each outset rounded outward, so the bound is
+ * never below the real one; mapping the box's corners is a fill's.  N13 is
+ * extended: a changed stroke node damages its bounds in both versions, and a
+ * changed foreground or palette damages the strokes that paint with it.
+ * ::gshscene_stroke_bounds is the one evaluation.
  *
  * **SK12 Hash and dump.**  Every format stays 1, and every existing hash and dump
- * is unchanged: no resource from before strokes is a style.  The **style**
- * (resource kind 8): `u32` 1, `u32` 8, `f64` width, `u8` width space,
+ * is unchanged: no list, version or resource from before strokes holds one.  The
+ * **style** (resource kind 8): `u32` 1, `u32` 8, `f64` width, `u8` width space,
  * `u8` join, `f64` miter limit, `u8` cap, `u8` degenerate, `u8` alignment, `u8`
  * alignment rule, `u8` dash scope, `f64` dash offset, `u64` dash count, `f64` each
  * dash, `u64` the width profile's content hash (0 for none).  Its dump is `stroke
  * width=<hex> space=N join=N miter=<hex> cap=N degenerate=N align=N rule=N
  * scope=N offset=<hex> dashes=N profile=<hash>` and a line `d <hex>` per dash.
+ * The **list item** and the **version node** are spelled in list.h and version.h.
+ *
+ * **SK13 The retained scene.**  ::GSHSCENE_NODE_STROKE (4): a centerline, a style,
+ * a map, a paint, a layer and a depth, set by an edit like any node (an upsert by
+ * key as for a shape), emitted as one stroke item with its placement composed,
+ * visited, diffed and damaged (SK10).  One SVG element with a fill and a stroke is
+ * two nodes, or two items, in paint order (SK14).
+ *
+ * **SK14 Fill and stroke of one element.**  Two items: the fill, then the stroke,
+ * in the order the format's paint order gives (SVG's `paint-order`; markers are
+ * items of their own).  A front end that needs them composited as one (an
+ * element's opacity) wraps them in a group, as now.
+ *
  */
 
 #ifndef GHOTI_IO_GSHSCENE_STROKE_H
 #define GHOTI_IO_GSHSCENE_STROKE_H
 
 #include <ghoti.io/shape-scene/core.h>
+#include <ghoti.io/shape-scene/list.h>
 #include <ghoti.io/shape-scene/macros.h>
 #include <ghoti.io/shape-scene/resource.h>
 #include <ghoti.io/shape-scene/types.h>
 
+#include <ghoti.io/shape-geometry/curve.h>
 #include <ghoti.io/shape-geometry/fill.h>
+#include <ghoti.io/shape-geometry/map.h>
 
 #include <stddef.h>
 #include <stdint.h>
@@ -208,6 +281,29 @@ GSHSCENE_API GSHSCENE_Result gshscene_store_intern_stroke_style(GSHSCENE_Store *
  */
 GSHSCENE_API GSHSCENE_Result gshscene_resource_stroke_style(const GSHSCENE_Resource * resource,
     GSHSCENE_Stroke_Style * out);
+
+/**
+ * @brief The target units in one device pixel for a target of unit @p unit (SK5, K8): 1 for a pixel kind's (0) and
+ *   for pixels, and the CSS reference pixel, 1/96 inch, in the others: `25.4 / 96` millimetres, `0.75` points,
+ *   `1 / 96` inch (the doubles nearest).  0 for a value outside ::GSHSCENE_Unit (sink.h).
+ */
+GSHSCENE_API double gshscene_stroke_pixel_size(uint32_t unit);
+
+/**
+ * @brief SK10: a conservative box of a stroke in target units, from its centerline's box in model space.
+ *
+ * @param style A stroke style resource.
+ * @param centerline The centerline's box in its model space (a path's bounds; a run's glyph boxes placed); an empty
+ *   box gives an empty result.
+ * @param composed The composed map, model space to target units (AD-24: `gshgeom_map_compose_chain` of the
+ *   instances' maps and the item's, with the target's last).
+ * @param unit The target's ::GSHSCENE_Unit (for a device width: ::gshscene_stroke_pixel_size).
+ * @param out The box; written only on success.
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, not a style, an invalid or 3D map, a unit out of range);
+ *   ::GSHSCENE_ERR_LIMIT (a corner the map cannot take, or a result that is not finite: the bound is unknown).
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_stroke_bounds(const GSHSCENE_Resource * style, const GSHGEOM_Bounds * centerline,
+    const GSHGEOM_Map * composed, uint32_t unit, GSHGEOM_Bounds * out);
 
 #ifdef __cplusplus
 }

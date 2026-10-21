@@ -46,6 +46,8 @@
  *   their keys.  The root cannot be removed.
  * - ::gshscene_edit_move gives a node a new parent and position.  A node cannot
  *   move into its own subtree, and the root cannot move.
+ * - A stroke (stroke.h, SK13) is a node like a shape: added, set and upserted by
+ *   key through these calls, with its centerline, style and paint in its properties.
  * - ::gshscene_edit_upsert finds the node a key is bound to in the edit's view
  *   and sets its properties, or adds a node under the given parent and binds
  *   the key: how a front-end lowers its document again and keeps the IDs.  An
@@ -107,7 +109,8 @@ GSHSCENE_API GSHSCENE_Store * gshscene_edit_store(const GSHSCENE_Edit * edit);
  * @param out_id The new node's ID; written only on success; may be NULL.
  * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, an edit that is spent, no such group, a position out
  *   of range, properties the kind forbids, a resource of another store, a bound key);
- *   ::GSHSCENE_ERR_UNSUPPORTED (a 3D map); ::GSHSCENE_ERR_LIMIT (`max_nodes`; a shape's paint with a component past
+ *   ::GSHSCENE_ERR_UNSUPPORTED (a 3D map; a stroke's 3D centerline, SK4); ::GSHSCENE_ERR_LIMIT (`max_nodes`; a shape's
+ *   or a stroke's paint with a component past
  *   `2^16`, N1, decided after the properties' validity); ::GSHSCENE_ERR_OOM.
  */
 GSHSCENE_API GSHSCENE_Result gshscene_edit_add(GSHSCENE_Edit * edit, uint64_t parent, size_t position,

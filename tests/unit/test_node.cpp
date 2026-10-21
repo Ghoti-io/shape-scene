@@ -58,11 +58,12 @@ uint64_t identity_hash() {
 }  // namespace
 
 TEST(NodeInit, EveryKindStartsAtTheDocumentedDefaults) {
-  for (GSHSCENE_Node_Kind kind : {GSHSCENE_NODE_GROUP, GSHSCENE_NODE_SHAPE, GSHSCENE_NODE_INSTANCE}) {
+  for (GSHSCENE_Node_Kind kind : {GSHSCENE_NODE_GROUP, GSHSCENE_NODE_SHAPE, GSHSCENE_NODE_INSTANCE, GSHSCENE_NODE_STROKE}) {
     GSHSCENE_Node n;
     std::memset(&n, 0xAB, sizeof n);
     gshscene_node_init(kind, &n);
     EXPECT_EQ(n.kind, kind);
+    EXPECT_EQ(n.style, nullptr);
     EXPECT_EQ(n.flags, 0u);
     EXPECT_EQ(n.layer, 0);
     EXPECT_EQ(n.opacity, 1.0);
@@ -89,7 +90,9 @@ TEST(NodeInit, KindsHavePinnedValuesAndNames) {
   EXPECT_EQ((int)GSHSCENE_NODE_GROUP, 1);
   EXPECT_EQ((int)GSHSCENE_NODE_SHAPE, 2);
   EXPECT_EQ((int)GSHSCENE_NODE_INSTANCE, 3);
-  EXPECT_EQ((int)GSHSCENE_NODE_KIND_COUNT, 4);
+  EXPECT_EQ((int)GSHSCENE_NODE_STROKE, 4);
+  EXPECT_EQ((int)GSHSCENE_NODE_KIND_COUNT, 5);
+  EXPECT_STREQ(gshscene_node_kind_string(GSHSCENE_NODE_STROKE), "stroke");
   EXPECT_STREQ(gshscene_node_kind_string(GSHSCENE_NODE_GROUP), "group");
   EXPECT_STREQ(gshscene_node_kind_string(GSHSCENE_NODE_SHAPE), "shape");
   EXPECT_STREQ(gshscene_node_kind_string(GSHSCENE_NODE_INSTANCE), "instance");
@@ -125,7 +128,7 @@ TEST(NodeRules, TheKindAndTheFlagsAreChecked) {
 
 TEST(NodeRules, AKindOutsideTheEnumIsRefusedWhateverTheOtherFieldsSay) {
   Fx f;
-  for (int bad : {0, 4, 5, 99, -1}) {
+  for (int bad : {0, 5, 6, 99, -1}) {
     GSHSCENE_Node n = instance_node(GSHSCENE_ROOT_ID);  // a node that would pass as an instance
     n.kind = (GSHSCENE_Node_Kind)bad;
     EXPECT_EQ(f.add(n), GSHSCENE_ERR_INVALID) << bad;

@@ -261,6 +261,7 @@ static void item_release(const GSHSCENE_Item * item) {
   gshscene_resource_release(item->resource);
   gshscene_resource_release(item->paint.gradient);
   gshscene_resource_release(item->group.soft_mask);
+  gshscene_resource_release(item->style);
 }
 
 static void items_release(GSHSCENE_List * list) {
@@ -341,6 +342,7 @@ static GSHSCENE_Result list_append(GSHSCENE_List * list, const GSHSCENE_Item * i
   gshscene_resource_retain(item->resource);
   gshscene_resource_retain(item->paint.gradient);
   gshscene_resource_retain(item->group.soft_mask);
+  gshscene_resource_retain(item->style);
   note_item(list, item);
   list->count++;
   list->expansion = total;
@@ -597,6 +599,55 @@ GSHSCENE_Result gshscene_list_fill(GSHSCENE_List * list, const GSHSCENE_Resource
   }
   item.resource = resource;
   item.fill_rule = rule;
+  item.layer = layer;
+  return list_append(list, &item);
+}
+
+/* SK4: whether a centerline is not planar: a 3D path, or a run whose outline is one (a run from a font is 2D). */
+int gshscene_centerline_3d(const GSHSCENE_Resource * resource) {
+  if (resource->kind == GSHSCENE_RESOURCE_PATH) {
+    return gshgeom_path_dimension(resource->u.path) == 3;
+  }
+  const GSHSCENE_Glyph_Run * run = &resource->u.glyphs.run;
+  for (size_t i = 0; run->source == GSHSCENE_GLYPHS_FROM_OUTLINES && i < run->glyph_count; i++) {
+    if (gshgeom_path_dimension(run->glyphs[i].outline->u.path) == 3) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+GSHSCENE_Result gshscene_list_stroke(GSHSCENE_List * list, const GSHSCENE_Resource * centerline,
+    const GSHSCENE_Resource * style, const GSHGEOM_Map * map, const GSHSCENE_Paint * paint, int32_t layer, double depth) {
+  if (!list || list->closed) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  GSHSCENE_Item item;
+  item_init(&item, GSHSCENE_ITEM_STROKE);
+  GSHSCENE_Result result = check_resource(list, centerline, TAKES_PATH | TAKES_RUN);
+  if (result == GSHSCENE_OK && (!style || style->store != list->store || style->kind != GSHSCENE_RESOURCE_STROKE_STYLE)) {
+    result = GSHSCENE_ERR_INVALID;
+  }
+  if (result == GSHSCENE_OK) {
+    result = canonical_map(map, &item.map);
+  }
+  if (result == GSHSCENE_OK) {
+    result = canonical_paint(list->store, paint, &item.paint);
+  }
+  if (result == GSHSCENE_OK) {
+    result = gshscene_list_canonical_depth(depth, &item.depth);
+  }
+  if (result == GSHSCENE_OK && (item.map.dim != 2 || gshscene_centerline_3d(centerline))) {
+    result = GSHSCENE_ERR_UNSUPPORTED; /* SK4: a stroke is planar */
+  }
+  if (result == GSHSCENE_OK && !gshscene_color_bounded(item.paint.rgba)) {
+    result = GSHSCENE_ERR_LIMIT; /* N1, after every other check */
+  }
+  if (result != GSHSCENE_OK) {
+    return result;
+  }
+  item.resource = centerline;
+  item.style = style;
   item.layer = layer;
   return list_append(list, &item);
 }
@@ -1284,7 +1335,7 @@ int gshscene_color_equal(const GSHSCENE_Color * a, const GSHSCENE_Color * b) {
 }
 
 static int item_equal(const GSHSCENE_Item * a, const GSHSCENE_Item * b) {
-  if (a->kind != b->kind || a->resource != b->resource || !map_equal(&a->map, &b->map) ||
+  if (a->kind != b->kind || a->resource != b->resource || a->style != b->style || !map_equal(&a->map, &b->map) ||
       a->fill_rule != b->fill_rule || a->layer != b->layer ||
       gshgeom_f64_bits(a->depth) != gshgeom_f64_bits(b->depth)) {
     return 0;
@@ -1337,6 +1388,16 @@ void gshscene_color_hash(GSHGEOM_Hash * h, const GSHSCENE_Color * color) {
   gshscene_space_hash(h, &color->space);
 }
 
+void gshscene_paint_hash(GSHGEOM_Hash * h, const GSHSCENE_Paint * paint) {
+  gshgeom_hash_u8(h, (uint8_t)paint->kind);
+  for (int k = 0; k < 4; k++) {
+    gshgeom_hash_f64(h, paint->rgba[k]);
+  }
+  gshscene_space_hash(h, &paint->space);
+  gshgeom_hash_u32(h, paint->entry);
+  gshgeom_hash_u64(h, paint->gradient ? gshscene_resource_hash(paint->gradient) : 0);
+}
+
 uint64_t gshscene_list_hash(const GSHSCENE_List * list) {
   GSHGEOM_Hash h;
   gshgeom_hash_init(&h);
@@ -1355,13 +1416,7 @@ uint64_t gshscene_list_hash(const GSHSCENE_List * list) {
       case GSHSCENE_ITEM_FILL:
         hash_resource_and_map(&h, item);
         gshgeom_hash_u8(&h, (uint8_t)item->fill_rule);
-        gshgeom_hash_u8(&h, (uint8_t)item->paint.kind);
-        for (int k = 0; k < 4; k++) {
-          gshgeom_hash_f64(&h, item->paint.rgba[k]);
-        }
-        gshscene_space_hash(&h, &item->paint.space);
-        gshgeom_hash_u32(&h, item->paint.entry);
-        gshgeom_hash_u64(&h, item->paint.gradient ? gshscene_resource_hash(item->paint.gradient) : 0);
+        gshscene_paint_hash(&h, &item->paint);
         gshgeom_hash_i32(&h, item->layer);
         gshgeom_hash_f64(&h, item->depth);
         break;
@@ -1382,6 +1437,14 @@ uint64_t gshscene_list_hash(const GSHSCENE_List * list) {
         break;
       case GSHSCENE_ITEM_INSTANCE:
         hash_resource_and_map(&h, item);
+        gshgeom_hash_i32(&h, item->layer);
+        gshgeom_hash_f64(&h, item->depth);
+        break;
+      case GSHSCENE_ITEM_STROKE: /* SK12 */
+        gshgeom_hash_u64(&h, gshscene_resource_hash(item->resource));
+        gshgeom_hash_u64(&h, gshscene_resource_hash(item->style));
+        gshgeom_hash_u64(&h, gshgeom_map_hash(&item->map));
+        gshscene_paint_hash(&h, &item->paint);
         gshgeom_hash_i32(&h, item->layer);
         gshgeom_hash_f64(&h, item->depth);
         break;
@@ -1406,6 +1469,21 @@ static int dump_resource_and_map(FILE * out, const GSHSCENE_Item * item) {
 int gshscene_space_dump(FILE * out, const GSHSCENE_Color_Space * space) {
   return fprintf(out, "%u:%u:%016llx", (unsigned)space->primaries, (unsigned)space->transfer,
       HEX(gshgeom_f64_bits(space->gamma)));
+}
+
+/* A paint as a fill's dump line spells it: ` paint=N <r> <g> <b> <a> space=<space> entry=E gradient=<hash>`. */
+static int dump_paint(FILE * out, const GSHSCENE_Paint * paint) {
+  int written = fprintf(out, " paint=%u %016llx %016llx %016llx %016llx space=", (unsigned)paint->kind,
+      HEX(gshgeom_f64_bits(paint->rgba[0])), HEX(gshgeom_f64_bits(paint->rgba[1])), HEX(gshgeom_f64_bits(paint->rgba[2])),
+      HEX(gshgeom_f64_bits(paint->rgba[3])));
+  if (written >= 0) {
+    written = gshscene_space_dump(out, &paint->space);
+  }
+  if (written >= 0) {
+    written = fprintf(out, " entry=%u gradient=%016llx", (unsigned)paint->entry,
+        HEX(paint->gradient ? gshscene_resource_hash(paint->gradient) : 0));
+  }
+  return written;
 }
 
 static int dump_layer_depth(FILE * out, const GSHSCENE_Item * item) {
@@ -1434,17 +1512,21 @@ GSHSCENE_Result gshscene_list_dump(const GSHSCENE_List * list, FILE * out) {
       case GSHSCENE_ITEM_FILL:
         written = fputc('F', out) == EOF ? -1 : dump_resource_and_map(out, item);
         if (written >= 0) {
-          written = fprintf(out, " rule=%u paint=%u %016llx %016llx %016llx %016llx space=", (unsigned)item->fill_rule,
-              (unsigned)item->paint.kind, HEX(gshgeom_f64_bits(item->paint.rgba[0])),
-              HEX(gshgeom_f64_bits(item->paint.rgba[1])), HEX(gshgeom_f64_bits(item->paint.rgba[2])),
-              HEX(gshgeom_f64_bits(item->paint.rgba[3])));
+          written = fprintf(out, " rule=%u", (unsigned)item->fill_rule);
         }
         if (written >= 0) {
-          written = gshscene_space_dump(out, &item->paint.space);
+          written = dump_paint(out, &item->paint);
         }
         if (written >= 0) {
-          written = fprintf(out, " entry=%u gradient=%016llx", (unsigned)item->paint.entry,
-              HEX(item->paint.gradient ? gshscene_resource_hash(item->paint.gradient) : 0));
+          written = dump_layer_depth(out, item);
+        }
+        break;
+      case GSHSCENE_ITEM_STROKE: /* SK12 */
+        written = fprintf(out, "K res=%s:%016llx style=%016llx map=%016llx",
+            gshscene_resource_kind_string(gshscene_resource_kind(item->resource)), HEX(gshscene_resource_hash(item->resource)),
+            HEX(gshscene_resource_hash(item->style)), HEX(gshgeom_map_hash(&item->map)));
+        if (written >= 0) {
+          written = dump_paint(out, &item->paint);
         }
         if (written >= 0) {
           written = dump_layer_depth(out, item);

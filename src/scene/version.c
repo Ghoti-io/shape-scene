@@ -294,10 +294,13 @@ static int put_node(FILE * out, const GSHSCENE_Node_Rec * node) {
       return 0;
     }
     case GSHSCENE_NODE_SHAPE:
-      if (put_common(out, 'S', node) < 0 ||
-          fprintf(out, " res=%s:%016llx map=%016llx rule=%u paint=%u %016llx %016llx %016llx %016llx space=",
-              gshscene_resource_kind_string(gshscene_resource_kind(p->resource)),
-              HEX(gshscene_resource_hash(p->resource)), HEX(gshgeom_map_hash(&p->map)), (unsigned)p->fill_rule,
+    case GSHSCENE_NODE_STROKE:
+      if (put_common(out, p->kind == GSHSCENE_NODE_STROKE ? 'K' : 'S', node) < 0 ||
+          fprintf(out, " res=%s:%016llx", gshscene_resource_kind_string(gshscene_resource_kind(p->resource)),
+              HEX(gshscene_resource_hash(p->resource))) < 0 ||
+          (p->kind == GSHSCENE_NODE_STROKE && fprintf(out, " style=%016llx", HEX(gshscene_resource_hash(p->style))) < 0) ||
+          fprintf(out, " map=%016llx rule=%u paint=%u %016llx %016llx %016llx %016llx space=", HEX(gshgeom_map_hash(&p->map)),
+              (unsigned)p->fill_rule,
               (unsigned)p->paint.kind, HEX(gshgeom_f64_bits(p->paint.rgba[0])), HEX(gshgeom_f64_bits(p->paint.rgba[1])),
               HEX(gshgeom_f64_bits(p->paint.rgba[2])), HEX(gshgeom_f64_bits(p->paint.rgba[3]))) < 0 ||
           gshscene_space_dump(out, &p->paint.space) < 0 ||

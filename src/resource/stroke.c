@@ -289,3 +289,207 @@ int gshscene_stroke_dump(const GSHSCENE_Resource * resource, FILE * out) {
   }
   return 0;
 }
+
+/* --- SK5 and SK10: the device pixel and the bounds --------------------------------------- */
+
+double gshscene_stroke_pixel_size(uint32_t unit) {
+  switch (unit) {
+    case GSHSCENE_UNIT_DEFAULT:
+    case GSHSCENE_UNIT_PIXEL:
+      return 1.0;
+    case GSHSCENE_UNIT_MILLIMETER:
+      return 25.4 / 96.0; /* the CSS reference pixel, 1/96 inch (K8) */
+    case GSHSCENE_UNIT_POINT:
+      return 72.0 / 96.0;
+    case GSHSCENE_UNIT_INCH:
+      return 1.0 / 96.0;
+    default:
+      return 0.0;
+  }
+}
+
+/**
+ * SK10's cover of the roundings: `h` is formed by at most five correctly rounded steps (the sum `miter_limit + 1`,
+ * two products, the unit's constant and the product by it), each within `2^-53` of its real value, so their product is
+ * at least `(1 - 2^-53)^5` times the real `h`; one more product by `1 + 2^-50` (itself rounded) lifts it above.
+ */
+#define STROKE_ROUND_UP (1.0 + 0x1p-50)
+
+/** The next double above @p x (finite). */
+static double next_up(double x) {
+  if (x == 0.0) {
+    return 0x1p-1074; /* the smallest subnormal, above both zeros */
+  }
+  uint64_t bits = gshgeom_f64_bits(x);
+  bits = x > 0.0 ? bits + 1u : bits - 1u;
+  double y;
+  memcpy(&y, &bits, sizeof y);
+  return y;
+}
+
+/** `a + b` rounded upward: the nearest sum, raised one double when the exact sum (TwoSum's error) is above it. */
+static double add_up(double a, double b) {
+  double s = a + b;
+  double bb = s - a;
+  double e = (a - (s - bb)) + (b - bb);
+  return e > 0.0 ? next_up(s) : s;
+}
+
+/** `a - b` rounded downward. */
+static double sub_down(double a, double b) {
+  return -add_up(-a, b);
+}
+
+/** SK10: `h` for @p s, in units of @p pixel per width unit, never below the real one. */
+static double reach(const GSHSCENE_Stroke_Style * s, double pixel) {
+  double f = 1.0;
+  if (s->join == (uint32_t)GSHSCENE_STROKE_JOIN_MITER) {
+    f = s->miter_limit; /* the miter's tip: 1 / sin(θ/2) half widths from its vertex, at most the limit */
+  } else if (s->join == (uint32_t)GSHSCENE_STROKE_JOIN_MITER_CLIP || s->join == (uint32_t)GSHSCENE_STROKE_JOIN_ARCS) {
+    f = s->miter_limit + 1.0; /* a clipped corner: the limit along the bisector, up to one half width across */
+  }
+  if (s->cap == (uint32_t)GSHSCENE_STROKE_CAP_SQUARE && f < 1.5) {
+    f = 1.5; /* a square cap's corner, sqrt 2 half widths from the end */
+  }
+  double a = s->alignment == (uint32_t)GSHSCENE_STROKE_ALIGN_CENTER ? 1.0 : 2.0;
+  return (s->width * 0.5) * f * a * pixel * STROKE_ROUND_UP;
+}
+
+GSHSCENE_Result gshscene_stroke_bounds(const GSHSCENE_Resource * style, const GSHGEOM_Bounds * centerline,
+    const GSHGEOM_Map * composed, uint32_t unit, GSHGEOM_Bounds * out) {
+  double pixel = gshscene_stroke_pixel_size(unit);
+  if (!style || style->kind != GSHSCENE_RESOURCE_STROKE_STYLE || !centerline || !composed || !out || pixel == 0.0 ||
+      composed->dim != 2 || gshgeom_map_check(composed) != GSHGEOM_OK) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  const GSHSCENE_Stroke_Style * s = &style->u.stroke.s;
+  GSHGEOM_Bounds b;
+  memset(&b, 0, sizeof b);
+  b.empty = 1;
+  if (centerline->empty || s->width == 0.0) {
+    *out = b; /* nothing to stroke, or SK8: width 0 covers nothing */
+    return GSHSCENE_OK;
+  }
+  int device = s->width_space == (uint32_t)GSHSCENE_STROKE_WIDTH_DEVICE;
+  double h = reach(s, device ? pixel : 1.0);
+  double x0 = centerline->min.x;
+  double y0 = centerline->min.y;
+  double x1 = centerline->max.x;
+  double y1 = centerline->max.y;
+  if (!device) {
+    /* Local: the box outset in model space, then mapped. */
+    x0 = sub_down(x0, h);
+    y0 = sub_down(y0, h);
+    x1 = add_up(x1, h);
+    y1 = add_up(y1, h);
+  }
+  const double xs[2] = {x0, x1};
+  const double ys[2] = {y0, y1};
+  for (int i = 0; i < 2; i++) {
+    for (int j = 0; j < 2; j++) {
+      GSHGEOM_Point q;
+      if (gshgeom_map_apply_point(composed, (GSHGEOM_Point){xs[i], ys[j], 0.0}, &q) != GSHGEOM_OK) {
+        return GSHSCENE_ERR_LIMIT;
+      }
+      if (b.empty) {
+        b.min = q;
+        b.max = q;
+        b.empty = 0;
+      } else {
+        b.min.x = q.x < b.min.x ? q.x : b.min.x;
+        b.min.y = q.y < b.min.y ? q.y : b.min.y;
+        b.max.x = q.x > b.max.x ? q.x : b.max.x;
+        b.max.y = q.y > b.max.y ? q.y : b.max.y;
+      }
+    }
+  }
+  if (device) {
+    /* Device: the mapped box outset in target units. */
+    b.min.x = sub_down(b.min.x, h);
+    b.min.y = sub_down(b.min.y, h);
+    b.max.x = add_up(b.max.x, h);
+    b.max.y = add_up(b.max.y, h);
+  }
+  if (!gshscene_finite(b.min.x) || !gshscene_finite(b.min.y) || !gshscene_finite(b.max.x) || !gshscene_finite(b.max.y)) {
+    return GSHSCENE_ERR_LIMIT;
+  }
+  b.min.z = b.max.z = 0.0;
+  *out = b;
+  return GSHSCENE_OK;
+}
+
+/* --- a centerline's box (SK10, for the damage) ---------------------------------------------- */
+
+GSHSCENE_Result gshscene_centerline_box(const GSHSCENE_Resource * resource, GSHGEOM_Bounds * out) {
+  GSHGEOM_Bounds box;
+  memset(&box, 0, sizeof box);
+  box.empty = 1;
+  const GSHGEOM_Path * path = gshscene_resource_path(resource);
+  if (path) {
+    if (gshgeom_path_dimension(path) != 2 || gshgeom_path_bounds(path, &box) != GSHGEOM_OK) {
+      return GSHSCENE_ERR_UNSUPPORTED;
+    }
+    *out = box;
+    return GSHSCENE_OK;
+  }
+  GSHSCENE_Glyph_Run run;
+  if (gshscene_resource_glyph_run(resource, &run) != GSHSCENE_OK) {
+    return GSHSCENE_ERR_UNSUPPORTED;
+  }
+  GSHGEOM_Map identity;
+  gshgeom_map_identity(2, &identity);
+  for (size_t i = 0; i < run.glyph_count; i++) {
+    double gx0, gy0, gx1, gy1;
+    GSHGEOM_Map map;
+    if (run.source == GSHSCENE_GLYPHS_FROM_FONT) {
+      /* SK7: the general route, each glyph's design box under its map into model space; an unbound face has none. */
+      GSHSCENE_Glyph_Box g = {0, 0, 0, 0, 0};
+      if (gshscene_glyph_box(resource, i, &g) != GSHSCENE_OK || gshscene_glyph_map(resource, &identity, i, &map) != GSHSCENE_OK) {
+        return GSHSCENE_ERR_UNSUPPORTED;
+      }
+      if (g.empty) {
+        continue;
+      }
+      gx0 = (double)g.x_min / 64.0;
+      gy0 = (double)g.y_min / 64.0;
+      gx1 = (double)g.x_max / 64.0;
+      gy1 = (double)g.y_max / 64.0;
+    } else {
+      GSHGEOM_Bounds ob;
+      const GSHGEOM_Path * outline = gshscene_resource_path(run.glyphs[i].outline);
+      if (!outline || gshgeom_path_dimension(outline) != 2 || gshgeom_path_bounds(outline, &ob) != GSHGEOM_OK) {
+        return GSHSCENE_ERR_UNSUPPORTED;
+      }
+      if (ob.empty) {
+        continue;
+      }
+      gx0 = ob.min.x;
+      gy0 = ob.min.y;
+      gx1 = ob.max.x;
+      gy1 = ob.max.y;
+      gshgeom_map_translate(2, run.glyphs[i].x, run.glyphs[i].y, 0.0, &map);
+    }
+    const double xs[2] = {gx0, gx1};
+    const double ys[2] = {gy0, gy1};
+    for (int a = 0; a < 2; a++) {
+      for (int c = 0; c < 2; c++) {
+        GSHGEOM_Point q;
+        if (gshgeom_map_apply_point(&map, (GSHGEOM_Point){xs[a], ys[c], 0.0}, &q) != GSHGEOM_OK) {
+          return GSHSCENE_ERR_UNSUPPORTED;
+        }
+        if (box.empty) {
+          box.min = q;
+          box.max = q;
+          box.empty = 0;
+        } else {
+          box.min.x = q.x < box.min.x ? q.x : box.min.x;
+          box.min.y = q.y < box.min.y ? q.y : box.min.y;
+          box.max.x = q.x > box.max.x ? q.x : box.max.x;
+          box.max.y = q.y > box.max.y ? q.y : box.max.y;
+        }
+      }
+    }
+  }
+  *out = box;
+  return GSHSCENE_OK;
+}

@@ -140,7 +140,8 @@ struct Dump_Sink {
 
 /** Fill @p caps, which the caller has zero-filled. */
 static void caps_full(GSHSCENE_Sink_Caps * caps, int readback) {
-  for (uint32_t k = GSHSCENE_ITEM_FILL; k < GSHSCENE_ITEM_KIND_COUNT; k++) {
+  /* The kinds it records; a stroke (SK4) is recorded once the sink knows its record. */
+  for (uint32_t k = GSHSCENE_ITEM_FILL; k <= GSHSCENE_ITEM_INSTANCE; k++) {
     caps->item_kinds |= UINT32_C(1) << k;
   }
   for (uint32_t c = 0; c < GSHSCENE_COMPOSITE_COUNT; c++) {
