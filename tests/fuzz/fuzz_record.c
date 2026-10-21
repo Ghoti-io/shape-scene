@@ -1234,7 +1234,10 @@ static void op(S * s, unsigned code) {
           ops[k].v[v] = pick(s, 3) ? 0 : (int32_t)arg(s) - 128;
         }
       }
-      GSHSCENE_Paint_Fixed paint = {2u + pick(s, 2), 0, (int32_t)pick(s, 20) - 2, pick(s, 4)};
+      GSHSCENE_Paint_Fixed paint = {0, 0, 0, 0}; /* one draw per statement: an initializer's order is unspecified */
+      paint.kind = 2u + pick(s, 2);
+      paint.alpha = (int32_t)pick(s, 20) - 2;
+      paint.bits = pick(s, 4);
       unsigned e = arg(s);
       paint.entry = e == 255 ? 0xFFFFu : e == 254 ? 0x10000u : e % 6;
       int clip = pick(s, 4) == 0;
