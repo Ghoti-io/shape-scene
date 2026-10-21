@@ -51,6 +51,11 @@ identity and the second under a quarter turn moved by (60, 0), rendered on the r
 at 16 ppem, the second the general route with a run-level entry) and on the stream (both general).  The generator
 restates glyph.h's route, the snapped scale, gshgeom_scale_26_6, the test provider's toy hinter, the device path's and
 the model path's hashes and the composition of the general route's map.
+
+Since color-paint story P2, a third fixture: four gradient fills on the stream (two of one linear gradient with a
+solid, a foreground and a palette stop, interpolated in linear sRGB; a radial one in the target's space; and a
+degenerate one, a notice), and the test sink's gradient records restated: each fill's ` grad=<id>`, and once per
+gradient its `R` line and the `r` line of each stop as the one resolve gives it.
 """
 import importlib.util
 import os
@@ -490,6 +495,97 @@ GLYPH_RASTER_REPORT_HASH, GLYPH_RASTER_REPORT_DUMP = report(OK, (2, 2, 2), GLYPH
 GLYPH_STREAM_REPORT_HASH, _ = report(OK, (2, 2, 2), GLYPH_STREAM_ENTRIES)
 
 
+# --- the gradient fixture (color-paint story P2) --------------------------------------------------------------
+# The test sink's gradient records (dump_sink.h: ` grad=<id>` in a fill's record, then once per gradient per render
+# `R <id> <hash> space=<space> stops=N` and an `r` line per stop as gshscene_gradient_resolve gives it), restated.
+# The test interns, into a fresh store and in this order, the palette (id 1), gradients A, B and D (ids 2, 3, 4)
+# and then the squares.  Every conversion here is exact by N2's text: a stop in the interpolation space is copied,
+# and an sRGB value at or below 0.04045 decodes to x / 12.92, one division, with no power and no matrix.
+SRGB_SRGB = (1, 2, 0.0)
+GRAD_PALETTE = [((0.03125, 0.0, 0.0390625, 1.0), SRGB_SRGB)]
+GRAD_FG = ((0.02, 0.03125, 0.0, 1.0), SRGB_SRGB)
+GRAD_A = sv.gradient(sv.LINEAR, (0.0, 0.0, 10.0, 0.0, 0.0, 0.0), ID,
+                     [sv.stop(0.0, sv.PAINT_SOLID, (0.25, 0.5, 1.0, 1.0), LINEAR_SRGB),
+                      sv.stop(0.5, sv.PAINT_FOREGROUND, (0.0, 0.0, 0.0, 0.5)),
+                      sv.stop(1.0, sv.PAINT_PALETTE, (0.0, 0.0, 0.0, 0.75), entry=0)], space=LINEAR_SRGB)
+GRAD_B = sv.gradient(sv.RADIAL, (1.0, 1.0, 0.0, 1.0, 1.0, 5.0), ID,
+                     [sv.stop(0.0, sv.PAINT_SOLID, (1.0, 0.0, 0.0, 1.0)), sv.stop(1.0, sv.PAINT_SOLID, (0.0, 0.0, 1.0, 0.5))])
+GRAD_D = sv.gradient(sv.LINEAR, (5.0, 5.0, 5.0, 5.0, 0.0, 0.0), ID,
+                     [sv.stop(0.0, sv.PAINT_SOLID, (1.0, 0.0, 0.0, 1.0)), sv.stop(1.0, sv.PAINT_SOLID, (0.0, 0.0, 1.0, 1.0))])
+GRAD_IDS = {"A": 2, "B": 3, "D": 4}
+GRAD_HASH = {"A": sv.gradient_hash(GRAD_A), "B": sv.gradient_hash(GRAD_B), "D": sv.gradient_hash(GRAD_D)}
+GRAD_SQUARES = [(2, 2, 8, "A", 1.0), (10, 4, 6, "A", 0.5), (20, 20, 6, "B", 1.0), (30, 2, 4, "D", 1.0)]
+GRAD_LIST_ITEMS = [sv.fill(sv.KIND_PATH, rhash(x, y, sz), ID, 0, (0.0, 0.0, 0.0, a), paint=sv.PAINT_GRADIENT,
+                           grad=GRAD_HASH[g]) for x, y, sz, g, a in GRAD_SQUARES]
+GRAD_LIST_HASH = sv.list_hash(GRAD_LIST_ITEMS, GRAD_FG, sv.palette_hash(GRAD_PALETTE))
+R_GRADIENT_DEGENERATE = 24
+
+
+def decode_srgb_low(x):
+    """N2's sRGB decode of an encoded value at or below its knee, 0.04045: x / 12.92."""
+    assert x <= 0.04045
+    return x / 12.92
+
+
+def resolved(g, target_space):
+    """G3 for the two gradients above: (interpolation space, [(offset, r, g, b, a)])."""
+    into = target_space if g["space"] == sv.TARGET else g["space"]
+    out = []
+    for offset, kind, rgba, sp, entry in g["stops"]:
+        if kind == sv.PAINT_SOLID:
+            color, space = rgba, sp
+        elif kind == sv.PAINT_FOREGROUND:
+            color, space = (GRAD_FG[0][0], GRAD_FG[0][1], GRAD_FG[0][2], GRAD_FG[0][3] * rgba[3]), GRAD_FG[1]
+        else:
+            e = GRAD_PALETTE[entry]
+            color, space = (e[0][0], e[0][1], e[0][2], e[0][3] * rgba[3]), e[1]
+        space = target_space if space == sv.TARGET else space
+        if space == into:
+            rgb = color[:3]
+        else:
+            assert space == SRGB_SRGB and into == LINEAR_SRGB, "only the exact conversions of this fixture"
+            rgb = tuple(decode_srgb_low(c) for c in color[:3])
+        out.append((offset,) + tuple(rgb) + (color[3],))
+    return into, out
+
+
+def gradient_render(target_map):
+    """The test sink's dump of the gradient fixture on a stream (no stamps) and the report's entries."""
+    target_space = SRGB_SRGB  # a stream that states no space: sRGB (S4)
+    lines = ["gshscene.dump-sink 1 kind=%d unit=%d units=%d list=%016x" % (KIND_STREAM, UNIT_MM, len(GRAD_SQUARES),
+                                                                           GRAD_LIST_HASH)]
+    seen = set()
+    entries = []
+    for i, (x, y, sz, g, _) in enumerate(GRAD_SQUARES):
+        head = "U %d" % i
+        if g == "D":
+            lines.append("%s X class=%d reason=%d" % (head, NOTICE, R_GRADIENT_DEGENERATE))
+            entries.append((NOTICE, R_GRADIENT_DEGENERATE, (i,), 0, 0.0))
+            continue
+        composed = chain([ident()], target_map)
+        b = sq_box(x, y, sz)
+        corners = [apply(composed, px, py) for px in (b[0], b[2]) for py in (b[1], b[3])]
+        box = (min(p[0] for p in corners), min(p[1] for p in corners), max(p[0] for p in corners),
+               max(p[1] for p in corners))
+        lines.append("%s F res=path:%016x map=%016x rule=0 grad=%d box=%s" % (
+            head, rhash(x, y, sz), mhash(composed), GRAD_IDS[g], " ".join("%016x" % bits(v) for v in box)))
+        if g not in seen:
+            seen.add(g)
+            into, stops = resolved(GRAD_A if g == "A" else GRAD_B, target_space)
+            lines.append("R %d %016x space=%d:%d:%016x stops=%d" % (GRAD_IDS[g], GRAD_HASH[g], into[0], into[1],
+                                                                   bits(into[2]), len(stops)))
+            for st in stops:
+                lines.append("r " + " ".join("%016x" % bits(v) for v in st))
+    n = len(GRAD_SQUARES)
+    lines.append("E result=0 processed=%d done=%d" % (n, n))
+    text = "\n".join(lines) + "\n"
+    return text, fnv(text.encode()), entries
+
+
+GRAD_STREAM_TEXT, GRAD_STREAM_HASH, GRAD_STREAM_ENTRIES = gradient_render(scale(0.5))
+GRAD_STREAM_REPORT_HASH, GRAD_STREAM_REPORT_DUMP = report(OK, (4, 4, 4), GRAD_STREAM_ENTRIES)
+
+
 def cxx_string(name, text):
     return sv.cxx_string(name, text)
 
@@ -506,7 +602,10 @@ def render_header():
                     ("kGlyphListHash", GLYPH_LIST_HASH), ("kGlyphRunHash", RUN_HASH),
                     ("kGlyphRasterOutputHash", GLYPH_RASTER_HASH), ("kGlyphRasterPixelsHash", GLYPH_RASTER_PIXELS),
                     ("kGlyphStreamOutputHash", GLYPH_STREAM_HASH), ("kGlyphRasterReportHash", GLYPH_RASTER_REPORT_HASH),
-                    ("kGlyphStreamReportHash", GLYPH_STREAM_REPORT_HASH)):
+                    ("kGlyphStreamReportHash", GLYPH_STREAM_REPORT_HASH), ("kGradientListHash", GRAD_LIST_HASH),
+                    ("kGradientAHash", GRAD_HASH["A"]), ("kGradientBHash", GRAD_HASH["B"]),
+                    ("kGradientStreamOutputHash", GRAD_STREAM_HASH),
+                    ("kGradientStreamReportHash", GRAD_STREAM_REPORT_HASH)):
         o.append("static const std::uint64_t %s = UINT64_C(0x%016x);\n" % (name, v))
     o.append("\n")
     o.append(cxx_string("kRasterDump", RASTER_TEXT))
@@ -516,6 +615,8 @@ def render_header():
     o.append(cxx_string("kGlyphRasterDump", GLYPH_RASTER_TEXT))
     o.append(cxx_string("kGlyphStreamDump", GLYPH_STREAM_TEXT))
     o.append(cxx_string("kGlyphRasterReportDump", GLYPH_RASTER_REPORT_DUMP))
+    o.append(cxx_string("kGradientStreamDump", GRAD_STREAM_TEXT))
+    o.append(cxx_string("kGradientStreamReportDump", GRAD_STREAM_REPORT_DUMP))
     o.append("\n}  // namespace sink_known\n\n#endif\n")
     return "".join(o)
 

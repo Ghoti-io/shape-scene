@@ -361,6 +361,87 @@ TEST(DumpSink, TheGlyphRecordsOnAStreamAreTheGenerators) {
   EXPECT_EQ(gshscene_report_hash(report.report), sink_known::kGlyphStreamReportHash);
 }
 
+// Color-paint story P2: the gradient records, restated by tools/gen-sink-vectors.py.  The fixture interns, into a
+// fresh store and in this order, the palette and gradients A, B and D, so that their ids are the generator's.
+TEST(DumpSink, TheGradientRecordsOnAStreamAreTheGenerators) {
+  Scene s;
+  GSHSCENE_Color_Space srgb{};
+  srgb.primaries = GCOL_PRIMARIES_SRGB;
+  srgb.transfer = GCOL_TRANSFER_SRGB;
+  GSHSCENE_Color_Space linear{};
+  linear.primaries = GCOL_PRIMARIES_SRGB;
+  linear.transfer = GCOL_TRANSFER_LINEAR;
+  GSHSCENE_Color entry{{0.03125, 0.0, 0.0390625, 1.0}, srgb};
+  const GSHSCENE_Resource * palette = nullptr;
+  ASSERT_EQ(gshscene_store_intern_palette(s.store, 1, &entry, &palette), GSHSCENE_OK);
+  s.held.push_back(palette);
+  auto intern = [&](GSHSCENE_Gradient g, std::vector<GSHSCENE_Gradient_Stop> stops) {
+    gshgeom_map_identity(2, &g.map);
+    g.stops = stops.data();
+    g.stop_count = stops.size();
+    const GSHSCENE_Resource * r = nullptr;
+    EXPECT_EQ(gshscene_store_intern_gradient(s.store, &g, &r), GSHSCENE_OK);
+    s.held.push_back(r);
+    return r;
+  };
+  GSHSCENE_Paint fg{};
+  fg.kind = GSHSCENE_PAINT_FOREGROUND;
+  fg.rgba[3] = 0.5;
+  GSHSCENE_Paint pal{};
+  pal.kind = GSHSCENE_PAINT_PALETTE;
+  pal.entry = 0;
+  pal.rgba[3] = 0.75;
+  GSHSCENE_Paint first = solid(0.25, 0.5, 1.0);
+  first.space = linear;
+  GSHSCENE_Gradient a{};
+  a.kind = GSHSCENE_GRADIENT_LINEAR;
+  a.p1[0] = 10.0;
+  a.space = linear;
+  GSHSCENE_Gradient b{};
+  b.kind = GSHSCENE_GRADIENT_RADIAL;
+  b.c0[0] = b.c0[1] = b.c1[0] = b.c1[1] = 1.0;
+  b.r1 = 5.0;
+  GSHSCENE_Gradient d{};
+  d.kind = GSHSCENE_GRADIENT_LINEAR;
+  d.p0[0] = d.p0[1] = d.p1[0] = d.p1[1] = 5.0;
+  const GSHSCENE_Resource * ga = intern(a, {{0.0, first}, {0.5, fg}, {1.0, pal}});
+  const GSHSCENE_Resource * gb = intern(b, {{0.0, solid(1, 0, 0)}, {1.0, solid(0, 0, 1, 0.5)}});
+  const GSHSCENE_Resource * gd = intern(d, {{0.0, solid(1, 0, 0)}, {1.0, solid(0, 0, 1)}});
+  ASSERT_EQ(gshscene_resource_id(ga), 2u) << "the generator's ids: a fresh store, in this order";
+  ASSERT_EQ(gshscene_resource_id(gb), 3u);
+  ASSERT_EQ(gshscene_resource_id(gd), 4u);
+  EXPECT_EQ(gshscene_resource_hash(ga), sink_known::kGradientAHash);
+  EXPECT_EQ(gshscene_resource_hash(gb), sink_known::kGradientBHash);
+  GSHSCENE_List * l = s.open();
+  GSHSCENE_Color fgc{{0.02, 0.03125, 0.0, 1.0}, srgb};
+  ASSERT_EQ(gshscene_list_set_foreground(l, &fgc), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_set_palette(l, palette), GSHSCENE_OK);
+  struct F {
+    double x, y, size;
+    const GSHSCENE_Resource * g;
+    double alpha;
+  };
+  for (const F & f : {F{2, 2, 8, ga, 1.0}, F{10, 4, 6, ga, 0.5}, F{20, 20, 6, gb, 1.0}, F{30, 2, 4, gd, 1.0}}) {
+    GSHSCENE_Paint p{};
+    p.kind = GSHSCENE_PAINT_GRADIENT;
+    p.gradient = f.g;
+    p.rgba[3] = f.alpha;
+    ASSERT_EQ(gshscene_list_fill(l, s.sq(f.x, f.y, f.size), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK);
+  }
+  ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_hash(l), sink_known::kGradientListHash);
+  SinkRef sink(make_full(nullptr, nullptr));
+  auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+  gshgeom_map_scale(2, 0.5, 0.5, 1.0, &stream->target.map);
+  ReportRef report;
+  Rendered r = render_job(sink.sink, request_for(l, *stream, report.report));
+  ASSERT_EQ(r.result, GSHSCENE_OK);
+  EXPECT_EQ(stream->bytes, sink_known::kGradientStreamDump);
+  EXPECT_EQ(r.output, sink_known::kGradientStreamOutputHash);
+  EXPECT_EQ(gshscene_report_hash(report.report), sink_known::kGradientStreamReportHash);
+  EXPECT_EQ(report_dump(report.report), with_bytes(sink_known::kGradientStreamReportDump, report.report));
+}
+
 TEST(DumpSink, AGlyphPastTheScratchIsRefusedAsTheSinksOwnLimit) {
   // Glyph 8's 3000 lines do not fit the 64 KiB of a glyph's scratch, on either route: refused, the rest drawn.
   for (uint32_t kind : {(uint32_t)GSHSCENE_TARGET_RASTER, (uint32_t)GSHSCENE_TARGET_STREAM}) {

@@ -21,6 +21,11 @@ static const std::uint64_t kGlyphRasterPixelsHash = UINT64_C(0x8beba4fd16fe2665)
 static const std::uint64_t kGlyphStreamOutputHash = UINT64_C(0x5aa17b1a72b58ea7);
 static const std::uint64_t kGlyphRasterReportHash = UINT64_C(0xe2ed986eb8ddf529);
 static const std::uint64_t kGlyphStreamReportHash = UINT64_C(0xd4d13e535d88b048);
+static const std::uint64_t kGradientListHash = UINT64_C(0x68f899816ef19362);
+static const std::uint64_t kGradientAHash = UINT64_C(0x421a8cafb53b7719);
+static const std::uint64_t kGradientBHash = UINT64_C(0x66b66bbe31c59cf1);
+static const std::uint64_t kGradientStreamOutputHash = UINT64_C(0x3c087ea5466bcd54);
+static const std::uint64_t kGradientStreamReportHash = UINT64_C(0xb1af2b8d2b335553);
 
 static const char * const kRasterDump =
 R"DUMP(gshscene.dump-sink 1 kind=1 unit=0 units=15 list=9f362a4217df5fc8
@@ -113,6 +118,25 @@ R"DUMP(gshscene.report 1 result=0 units=2/2/2 entries=3 counted=3 overflowed=0 s
 E class=1 reason=18 chain=0 second=2 depth=0000000000000000
 E class=1 reason=18 chain=1 second=2 depth=0000000000000000
 E class=4 reason=12 chain=1 second=0 depth=0000000000000000
+)DUMP";
+static const char * const kGradientStreamDump =
+R"DUMP(gshscene.dump-sink 1 kind=2 unit=2 units=4 list=68f899816ef19362
+U 0 F res=path:9a8490040d04ed76 map=c530824dc0bebfa4 rule=0 grad=2 box=3ff0000000000000 3ff0000000000000 4014000000000000 4014000000000000
+R 2 421a8cafb53b7719 space=1:1:0000000000000000 stops=3
+r 0000000000000000 3fd0000000000000 3fe0000000000000 3ff0000000000000 3ff0000000000000
+r 3fe0000000000000 3f595cbb0be377ae 3f63d0722149b580 0000000000000000 3fe0000000000000
+r 3ff0000000000000 3f63d0722149b580 0000000000000000 3f68c48ea99c22e0 3fe8000000000000
+U 1 F res=path:ed085beb9d35c102 map=c530824dc0bebfa4 rule=0 grad=2 box=4014000000000000 4000000000000000 4020000000000000 4014000000000000
+U 2 F res=path:5f8c4746a1476c3a map=c530824dc0bebfa4 rule=0 grad=3 box=4024000000000000 4024000000000000 402a000000000000 402a000000000000
+R 3 66b66bbe31c59cf1 space=1:2:0000000000000000 stops=2
+r 0000000000000000 3ff0000000000000 0000000000000000 0000000000000000 3ff0000000000000
+r 3ff0000000000000 0000000000000000 0000000000000000 3ff0000000000000 3fe0000000000000
+U 3 X class=5 reason=24
+E result=0 processed=4 done=4
+)DUMP";
+static const char * const kGradientStreamReportDump =
+R"DUMP(gshscene.report 1 result=0 units=4/4/4 entries=1 counted=1 overflowed=0 static=0 frame=%FRAME% workspace=%WORKSPACE% work=1 hash=b1af2b8d2b335553
+E class=5 reason=24 chain=3 second=0 depth=0000000000000000
 )DUMP";
 
 }  // namespace sink_known
