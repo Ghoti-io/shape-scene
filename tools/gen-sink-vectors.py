@@ -281,7 +281,7 @@ def pixels_hash(stamps, w=64, h=64):
 RASTER_PIXELS = pixels_hash(RASTER_STAMPS)
 
 # --- reports (report.h) ------------------------------------------------------------------------------------
-REFUSED, APPROXIMATED, AMBIGUITY, HINT = 1, 2, 3, 4
+REFUSED, APPROXIMATED, AMBIGUITY, HINT, NOTICE = 1, 2, 3, 4, 5
 R_BLEND, R_CLIP, R_LIMIT, R_TIE_DECLARED = 4, 5, 6, 11
 OK, ERR_REFUSED = 0, 9
 
@@ -291,12 +291,12 @@ def report(result, units, entries, static=0, work=1, failure_chain=(), reason=""
     """entries: (class, reason, chain, second, depth), in the order report.h says."""
     keyed = sorted(entries, key=lambda e: (list(e[2]), e[0], e[1], e[3]))
     assert keyed == list(entries), "the expectation itself is out of order"
-    by = [0, 0, 0, 0, 0]
+    by = [0, 0, 0, 0, 0, 0]
     for e in entries:
         by[e[0]] += 1
-    out = u32(1) + u32(0x54525052) + u32(result) + u64(units[0]) + u64(units[1]) + u64(units[2])
+    out = u32(2) + u32(0x54525052) + u32(result) + u64(units[0]) + u64(units[1]) + u64(units[2])
     out += u64(len(entries)) + u8(0)
-    for c in range(1, 5):
+    for c in range(1, 6):
         out += u64(by[c])
     out += u64(static) + u64(work)
     fc = failure_chain if result != OK else ()
@@ -305,7 +305,7 @@ def report(result, units, entries, static=0, work=1, failure_chain=(), reason=""
     for cls, rsn, ch, second, depth in entries:
         out += u8(cls) + u32(rsn) + u64(len(ch)) + b"".join(u64(i) for i in ch) + u64(second) + f64(depth)
     h = fnv(out)
-    lines = ["gshscene.report 1 result=%d units=%d/%d/%d entries=%d counted=%d overflowed=0 static=%d frame=%s "
+    lines = ["gshscene.report 2 result=%d units=%d/%d/%d entries=%d counted=%d overflowed=0 static=%d frame=%s "
              "workspace=%s work=%d hash=%016x" % (result, units[0], units[1], units[2], len(entries), len(entries), static,
                                                   frame, workspace, work, h)]
     if result != OK:

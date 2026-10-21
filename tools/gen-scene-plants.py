@@ -48,15 +48,19 @@ FILES = {
     "src/scene/emit.c": "em",
     "src/scene/diff.c": "df",
     "src/list/fixed.c": "lf",
+    "src/resource/gradient.c": "bg",
+    "src/paint/convert.c": "bv",
 }
 LINE_FILTER = {
     "src/store/store.c": r"bytes|fits\(",
-    "src/resource/resource.c": r"BYTES|bytes|sat_|palette|rgba|colors|PALETTE",
+    "src/resource/resource.c": r"BYTES|bytes|sat_|palette|rgba|colors|PALETTE|gradient|GRADIENT",
     "src/list/list.c": r"max_bytes|max_nodes|max_node_depth|NODE_DEPTH_CEILING|gshscene_list_canonical|gshscene_list_check_rule|return canonical_|return check_rule"
     # story 12: the order, the ties, the foreground, the composite helpers and the new equality
     r"|unit|frame|scratch|\btie|ties|nonflat|composite|foreground|context|space_equal|color_equal|open_n|out_n|prev_pos|closing|match\["
     # story 14c: the palette, its paint and its resolution, the entry, truncation
-    r"|palette|PALETTE|entry|truncate|instance \?|picture >|list->count = count|list->depth|list->expansion =|resolve",
+    r"|palette|PALETTE|entry|truncate|instance \?|picture >|list->count = count|list->depth|list->expansion =|resolve"
+    # color-paint story P1: the gradient paint, its references, hash and dump
+    r"|gradient|GRADIENT",
     "src/core/core.c": r"max_bytes|max_nodes|max_node_depth|REFUSED|refused",
 }
 EXTRA = {
@@ -66,18 +70,20 @@ EXTRA = {
     "src/core/core.c": "bc",
 }
 TESTS_EXTRA = ["testBytes", "testCore", "testStore", "testScene_limits", "testOrder", "testList", "testColor", "testDump",
-               "testComposite", "testPaint_scene", "testEmit", "testPalette"]
+               "testComposite", "testPaint_scene", "testEmit", "testPalette", "testGradient"]
 TESTS_BY_FILE = {
     "src/paint/color_space.c": ["testColor", "testList", "testNode", "testPaint_scene", "testScene_dump"],
-    "src/scene/node.c": ["testNode", "testEdit", "testScene", "testScene_dump", "testVersion", "testPaint_scene", "testOrder", "testEmit", "testPalette"],
+    "src/scene/node.c": ["testNode", "testEdit", "testScene", "testScene_dump", "testVersion", "testPaint_scene", "testOrder", "testEmit", "testPalette", "testGradient"],
     "src/scene/edit.c": ["testEdit", "testScene", "testNode", "testPaint_scene", "fuzz-replay", "testPalette"],
     "src/scene/scene.c": ["testScene", "testEdit", "testScene_limits", "testDiff", "testEmit", "testPaint_scene", "fuzz-replay", "testPalette"],
-    "src/scene/version.c": ["testVersion", "testScene_dump", "testScene", "testEmit", "testDiff", "testPaint_scene", "testOrder", "testPalette"],
+    "src/scene/version.c": ["testVersion", "testScene_dump", "testScene", "testEmit", "testDiff", "testPaint_scene", "testOrder", "testPalette", "testGradient"],
     "src/scene/walk.c": ["testVersion", "testEmit", "testDiff", "testScene_limits", "testOrder"],
     "src/scene/validate.c": ["testScene", "testScene_limits", "testEdit", "testPaint_scene", "fuzz-replay"],
     "src/scene/emit.c": ["testEmit", "testScene_limits", "testVersion", "testDiff", "testOrder", "testPaint_scene", "testPalette"],
-    "src/scene/diff.c": ["testDiff", "testScene", "testVersion", "testPaint_scene", "testGlyph", "testPalette"],
-    "src/list/fixed.c": ["testPalette", "fuzz-replay"],
+    "src/scene/diff.c": ["testDiff", "testScene", "testVersion", "testPaint_scene", "testGlyph", "testPalette", "testGradient"],
+    "src/list/fixed.c": ["testPalette", "testGradient", "fuzz-replay"],
+    "src/resource/gradient.c": ["testGradient", "testDump", "testDump_sink", "fuzz-replay", "fuzz-render", "probe"],
+    "src/paint/convert.c": ["testGradient", "probe"],
 }
 
 SINK_FILES = {
@@ -87,7 +93,7 @@ SINK_FILES = {
     "src/sink/cancel.c": "cn",
     "src/glyph/glyph.c": "gl",
 }
-SINK_TESTS = ["testDump_sink", "testSink", "testReport", "testGlyph", "testPalette", "fuzz-render", "probe"]
+SINK_TESTS = ["testDump_sink", "testSink", "testReport", "testGlyph", "testPalette", "testGradient", "fuzz-render", "probe"]
 
 REL = [("==", "!="), ("!=", "=="), ("<=", "<"), (">=", ">"), ("<", "<="), (">", ">=")]
 
@@ -235,7 +241,7 @@ def candidates(path):
 
 
 STRING_FILES = {"src/scene/version.c", "src/scene/validate.c", "src/scene/node.c", "src/list/list.c",
-                "src/sink/report.c", "src/sink/dump_sink.c", "src/sink/sink.c"}
+                "src/sink/report.c", "src/sink/dump_sink.c", "src/sink/sink.c", "src/resource/gradient.c"}
 
 
 def main():

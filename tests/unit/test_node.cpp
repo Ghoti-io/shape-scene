@@ -294,7 +294,7 @@ TEST(NodeRules, AShapeNeedsAPathOrGlyphRunOfTheStoreAndAValidRuleAndPaint) {
   // The paint follows the rules of a list's fill.
   n = shape_node(f.sq.get());
   n.paint.kind = GSHSCENE_PAINT_GRADIENT;
-  EXPECT_EQ(f.add(n), GSHSCENE_ERR_UNSUPPORTED);
+  EXPECT_EQ(f.add(n), GSHSCENE_ERR_INVALID) << "a gradient paint names a gradient resource";
   n = shape_node(f.sq.get());
   n.paint.kind = GSHSCENE_PAINT_PALETTE;
   n.paint.entry = 0xFFFFu;

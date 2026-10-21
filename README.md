@@ -11,11 +11,13 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
 - **Resources** (`resource.h`). A store interns content, by hash and then by equality, so equal
   content gets one reference-counted handle. Kinds: a model path, a glyph run (glyphs named by
   a face resource and glyph id, or given as path outlines), a face (a font's face and instance,
-  bound to a glyph path provider), a palette (a table of colors), and a picture (a closed list,
-  frozen, which an instance draws under a map). Gradients and images are named and reserved.
+  bound to a glyph path provider), a palette (a table of colors), a gradient (linear, two-circle
+  radial or sweep, with a color line, an extend, an interpolation space and a gradient map), and a
+  picture (a closed list, frozen, which an instance draws under a map). Images are named and reserved.
 - **Recording without floats** (`fixed.h`). Integer-only calls, for a front end whose headers
   name no floating type: fills and clips of glyph runs under a design map of fixed-point ops,
-  palette and foreground paints, groups by operator, a palette from 8-bit entries, and truncation
+  palette and foreground paints, groups by operator, a palette from 8-bit entries, a gradient from
+  COLRv1's integers and a fill with it, and truncation
   so that a lowering is all or nothing. Each handle has a
   64-bit id that is never reused, and a release-listener API lets a sink's cache drop an entry
   when the last reference goes. A store and its handles are thread-safe.
@@ -28,9 +30,11 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
   gamuts, three transfers, from `color`); `currentColor` is a foreground paint that resolves
   against the version's or list's foreground; a palette paint names an entry of the version's or
   list's palette, an interned table of colors (a font's CPAL palette, for instance), and a fill
-  whose entry is missing is refused, never drawn in another color; a group has a blend space, an opacity, a Porter-Duff
-  operator and an ordering context. An exact reference (`tools/composite-oracle.py`) and committed
-  known answers define what two sinks must agree on.
+  whose entry is missing is refused, never drawn in another color; a gradient paint names a gradient
+  resource, whose stops (solid, foreground or palette) are converted into its interpolation space by
+  one function every sink calls at draw time; a group has a blend space, an opacity, a Porter-Duff
+  operator and an ordering context. Exact references (`tools/composite-oracle.py`,
+  `tools/gradient-oracle.py`) and committed known answers define what two sinks must agree on.
 - **Hash and dump** of every resource and list, in `shape-geometry`'s spelling (FNV-1a 64 over
   little-endian fields), the same on every target.
 - **Limits** on everything a caller can make unbounded, each asserted by its bound, including the
@@ -50,7 +54,7 @@ The retained scene (`version.h`, `edit.h`, `scene.h`, `diff.h`):
 - Structural limits (nodes, depth, occurrences, list items, push and picture nesting) are enforced
   at publish; `make fuzz-replay` replays a committed corpus through the recording API.
 
-The sink contract (`sink.h`, `report.h`, `cancel.h`; the normative text, S1 to S16, is in
+The sink contract (`sink.h`, `report.h`, `cancel.h`; the normative text, S1 to S17, is in
 `documentation/design.md`):
 
 - **A render** is a request (a closed list, a described target, a report, an optional cancel token,
@@ -58,8 +62,8 @@ The sink contract (`sink.h`, `report.h`, `cancel.h`; the normative text, S1 to S
   `poll` and an optional `wait`, with a one-call `gshscene_sink_render` for sinks that can block.
   Capabilities are asked per sink and target. Targets are rasters or streams (a document a writer
   sink emits, in units it states); GPU kinds are reserved.
-- **The report** is the caller's, reused across frames: what was refused, approximated or resolved
-  (depth ties), keyed by list entry and resolvable to node IDs and instance paths for a version's
+- **The report** is the caller's, reused across frames: what was refused, approximated, resolved
+  (depth ties) or noticed (a gradient that draws nothing), keyed by list entry and resolvable to node IDs and instance paths for a version's
   list, with a summary and a failure record; a dump and a hash in the family's spelling.
 - **Strict, cancel, conflation, caller memory**: a planning pass in the contract layer finds every
   refusal the caps decide before the target is touched; cancel is cooperative at points each sink
@@ -71,7 +75,7 @@ The sink contract (`sink.h`, `report.h`, `cancel.h`; the normative text, S1 to S
 
 `examples/frame.c` records a frame in immediate mode; `examples/retained.c` is an application, a
 front-end and a driver; `examples/sink.c` renders a list through the sink contract with the test
-sink.
+sink; `examples/gradient.c` interns, resolves and renders gradients.
 
 ## Building
 
@@ -81,8 +85,8 @@ make install PREFIX="$PWD/.local"
 ```
 
 Dependencies are found by pkg-config and nothing else; a missing one is an
-error that names the fix. The libraries this one needs: cutil, color and shape-geometry (`image`
-returns with the raster-target step).
+error that names the fix. The libraries this one needs: cutil, color, math, image and
+shape-geometry.
 
 Determinism is a requirement, not a hope: every `double` stage builds with
 `-ffp-contract=off` and no x87, and elementary functions come from `math`, not

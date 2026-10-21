@@ -32,8 +32,12 @@
  * set, the sink's extent limit and the report's cap, the write of the stream and
  * the allocation that fail, and how many units a deferred step goes through.  The
  * rest builds up to three pictures and a list (fills of paths, of glyph runs from
- * a face and from outlines, foreground fills, clips, groups with every operator,
- * blend space and ordering, instances), always balanced and closed.  After the
+ * a face and from outlines, foreground fills, gradient fills of every kind, two
+ * of them degenerate and one with a missing palette stop, some under a map that
+ * is not invertible, clips, groups with every operator, blend space and
+ * ordering, instances), always balanced and closed.  The step byte's high bits
+ * take radial gradients, every gradient, or stated interpolation spaces away
+ * from the sink's caps (S17).  After the
  * render the contract's invariants are checked, and a violation is an `abort`:
  *
  * - the result is one the contract allows for the request, and the report's
@@ -79,14 +83,15 @@
 enum {
   OUT_OK = 0, OUT_STRICT_PLANNED, OUT_STRICT_DRAWING, OUT_CANCEL_START, OUT_CANCEL_MID, OUT_SUBMITTED_PAST_CANCEL,
   OUT_LIMIT_WORKSPACE, OUT_LIMIT_REPORT, OUT_IO, OUT_OOM, OUT_SEAMLESS, OUT_CALLER_MEMORY_REFUSED, OUT_APPROXIMATED,
-  OUT_TIES, OUT_DEFERRED, OUT_INVALID, OUT_UNSUPPORTED, OUT_COUNT
+  OUT_TIES, OUT_DEFERRED, OUT_INVALID, OUT_UNSUPPORTED, OUT_GRADIENT_DRAWN, OUT_GRADIENT_REFUSED, OUT_NOTICE, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"ok", "strict, refused by the plan", "strict, refused while drawing",
     "cancelled before the start", "cancelled between units", "a before-submit sink completing past its token",
     "a workspace too small", "the report's cap", "a failed write", "a failed allocation", "the conflation flag",
     "caller memory refused", "an approximation", "a tie", "a deferred completion", "an invalid request",
-    "an unsupported target"};
+    "an unsupported target", "a gradient resolved by the test sink", "a gradient kind refused",
+    "a notice (a gradient that draws nothing)"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -186,6 +191,8 @@ static GSHSCENE_Result stream_write(void * ctx, const void * bytes, size_t count
   }
   s->writes++;
   const unsigned char * b = bytes;
+  /* The test sink writes a gradient's record in one write, once per gradient per render (S17). */
+  outcomes[OUT_GRADIENT_DRAWN] += count > 2 && b[0] == 'R' && b[1] == ' ';
   for (size_t i = 0; i < count; i++) {
     s->hash = (s->hash ^ b[i]) * UINT64_C(0x100000001b3);
   }
@@ -232,6 +239,7 @@ typedef struct Scene {
   size_t held_count;
   const GSHSCENE_Resource * pictures[PICTURES];
   size_t picture_count;
+  const GSHSCENE_Resource * gradients[6]; /* made on first use (S17) */
 } Scene;
 
 static const GSHSCENE_Resource * keep(Scene * s, const GSHSCENE_Resource * r) {
@@ -330,6 +338,58 @@ static const GSHSCENE_Resource * run_from(Scene * s, int font, uint8_t a) {
 }
 
 /** Build a list from the ops; balanced and closed; NULL when the input built nothing usable. */
+/**
+ * One of six gradients (color-paint story P1, S17): a linear, a radial cone and a sweep that draw; a linear with
+ * p0 = p1 and a sweep with a0 = a1 under repeat, which draw nothing (G10); and a linear with a stop of palette entry
+ * 2, which the list's two-entry palette does not have.
+ */
+static const GSHSCENE_Resource * gradient_from(Scene * s, unsigned k) {
+  k %= 6;
+  if (s->gradients[k]) {
+    return s->gradients[k];
+  }
+  GSHSCENE_Gradient_Stop stops[2];
+  memset(stops, 0, sizeof stops);
+  stops[0].color.kind = GSHSCENE_PAINT_FOREGROUND;
+  stops[0].color.rgba[3] = 1.0;
+  stops[1].offset = 1.0;
+  stops[1].color.kind = GSHSCENE_PAINT_SOLID;
+  stops[1].color.rgba[2] = 1.0;
+  stops[1].color.rgba[3] = 0.5;
+  GSHSCENE_Gradient g;
+  memset(&g, 0, sizeof g);
+  gshgeom_map_identity(2, &g.map);
+  g.stop_count = 2;
+  g.stops = stops;
+  g.kind = k == 1 ? GSHSCENE_GRADIENT_RADIAL : (k == 2 || k == 4) ? GSHSCENE_GRADIENT_SWEEP : GSHSCENE_GRADIENT_LINEAR;
+  g.p1[0] = k == 3 ? 0.0 : 20.0;
+  if (k == 1) {
+    g.c0[0] = 4;
+    g.r0 = 2;
+    g.c1[0] = 30;
+    g.r1 = 8;
+  }
+  if (k == 2 || k == 4) {
+    g.center[0] = g.center[1] = 24;
+    g.angle_unit = GSHGEOM_ANGLE_TURNS;
+    g.a1 = k == 2 ? 1.0 : 0.0;
+    g.extend = k == 4 ? GSHSCENE_EXTEND_REPEAT : GSHSCENE_EXTEND_PAD;
+  }
+  if (k == 5) {
+    stops[0].color.kind = GSHSCENE_PAINT_PALETTE;
+    stops[0].color.entry = 2;
+    g.space.primaries = GCOL_PRIMARIES_SRGB;
+    g.space.transfer = GCOL_TRANSFER_LINEAR;
+    stops[1].color.space = g.space;
+  }
+  const GSHSCENE_Resource * r = NULL;
+  if (gshscene_store_intern_gradient(s->store, &g, &r) != GSHSCENE_OK) {
+    return NULL;
+  }
+  s->gradients[k] = keep(s, r);
+  return s->gradients[k];
+}
+
 static GSHSCENE_List * build(Scene * s, Input * in, int * ties) {
   GSHSCENE_List * list = NULL;
   if (gshscene_list_create(NULL, NULL, s->store, &list) != GSHSCENE_OK) {
@@ -361,15 +421,27 @@ static GSHSCENE_List * build(Scene * s, Input * in, int * ties) {
     switch (op) {
       case 0:
       case 9: {
+        GSHGEOM_Map flat;
+        const double m[4] = {1, 0, 0, 0};
+        const double t[2] = {0, 0};
+        gshgeom_map_from_matrix(2, m, t, &flat);
+        int singular = 0;
         if (op == 9) {
           memset(&paint, 0, sizeof paint);
           paint.kind = (a & 2) ? GSHSCENE_PAINT_PALETTE : GSHSCENE_PAINT_FOREGROUND;
           paint.entry = (a & 2) ? (uint32_t)(b % 3) : 0;
           paint.rgba[3] = 0.75;
+          if ((a & 12) == 12) {
+            /* S17: a gradient, a quarter of the time; under a map that is not invertible, an eighth of those. */
+            paint.kind = GSHSCENE_PAINT_GRADIENT;
+            paint.entry = 0;
+            paint.gradient = gradient_from(s, b);
+            singular = (c & 0xe0) == 0xe0;
+          }
         }
         const GSHSCENE_Resource * r = square(s, a % SIDE, b % SIDE, 1 + c % 20);
-        if (r) {
-          gshscene_list_fill(list, r, NULL, (GSHGEOM_Fill_Rule)(a & 1), &paint, layer, d);
+        if (r && (paint.kind != GSHSCENE_PAINT_GRADIENT || paint.gradient)) {
+          gshscene_list_fill(list, r, singular ? &flat : NULL, (GSHGEOM_Fill_Rule)(a & 1), &paint, layer, d);
         }
         break;
       }
@@ -492,7 +564,7 @@ static void check_report(const GSHSCENE_Report * report, size_t cap, GSHSCENE_Re
   CHECK(sum.counted >= count);
   CHECK((sum.counted > count) == (sum.overflowed != 0));
   CHECK(!sum.overflowed || count == cap);
-  size_t by[GSHSCENE_ENTRY_CLASS_COUNT] = {0, 0, 0, 0, 0};
+  size_t by[GSHSCENE_ENTRY_CLASS_COUNT] = {0, 0, 0, 0, 0, 0};
   GSHSCENE_Report_Entry prev;
   memset(&prev, 0, sizeof prev);
   for (size_t i = 0; i < count; i++) {
@@ -502,6 +574,12 @@ static void check_report(const GSHSCENE_Report * report, size_t cap, GSHSCENE_Re
     CHECK(e.reason >= GSHSCENE_REASON_ITEM_KIND && e.reason < GSHSCENE_REASON_COUNT);
     CHECK((e.chain_count == 0) == (e.chain == NULL));
     by[e.entry_class]++;
+    /* S17: a notice names what draws nothing, and only a refusal names a gradient's kind. */
+    CHECK(e.entry_class != GSHSCENE_ENTRY_NOTICE || e.reason == GSHSCENE_REASON_MAP_NOT_INVERTIBLE ||
+          e.reason == GSHSCENE_REASON_GRADIENT_DEGENERATE);
+    CHECK(e.reason != GSHSCENE_REASON_GRADIENT || e.entry_class == GSHSCENE_ENTRY_REFUSED);
+    CHECK(e.reason != GSHSCENE_REASON_INTERPOLATION_SPACE || e.entry_class == GSHSCENE_ENTRY_APPROXIMATED);
+    outcomes[OUT_GRADIENT_REFUSED] += e.reason == GSHSCENE_REASON_GRADIENT;
     if (i) {
       CHECK(chain_less_eq(&prev, &e));
     }
@@ -523,6 +601,9 @@ static void check_report(const GSHSCENE_Report * report, size_t cap, GSHSCENE_Re
   }
   if (sum.by_class[GSHSCENE_ENTRY_RESOLVED_AMBIGUITY]) {
     outcomes[OUT_TIES]++;
+  }
+  if (sum.by_class[GSHSCENE_ENTRY_NOTICE]) {
+    outcomes[OUT_NOTICE]++;
   }
 }
 
@@ -595,6 +676,16 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
     }
     if (h_caps & 128) {
       c->flags |= GSHSCENE_CAP_THREAD_AFFINE;
+    }
+    /* S17: a sink without radial gradients, without any, or interpolating only in the target's space. */
+    if (h_step & 32) {
+      c->gradient_kinds &= ~(UINT32_C(1) << GSHSCENE_GRADIENT_RADIAL);
+    }
+    if (h_step & 64) {
+      c->gradient_kinds = 0;
+    }
+    if (h_step & 128) {
+      c->flags &= ~GSHSCENE_CAP_GRADIENT_SPACES;
     }
   }
   if (h_caps & 16) {

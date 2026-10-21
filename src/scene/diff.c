@@ -450,11 +450,23 @@ static GSHSCENE_Result damage_group_leave(void * ctx, const GSHSCENE_Walk * walk
   return GSHSCENE_OK;
 }
 
+/** N13: whether a paint reads the foreground: a foreground paint, or a gradient with a foreground stop (G3). */
+static int paints_with_foreground(const GSHSCENE_Paint * paint) {
+  return paint->kind == GSHSCENE_PAINT_FOREGROUND ||
+      (paint->kind == GSHSCENE_PAINT_GRADIENT && paint->gradient->u.gradient.foreground);
+}
+
+/** N13: whether a paint reads the palette: a palette paint, or a gradient with a palette stop (G3). */
+static int paints_from_palette(const GSHSCENE_Paint * paint) {
+  return paint->kind == GSHSCENE_PAINT_PALETTE ||
+      (paint->kind == GSHSCENE_PAINT_GRADIENT && paint->gradient->u.gradient.palette_need != 0);
+}
+
 static GSHSCENE_Result damage_shape(
     void * ctx, const GSHSCENE_Walk * walk, const GSHSCENE_Node_Rec * shape, const GSHGEOM_Map * map) {
   Damage_Walk * d = ctx;
-  if (d->inside > 0 || is_marked(d, shape) || (d->foreground && shape->p.paint.kind == GSHSCENE_PAINT_FOREGROUND) ||
-      (d->palette && shape->p.paint.kind == GSHSCENE_PAINT_PALETTE)) {
+  if (d->inside > 0 || is_marked(d, shape) || (d->foreground && paints_with_foreground(&shape->p.paint)) ||
+      (d->palette && paints_from_palette(&shape->p.paint))) {
     return add_shape(d, walk, shape, map);
   }
   return GSHSCENE_OK;

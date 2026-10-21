@@ -23,7 +23,9 @@ test_dump.cpp builds with the API).
 
 The fixtures: a square path, shape-geometry's own fixture path (every verb), a
 face, a glyph run from that face and one from outlines, a palette (story 14c; one
-made from doubles and the same entries from RGBA8), a picture, and a list holding every
+made from doubles and the same entries from RGBA8), three gradients (color-paint story
+P1: linear, radial and sweep, with a list of their fills and a scene with a gradient
+shape), a picture, and a list holding every
 kind of item and every paint, with a foreground and a palette, each also in its dump text; and a scene (version.h) holding every kind
 of node, with a clip, a key, a hidden node and an instance, built by the test in the
 order of the IDs below (the root 1, then 2 to 7), with its hash and its dump, and the
@@ -134,9 +136,9 @@ TRANSLATE = map_hash(2, [1, 0, 0, 1], [1.5, -2.25], 1)
 DESIGN = map_hash(2, [2.5, 0, 0, -2.5], [10, 20], 1 | 2 | 8)
 
 # --- resources (resource.h) ----------------------------------------------------
-KIND_PATH, KIND_RUN, KIND_PICTURE, KIND_FACE, KIND_PALETTE = 1, 2, 3, 6, 7
+KIND_PATH, KIND_RUN, KIND_PICTURE, KIND_GRADIENT, KIND_FACE, KIND_PALETTE = 1, 2, 3, 4, 6, 7
 KIND_NAME = {KIND_PATH: "path", KIND_RUN: "glyph-run", KIND_PICTURE: "picture", KIND_FACE: "face",
-             KIND_PALETTE: "palette"}
+             KIND_PALETTE: "palette", KIND_GRADIENT: "gradient"}
 # The format is per kind (resource.h): a glyph run's is 2 since story 14a, the rest 1.
 RUN_FORMAT = 2
 
@@ -252,9 +254,81 @@ PALETTE8 = [rgba8(*c) for c in PALETTE8_BYTES]
 PALETTE8_HASH = palette_hash(PALETTE8)
 
 
+# --- gradients (resource.h, paint.h G1 to G3; color-paint story P1) ------------------------------------
+LINEAR, RADIAL, SWEEP = 1, 2, 3
+PAINT_SOLID, PAINT_GRADIENT, PAINT_FOREGROUND, PAINT_PALETTE = 0, 1, 2, 3
+PAD, REPEAT, REFLECT = 0, 1, 2
+DEGREES, TURNS = 1, 3
+
+
+def stop(offset, kind, rgba=(0.0, 0.0, 0.0, 1.0), space=(0, 0, 0.0), entry=0):
+    """A stop as given: an offset and a paint (kind, four doubles, a space, an entry)."""
+    return (offset, kind, rgba, space, entry)
+
+
+def gradient(kind, geom, gmap, stops, extend=PAD, space=(0, 0, 0.0), premul=0, unit=0):
+    """geom: linear (p0x, p0y, p1x, p1y, dx, dy); radial (c0x, c0y, r0, c1x, c1y, r1); sweep (cx, cy, a0, a1)."""
+    # G2: the store sorts by offset, stably; Python's sort is stable.  -0 is +0.
+    z = lambda v: 0.0 if v == 0 else v
+    ordered = sorted(((z(s[0]),) + s[1:] for s in stops), key=lambda s: s[0])
+    return dict(kind=kind, geom=tuple(z(v) for v in geom), map=gmap, stops=ordered, extend=extend, space=space,
+                premul=premul, unit=unit)
+
+
+def gradient_hash(g):
+    out = u32(1) + u32(KIND_GRADIENT) + u8(g["kind"]) + u8(g["extend"]) + space_bytes(g["space"]) + u8(g["premul"])
+    out += u64(g["map"])
+    if g["kind"] == SWEEP:
+        cx, cy, a0, a1 = g["geom"]
+        out += f64(cx) + f64(cy) + u8(g["unit"]) + f64(a0) + f64(a1)
+    else:
+        out += b"".join(f64(v) for v in g["geom"])
+    out += u64(len(g["stops"]))
+    for offset, kind, rgba, sp, entry in g["stops"]:
+        out += f64(offset) + u8(kind) + color_bytes(rgba, sp) + u32(entry)
+    return fnv(out)
+
+
+def gradient_dump(g):
+    h = gradient_hash(g)
+    hx = lambda v: "%016x" % bits(v)
+    lines = ["gshscene.resource 1 kind=gradient hash=%016x" % h,
+             "gradient kind=%d extend=%d space=%s premul=%d map=%016x stops=%d" % (
+                 g["kind"], g["extend"], space_text(g["space"]), g["premul"], g["map"], len(g["stops"]))]
+    v = g["geom"]
+    if g["kind"] == LINEAR:
+        lines.append("linear p0=%s %s p1=%s %s d=%s %s" % tuple(hx(x) for x in v))
+    elif g["kind"] == RADIAL:
+        lines.append("radial c0=%s %s r0=%s c1=%s %s r1=%s" % tuple(hx(x) for x in v))
+    else:
+        lines.append("sweep c=%s %s unit=%d a0=%s a1=%s" % (hx(v[0]), hx(v[1]), g["unit"], hx(v[2]), hx(v[3])))
+    for offset, kind, rgba, sp, entry in g["stops"]:
+        lines.append("s %s paint=%d %s space=%s entry=%d" % (hx(offset), kind, " ".join(hx(c) for c in rgba),
+                                                            space_text(sp), entry))
+    return "\n".join(lines) + "\n"
+
+
+# Three gradients (test_gradient.cpp builds the same): a linear one with an isoline direction, its stops given out of
+# order with two at one offset and one of each paint kind, in linear sRGB premultiplied; a radial cone with a negative
+# radius under a design map, in the target's space; a sweep in degrees, reflected, in P3 with a gamma.
+GRAD_LINEAR = gradient(LINEAR, (0.0, 0.0, 10.0, 0.0, 1.0, 3.0), TRANSLATE,
+                       [stop(1.0, PAINT_SOLID, (1.0, 0.5, 0.25, 1.0), SRGB_SRGB),
+                        stop(0.5, PAINT_FOREGROUND, (0.0, 0.0, 0.0, 0.5)),
+                        stop(-0.0, PAINT_PALETTE, (0.0, 0.0, 0.0, 0.75), entry=2),
+                        stop(0.5, PAINT_SOLID, (0.0, 1.0, 0.0, 0.25), P3_GAMMA)],
+                       extend=REPEAT, space=SRGB_LINEAR, premul=1)
+GRAD_RADIAL = gradient(RADIAL, (1.0, 2.0, -1.5, 4.0, 2.0, 6.25), DESIGN,
+                       [stop(0.0, PAINT_SOLID, (0.0, 0.0, 0.0, 1.0)), stop(1.0, PAINT_SOLID, (1.0, 1.0, 1.0, 0.0))])
+GRAD_SWEEP = gradient(SWEEP, (3.0, -4.0, 90.0, 450.0), IDENTITY,
+                      [stop(0.25, PAINT_SOLID, (0.5, 0.25, 1.0, 1.0), ADOBE_GAMMA)],
+                      extend=REFLECT, space=P3_GAMMA, unit=DEGREES)
+GRAD_LINEAR_HASH = gradient_hash(GRAD_LINEAR)
+GRAD_RADIAL_HASH = gradient_hash(GRAD_RADIAL)
+GRAD_SWEEP_HASH = gradient_hash(GRAD_SWEEP)
+
+
 # --- lists (list.h) ---------------------------------------------------------------
 FILL, CLIP_PUSH, CLIP_POP, GROUP_PUSH, GROUP_POP, INSTANCE = 1, 2, 3, 4, 5, 6
-PAINT_SOLID, PAINT_FOREGROUND, PAINT_PALETTE = 0, 2, 3
 ORDER_FLAT, ORDER_DEPTH, ORDER_OVERLAY = 0, 1, 2
 COMPOSITE = {"src-over": 0, "clear": 1, "src": 2, "dest": 3, "dest-over": 4, "src-in": 5, "dest-in": 6,
              "src-out": 7, "dest-out": 8, "src-atop": 9, "dest-atop": 10, "xor": 11, "plus": 12}
@@ -262,9 +336,9 @@ TIE_LAYER, TIE_PATH, TIE_DECLARED = 1, 2, 3
 DEFAULT_FG = ((0.0, 0.0, 0.0, 1.0), TARGET)
 
 
-def fill(rkind, rhash, mhash, rule, rgba, space=TARGET, layer=0, depth=0.0, paint=PAINT_SOLID, entry=0):
+def fill(rkind, rhash, mhash, rule, rgba, space=TARGET, layer=0, depth=0.0, paint=PAINT_SOLID, entry=0, grad=0):
     return dict(k=FILL, rkind=rkind, rhash=rhash, mhash=mhash, rule=rule, rgba=rgba, space=space, layer=layer,
-                depth=depth, paint=paint, entry=entry)
+                depth=depth, paint=paint, entry=entry, grad=grad)
 
 
 def clip_push(rkind, rhash, mhash, rule, layer=0, depth=0.0):
@@ -288,7 +362,8 @@ def item_bytes(it):
     out = u8(k)
     if k == FILL:
         out += u64(it["rhash"]) + u64(it["mhash"]) + u8(it["rule"]) + u8(it["paint"])
-        out += color_bytes(it["rgba"], it["space"]) + u32(it["entry"]) + i32(it["layer"]) + f64(it["depth"])
+        out += color_bytes(it["rgba"], it["space"]) + u32(it["entry"]) + u64(it["grad"]) + i32(it["layer"])
+        out += f64(it["depth"])
     elif k == CLIP_PUSH:
         out += u64(it["rhash"]) + u64(it["mhash"]) + u8(it["rule"]) + i32(it["layer"]) + f64(it["depth"])
     elif k == GROUP_PUSH:
@@ -300,7 +375,7 @@ def item_bytes(it):
 
 
 def list_hash(items, fg=DEFAULT_FG, palette=0):
-    out = u32(3) + u32(0x5453494C) + color_bytes(fg[0], fg[1]) + u64(palette) + u64(len(items))
+    out = u32(4) + u32(0x5453494C) + color_bytes(fg[0], fg[1]) + u64(palette) + u64(len(items))
     for it in items:
         out += item_bytes(it)
     return fnv(out)
@@ -310,9 +385,9 @@ def item_line(it):
     k = it["k"]
     ld = "layer=%d depth=%016x" % (it["layer"], bits(it["depth"])) if k != CLIP_POP and k != GROUP_POP else ""
     if k == FILL:
-        return "F res=%s:%016x map=%016x rule=%d paint=%d %s space=%s entry=%d %s" % (
+        return "F res=%s:%016x map=%016x rule=%d paint=%d %s space=%s entry=%d gradient=%016x %s" % (
             KIND_NAME[it["rkind"]], it["rhash"], it["mhash"], it["rule"], it["paint"],
-            " ".join("%016x" % bits(c) for c in it["rgba"]), space_text(it["space"]), it["entry"], ld)
+            " ".join("%016x" % bits(c) for c in it["rgba"]), space_text(it["space"]), it["entry"], it["grad"], ld)
     if k == CLIP_PUSH:
         return "C res=%s:%016x map=%016x rule=%d %s" % (KIND_NAME[it["rkind"]], it["rhash"], it["mhash"], it["rule"], ld)
     if k == CLIP_POP:
@@ -326,7 +401,7 @@ def item_line(it):
 
 
 def list_dump(items, fg=DEFAULT_FG, ties=(), palette=0):
-    lines = ["gshscene.list 3 items=%d ties=%d fg=%s palette=%016x hash=%016x" % (
+    lines = ["gshscene.list 4 items=%d ties=%d fg=%s palette=%016x hash=%016x" % (
         len(items), len(ties), color_text(fg[0], fg[1]), palette, list_hash(items, fg, palette))]
     lines += [item_line(it) for it in items]
     for first, second, depth, reason in ties:
@@ -417,6 +492,15 @@ LIST_ITEMS = [
 ]
 LIST_HASH = list_hash(LIST_ITEMS, LIST_FG, PALETTE_HASH)
 
+# A list of gradient fills (test_gradient.cpp): each gradient once, the linear one twice, alphas of their own.
+GRAD_LIST_ITEMS = [
+    fill(KIND_PATH, SQ_RES, IDENTITY, 0, (0.0, 0.0, 0.0, 1.0), paint=PAINT_GRADIENT, grad=GRAD_LINEAR_HASH),
+    fill(KIND_PATH, P2_RES, TRANSLATE, 1, (0.0, 0.0, 0.0, 0.5), paint=PAINT_GRADIENT, grad=GRAD_RADIAL_HASH, layer=2),
+    fill(KIND_PATH, SQ_RES, DESIGN, 0, (0.0, 0.0, 0.0, 0.25), paint=PAINT_GRADIENT, grad=GRAD_SWEEP_HASH),
+    fill(KIND_PATH, SQ_RES, IDENTITY, 0, (0.0, 0.0, 0.0, 0.0), paint=PAINT_GRADIENT, grad=GRAD_LINEAR_HASH, depth=1.0),
+]
+GRAD_LIST_HASH = list_hash(GRAD_LIST_ITEMS)
+
 # The order fixture: recorded in declared order (ORDER_ITEMS_DECLARED); the generator puts it in paint order.
 # A depth group holding: a (depth 1), b (depth 2, layer 1), c (depth 2, layer 0), d (depth 2, layer 0: declared
 # after c), e (depth 3), a clip block (depth 2, layer 0) around f, an overlay group (depth 0) with fills of layers
@@ -477,15 +561,15 @@ def node_bytes(n):
         out += u64(len(n["children"])) + b"".join(u64(c) for c in n["children"])
     elif n["kind"] == NODE_SHAPE:
         out += u64(n["res"][1]) + u64(n["map"]) + u8(n["rule"]) + u8(n["paint"])
-        out += b"".join(f64(c) for c in n["rgba"]) + space_bytes(n["space"]) + u32(n["entry"]) + i32(n["layer"])
-        out += f64(n["depth"])
+        out += b"".join(f64(c) for c in n["rgba"]) + space_bytes(n["space"]) + u32(n["entry"]) + u64(n["grad"])
+        out += i32(n["layer"]) + f64(n["depth"])
     else:
         out += u64(n["target"]) + u64(n["map"]) + i32(n["layer"]) + f64(n["depth"])
     return out
 
 
 def version_hash(nodes, fg=DEFAULT_FG, palette=0):
-    out = u32(3) + u32(0x4E454353) + color_bytes(fg[0], fg[1]) + u64(palette) + u64(len(nodes))
+    out = u32(4) + u32(0x4E454353) + color_bytes(fg[0], fg[1]) + u64(palette) + u64(len(nodes))
     for n in nodes:
         out += node_bytes(n)
     return fnv(out)
@@ -505,15 +589,15 @@ def node_line(n):
             head, n["map"], bits(n["opacity"]), space_text(n["blend"]), n["composite"], n["order"], n["layer"],
             bits(n["depth"]), clip_text, children)
     if n["kind"] == NODE_SHAPE:
-        return "%s res=%s:%016x map=%016x rule=%d paint=%d %s space=%s entry=%d layer=%d depth=%016x" % (
+        return "%s res=%s:%016x map=%016x rule=%d paint=%d %s space=%s entry=%d gradient=%016x layer=%d depth=%016x" % (
             head, KIND_NAME[n["res"][0]], n["res"][1], n["map"], n["rule"], n["paint"],
-            " ".join("%016x" % bits(c) for c in n["rgba"]), space_text(n["space"]), n["entry"], n["layer"],
+            " ".join("%016x" % bits(c) for c in n["rgba"]), space_text(n["space"]), n["entry"], n["grad"], n["layer"],
             bits(n["depth"]))
     return "%s target=%d map=%016x layer=%d depth=%016x" % (head, n["target"], n["map"], n["layer"], bits(n["depth"]))
 
 
 def version_dump(nodes, fg=DEFAULT_FG, palette=0):
-    lines = ["gshscene.version 3 nodes=%d root=1 fg=%s palette=%016x hash=%016x" % (
+    lines = ["gshscene.version 4 nodes=%d root=1 fg=%s palette=%016x hash=%016x" % (
         len(nodes), color_text(fg[0], fg[1]), palette, version_hash(nodes, fg, palette))]
     lines += [node_line(n) for n in nodes]
     return "\n".join(lines) + "\n"
@@ -528,7 +612,7 @@ def group_node(i, parent, children, **kw):
 
 def shape_node(i, parent, res, **kw):
     n = dict(id=i, kind=NODE_SHAPE, flags=0, parent=parent, key=None, res=res, map=IDENTITY, rule=0, paint=PAINT_SOLID,
-             rgba=BLACK, space=TARGET, entry=0, layer=0, depth=0.0)
+             rgba=BLACK, space=TARGET, entry=0, grad=0, layer=0, depth=0.0)
     n.update(kw)
     return n
 
@@ -554,6 +638,11 @@ SCENE_NODES = [
 ]
 SCENE_NODES[0]["children"].append(8)
 SCENE_HASH = version_hash(SCENE_NODES, SCENE_FG, PALETTE_HASH)
+GRAD_SCENE_NODES = [
+    group_node(1, 0, [2]),
+    shape_node(2, 1, (KIND_PATH, SQ_RES), paint=PAINT_GRADIENT, rgba=(0.0, 0.0, 0.0, 0.5), grad=GRAD_RADIAL_HASH),
+]
+GRAD_SCENE_HASH = version_hash(GRAD_SCENE_NODES)
 EMPTY_NODES = [group_node(1, 0, [])]
 EMPTY_HASH = version_hash(EMPTY_NODES)
 
@@ -611,7 +700,10 @@ def render():
                     ("kMapTranslateHash", TRANSLATE), ("kMapDesignHash", DESIGN),
                     ("kSceneHash", SCENE_HASH), ("kEmptySceneHash", EMPTY_HASH), ("kSceneBHash", version_hash(SCENE_B)),
                     ("kPathKeyEmpty", path_key([])), ("kPathKeyOne", path_key([1])),
-                    ("kPathKeyTwo", path_key([4, 5])), ("kPathKeyThree", path_key([7, 7, 3]))):
+                    ("kPathKeyTwo", path_key([4, 5])), ("kPathKeyThree", path_key([7, 7, 3])),
+                    ("kGradientLinearHash", GRAD_LINEAR_HASH), ("kGradientRadialHash", GRAD_RADIAL_HASH),
+                    ("kGradientSweepHash", GRAD_SWEEP_HASH), ("kGradientListHash", GRAD_LIST_HASH),
+                    ("kGradientSceneHash", GRAD_SCENE_HASH)):
         o.append("static const std::uint64_t %s = UINT64_C(0x%016x);\n" % (name, v))
     o.append("static const int kSceneBLayer = %d;\n" % B_LAYER)
     o.append("static const double kSceneBTranslate[4][2] = {%s};\n" % ", ".join("{%r, %r}" % (t[0], t[1]) for t in B_T))
@@ -629,6 +721,11 @@ def render():
     o.append(cxx_string("kSceneDump", version_dump(SCENE_NODES, SCENE_FG, PALETTE_HASH)))
     o.append(cxx_string("kEmptySceneDump", version_dump(EMPTY_NODES)))
     o.append(cxx_string("kSceneBDump", version_dump(SCENE_B)))
+    o.append(cxx_string("kGradientLinearDump", gradient_dump(GRAD_LINEAR)))
+    o.append(cxx_string("kGradientRadialDump", gradient_dump(GRAD_RADIAL)))
+    o.append(cxx_string("kGradientSweepDump", gradient_dump(GRAD_SWEEP)))
+    o.append(cxx_string("kGradientListDump", list_dump(GRAD_LIST_ITEMS)))
+    o.append(cxx_string("kGradientSceneDump", version_dump(GRAD_SCENE_NODES)))
     o.append("\n}  // namespace known\n\n#endif\n")
     return "".join(o)
 

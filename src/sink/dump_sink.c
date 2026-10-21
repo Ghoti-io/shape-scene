@@ -117,6 +117,10 @@ typedef struct Run {
   size_t stop_count;
   char * line;
   Glyph_Arena glyphs;     /* the scratch of one glyph's provider paths */
+  uint64_t * gradients;   /* the ids of the gradients written so far (S17: once per gradient per render) */
+  size_t gradient_count;
+  GSHSCENE_Resolved_Stop * stops; /* room for the most stops of a gradient the list names */
+  size_t stop_capacity;
 } Run;
 
 struct Dump_Sink {
@@ -143,7 +147,11 @@ static void caps_full(GSHSCENE_Sink_Caps * caps, int readback) {
     caps->composites |= UINT32_C(1) << c;
   }
   caps->flags = GSHSCENE_CAP_CAN_BLOCK | GSHSCENE_CAP_CALLER_MEMORY | GSHSCENE_CAP_GLYPHS_FROM_FONT |
-      GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_BLEND_SPACES | GSHSCENE_CAP_PREPARE | (readback ? GSHSCENE_CAP_READBACK : 0);
+      GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_BLEND_SPACES | GSHSCENE_CAP_GRADIENT_SPACES | GSHSCENE_CAP_PREPARE |
+      (readback ? GSHSCENE_CAP_READBACK : 0);
+  for (uint32_t k = GSHSCENE_GRADIENT_LINEAR; k < GSHSCENE_GRADIENT_KIND_COUNT; k++) {
+    caps->gradient_kinds |= UINT32_C(1) << k;
+  }
   caps->cancel_unit = GSHSCENE_CANCEL_BETWEEN_UNITS;
   caps->cancel_work_bound = 1;
   caps->work_measure = "units";
@@ -166,7 +174,9 @@ static int caps_valid(const GSHSCENE_Sink_Caps * caps) {
       return 0;
     }
   }
-  return !(caps->flags & ~GSHSCENE_CAP_FLAGS_ALL) && caps->cancel_unit >= GSHSCENE_CANCEL_BETWEEN_UNITS &&
+  const uint32_t kinds = ((UINT32_C(1) << GSHSCENE_GRADIENT_KIND_COUNT) - 1u) & ~UINT32_C(1);
+  return !(caps->flags & ~GSHSCENE_CAP_FLAGS_ALL) && !(caps->gradient_kinds & ~kinds) &&
+      caps->cancel_unit >= GSHSCENE_CANCEL_BETWEEN_UNITS &&
       caps->cancel_unit < GSHSCENE_CANCEL_UNIT_COUNT && caps->work_measure != NULL;
 }
 
@@ -219,14 +229,35 @@ static size_t nesting(const GSHSCENE_List * list) {
   return most;
 }
 
+/** The gradient fills of @p list's expansion (@p fills, saturating) and the most stops one of their gradients has. */
+static void gradient_need(const GSHSCENE_List * list, size_t * fills, size_t * stops) {
+  size_t count = gshscene_list_count(list);
+  for (size_t i = 0; i < count; i++) {
+    const GSHSCENE_Item * item = NULL;
+    if (gshscene_list_item(list, i, &item) != GSHSCENE_OK) {
+      break;
+    }
+    if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
+      *fills = gshscene_sat_add(*fills, 1);
+      size_t n = item->paint.gradient->u.gradient.g.stop_count;
+      *stops = n > *stops ? n : *stops;
+    } else if (item->kind == GSHSCENE_ITEM_INSTANCE) {
+      gradient_need(gshscene_resource_picture(item->resource), fills, stops);
+    }
+  }
+}
+
 static size_t align_up(size_t n) {
   return gshscene_sat_add(n, CARVE_ALIGN - 1) & ~(size_t)(CARVE_ALIGN - 1);
 }
 
 /** The bytes a run of @p list needs, the slack for an unaligned workspace included. */
-static size_t run_bytes(const GSHSCENE_List * list, size_t * levels, size_t * blocks) {
+static size_t run_bytes(const GSHSCENE_List * list, size_t * levels, size_t * blocks, size_t * fills, size_t * stops) {
   *levels = gshscene_sat_add(gshscene_list_picture_depth(list), 1);
   *blocks = gshscene_sat_add(nesting(list), 1);
+  *fills = 0;
+  *stops = 0;
+  gradient_need(list, fills, stops);
   size_t n = CARVE_ALIGN - 1;
   n = gshscene_sat_add(n, align_up(sizeof(Run)));
   n = gshscene_sat_add(n, align_up(gshscene_expansion_bytes(list)));
@@ -234,6 +265,8 @@ static size_t run_bytes(const GSHSCENE_List * list, size_t * levels, size_t * bl
   n = gshscene_sat_add(n, align_up(gshscene_sat_mul(*blocks, sizeof(Block))));
   n = gshscene_sat_add(n, align_up(gshscene_sat_mul(*levels, sizeof(size_t))));
   n = gshscene_sat_add(n, align_up(LINE_BYTES));
+  n = gshscene_sat_add(n, align_up(gshscene_sat_mul(*fills, sizeof(uint64_t))));
+  n = gshscene_sat_add(n, align_up(gshscene_sat_mul(*stops, sizeof(GSHSCENE_Resolved_Stop))));
   n = gshscene_sat_add(n, GLYPH_BYTES);
   return n;
 }
@@ -304,7 +337,9 @@ static GSHSCENE_Result op_workspace_bytes(void * impl, const GSHSCENE_Render_Req
   (void)impl;
   size_t levels;
   size_t blocks;
-  *out = run_bytes(request->list, &levels, &blocks);
+  size_t fills;
+  size_t stops;
+  *out = run_bytes(request->list, &levels, &blocks, &fills, &stops);
   return GSHSCENE_OK;
 }
 
@@ -657,6 +692,42 @@ static GSHSCENE_Result glyph_records(Run * run, const GSHSCENE_Item * item, cons
 }
 
 /**
+ * The gradient's record (dump_sink.h), the first time a render meets its id (S17): its stops through the one
+ * conversion, against the list's foreground and palette and the target's space.
+ */
+static GSHSCENE_Result gradient_record(Run * run, const GSHSCENE_Resource * gradient, GSHSCENE_Result * failed) {
+  uint64_t id = gshscene_resource_id(gradient);
+  for (size_t i = 0; i < run->gradient_count; i++) {
+    if (run->gradients[i] == id) {
+      return GSHSCENE_OK;
+    }
+  }
+  const GSHSCENE_List * list = run->job->request.list;
+  GSHSCENE_Color foreground;
+  GSHSCENE_Color_Space space;
+  gshscene_list_foreground(list, &foreground);
+  GSHSCENE_Result r = gshscene_gradient_resolve(gradient, &foreground, gshscene_list_palette(list),
+      &run->job->target_space, &space, run->stops, run->stop_capacity);
+  if (r != GSHSCENE_OK) {
+    return GSHSCENE_ERR_INTERNAL; /* the plan refused a missing entry; nothing else can fail */
+  }
+  run->gradients[run->gradient_count++] = id;
+  size_t n = gradient->u.gradient.g.stop_count;
+  snprintf(run->line, LINE_BYTES, "R %" PRIu64 " %016" PRIx64 " space=%u:%u:%016" PRIx64 " stops=%" PRIu64 "\n", id,
+      gshscene_resource_hash(gradient), (unsigned)space.primaries, (unsigned)space.transfer,
+      gshgeom_f64_bits(space.gamma), (uint64_t)n);
+  emit_text(run, run->line, failed);
+  for (size_t i = 0; i < n; i++) {
+    const GSHSCENE_Resolved_Stop * s = &run->stops[i];
+    snprintf(run->line, LINE_BYTES, "r %016" PRIx64 " %016" PRIx64 " %016" PRIx64 " %016" PRIx64 " %016" PRIx64 "\n",
+        gshgeom_f64_bits(s->offset), gshgeom_f64_bits(s->rgba[0]), gshgeom_f64_bits(s->rgba[1]),
+        gshgeom_f64_bits(s->rgba[2]), gshgeom_f64_bits(s->rgba[3]));
+    emit_text(run, run->line, failed);
+  }
+  return GSHSCENE_OK;
+}
+
+/**
  * Go through one unit.  @return 0 to go on; a result to stop with (::GSHSCENE_ERR_REFUSED for a strict refusal while
  * drawing, an I/O error from the stream).
  */
@@ -687,6 +758,13 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
       Box model;
       Box box;
       int mapped = !unit_map(run, item, count, &map);
+      /* S17: a gradient fill that draws nothing (the plan wrote its notice) is gone through and not drawn. */
+      GSHSCENE_Reason notice = gshscene_gradient_notice(item, run->maps, count - 1, &run->job->target.map);
+      if (notice) {
+        snprintf(run->line, LINE_BYTES, " X class=%d reason=%d\n", (int)GSHSCENE_ENTRY_NOTICE, (int)notice);
+        emit_text(run, run->line, &failed);
+        return failed;
+      }
       /* A run from a font: its route, decided as the plan decided it; a refused run was reported by the plan. */
       GSHSCENE_Glyph_Run glyphs;
       GSHSCENE_Glyph_Route route;
@@ -719,16 +797,27 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
         run->skip_reason = GSHSCENE_REASON_RESOURCE_LIMIT;
         return failed;
       }
-      snprintf(run->line, LINE_BYTES, " %c res=%s:%016" PRIx64 " map=%016" PRIx64 " rule=%d box=",
+      snprintf(run->line, LINE_BYTES, " %c res=%s:%016" PRIx64 " map=%016" PRIx64 " rule=%d",
           item->kind == GSHSCENE_ITEM_FILL ? 'F' : 'C', gshscene_resource_kind_string(gshscene_resource_kind(item->resource)),
           gshscene_resource_hash(item->resource), gshgeom_map_hash(&map), (int)item->fill_rule);
       emit_text(run, run->line, &failed);
+      if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
+        snprintf(run->line, LINE_BYTES, " grad=%" PRIu64, gshscene_resource_id(item->paint.gradient));
+        emit_text(run, run->line, &failed);
+      }
+      emit_text(run, " box=", &failed);
       if (box.empty) {
         emit_text(run, "-\n", &failed);
       } else {
         snprintf(run->line, LINE_BYTES, "%016" PRIx64 " %016" PRIx64 " %016" PRIx64 " %016" PRIx64 "\n",
             gshgeom_f64_bits(box.x0), gshgeom_f64_bits(box.y0), gshgeom_f64_bits(box.x1), gshgeom_f64_bits(box.y1));
         emit_text(run, run->line, &failed);
+      }
+      if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
+        GSHSCENE_Result r = gradient_record(run, item->paint.gradient, &failed);
+        if (r != GSHSCENE_OK) {
+          return r;
+        }
       }
       if (routed) {
         GSHSCENE_Result r = glyph_records(run, item, &map, &route, chain, count, &failed);
@@ -880,7 +969,9 @@ static GSHSCENE_Result op_begin(void * impl, GSHSCENE_Job * job) {
   const GSHSCENE_Render_Request * request = gshscene_job_request(job);
   size_t levels;
   size_t blocks;
-  size_t need = run_bytes(request->list, &levels, &blocks);
+  size_t fills;
+  size_t stops;
+  size_t need = run_bytes(request->list, &levels, &blocks, &fills, &stops);
   unsigned char * memory = NULL;
   unsigned char * base;
   if (request->flags & GSHSCENE_RENDER_CALLER_MEMORY) {
@@ -900,6 +991,9 @@ static GSHSCENE_Result op_begin(void * impl, GSHSCENE_Job * job) {
   run->blocks = carve(&cursor, blocks * sizeof(Block));
   run->stop = carve(&cursor, levels * sizeof(size_t));
   run->line = carve(&cursor, LINE_BYTES);
+  run->gradients = carve(&cursor, fills * sizeof(uint64_t));
+  run->stops = carve(&cursor, stops * sizeof(GSHSCENE_Resolved_Stop));
+  run->stop_capacity = stops;
   arena_init(&run->glyphs, carve(&cursor, GLYPH_BYTES), GLYPH_BYTES);
   run->sink = ds;
   run->job = job;

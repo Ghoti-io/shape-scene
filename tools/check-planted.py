@@ -101,8 +101,6 @@ changes no result, cannot be seen by any test:
     failing writes (``Dump.EveryWriteOfEveryDumpIsChecked``) is what holds the
     final check (planted), and it found that an unbuffered stream's ``fprintf``
     loses the failure's return value
-  - the gradient term of ``item_equal`` (a gradient paint is refused until a
-    story gives it a meaning, so no list holds one)
   - the ``kind`` term of ``item_equal``: two lists can differ only in the kind
     of an item where the item's other fields differ too, except for a clip pop
     against a group pop, and those cannot stand at the same place in lists that
@@ -150,6 +148,26 @@ changes no result, cannot be seen by any test:
   - the ``fill_rule``, paint-kind and ``memset`` of ``item_init``: each is the
     zero the ``memset`` wrote already (a nonzero rule, kind or space is set
     afterwards by the caller)
+
+  gh-, gr-, cv-, gp-, gs-, gf-, gorc-, gtst-, and the rp- and ds- plants of
+  gradients (color-paint story P1)
+               the gradient resource and paint (G1 to G13): the pinned values
+               and constants, every validity rule of the resource and its
+               canonical form, the stable sort, the hash field by field and
+               equality field by field (a planted collision makes equality the
+               only witness), the bytes, the stops' conversion at draw time
+               (gshscene_gradient_resolve: the interpolation space, the target's,
+               the palette's bound, the alpha) and every constant of N2 and N3 in
+               src/paint/convert.c, the predicate of what draws nothing (each
+               degenerate case, each place of the chain, the order), the paint's
+               references in a list and a node, its hash and dump, damage, the
+               planning pass's refusal, approximation and notice (S17), the test
+               sink's records, the float-free constructor's conversions; and the
+               gradient oracle (``gorc``: its selftest or the vectors it writes)
+               and the evaluator (``gtst``).  src/resource/gradient.c and
+               src/paint/convert.c are also mutated by the generator (``bg-``,
+               ``bv-``), and the files the story changed were swept again; what
+               survived is listed with the sweep below
 
   sk-, rp-, ds-, cn-, rule-, and the sink's hdr- and core- plants (story 13a)
                the sink contract: one named plant per S-rule (``rule-S1`` to
@@ -765,7 +783,7 @@ PLANTS = [
     ('ls-map-translation', 'src', LS, '    out->t[i] = map->t[i];', '', L),
     ('ls-rule-range', 'src', LS, '  return (unsigned)rule < (unsigned)GSHGEOM_FILL_RULE_COUNT ? GSHSCENE_OK : GSHSCENE_ERR_INVALID;', '  return (unsigned)rule <= (unsigned)GSHGEOM_FILL_RULE_COUNT ? GSHSCENE_OK : GSHSCENE_ERR_INVALID;', L),
     ('ls-paint-default-alpha', 'src', LS, '  out->rgba[3] = 1.0;\n  if (!paint) {', '  if (!paint) {', L),
-    ('ls-paint-null', 'src', LS, '  if (!paint) {\n    return GSHSCENE_OK;\n  }\n  if (paint->kind == GSHSCENE_PAINT_GRADIENT) {', '  if (paint->kind == GSHSCENE_PAINT_GRADIENT) {', L),
+    ('ls-paint-null', 'src', LS, '  if (!paint) {\n    return GSHSCENE_OK;\n  }\n  if (paint->kind != GSHSCENE_PAINT_SOLID &&', '  if (paint->kind != GSHSCENE_PAINT_SOLID &&', L),
     ('ls-paint-alpha-low', 'src', LS, '  if (!(paint->rgba[3] >= 0.0 && paint->rgba[3] <= 1.0)) {', '  if (!(paint->rgba[3] > 0.0 && paint->rgba[3] <= 1.0)) {', L),
     ('ls-paint-alpha-high', 'src', LS, '  if (!(paint->rgba[3] >= 0.0 && paint->rgba[3] <= 1.0)) {', '  if (!(paint->rgba[3] >= 0.0 && paint->rgba[3] < 1.0)) {', L),
     ('ls-paint-alpha-unchecked', 'src', LS, '  if (!(paint->rgba[3] >= 0.0 && paint->rgba[3] <= 1.0)) {', '  if (0) {', L),
@@ -779,10 +797,10 @@ PLANTS = [
     ('ls-stack-alloc-error', 'src', LS, '  GSHSCENE_Result result = arena_alloc(list, capacity, &memory);\n  if (result != GSHSCENE_OK) {\n    return result;\n  }', '  GSHSCENE_Result result = arena_alloc(list, capacity, &memory);\n  (void)result;', L),
     ('ls-stack-copy', 'src', LS, '  if (list->depth) {\n    memcpy(memory, list->stack, list->depth);\n  }', '', L),
     ('ls-stack-installed', 'src', LS, '  list->stack = (uint8_t *)memory;\n  list->stack_capacity = capacity;', '  list->stack_capacity = capacity;', L),
-    ('ls-fill-resource-check', 'src', LS, '  GSHSCENE_Result result = check_resource(list, resource, TAKES_PATH | TAKES_RUN);\n  if (result == GSHSCENE_OK) {\n    result = canonical_map(map, &item.map);\n  }\n  if (result == GSHSCENE_OK) {\n    result = check_rule(rule);\n  }\n  if (result == GSHSCENE_OK) {\n    result = canonical_paint(paint, &item.paint);', '  GSHSCENE_Result result = GSHSCENE_OK;\n  if (result == GSHSCENE_OK) {\n    result = canonical_map(map, &item.map);\n  }\n  if (result == GSHSCENE_OK) {\n    result = check_rule(rule);\n  }\n  if (result == GSHSCENE_OK) {\n    result = canonical_paint(paint, &item.paint);', L),
+    ('ls-fill-resource-check', 'src', LS, '  GSHSCENE_Result result = check_resource(list, resource, TAKES_PATH | TAKES_RUN);\n  if (result == GSHSCENE_OK) {\n    result = canonical_map(map, &item.map);\n  }\n  if (result == GSHSCENE_OK) {\n    result = check_rule(rule);\n  }\n  if (result == GSHSCENE_OK) {\n    result = canonical_paint(list->store, paint, &item.paint);', '  GSHSCENE_Result result = GSHSCENE_OK;\n  if (result == GSHSCENE_OK) {\n    result = canonical_map(map, &item.map);\n  }\n  if (result == GSHSCENE_OK) {\n    result = check_rule(rule);\n  }\n  if (result == GSHSCENE_OK) {\n    result = canonical_paint(list->store, paint, &item.paint);', L),
     ('ls-fill-map-check', 'src', LS, '  if (result == GSHSCENE_OK) {\n    result = canonical_map(map, &item.map);\n  }\n  if (result == GSHSCENE_OK) {\n    result = check_rule(rule);\n  }\n  if (result == GSHSCENE_OK) {\n    result = canonical_paint', '  if (result == GSHSCENE_OK) {\n    canonical_map(map, &item.map);\n  }\n  if (result == GSHSCENE_OK) {\n    result = check_rule(rule);\n  }\n  if (result == GSHSCENE_OK) {\n    result = canonical_paint', L),
     ('ls-fill-rule-check', 'src', LS, '  if (result == GSHSCENE_OK) {\n    result = check_rule(rule);\n  }\n  if (result == GSHSCENE_OK) {\n    result = canonical_paint', '  if (result == GSHSCENE_OK) {\n    check_rule(rule);\n  }\n  if (result == GSHSCENE_OK) {\n    result = canonical_paint', L),
-    ('ls-fill-paint-check', 'src', LS, '  if (result == GSHSCENE_OK) {\n    result = canonical_paint(paint, &item.paint);\n  }', '  if (result == GSHSCENE_OK) {\n    canonical_paint(paint, &item.paint);\n  }', L),
+    ('ls-fill-paint-check', 'src', LS, '  if (result == GSHSCENE_OK) {\n    result = canonical_paint(list->store, paint, &item.paint);\n  }', '  if (result == GSHSCENE_OK) {\n    canonical_paint(list->store, paint, &item.paint);\n  }', L),
     ('ls-fill-resource', 'src', LS, '  item.resource = resource;\n  item.fill_rule = rule;\n  item.layer = layer;\n  return list_append(list, &item);\n}\n\nGSHSCENE_Result gshscene_list_clip_push', '  item.fill_rule = rule;\n  item.layer = layer;\n  return list_append(list, &item);\n}\n\nGSHSCENE_Result gshscene_list_clip_push', L),
     ('ls-fill-rule', 'src', LS, '  item.resource = resource;\n  item.fill_rule = rule;\n  item.layer = layer;\n  return list_append(list, &item);\n}\n\nGSHSCENE_Result gshscene_list_clip_push', '  item.resource = resource;\n  item.layer = layer;\n  return list_append(list, &item);\n}\n\nGSHSCENE_Result gshscene_list_clip_push', L),
     ('ls-fill-layer', 'src', LS, '  item.resource = resource;\n  item.fill_rule = rule;\n  item.layer = layer;\n  return list_append(list, &item);\n}\n\nGSHSCENE_Result gshscene_list_clip_push', '  item.resource = resource;\n  item.fill_rule = rule;\n  (void)layer;\n  return list_append(list, &item);\n}\n\nGSHSCENE_Result gshscene_list_clip_push', L),
@@ -859,7 +877,7 @@ PLANTS = [
     ('hdr-kind-path', 'hdr', HR, '  GSHSCENE_RESOURCE_PATH = 1,      ///< A model path.', '  GSHSCENE_RESOURCE_PATH = 9,      ///< A model path.', R + D),
     ('hdr-kind-glyph-run', 'hdr', HR, '  GSHSCENE_RESOURCE_GLYPH_RUN = 2, ///< Glyphs, by font and id or as outlines.', '  GSHSCENE_RESOURCE_GLYPH_RUN = 9, ///< Glyphs, by font and id or as outlines.', R + D),
     ('hdr-kind-picture', 'hdr', HR, '  GSHSCENE_RESOURCE_PICTURE = 3,   ///< A closed list, frozen: what an instance draws.', '  GSHSCENE_RESOURCE_PICTURE = 10,   ///< A closed list, frozen: what an instance draws.', R + D),
-    ('hdr-kind-gradient', 'hdr', HR, '  GSHSCENE_RESOURCE_GRADIENT = 4,  ///< Reserved for story 12: no constructor yet.', '  GSHSCENE_RESOURCE_GRADIENT = 11,  ///< Reserved for story 12: no constructor yet.', R),
+    ('hdr-kind-gradient', 'hdr', HR, '  GSHSCENE_RESOURCE_GRADIENT = 4,  ///< A gradient', '  GSHSCENE_RESOURCE_GRADIENT = 11,  ///< A gradient', R),
     ('hdr-kind-image', 'hdr', HR, '  GSHSCENE_RESOURCE_IMAGE = 5,     ///< Reserved for the raster stories: no constructor yet.', '  GSHSCENE_RESOURCE_IMAGE = 12,     ///< Reserved for the raster stories: no constructor yet.', R),
     ('hdr-source-font', 'hdr', HR, '  GSHSCENE_GLYPHS_FROM_FONT = 0,', '  GSHSCENE_GLYPHS_FROM_FONT = 1,', D + R),
     ('hdr-item-fill', 'hdr', HL, '  GSHSCENE_ITEM_FILL = 1,       ///< Fill a resource under a map with a paint.', '  GSHSCENE_ITEM_FILL = 7,       ///< Fill a resource under a map with a paint.', L + D),
@@ -870,7 +888,7 @@ PLANTS = [
     ('hdr-item-instance', 'hdr', HL, '  GSHSCENE_ITEM_INSTANCE = 6,   ///< Draw a picture under a map.', '  GSHSCENE_ITEM_INSTANCE = 12,   ///< Draw a picture under a map.', L + D),
     ('hdr-paint-foreground', 'hdr', HP, '  GSHSCENE_PAINT_FOREGROUND = 2,', '  GSHSCENE_PAINT_FOREGROUND = 6,', L + ["testColor"]),
     ('hdr-paint-palette', 'hdr', HP, '  GSHSCENE_PAINT_PALETTE = 3,', '  GSHSCENE_PAINT_PALETTE = 7,', L + ['testColor']),
-    ('hdr-paint-gradient', 'hdr', HP, '  GSHSCENE_PAINT_GRADIENT = 1, ///< Reserved:', '  GSHSCENE_PAINT_GRADIENT = 4, ///< Reserved:', L),
+    ('hdr-paint-gradient', 'hdr', HP, '  GSHSCENE_PAINT_GRADIENT = 1,\n', '  GSHSCENE_PAINT_GRADIENT = 4,\n', L),
 ]
 
 # --- story 11: the constants, enumerations and spellings that no operator-level mutation reaches ----------------------
@@ -933,7 +951,7 @@ LC = ["testList", "testColor"]
 
 PLANTS += [
     # the format and the pinned values
-    ('ls-format-version', 'src', LS, '#define LIST_FORMAT_VERSION 3u', '#define LIST_FORMAT_VERSION 2u', D),
+    ('ls-format-version', 'src', LS, '#define LIST_FORMAT_VERSION 4u', '#define LIST_FORMAT_VERSION 3u', D),
     ('hdr-ordering-flat', 'hdr', HL, '  GSHSCENE_ORDER_FLAT = 0,', '  GSHSCENE_ORDER_FLAT = 3,', L + O),
     ('hdr-ordering-depth', 'hdr', HL, '  GSHSCENE_ORDER_DEPTH = 1,', '  GSHSCENE_ORDER_DEPTH = 4,', O),
     ('hdr-ordering-overlay', 'hdr', HL, '  GSHSCENE_ORDER_OVERLAY = 2,', '  GSHSCENE_ORDER_OVERLAY = 5,', O),
@@ -942,7 +960,7 @@ PLANTS += [
     ('hdr-tie-path', 'hdr', HL, '  GSHSCENE_TIE_PATH = 2,', '  GSHSCENE_TIE_PATH = 22,', O),
     ('hdr-tie-declared', 'hdr', HL, '  GSHSCENE_TIE_DECLARED = 3,', '  GSHSCENE_TIE_DECLARED = 23,', O),
     ('hdr-problem-parameter', 'hdr', "include/ghoti.io/shape-scene/scene.h", '  GSHSCENE_PROBLEM_PARAMETER = 5,', '  GSHSCENE_PROBLEM_PARAMETER = 25,', PS),
-    ('vs-format-version', 'src', IH, '#define VERSION_FORMAT_VERSION 3u', '#define VERSION_FORMAT_VERSION 2u', ["testScene_dump"]),
+    ('vs-format-version', 'src', IH, '#define VERSION_FORMAT_VERSION 4u', '#define VERSION_FORMAT_VERSION 3u', ["testScene_dump"]),
     ('cs-gamma-min', 'src', CS, '#define GAMMA_MIN 0.1', '#define GAMMA_MIN 0.2', CL),
     ('cs-gamma-max', 'src', CS, '#define GAMMA_MAX 10.0', '#define GAMMA_MAX 9.0', CL),
 ]
@@ -963,19 +981,19 @@ PLANTS += [
     ('ls-destroy-standard-chunks', 'src', LS, '  chunks_free(list, list->head, NULL);\n  chunks_free(list, list->big, NULL);\n  gshscene_free(&list->alloc, list->ties);', '  chunks_free(list, list->big, NULL);\n  gshscene_free(&list->alloc, list->ties);', L),
     ('ls-destroy-big-chunks', 'src', LS, '  chunks_free(list, list->head, NULL);\n  chunks_free(list, list->big, NULL);\n  gshscene_free(&list->alloc, list->ties);', '  chunks_free(list, list->head, NULL);\n  gshscene_free(&list->alloc, list->ties);', L),
     ('ls-destroy-ties', 'src', LS, '  gshscene_free(&list->alloc, list->ties);\n  GSHSCENE_Store * store = list->store;', '  GSHSCENE_Store * store = list->store;', O),
-    ('ls-append-no-retain', 'src', LS, '  gshscene_resource_retain(item->resource);\n  note_item(list, item);', '  note_item(list, item);', L),
+    ('ls-append-no-retain', 'src', LS, '  gshscene_resource_retain(item->resource);\n  gshscene_resource_retain(item->paint.gradient);', '  gshscene_resource_retain(item->paint.gradient);', L),
     ('ls-append-no-note', 'src', LS, '  note_item(list, item);\n  list->count++;', '  list->count++;', O),
     # the paint
-    ('ls-paint-gradient', 'src', LS, '  if (paint->kind == GSHSCENE_PAINT_GRADIENT) {\n    return GSHSCENE_ERR_UNSUPPORTED;', '  if (0) {\n    return GSHSCENE_ERR_UNSUPPORTED;', L),
-    ('ls-paint-palette', 'src', LS, '          paint->kind != GSHSCENE_PAINT_PALETTE) ||', '          1) ||', L + CL),
+    ('ls-paint-gradient', 'src', LS, '  if (paint->kind == GSHSCENE_PAINT_GRADIENT\n          ? (!paint->gradient ||', '  if (paint->kind == GSHSCENE_PAINT_GRADIENT\n          ? (0 ||', L),
+    ('ls-paint-palette', 'src', LS, 'paint->kind != GSHSCENE_PAINT_PALETTE && paint->kind != GSHSCENE_PAINT_GRADIENT) {', '1 && paint->kind != GSHSCENE_PAINT_GRADIENT) {', L + CL),
     ('ls-paint-entry-palette-only', 'src', LS, 'paint->entry > GSHSCENE_PALETTE_ENTRY_MAX : paint->entry != 0) {', 'paint->entry > GSHSCENE_PALETTE_ENTRY_MAX : 0) {', CL),
     ('ls-paint-entry-bound', 'src', LS, 'paint->entry > GSHSCENE_PALETTE_ENTRY_MAX : paint->entry != 0) {', 'paint->entry > 0xFFFFu : paint->entry != 0) {', CL + ['testNode']),
     ('ls-paint-entry-bound-tie', 'src', LS, 'paint->entry > GSHSCENE_PALETTE_ENTRY_MAX : paint->entry != 0) {', 'paint->entry >= GSHSCENE_PALETTE_ENTRY_MAX : paint->entry != 0) {', CL + ['testNode', 'testDump']),
     ('ls-paint-entry-kind', 'src', LS, '  if (paint->kind == GSHSCENE_PAINT_PALETTE ? paint->entry', '  if (paint->kind == GSHSCENE_PAINT_FOREGROUND ? paint->entry', CL),
     ('ls-paint-entry-copied', 'src', LS, '    out->entry = paint->entry;\n', '', CL + D + ['testPalette']),
-    ('ls-paint-solid-only', 'src', LS, '  if ((paint->kind != GSHSCENE_PAINT_SOLID && paint->kind != GSHSCENE_PAINT_FOREGROUND &&', '  if ((paint->kind != GSHSCENE_PAINT_SOLID && 0 &&', CL + ['testPalette']),
-    ('ls-paint-kind', 'src', LS, '  if ((paint->kind != GSHSCENE_PAINT_SOLID && paint->kind != GSHSCENE_PAINT_FOREGROUND &&\n          paint->kind != GSHSCENE_PAINT_PALETTE) ||\n      paint->gradient) {', '  if (paint->gradient) {', L + ['testPalette']),
-    ('ls-paint-gradient-pointer', 'src', LS, '          paint->kind != GSHSCENE_PAINT_PALETTE) ||\n      paint->gradient) {', '          paint->kind != GSHSCENE_PAINT_PALETTE)) {', L + CL),
+    ('ls-paint-solid-only', 'src', LS, '  if (paint->kind != GSHSCENE_PAINT_SOLID && paint->kind != GSHSCENE_PAINT_FOREGROUND &&', '  if (paint->kind != GSHSCENE_PAINT_SOLID && 0 &&', CL + ['testPalette']),
+    ('ls-paint-kind', 'src', LS, '  if (paint->kind != GSHSCENE_PAINT_SOLID && paint->kind != GSHSCENE_PAINT_FOREGROUND &&\n      paint->kind != GSHSCENE_PAINT_PALETTE && paint->kind != GSHSCENE_PAINT_GRADIENT) {', '  if (0) {', L + ['testPalette']),
+    ('ls-paint-gradient-pointer', 'src', LS, '          : paint->gradient != NULL) {', '          : 0) {', L + CL),
     ('ls-paint-foreground-red', 'src', LS, 'if (gshgeom_f64_bits(paint->rgba[0]) != 0 || gshgeom_f64_bits(paint->rgba[1]) != 0 ||', 'if (gshgeom_f64_bits(paint->rgba[1]) != 0 ||', CL),
     ('ls-paint-foreground-green', 'src', LS, 'if (gshgeom_f64_bits(paint->rgba[0]) != 0 || gshgeom_f64_bits(paint->rgba[1]) != 0 ||', 'if (gshgeom_f64_bits(paint->rgba[0]) != 0 ||', CL),
     ('ls-paint-foreground-blue', 'src', LS, '        gshgeom_f64_bits(paint->rgba[2]) != 0 || !gshscene_color_space_is_target(&paint->space)) {', '        !gshscene_color_space_is_target(&paint->space)) {', CL),
@@ -1096,7 +1114,7 @@ PLANTS += [
     ('ls-hash-fill-space', 'src', LS, '        gshscene_space_hash(&h, &item->paint.space);\n        gshgeom_hash_u32(&h, item->paint.entry);', '        gshgeom_hash_u32(&h, item->paint.entry);', D),
     ('ls-hash-fill-entry', 'src', LS, '        gshgeom_hash_u32(&h, item->paint.entry);\n', '', D + ['testPalette']),
     ('ls-hash-fill-entry-width', 'src', LS, '        gshgeom_hash_u32(&h, item->paint.entry);\n', '        gshgeom_hash_u64(&h, item->paint.entry);\n', D),
-    ('ls-hash-fill-layer-width', 'src', LS, '        gshgeom_hash_u32(&h, item->paint.entry);\n        gshgeom_hash_i32(&h, item->layer);', '        gshgeom_hash_u32(&h, item->paint.entry);\n        gshgeom_hash_i64(&h, item->layer);', D),
+    ('ls-hash-fill-layer-width', 'src', LS, '        gshgeom_hash_u64(&h, item->paint.gradient ? gshscene_resource_hash(item->paint.gradient) : 0);\n        gshgeom_hash_i32(&h, item->layer);', '        gshgeom_hash_u64(&h, item->paint.gradient ? gshscene_resource_hash(item->paint.gradient) : 0);\n        gshgeom_hash_i64(&h, item->layer);', D),
     ('ls-hash-fill-depth', 'src', LS, '        gshgeom_hash_i32(&h, item->layer);\n        gshgeom_hash_f64(&h, item->depth);\n        break;\n      case GSHSCENE_ITEM_CLIP_PUSH:', '        gshgeom_hash_i32(&h, item->layer);\n        break;\n      case GSHSCENE_ITEM_CLIP_PUSH:', D),
     ('ls-hash-clip-layer', 'src', LS, '        gshgeom_hash_u8(&h, (uint8_t)item->fill_rule);\n        gshgeom_hash_i32(&h, item->layer);\n        gshgeom_hash_f64(&h, item->depth);\n        break;\n      case GSHSCENE_ITEM_GROUP_PUSH:', '        gshgeom_hash_u8(&h, (uint8_t)item->fill_rule);\n        gshgeom_hash_f64(&h, item->depth);\n        break;\n      case GSHSCENE_ITEM_GROUP_PUSH:', D),
     ('ls-hash-clip-depth', 'src', LS, '        gshgeom_hash_u8(&h, (uint8_t)item->fill_rule);\n        gshgeom_hash_i32(&h, item->layer);\n        gshgeom_hash_f64(&h, item->depth);\n        break;\n      case GSHSCENE_ITEM_GROUP_PUSH:', '        gshgeom_hash_u8(&h, (uint8_t)item->fill_rule);\n        gshgeom_hash_i32(&h, item->layer);\n        break;\n      case GSHSCENE_ITEM_GROUP_PUSH:', D),
@@ -1122,7 +1140,7 @@ PLANTS += [
     ('ls-dump-header-hash-width', 'src', LS, '" palette=%016llx hash=%016llx\\n"', '" palette=%016llx hash=%llx\\n"', D),
     ('ls-dump-header-palette-width', 'src', LS, '" palette=%016llx hash=%016llx\\n"', '" palette=%llx hash=%016llx\\n"', D),
     ('ls-dump-header-palette-hash', 'src', LS, 'HEX(list->palette ? gshscene_resource_hash(list->palette) : 0),', 'HEX(list->palette ? 1u : 0),', D),
-    ('ls-dump-entry', 'src', LS, '          written = fprintf(out, " entry=%u", (unsigned)item->paint.entry);', '          written = fprintf(out, " entry=%u", 0u);', D),
+    ('ls-dump-entry', 'src', LS, '" entry=%u gradient=%016llx", (unsigned)item->paint.entry,', '" entry=%u gradient=%016llx", 0u,', D),
     ('ls-dump-header-foreground', 'src', LS, '      gshscene_space_dump(out, &fg->space) < 0 ||\n', '', D),
     ('ls-dump-space-width', 'src', LS, '"%u:%u:%016llx"', '"%u:%u:%llx"', D),
     ('ls-dump-space-order', 'src', LS, '(unsigned)space->primaries, (unsigned)space->transfer,', '(unsigned)space->transfer, (unsigned)space->primaries,', D),
@@ -1302,10 +1320,10 @@ PLANTS += [
     ('hdr-target-kinds', 'hdr', HS, '  GSHSCENE_TARGET_STREAM = 2,', '  GSHSCENE_TARGET_STREAM = 5,', SINKT),
     ('hdr-seamless', 'hdr', HS, '#define GSHSCENE_TARGET_SEAMLESS (UINT32_C(1) << 0)', '#define GSHSCENE_TARGET_SEAMLESS (UINT32_C(1) << 3)', SINKT),
     ('hdr-render-strict', 'hdr', HS, '#define GSHSCENE_RENDER_STRICT (UINT32_C(1) << 0)', '#define GSHSCENE_RENDER_STRICT (UINT32_C(1) << 2)', SINKT),
-    ('hdr-cap-flags', 'hdr', HS, '#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 8) - 1)', '#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 7) - 1)', SINKT),
+    ('hdr-cap-flags', 'hdr', HS, '#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 9) - 1)', '#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 8) - 1)', SINKT),
     ('hdr-cancel-units', 'hdr', HS, '  GSHSCENE_CANCEL_BEFORE_SUBMIT = 2,', '  GSHSCENE_CANCEL_BEFORE_SUBMIT = 3,', SINKT),
     ('rp-tag', 'src', RP, '#define REPORT_TAG UINT32_C(0x54525052)', '#define REPORT_TAG UINT32_C(0x54525053)', ['testDump_sink']),
-    ('rp-format', 'src', RP, '#define REPORT_FORMAT 1u', '#define REPORT_FORMAT 2u', ['testDump_sink']),
+    ('rp-format', 'src', RP, '#define REPORT_FORMAT 2u', '#define REPORT_FORMAT 1u', ['testDump_sink']),
     ('ds-format', 'src', DS, '#define DUMP_FORMAT 1u', '#define DUMP_FORMAT 2u', ['testDump_sink']),
     ('ds-edge-high', 'src', DS, '#define EDGE_HIGH 2147483647.0', '#define EDGE_HIGH 16.0', ['testDump_sink']),
     ('ds-edge-low', 'src', DS, '#define EDGE_LOW (-2147483648.0)', '#define EDGE_LOW (16.0)', ['testDump_sink']),
@@ -1426,14 +1444,14 @@ PLANTS += [
     ('res-out', 'src', LS, '  *out = c;\n  return GSHSCENE_OK;\n}', '  return GSHSCENE_OK;\n}', PT),
     ('pal-plan-fill-only', 'src', SK, '  if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_PALETTE) {', '  if (item->paint.kind == GSHSCENE_PAINT_PALETTE) {', PT),
     ('pal-plan-kind', 'src', SK, '  if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_PALETTE) {', '  if (item->kind == GSHSCENE_ITEM_FILL) {', PT + ["testDump_sink"]),
-    ('pal-plan-reason', 'src', SK, '      d.reason = GSHSCENE_REASON_PALETTE_ENTRY;', '      d.reason = GSHSCENE_REASON_ITEM_KIND;', PT + ["testDump_sink"]),
+    ('pal-plan-reason', 'src', SK, 'palette, &resolved) != GSHSCENE_OK) {\n      d.entry_class = GSHSCENE_ENTRY_REFUSED;\n      d.reason = GSHSCENE_REASON_PALETTE_ENTRY;', 'palette, &resolved) != GSHSCENE_OK) {\n      d.entry_class = GSHSCENE_ENTRY_REFUSED;\n      d.reason = GSHSCENE_REASON_ITEM_KIND;', PT + ["testDump_sink"]),
     ('pal-plan-refuse', 'src', SK, '    if (gshscene_paint_resolve(&item->paint, &unused, palette, &resolved) != GSHSCENE_OK) {', '    if (0 && gshscene_paint_resolve(&item->paint, &unused, palette, &resolved) != GSHSCENE_OK) {', PT + ["testDump_sink"]),
     ('pal-plan-list', 'src', SK, 'gshscene_caps_disposition(&job->caps, item, &job->target_space, gshscene_list_palette(list));', 'gshscene_caps_disposition(&job->caps, item, &job->target_space, NULL);', ["testDump_sink"]),
     ('pal-test-sink-list', 'src', DS, '&run->job->caps, item, &run->job->target_space, gshscene_list_palette(run->job->request.list));', '&run->job->caps, item, &run->job->target_space, NULL);', ["testDump_sink"]),
     # truncate
     ('tr-closed', 'src', LS, '  if (!list || list->closed || count > list->count) {', '  if (!list || count > list->count) {', PT),
     ('tr-count', 'src', LS, '  if (!list || list->closed || count > list->count) {', '  if (!list || list->closed || count > list->count + 1u) {', PT),
-    ('tr-release', 'src', LS, '  for (size_t i = count; i < list->count; i++) {\n    gshscene_resource_release(item_at(list, i)->resource);\n  }', '', PT),
+    ('tr-release', 'src', LS, '  for (size_t i = count; i < list->count; i++) {\n    gshscene_resource_release(item_at(list, i)->resource);\n    gshscene_resource_release(item_at(list, i)->paint.gradient);\n  }', '', PT),
     ('tr-set-count', 'src', LS, '  list->count = count;\n  /* What recording', '  /* What recording', PT),
     ('tr-depth', 'src', LS, '  list->expansion = 0;\n  list->depth = 0;\n  for (size_t i = 0; i < count; i++) {', '  list->expansion = 0;\n  for (size_t i = 0; i < count; i++) {', PT),
     ('tr-expansion', 'src', LS, '  list->expansion = 0;\n  list->depth = 0;\n  for (size_t i = 0; i < count; i++) {', '  list->depth = 0;\n  for (size_t i = 0; i < count; i++) {', PT),
@@ -1470,10 +1488,10 @@ PLANTS += [
     ('fx-skew-y-failure', 'src', FX, '      if (r == GSHSCENE_OK) {\n        r = tangent(v[1], &ty);', '      if (0) {\n        r = tangent(v[1], &ty);', PT),
     ('fx-skew-center', 'src', FX, '      return about(&core, v[2], v[3], out);\n    }\n    default:', '      return about(&core, v[3], v[2], out);\n    }\n    default:', PT),
     ('fx-map-none', 'src', FX, '  if (count == 0) {\n    return from_geometry(gshgeom_map_identity(2, out));', '  if (count == 0 && 0) {\n    return from_geometry(gshgeom_map_identity(2, out));', PT),
-    ('fx-map-null', 'src', FX, '  if (!ops) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  if (count > GSHSCENE_FIXED_MAX_OPS)', '  if (count > GSHSCENE_FIXED_MAX_OPS)', PT),
-    ('fx-map-max', 'src', FX, '  if (count > GSHSCENE_FIXED_MAX_OPS) {', '  if (count >= GSHSCENE_FIXED_MAX_OPS) {', PT),
-    ('fx-map-glyphs', 'src', FX, '      run.glyph_count == 0 || gshscene_face_info(run.face, &info) != GSHSCENE_OK) {', '      gshscene_face_info(run.face, &info) != GSHSCENE_OK) {', PT),
-    ('fx-map-scale', 'src', FX, '  const double s = run.size / (double)(int32_t)info.upem;', '  const double s = run.size / 2048.0;', PT),
+    ('fx-map-null', 'src', FX, '  if (count && !ops) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  return count >', '  if (0) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  return count >', PT),
+    ('fx-map-max', 'src', FX, '  return count > GSHSCENE_FIXED_MAX_OPS ? GSHSCENE_ERR_LIMIT : GSHSCENE_OK;', '  return count >= GSHSCENE_FIXED_MAX_OPS ? GSHSCENE_ERR_LIMIT : GSHSCENE_OK;', PT),
+    ('fx-map-glyphs', 'src', FX, '      run->glyph_count == 0 || gshscene_face_info(run->face, &info) != GSHSCENE_OK) {', '      gshscene_face_info(run->face, &info) != GSHSCENE_OK) {', PT),
+    ('fx-map-scale', 'src', FX, '  *scale = run->size / (double)(int32_t)info.upem;', '  *scale = run->size / 2048.0;', PT),
     ('fx-map-bx', 'src', FX, '  const double bx = s * t.t[0];', '  const double bx = t.t[0];', PT),
     ('fx-map-by', 'src', FX, '  const double by = s * t.t[1];', '  const double by = s * t.t[0];', PT),
     ('fx-map-identity-test', 'src', FX, '  if (t.m[0][0] == 1.0 && t.m[0][1] == 0.0 && t.m[1][0] == 0.0 && t.m[1][1] == 1.0) {', '  if (t.m[0][0] == 1.0 && t.m[1][1] == 1.0) {', PT),
@@ -1500,7 +1518,7 @@ PLANTS += [
     ('vp-get', 'src', VS, '  return version ? version->palette : NULL;', '  (void)version;\n  return NULL;', PT),
     ('vp-hash', 'src', VS, '  gshgeom_hash_u64(&h, version->palette ? gshscene_resource_hash(version->palette) : 0);\n', '', ["testScene_dump"] + PT),
     ('vp-dump-palette', 'src', VS, '          HEX(version->palette ? gshscene_resource_hash(version->palette) : 0), HEX(gshscene_version_hash(version))) < 0) {', '          HEX((uint64_t)0), HEX(gshscene_version_hash(version))) < 0) {', ["testScene_dump"]),
-    ('vp-dump-entry', 'src', VS, 'fprintf(out, " entry=%u layer=%lld depth=%016llx", (unsigned)p->paint.entry,', 'fprintf(out, " entry=%u layer=%lld depth=%016llx", 0u,', ["testScene_dump"]),
+    ('vp-dump-entry', 'src', VS, '" entry=%u gradient=%016llx layer=%lld depth=%016llx", (unsigned)p->paint.entry,', '" entry=%u gradient=%016llx layer=%lld depth=%016llx", 0u,', ["testScene_dump"]),
     ('vp-node-hash-entry', 'src', ND, '      gshgeom_hash_u32(h, p->paint.entry);\n', '', ["testScene_dump"]),
     ('vp-node-equal-entry', 'src', ND, ' ||\n          a->paint.entry != b->paint.entry) {', ') {', PT + ["testDiff", "testEdit"]),
     ('ep-set-spent', 'src', ED, '  if (!edit || edit->spent ||\n      (palette &&', '  if (!edit ||\n      (palette &&', PT),
@@ -1521,8 +1539,8 @@ PLANTS += [
     ('sp-result-default', 'src', SC, '    const GSHSCENE_Resource * palette = current->palette;', '    const GSHSCENE_Resource * palette = NULL;', PT),
     ('em-palette', 'src', EM, '    result = gshscene_list_set_palette(sink.list, version->palette);', '    result = gshscene_list_set_palette(sink.list, NULL);', PT),
     ('df-palette-changed', 'src', DF, '  diff->palette_changed = a->palette != b->palette;', '  diff->palette_changed = 0;', PT + ["testDiff"]),
-    ('df-palette-damage', 'src', DF, ' ||\n      (d->palette && shape->p.paint.kind == GSHSCENE_PAINT_PALETTE)) {', ') {', PT),
-    ('df-palette-kind', 'src', DF, '      (d->palette && shape->p.paint.kind == GSHSCENE_PAINT_PALETTE)) {', '      (d->palette && shape->p.paint.kind == GSHSCENE_PAINT_FOREGROUND)) {', PT),
+    ('df-palette-damage', 'src', DF, ' ||\n      (d->palette && paints_from_palette(&shape->p.paint))) {', ') {', PT),
+    ('df-palette-kind', 'src', DF, '  return paint->kind == GSHSCENE_PAINT_PALETTE ||', '  return paint->kind == GSHSCENE_PAINT_FOREGROUND ||', PT),
     ('df-palette-empty', 'src', DF, '  if (n == 0 && !foreground && !palette) {', '  if (n == 0 && !foreground) {', PT),
     ('df-palette-pass', 'src', DF, '  d.palette = palette;\n', '', PT),
     ('df-palette-get', 'src', DF, '  return diff ? diff->palette_changed : 0;', '  (void)diff;\n  return 0;', PT),
@@ -1601,6 +1619,218 @@ PLANTS += [
     ('df-font-run-unbounded', 'src', "src/scene/diff.c", '  if (run.source == GSHSCENE_GLYPHS_FROM_FONT) {\n    return add_font_run(d, resource, run.glyph_count, &composed);\n  }', '  if (run.source == GSHSCENE_GLYPHS_FROM_FONT) {\n    d->unbounded = 1;\n    return GSHSCENE_OK;\n  }', ['testGlyph', 'testDiff']),
     ('df-font-fast-points-scaled', 'src', "src/scene/diff.c", '            add_point(d, (double)e.p[j].x / 64.0, (double)e.p[j].y / 64.0);', '            add_point(d, (double)e.p[j].x / 32.0, (double)e.p[j].y / 64.0);', ['testGlyph']),
     ('df-font-general-box-units', 'src', "src/scene/diff.c", '    add_box(d, &map, (double)box.x_min / 64.0, (double)box.y_min / 64.0, (double)box.x_max / 64.0,', '    add_box(d, &map, (double)box.x_min, (double)box.y_min / 64.0, (double)box.x_max / 64.0,', ['testGlyph']),
+]
+
+# Color-paint story P1: gradients (G1 to G13), the one conversion of stops (G3), the notices (G10, G11), S17.
+GR = "src/resource/gradient.c"
+CV = "src/paint/convert.c"
+GT = ["testGradient"]
+GTD = ["testGradient", "testDump_sink"]
+GO = "tools/gradient-oracle.py"
+GG = "tools/gen-gradient-vectors.py"
+RC = "tests/ref_composite.h"
+PLANTS += [
+    # the pinned values and constants
+    ('gh-kind-radial', 'hdr', HP, '  GSHSCENE_GRADIENT_RADIAL = 2,', '  GSHSCENE_GRADIENT_RADIAL = 5,', GT),
+    ('gh-kind-sweep', 'hdr', HP, '  GSHSCENE_GRADIENT_SWEEP = 3,', '  GSHSCENE_GRADIENT_SWEEP = 4,', GT),
+    ('gh-extend-reflect', 'hdr', HP, '  GSHSCENE_EXTEND_REFLECT = 2,', '  GSHSCENE_EXTEND_REFLECT = 3,', GT),
+    ('gh-tolerance', 'hdr', HP, '#define GSHSCENE_RESOLVE_TOLERANCE 1e-13', '#define GSHSCENE_RESOLVE_TOLERANCE 1e-15', GT),
+    ('gh-bytes-per-stop', 'hdr', HR, '#define GSHSCENE_BYTES_PER_STOP ((size_t)96)', '#define GSHSCENE_BYTES_PER_STOP ((size_t)64)', GT),
+    ('gh-notice-class', 'hdr', HRP, '  GSHSCENE_ENTRY_NOTICE = 5,', '  GSHSCENE_ENTRY_NOTICE = 6,', ["testReport"]),
+    ('gh-reason-gradient', 'hdr', HRP, '  GSHSCENE_REASON_GRADIENT = 21,', '  GSHSCENE_REASON_GRADIENT = 25,', ["testReport"]),
+    ('gh-reason-space', 'hdr', HRP, '  GSHSCENE_REASON_INTERPOLATION_SPACE = 22,', '  GSHSCENE_REASON_INTERPOLATION_SPACE = 25,', ["testReport"]),
+    ('gh-reason-invertible', 'hdr', HRP, '  GSHSCENE_REASON_MAP_NOT_INVERTIBLE = 23,', '  GSHSCENE_REASON_MAP_NOT_INVERTIBLE = 25,', ["testReport"]),
+    ('gh-reason-degenerate', 'hdr', HRP, '  GSHSCENE_REASON_GRADIENT_DEGENERATE = 24,', '  GSHSCENE_REASON_GRADIENT_DEGENERATE = 25,', ["testReport"]),
+    ('gh-cap-spaces', 'hdr', HS, '#define GSHSCENE_CAP_GRADIENT_SPACES (UINT32_C(1) << 8)', '#define GSHSCENE_CAP_GRADIENT_SPACES (UINT32_C(1) << 7)', SINKT),
+    ('gh-fixed-sweep', 'hdr', HF, '#define GSHSCENE_FIXED_GRADIENT_SWEEP 3u', '#define GSHSCENE_FIXED_GRADIENT_SWEEP 4u', GT),
+    ('gh-fixed-radial', 'hdr', HF, '#define GSHSCENE_FIXED_GRADIENT_RADIAL 2u', '#define GSHSCENE_FIXED_GRADIENT_RADIAL 3u', GT),
+    # G1, G2: the resource's rules, its canonical form and its sort
+    ('gr-format', 'src', GR, '#define GRADIENT_FORMAT_VERSION 1u', '#define GRADIENT_FORMAT_VERSION 2u', GT),
+    ('gr-zero', 'src', GR, '  return x == 0.0 ? 0.0 : x;', '  return x;', GT),
+    ('gr-linear-other', 'src', GR, '      if (!all_finite(linear, 6) || !all_zero_bits(radial, 6) ||', '      if (!all_finite(linear, 6) ||', GT),
+    ('gr-linear-finite', 'src', GR, '      if (!all_finite(linear, 6) || !all_zero_bits(radial, 6) ||', '      if (!all_finite(linear, 5) || !all_zero_bits(radial, 6) ||', GT),
+    ('gr-linear-unit', 'src', GR, '!all_zero_bits(sweep, 4) || in->angle_unit != 0) {\n        return GSHSCENE_ERR_INVALID;\n      }\n      for (int i = 0; i < 2; i++) {\n        out->p0', '!all_zero_bits(sweep, 4)) {\n        return GSHSCENE_ERR_INVALID;\n      }\n      for (int i = 0; i < 2; i++) {\n        out->p0', GT),
+    ('gr-radial-finite', 'src', GR, '      if (!all_finite(radial, 6) ||', '      if (!all_finite(radial, 2) ||', GT),
+    ('gr-sweep-finite', 'src', GR, '      if (!all_finite(sweep, 4) ||', '      if (!all_finite(sweep, 3) ||', GT),
+    ('gr-sweep-unit', 'src', GR, '          in->angle_unit >= (uint32_t)GSHGEOM_ANGLE_UNIT_COUNT) {', '          in->angle_unit > (uint32_t)GSHGEOM_ANGLE_UNIT_COUNT) {', GT),
+    ('gr-sweep-keeps-unit', 'src', GR, '      out->angle_unit = in->angle_unit;\n', '', GT),
+    ('gr-extend', 'src', GR, '  if (in->extend >= (uint32_t)GSHSCENE_EXTEND_COUNT || in->premultiplied > 1u) {', '  if (in->extend > (uint32_t)GSHSCENE_EXTEND_COUNT || in->premultiplied > 1u) {', GT),
+    ('gr-premul', 'src', GR, '  if (in->extend >= (uint32_t)GSHSCENE_EXTEND_COUNT || in->premultiplied > 1u) {', '  if (in->extend >= (uint32_t)GSHSCENE_EXTEND_COUNT || in->premultiplied > 2u) {', GT),
+    ('gr-map-dim', 'src', GR, '  if (in->map.dim != 2 || gshscene_list_canonical_map', '  if (gshscene_list_canonical_map', GT),
+    ('gr-stop-gradient', 'src', GR, '    if (!gshscene_finite(s->offset) || s->color.kind == GSHSCENE_PAINT_GRADIENT) {', '    if (!gshscene_finite(s->offset)) {', GT),
+    ('gr-stop-finite', 'src', GR, '    if (!gshscene_finite(s->offset) || s->color.kind == GSHSCENE_PAINT_GRADIENT) {', '    if (s->color.kind == GSHSCENE_PAINT_GRADIENT) {', GT),
+    ('gr-stop-target', 'src', GR, '    if (stops[i].color.kind == GSHSCENE_PAINT_SOLID && !target &&', '    if (stops[i].color.kind == GSHSCENE_PAINT_SOLID && 0 &&', GT),
+    ('gr-stop-zero', 'src', GR, '    stops[i].offset = canonical_zero(s->offset);', '    stops[i].offset = s->offset;', GT),
+    ('gr-sort-stable', 'src', GR, '        scratch[k++] = stops[b].offset < stops[a].offset ? stops[b++] : stops[a++];', '        scratch[k++] = stops[b].offset <= stops[a].offset ? stops[b++] : stops[a++];', GT),
+    ('gr-sort-pass', 'src', GR, '    memcpy(stops, scratch, count * sizeof *stops);\n  }\n}', '  }\n}', GT),
+    ('gr-limit', 'src', GR, '  if (count > store->limits.max_resource_elements || count > SIZE_MAX', '  if (count >= store->limits.max_resource_elements || count > SIZE_MAX', GT),
+    ('gr-bytes', 'src', GR, 'gshscene_sat_mul(count, GSHSCENE_BYTES_PER_STOP)', 'gshscene_sat_mul(count, GSHSCENE_BYTES_PER_COLOR)', GT),
+    ('gr-null-stops', 'src', GR, '  if (!store || !gradient || !out || (gradient->stop_count && !gradient->stops)) {', '  if (!store || !gradient || !out) {', GT),
+    # the hash, field by field, and equality
+    ('gr-hash-kind-extend', 'src', GR, '  gshgeom_hash_u8(&h, (uint8_t)g->kind);\n  gshgeom_hash_u8(&h, (uint8_t)g->extend);', '  gshgeom_hash_u8(&h, (uint8_t)g->extend);\n  gshgeom_hash_u8(&h, (uint8_t)g->kind);', GT),
+    ('gr-hash-premul', 'src', GR, '  gshgeom_hash_u8(&h, (uint8_t)g->premultiplied);\n', '', GT),
+    ('gr-hash-map', 'src', GR, '  gshgeom_hash_u64(&h, gshgeom_map_hash(&g->map));\n', '', GT),
+    ('gr-hash-d', 'src', GR, '      gshgeom_hash_f64(&h, g->d[0]);\n      gshgeom_hash_f64(&h, g->d[1]);\n', '      gshgeom_hash_f64(&h, g->d[1]);\n      gshgeom_hash_f64(&h, g->d[0]);\n', GT),
+    ('gr-hash-radii', 'src', GR, '      gshgeom_hash_f64(&h, g->r0);\n', '', GT),
+    ('gr-hash-unit', 'src', GR, '      gshgeom_hash_u8(&h, (uint8_t)g->angle_unit);\n', '', GT),
+    ('gr-hash-count', 'src', GR, '  gshgeom_hash_u64(&h, (uint64_t)g->stop_count);\n', '', GT),
+    ('gr-hash-offset', 'src', GR, '    gshgeom_hash_f64(&h, g->stops[i].offset);\n', '', GT),
+    ('gr-hash-entry', 'src', GR, '  gshgeom_hash_u32(h, paint->entry);\n', '', GT),
+    ('gr-match-unit', 'src', GR, '      a->angle_unit != b->angle_unit || ', '      ', GT),
+    ('gr-match-map', 'src', GR, ' || !map_same(&a->map, &b->map) ||', ' ||', GT),
+    ('gr-match-map-tag', 'src', GR, '  if (a->dim != b->dim || a->kind != b->kind) {\n    return 0;\n  }\n  for (int i = 0; i < 2; i++) {', '  if (a->dim != b->dim) {\n    return 0;\n  }\n  for (int i = 0; i < 2; i++) {', GT),
+    ('gr-match-geometry', 'src', GR, '  for (int i = 0; i < 16; i++) {', '  for (int i = 0; i < 15; i++) {', GT),
+    ('gr-match-offset', 'src', GR, '    if (!same_bits(a->stops[i].offset, b->stops[i].offset) || !paint_same', '    if (!paint_same', GT),
+    ('gr-match-space', 'src', GR, '  if (a->kind != b->kind || a->entry != b->entry || !gshscene_space_equal(&a->space, &b->space)) {', '  if (a->kind != b->kind || a->entry != b->entry) {', GT),
+    ('gr-foreground', 'src', GR, '      resource->u.gradient.foreground = 1;', '      resource->u.gradient.foreground = 0;', GT),
+    ('gr-palette-need', 'src', GR, 'p->entry + 1u > resource->u.gradient.palette_need) {', 'p->entry > resource->u.gradient.palette_need) {', GT),
+    ('gr-read-kind', 'src', GR, '  if (!resource || !out || resource->kind != GSHSCENE_RESOURCE_GRADIENT) {', '  if (!resource || !out) {', GT),
+    ('gr-dump-stops', 'src', GR, ' map=%016llx stops=%llu\\n", (unsigned)g->premultiplied, HEX(gshgeom_map_hash(&g->map)),\n          HEX(g->stop_count))', ' map=%016llx stops=%llu\\n", (unsigned)g->premultiplied, HEX(gshgeom_map_hash(&g->map)),\n          HEX(g->stop_count + 1u))', GT),
+    ('gr-dump-r1', 'src', GR, '        w = fprintf(out, " r1=%016llx", HEX(gshgeom_f64_bits(g->r1)));', '        w = fprintf(out, " r1=%016llx", HEX(gshgeom_f64_bits(g->r0)));', GT),
+    # G3: the stops at draw time
+    ('gr-resolve-need', 'src', GR, 'gradient->u.gradient.palette_need > palette->u.palette.count)) {', 'gradient->u.gradient.palette_need >= palette->u.palette.count)) {', GT),
+    ('gr-resolve-none', 'src', GR, '  if (gradient->u.gradient.palette_need && (!palette ||', '  if (gradient->u.gradient.palette_need && (', GT),
+    ('gr-resolve-into', 'src', GR, '  const GSHSCENE_Color_Space * into = gshscene_color_space_is_target(&g->space) ? target_space : &g->space;', '  const GSHSCENE_Color_Space * into = &g->space;', GT),
+    ('gr-resolve-from', 'src', GR, 'gshscene_color_space_is_target(&c.space) ? target_space : &c.space;', '&c.space;', GT),
+    ('gr-resolve-alpha', 'src', GR, '    out[i].rgba[3] = c.rgba[3];\n', '', GT),
+    ('gr-resolve-offset', 'src', GR, '    out[i].offset = g->stops[i].offset;\n', '', GT),
+    ('gr-resolve-zero-target', 'src', GR, ' || gshscene_color_space_is_target(target_space) ||', ' ||', GT),
+    ('gr-resolve-capacity', 'src', GR, '  if (capacity < g->stop_count || (g->stop_count && !out)) {', '  if (capacity + 1u < g->stop_count || (g->stop_count && !out)) {', GT),
+    ('gr-resolve-space', 'src', GR, '    *out_space = *into;', '    *out_space = *target_space;', GT),
+    # G10, G11: what draws nothing
+    ('gr-singular-zero', 'src', GR, '  return map->dim != 0 && gshgeom_orient2d(o, a, b, &sign) == GSHGEOM_OK && sign == 0;', '  return map->dim != 0 && gshgeom_orient2d(o, a, b, &sign) == GSHGEOM_OK && sign <= 0;', GT),
+    ('gr-singular-dim', 'src', GR, '  return map->dim != 0 && gshgeom_orient2d', '  return gshgeom_orient2d', GT),
+    ('gr-singular-column', 'src', GR, '  GSHGEOM_Point b = {map->m[0][1], map->m[1][1], 0.0};', '  GSHGEOM_Point b = {map->m[0][1], map->m[0][0], 0.0};', GT),
+    ('gr-linear-point', 'src', GR, '        if (g->p0[0] == g->p1[0] && g->p0[1] == g->p1[1]) {', '        if (g->p0[0] == g->p1[0]) {', GT),
+    ('gr-linear-orient', 'src', GR, '      GSHGEOM_Point c = {g->p0[0], g->p0[1], 1.0};', '      GSHGEOM_Point c = {g->p0[0], g->p0[1], 0.0};', GT),
+    ('gr-linear-direction', 'src', GR, '      GSHGEOM_Point d = {g->d[0], g->d[1], 0.0};', '      GSHGEOM_Point d = {g->d[1], g->d[0], 0.0};', GT),
+    ('gr-radial-radii', 'src', GR, ' && g->r0 == g->r1) {', ') {', GT),
+    ('gr-radial-centers', 'src', GR, '      if (g->c0[0] == g->c1[0] && g->c0[1] == g->c1[1] && g->r0 == g->r1) {', '      if (g->c0[0] == g->c1[0] && g->r0 == g->r1) {', GT),
+    ('gr-sweep-pad', 'src', GR, '      if (repeats && g->a0 == g->a1) {', '      if (g->a0 == g->a1) {', GT),
+    ('gr-period-pad', 'src', GR, '  return repeats && g->stop_count >= 2 &&', '  return g->stop_count >= 2 &&', GT),
+    ('gr-period-count', 'src', GR, '  return repeats && g->stop_count >= 2 &&', '  return repeats && g->stop_count >= 1 &&', GT),
+    ('gr-notice-order', 'src', GR, '  if (not_invertible) {\n    return GSHSCENE_REASON_MAP_NOT_INVERTIBLE;', '  if (not_invertible && !degenerate(g)) {\n    return GSHSCENE_REASON_MAP_NOT_INVERTIBLE;', GT),
+    ('gr-notice-target', 'src', GR, '  int not_invertible = (target_map && singular(target_map)) || singular(&item->map)', '  int not_invertible = singular(&item->map)', GT),
+    ('gr-notice-item', 'src', GR, ' || singular(&item->map) || singular(&g->map);', ' || singular(&g->map);', GT),
+    ('gr-notice-gradient-map', 'src', GR, ' || singular(&item->map) || singular(&g->map);', ' || singular(&item->map);', GT),
+    ('gr-notice-instances', 'src', GR, '  for (size_t i = 0; i < instance_count && !not_invertible; i++) {', '  for (size_t i = 1; i < instance_count && !not_invertible; i++) {', GT),
+    ('gr-notice-fill-only', 'src', GR, '  if (!item || item->kind != GSHSCENE_ITEM_FILL || item->paint.kind', '  if (!item || item->paint.kind', GT),
+    # N2, N3 in doubles (convert.c), measured against the oracle's conversions
+    ('cv-white', 'src', CV, '#define WHITE_X 0.3127', '#define WHITE_X 0.3128', GT),
+    ('cv-srgb-red', 'src', CV, '{{0.64, 0.33}, {0.30, 0.60}, {0.15, 0.06}};\n  static const double ADOBE', '{{0.64, 0.33}, {0.30, 0.61}, {0.15, 0.06}};\n  static const double ADOBE', GT),
+    ('cv-adobe', 'src', CV, '{{0.64, 0.33}, {0.21, 0.71}, {0.15, 0.06}}', '{{0.64, 0.33}, {0.21, 0.72}, {0.15, 0.06}}', GT),
+    ('cv-p3', 'src', CV, '{0.265, 0.690}', '{0.265, 0.691}', GT),
+    ('cv-bt2020', 'src', CV, '{{0.708, 0.292}', '{{0.708, 0.293}', GT),
+    ('cv-decode-knee', 'src', CV, '#define SRGB_DECODE_KNEE 0.04045', '#define SRGB_DECODE_KNEE 0.0404', GT),
+    ('cv-encode-knee', 'src', CV, '#define SRGB_ENCODE_KNEE 0.0031308', '#define SRGB_ENCODE_KNEE 0.00312', GT),
+    ('cv-slope', 'src', CV, '#define SRGB_SLOPE 12.92', '#define SRGB_SLOPE 12.9', GT),
+    ('cv-offset', 'src', CV, '#define SRGB_OFFSET 0.055', '#define SRGB_OFFSET 0.056', GT),
+    ('cv-exponent', 'src', CV, '#define SRGB_EXPONENT 2.4', '#define SRGB_EXPONENT 2.5', GT),
+    ('cv-gamma-encode', 'src', CV, '      return signed_pow(y, 1.0 / space->gamma);', '      return signed_pow(y, space->gamma);', GT),
+    ('cv-signed', 'src', CV, '  return x < 0.0 ? -gmath_pow(-x, e) : gmath_pow(x, e);', '  return gmath_pow(x < 0.0 ? -x : x, e);', GT),
+    ('cv-same-space', 'src', CV, '  if (gshscene_space_equal(from, to)) {', '  if (0) {', GT),
+    ('cv-matrix-order', 'src', CV, '    rgb_to_xyz(from->primaries, ma);\n    rgb_to_xyz(to->primaries, mb);', '    rgb_to_xyz(to->primaries, ma);\n    rgb_to_xyz(from->primaries, mb);', GT),
+    ('cv-matrix-skip', 'src', CV, '  if (from->primaries != to->primaries) {', '  if (from->primaries == to->primaries) {', GT),
+    ('cv-inverse', 'src', CV, '      out[i][j] = (m[r0][c0] * m[r1][c1] - m[r0][c1] * m[r1][c0]) / d;', '      out[j][i] = (m[r0][c0] * m[r1][c1] - m[r0][c1] * m[r1][c0]) / d;', GT),
+    ('cv-scale-columns', 'src', CV, '      out[r][c] = s[c] * p[r][c];', '      out[r][c] = s[r] * p[r][c];', GT),
+    ('cv-z', 'src', CV, '    p[2][c] = (1.0 - xy[c][0] - xy[c][1]) / xy[c][1];', '    p[2][c] = (1.0 - xy[c][0]) / xy[c][1];', GT),
+    # the paint in a list and a scene
+    ('gp-list-release', 'src', LS, '    gshscene_resource_release(item_at(list, i)->paint.gradient);\n  }\n}', '  }\n}', GT),
+    ('gp-truncate-release', 'src', LS, '    gshscene_resource_release(item_at(list, i)->paint.gradient);\n  }\n  list->count = count;', '  }\n  list->count = count;', GT),
+    ('gp-hash', 'src', LS, '        gshgeom_hash_u64(&h, item->paint.gradient ? gshscene_resource_hash(item->paint.gradient) : 0);\n', '', GT + ["testDump"]),
+    ('gp-dump', 'src', LS, '              HEX(item->paint.gradient ? gshscene_resource_hash(item->paint.gradient) : 0));', '              HEX(item->paint.gradient ? gshscene_resource_id(item->paint.gradient) : 0));', GT + ["testDump"]),
+    ('gp-equal', 'src', LS, '      a->paint.gradient != b->paint.gradient || a->paint.entry != b->paint.entry) {', '      a->paint.entry != b->paint.entry) {', GT),
+    ('gp-store', 'src', LS, '(!paint->gradient || paint->gradient->store != store || paint->gradient->kind', '(!paint->gradient || paint->gradient->kind', GT),
+    ('gp-kind', 'src', LS, ' || paint->gradient->kind != GSHSCENE_RESOURCE_GRADIENT)', ')', GT),
+    ('gp-keep', 'src', LS, '    out->gradient = paint->gradient;\n', '', GT),
+    ('gp-node-retain', 'src', ND, '  gshscene_resource_retain(p->paint.gradient);\n', '', GT),
+    ('gp-node-hash', 'src', ND, '      gshgeom_hash_u64(h, p->paint.gradient ? gshscene_resource_hash(p->paint.gradient) : 0);\n', '', GT),
+    ('gp-version-dump', 'src', VS, '              HEX(p->paint.gradient ? gshscene_resource_hash(p->paint.gradient) : 0), (long long)p->layer,', '              HEX((uint64_t)0), (long long)p->layer,', GT),
+    ('gp-diff-foreground', 'src', DF, '(paint->kind == GSHSCENE_PAINT_GRADIENT && paint->gradient->u.gradient.foreground);', '0;', GT),
+    ('gp-diff-palette', 'src', DF, '(paint->kind == GSHSCENE_PAINT_GRADIENT && paint->gradient->u.gradient.palette_need != 0);', '0;', GT),
+    # S17: the plan, the report and the test sink
+    ('gs-disp-kind', 'src', SK, '    if (gk >= 32 || !(caps->gradient_kinds & (UINT32_C(1) << gk))) {', '    if (gk >= 32) {', GTD),
+    ('gs-disp-reason', 'src', SK, '      d.reason = GSHSCENE_REASON_GRADIENT;', '      d.reason = GSHSCENE_REASON_ITEM_KIND;', GTD),
+    ('gs-disp-palette', 'src', SK, '    if (need && (!palette || palette->kind != GSHSCENE_RESOURCE_PALETTE || need > palette->u.palette.count)) {', '    if (need && (!palette || palette->kind != GSHSCENE_RESOURCE_PALETTE || need >= palette->u.palette.count)) {', GTD),
+    ('gs-disp-no-palette', 'src', SK, '    if (need && (!palette || palette->kind', '    if (need && palette && (palette->kind', GTD),
+    ('gs-disp-space-flag', 'src', SK, '  if (gradient && !(caps->flags & GSHSCENE_CAP_GRADIENT_SPACES) &&', '  if (gradient &&', GTD),
+    ('gs-disp-space-target', 'src', SK, '      !gshscene_color_space_is_target(&gradient->u.gradient.g.space) &&\n      !(target_space && gshscene_space_equal(&gradient->u.gradient.g.space, target_space))) {', '      !gshscene_color_space_is_target(&gradient->u.gradient.g.space)) {', GTD),
+    ('gs-disp-space-zero', 'src', SK, '      !gshscene_color_space_is_target(&gradient->u.gradient.g.space) &&\n', '', GTD),
+    ('gs-disp-space-reason', 'src', SK, '    d.reason = GSHSCENE_REASON_INTERPOLATION_SPACE;', '    d.reason = GSHSCENE_REASON_BLEND_SPACE;', GTD),
+    ('gs-plan-notice', 'src', SK, '    if (notice) {\n      result = gshscene_report_add', '    if (0) {\n      result = gshscene_report_add', GTD),
+    ('gs-plan-class', 'src', SK, 'gshscene_report_add(report, GSHSCENE_ENTRY_NOTICE, notice,', 'gshscene_report_add(report, GSHSCENE_ENTRY_APPROXIMATED, notice,', GTD),
+    ('gs-plan-instances', 'src', SK, 'gshscene_gradient_notice(item, maps, count - 1, &job->target.map);', 'gshscene_gradient_notice(item, maps, 0, &job->target.map);', GTD),
+    ('gs-plan-target', 'src', SK, 'gshscene_gradient_notice(item, maps, count - 1, &job->target.map);', 'gshscene_gradient_notice(item, maps, count - 1, NULL);', GTD),
+    ('rp-class-notice', 'src', RP, '      return "notice";', '      return "notices";', ["testReport"]),
+    ('rp-reason-gradient', 'src', RP, '      return "gradient";', '      return "gradients";', ["testReport"]),
+    ('rp-reason-space', 'src', RP, '      return "interpolation-space";', '      return "interpolation";', ["testReport"]),
+    ('rp-reason-invertible', 'src', RP, '      return "map-not-invertible";', '      return "not-invertible";', ["testReport"]),
+    ('rp-reason-degenerate', 'src', RP, '      return "gradient-degenerate";', '      return "degenerate";', ["testReport"]),
+    ('ds-notice', 'src', DS, '      if (notice) {\n        snprintf', '      if (0) {\n        snprintf', GTD),
+    ('ds-notice-class', 'src', DS, '" X class=%d reason=%d\\n", (int)GSHSCENE_ENTRY_NOTICE, (int)notice);', '" X class=%d reason=%d\\n", (int)GSHSCENE_ENTRY_REFUSED, (int)notice);', GTD),
+    ('ds-notice-instances', 'src', DS, 'gshscene_gradient_notice(item, run->maps, count - 1, &run->job->target.map);', 'gshscene_gradient_notice(item, run->maps, 0, &run->job->target.map);', GTD),
+    ('ds-record-once', 'src', DS, '    if (run->gradients[i] == id) {', '    if (0) {', GTD),
+    ('ds-record-remember', 'src', DS, '  run->gradients[run->gradient_count++] = id;\n', '', GTD),
+    ('ds-record-id', 'src', DS, 'snprintf(run->line, LINE_BYTES, " grad=%" PRIu64, gshscene_resource_id(item->paint.gradient));', 'snprintf(run->line, LINE_BYTES, " grad=%" PRIu64, gshscene_resource_hash(item->paint.gradient));', GTD),
+    ('ds-record-fill-only', 'src', DS, '      if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {\n        GSHSCENE_Result r = gradient_record', '      if (0) {\n        GSHSCENE_Result r = gradient_record', GTD),
+    ('ds-record-foreground', 'src', DS, '  gshscene_list_foreground(list, &foreground);\n', '  gshscene_color_init(&foreground);\n', GTD),
+    ('ds-record-stops', 'src', DS, '        gshgeom_f64_bits(s->rgba[2]), gshgeom_f64_bits(s->rgba[3]));', '        gshgeom_f64_bits(s->rgba[2]), gshgeom_f64_bits(s->rgba[2]));', GTD),
+    ('ds-need-stops', 'src', DS, '      *stops = n > *stops ? n : *stops;', '      *stops = n;', GTD),
+    ('ds-need-pictures', 'src', DS, '      gradient_need(gshscene_resource_picture(item->resource), fills, stops);', '      (void)0;', GTD),
+    ('ds-caps-kinds', 'src', DS, '  for (uint32_t k = GSHSCENE_GRADIENT_LINEAR; k < GSHSCENE_GRADIENT_KIND_COUNT; k++) {', '  for (uint32_t k = GSHSCENE_GRADIENT_RADIAL; k < GSHSCENE_GRADIENT_KIND_COUNT; k++) {', GTD),
+    ('ds-caps-spaces', 'src', DS, ' | GSHSCENE_CAP_GRADIENT_SPACES | GSHSCENE_CAP_PREPARE |', ' | GSHSCENE_CAP_PREPARE |', GTD),
+    ('ds-caps-valid', 'src', DS, ' && !(caps->gradient_kinds & ~kinds) &&', ' &&', GTD),
+    ('ds-caps-valid-bit0', 'src', DS, ' - 1u) & ~UINT32_C(1);', ' - 1u);', GTD),
+    # the float-free gradient (fixed.h)
+    ('gf-d', 'src', FX, '      g.d[0] = ((double)v[4] - (double)v[0]) / unit;', '      g.d[0] = (double)v[4] / unit;', GT),
+    ('gf-dy', 'src', FX, '      g.d[1] = ((double)v[5] - (double)v[1]) / unit;', '      g.d[1] = ((double)v[5] - (double)v[0]) / unit;', GT),
+    ('gf-sweep-scale', 'src', FX, '      g.a0 = (double)v[2] * 180.0 / unit;', '      g.a0 = (double)v[2] * 360.0 / unit;', GT),
+    ('gf-sweep-a1', 'src', FX, '      g.a1 = (double)v[3] * 180.0 / unit;', '      g.a1 = (double)v[2] * 180.0 / unit;', GT),
+    ('gf-sweep-unit', 'src', FX, '      g.angle_unit = GSHGEOM_ANGLE_DEGREES;', '      g.angle_unit = GSHGEOM_ANGLE_TURNS;', GT),
+    ('gf-radius', 'src', FX, '      g.r1 = fixed_value(v[5], fixed->bits);', '      g.r1 = fixed_value(v[5], 0u);', GT),
+    ('gf-values', 'src', FX, 'GRADIENT_VALUES[4] = {0u, 6u, 6u, 4u};', 'GRADIENT_VALUES[4] = {0u, 6u, 6u, 6u};', GT),
+    ('gf-transfer', 'src', FX, ' && fixed->transfer != (uint32_t)GCOL_TRANSFER_SRGB) {', ') {', GT),
+    ('gf-placement', 'src', FX, 'gshgeom_map_design_to_model(s, run.glyphs[0].x, run.glyphs[0].y, &maps[0]);', 'gshgeom_map_design_to_model(s, 0.0, 0.0, &maps[0]);', GT),
+    ('gf-ops', 'src', FX, '  checked = ops_maps(ops, count, maps + 1);', '  checked = ops_maps(ops, 0, maps + 1);', GT),
+    ('gf-stop-bits', 'src', FX, '    stops[i].offset = fixed_value(s->offset, s->bits);', '    stops[i].offset = fixed_value(s->offset, 0u);', GT),
+    ('gf-store', 'src', FX, ' || run->store != store || fixed->kind', ' || fixed->kind', GT),
+    ('gf-fill-alpha', 'src', FX, '  p.rgba[3] = fixed_value(alpha, bits);', '  p.rgba[3] = 1.0;', GT),
+    ('gf-fill-range', 'src', FX, '      alpha < 0 || alpha > ((int32_t)1 << bits)) {', '      alpha < 0) {', GT),
+    # the oracle (G4 to G11, N3): its selftest or the vectors it writes
+    ('gorc-reflect', 'orc', GO, '                t = o_first + period - (-mp if neg else mp)', '                t = o_first + period + (-mp if neg else mp)', ['gselftest', 'gvectors']),
+    ('gorc-repeat', 'orc', GO, '            t = t - k * period if not isinstance(t, D) else t - D(k) * dec(period)', '            t = t - k * 2 * period if not isinstance(t, D) else t - D(k) * dec(period)', ['gselftest', 'gvectors']),
+    ('gorc-pad', 'orc', GO, '            return interpolant(stops[0][1] if lt(t, o_first) else stops[-1][1], premul)\n        if extend == REPEAT:', '            return interpolant(stops[-1][1] if lt(t, o_first) else stops[0][1], premul)\n        if extend == REPEAT:', ['gselftest', 'gvectors']),
+    ('gorc-period-zero', 'orc', GO, '        if extend != PAD:\n            return None\n        return interpolant', '        if extend == REFLECT:\n            return None\n        return interpolant', ['gselftest', 'gvectors']),
+    ('gorc-equal-offsets', 'orc', GO, '    while j < len(stops) and not lt(t, stops[j][0]):', '    while j < len(stops) and lt(stops[j][0], t):', ['gselftest', 'gvectors']),
+    ('gorc-premul', 'orc', GO, '    return [a * r, a * g, a * b, a] if premul else [r, g, b, a]', '    return [r, g, b, a]', ['gselftest', 'gvectors']),
+    ('gorc-unpremul', 'orc', GO, '        vals = [ZERO] * 4 if a == 0 else [vals[0] / a, vals[1] / a, vals[2] / a, a]', '        vals = [ZERO] * 4 if a == 0 else [vals[0], vals[1], vals[2], a]', ['gselftest', 'gvectors']),
+    ('gorc-alpha', 'orc', GO, '    vals[3] = vals[3] * alpha', '    vals[3] = vals[3]', ['gvectors']),
+    ('gorc-normal', 'orc', GO, '        nx, ny = -dy, dx', '        nx, ny = dy, dx', ['gselftest', 'gvectors']),
+    ('gorc-root', 'orc', GO, '        hi = Q(b / a, ONE / a, disc) if a > 0 else Q(b / a, -ONE / a, disc)', '        hi = Q(b / a, -ONE / a, disc) if a > 0 else Q(b / a, ONE / a, disc)', ['gselftest', 'gvectors']),
+    ('gorc-radius', 'orc', GO, '        if rw.sign() > 0:', '        if rw.sign() >= 0:', ['gselftest', 'gvectors']),
+    ('gorc-equal-circles', 'orc', GO, '    if c0x == c1x and c0y == c1y and r0 == r1:', '    if c0x == c1x and c0y == c1y:', ['gselftest', 'gvectors']),
+    ('gorc-quarter', 'orc', GO, '        return F(1, 4) if y > 0 else F(3, 4)', '        return F(3, 4) if y > 0 else F(1, 4)', ['gselftest', 'gvectors']),
+    ('gorc-atan', 'orc', GO, '            x = x / (1 + (1 + x * x).sqrt())', '            x = x / (1 + (1 + x * x).sqrt() * D("1.0000000001"))', ['gselftest', 'gvectors']),
+    ('gorc-pi', 'orc', GO, '        value = 16 * atan_inv(5) - 4 * atan_inv(239)', '        value = 16 * atan_inv(5) - 4 * atan_inv(238)', ['gselftest', 'gvectors']),
+    ('gorc-step', 'orc', GO, "            below = (dec(theta) < dec(a0)) if isinstance(theta, D) else theta < a0", "            below = (dec(theta) <= dec(a0)) if isinstance(theta, D) else theta <= a0", ['gvectors']),
+    ('gorc-singular', 'orc', GO, '        if det(m) == 0:', '        if det(m) == 0 and m[0] == 0:', ['gselftest', 'gvectors']),
+    ('gorc-inverse', 'orc', GO, '    return ((m[3] * x - m[1] * y) / dd, (-m[2] * x + m[0] * y) / dd)', '    return ((m[3] * x - m[2] * y) / dd, (-m[1] * x + m[0] * y) / dd)', ['gvectors']),
+    ('gorc-decode', 'orc', GO, '        return power((x + F("0.055")) / F("1.055"), F("2.4")), False', '        return power((x + F("0.055")) / F("1.055"), F("2.2")), False', ['gselftest', 'gvectors']),
+    ('gorc-white', 'orc', GO, 'WHITE = (F("0.3127"), F("0.3290"))', 'WHITE = (F("0.3127"), F("0.3291"))', ['gselftest', 'gvectors']),
+    ('gorc-margin', 'orc', GG, '                        if r["drawn"] and r["margin"] is not None and r["margin"] < oracle.D("1e-30"):', '                        if r["drawn"] and r["margin"] is not None and r["margin"] < oracle.D("1e-300"):', ['gvectors']),
+    # the evaluator (tests/ref_composite.h): its agreement with the vectors
+    ('gtst-reflect', 'tst', RC, '      t = o0 + period - std::fabs(m - period);', '      t = o0 + period + std::fabs(m - period);', GT),
+    ('gtst-repeat', 'tst', RC, '      t = o0 + (t - o0 - std::floor((t - o0) / period) * period);', '      t = o0 + (t - o0 - std::floor((t - o0) / period));', GT),
+    ('gtst-pad', 'tst', RC, '      g_interpolant(t < o0 ? stops.front() : stops.back(), premul, out);\n      return true;\n    }\n    if (extend == GSHSCENE_EXTEND_REPEAT) {', '      g_interpolant(t < o0 ? stops.back() : stops.front(), premul, out);\n      return true;\n    }\n    if (extend == GSHSCENE_EXTEND_REPEAT) {', GT),
+    ('gtst-equal-offsets', 'tst', RC, '  while (j < stops.size() && !(t < stops[j].offset)) {', '  while (j < stops.size() && stops[j].offset < t) {', GT),
+    ('gtst-premul', 'tst', RC, '    out[k] = premul ? s.rgba[k] * a : s.rgba[k];', '    out[k] = s.rgba[k];', GT),
+    ('gtst-normal', 'tst', RC, '      nx = -geom[5];', '      nx = geom[5];', GT),
+    ('gtst-root', 'tst', RC, '        if (hi < lo) {\n          std::swap(hi, lo);', '        if (hi > lo) {\n          std::swap(hi, lo);', GT),
+    ('gtst-radius', 'tst', RC, '      if (r0 + w[i] * dr > 0.0) {', '      if (r0 + w[i] * dr >= -1.0) {', GT),
+    ('gtst-sweep-unit', 'tst', RC, '    double per_turn = unit == GSHGEOM_ANGLE_DEGREES ? 360.0 : unit == GSHGEOM_ANGLE_GRADIANS ? 400.0', '    double per_turn = unit == GSHGEOM_ANGLE_DEGREES ? 360.0 : unit == GSHGEOM_ANGLE_GRADIANS ? 360.0', GT),
+    ('gtst-sweep-wrap', 'tst', RC, '      if (rad < 0) {\n        rad += two_pi;', '      if (rad < 0) {\n        rad += two_pi / 2;', GT),
+    ('gtst-unmap', 'tst', RC, '  x = (d * u - b * v) / det / s;', '  x = (d * u - c * v) / det / s;', GT),
+    ('gtst-alpha', 'tst', RC, '  r.rgba[3] = r.rgba[3] * alpha;', '  r.rgba[3] = r.rgba[3];', GT),
 ]
 
 # The generated plants (tools/gen-scene-plants.py): the mutations of src/scene
@@ -1772,16 +2002,20 @@ def do_plant(plant, control_objs):
         # A change to the oracle: its own selftest, or the vectors it writes, must disagree with the committed ones.
         tools = d / "tools"
         tools.mkdir()
-        for name in ("composite-oracle.py", "gen-composite-vectors.py", "gen-scene-vectors.py"):
+        for name in ("composite-oracle.py", "gen-composite-vectors.py", "gen-scene-vectors.py", "gradient-oracle.py",
+                     "gen-gradient-vectors.py"):
             shutil.copy(ROOT / "tools" / name, tools / name)
         (d / "tests").mkdir()
-        shutil.copy(ROOT / "tests" / "composite_vectors.h", d / "tests" / "composite_vectors.h")
+        for name in ("composite_vectors.h", "gradient_vectors.h"):
+            shutil.copy(ROOT / "tests" / name, d / "tests" / name)
         planted = tools / Path(fname).name
         planted.write_text(apply(planted.read_text(), old, new, pid))
         caught_by = []
         for test in tests:
-            args = ["--selftest"] if test == "selftest" else ["--check"]
-            script = "composite-oracle.py" if test == "selftest" else "gen-composite-vectors.py"
+            # selftest and vectors: the composite oracle's; gselftest and gvectors: the gradient oracle's (P1).
+            args = ["--selftest"] if test in ("selftest", "gselftest") else ["--check"]
+            script = {"selftest": "composite-oracle.py", "vectors": "gen-composite-vectors.py",
+                      "gselftest": "gradient-oracle.py", "gvectors": "gen-gradient-vectors.py"}[test]
             r = run([sys.executable, str(tools / script)] + args)
             if r.returncode != 0:
                 caught_by.append((test, [(r.stdout + r.stderr).strip().splitlines()[-1][:80] if (r.stdout + r.stderr).strip() else "crash"]))

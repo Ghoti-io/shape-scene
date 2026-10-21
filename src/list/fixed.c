@@ -140,37 +140,62 @@ static GSHSCENE_Result op_map(const GSHSCENE_Fixed_Op * op, GSHGEOM_Map * out) {
   }
 }
 
-/** The item map of a design map on @p resource (fixed.h); the identity for no ops. */
-static GSHSCENE_Result design_map(const GSHSCENE_Resource * resource, const GSHSCENE_Fixed_Op * ops, size_t count,
-    GSHGEOM_Map * out) {
-  if (count == 0) {
-    return from_geometry(gshgeom_map_identity(2, out));
-  }
-  if (!ops) {
+/** Whether @p count ops at @p ops can be a design map (fixed.h): a pointer for any, at most the most. */
+static GSHSCENE_Result check_ops(const GSHSCENE_Fixed_Op * ops, size_t count) {
+  if (count && !ops) {
     return GSHSCENE_ERR_INVALID;
   }
-  if (count > GSHSCENE_FIXED_MAX_OPS) {
-    return GSHSCENE_ERR_LIMIT;
-  }
-  GSHSCENE_Glyph_Run run;
-  GSHSCENE_Face_Info info;
-  if (gshscene_resource_glyph_run(resource, &run) != GSHSCENE_OK || run.source != GSHSCENE_GLYPHS_FROM_FONT ||
-      run.glyph_count == 0 || gshscene_face_info(run.face, &info) != GSHSCENE_OK) {
-    return GSHSCENE_ERR_INVALID;
-  }
-  GSHGEOM_Map maps[GSHSCENE_FIXED_MAX_OPS];
+  return count > GSHSCENE_FIXED_MAX_OPS ? GSHSCENE_ERR_LIMIT : GSHSCENE_OK;
+}
+
+/** The maps of @p count checked ops, into @p maps. */
+static GSHSCENE_Result ops_maps(const GSHSCENE_Fixed_Op * ops, size_t count, GSHGEOM_Map * maps) {
   for (size_t i = 0; i < count; i++) {
     GSHSCENE_Result r = op_map(&ops[i], &maps[i]);
     if (r != GSHSCENE_OK) {
       return r;
     }
   }
+  return GSHSCENE_OK;
+}
+
+/** A run from a bound face with a glyph to be about (fixed.h): its content and its scale `size / upem`. */
+static GSHSCENE_Result font_run(const GSHSCENE_Resource * resource, GSHSCENE_Glyph_Run * run, double * scale) {
+  GSHSCENE_Face_Info info;
+  if (gshscene_resource_glyph_run(resource, run) != GSHSCENE_OK || run->source != GSHSCENE_GLYPHS_FROM_FONT ||
+      run->glyph_count == 0 || gshscene_face_info(run->face, &info) != GSHSCENE_OK) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  *scale = run->size / (double)(int32_t)info.upem;
+  return GSHSCENE_OK;
+}
+
+/** The item map of a design map on @p resource (fixed.h); the identity for no ops. */
+static GSHSCENE_Result design_map(const GSHSCENE_Resource * resource, const GSHSCENE_Fixed_Op * ops, size_t count,
+    GSHGEOM_Map * out) {
+  if (count == 0) {
+    return from_geometry(gshgeom_map_identity(2, out));
+  }
+  GSHSCENE_Result checked = check_ops(ops, count);
+  if (checked != GSHSCENE_OK) {
+    return checked;
+  }
+  GSHSCENE_Glyph_Run run;
+  double s;
+  checked = font_run(resource, &run, &s);
+  if (checked != GSHSCENE_OK) {
+    return checked;
+  }
+  GSHGEOM_Map maps[GSHSCENE_FIXED_MAX_OPS];
+  checked = ops_maps(ops, count, maps);
+  if (checked != GSHSCENE_OK) {
+    return checked;
+  }
   GSHGEOM_Map t;
   GSHGEOM_Result g = gshgeom_map_compose_chain(maps, count, NULL, &t);
   if (g != GSHGEOM_OK) {
     return from_geometry(g);
   }
-  const double s = run.size / (double)(int32_t)info.upem;
   const double bx = s * t.t[0];
   const double by = s * t.t[1];
   if (t.m[0][0] == 1.0 && t.m[0][1] == 0.0 && t.m[1][0] == 0.0 && t.m[1][1] == 1.0) {
@@ -259,4 +284,136 @@ GSHSCENE_Result gshscene_list_group_push_fixed(GSHSCENE_List * list, uint32_t co
   group.ordering = GSHSCENE_ORDER_FLAT;
   group.composite = composite;
   return gshscene_list_group_push(list, &group, layer, 0.0);
+}
+
+GSHSCENE_Result gshscene_list_fill_gradient_fixed(GSHSCENE_List * list, const GSHSCENE_Resource * resource,
+    const GSHSCENE_Fixed_Op * ops, size_t op_count, GSHGEOM_Fill_Rule rule, const GSHSCENE_Resource * gradient,
+    int32_t alpha, uint32_t bits, int32_t layer) {
+  if (!list || list->closed || !resource || resource->store != list->store || bits > GSHSCENE_FIXED_MAX_BITS ||
+      alpha < 0 || alpha > ((int32_t)1 << bits)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  GSHSCENE_Paint p;
+  memset(&p, 0, sizeof p);
+  p.kind = GSHSCENE_PAINT_GRADIENT;
+  p.rgba[3] = fixed_value(alpha, bits);
+  p.gradient = gradient;
+  GSHGEOM_Map map;
+  GSHSCENE_Result r = design_map(resource, ops, op_count, &map);
+  return r == GSHSCENE_OK ? gshscene_list_fill(list, resource, &map, rule, &p, layer, 0.0) : r;
+}
+
+/* --- a gradient (fixed.h, G1 to G13) ------------------------------------------------------ */
+
+/** How many values each gradient kind uses (fixed.h's table), by kind. */
+static const unsigned GRADIENT_VALUES[4] = {0u, 6u, 6u, 4u};
+
+/** The gradient map of fixed.h: `design_to_model(size / upem, g) . T`, T the ops' chain. */
+static GSHSCENE_Result gradient_map(const GSHSCENE_Resource * resource, const GSHSCENE_Fixed_Op * ops, size_t count,
+    GSHGEOM_Map * out) {
+  GSHSCENE_Result checked = check_ops(ops, count);
+  if (checked != GSHSCENE_OK) {
+    return checked;
+  }
+  GSHSCENE_Glyph_Run run;
+  double s;
+  checked = font_run(resource, &run, &s);
+  if (checked != GSHSCENE_OK) {
+    return checked;
+  }
+  GSHGEOM_Map maps[GSHSCENE_FIXED_MAX_OPS + 1];
+  GSHGEOM_Result g = gshgeom_map_design_to_model(s, run.glyphs[0].x, run.glyphs[0].y, &maps[0]);
+  if (g != GSHGEOM_OK) {
+    return from_geometry(g);
+  }
+  checked = ops_maps(ops, count, maps + 1);
+  if (checked != GSHSCENE_OK) {
+    return checked;
+  }
+  return from_geometry(gshgeom_map_compose_chain(maps, count + 1, NULL, out));
+}
+
+GSHSCENE_Result gshscene_store_intern_gradient_fixed(GSHSCENE_Store * store, const GSHSCENE_Resource * run,
+    const GSHSCENE_Gradient_Fixed * fixed, const GSHSCENE_Resource ** out) {
+  if (!store || !run || !fixed || !out || run->store != store || fixed->kind < GSHSCENE_FIXED_GRADIENT_LINEAR ||
+      fixed->kind > GSHSCENE_FIXED_GRADIENT_SWEEP || fixed->bits > GSHSCENE_FIXED_MAX_BITS ||
+      (fixed->stop_count && !fixed->stops)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  for (unsigned i = GRADIENT_VALUES[fixed->kind]; i < 6u; i++) {
+    if (fixed->v[i] != 0) {
+      return GSHSCENE_ERR_INVALID; /* one spelling: a value the kind does not use is zero */
+    }
+  }
+  /* A space of primaries and a linear or sRGB transfer, no gamma: what a float-free caller can name. */
+  if (fixed->transfer != (uint32_t)GCOL_TRANSFER_LINEAR && fixed->transfer != (uint32_t)GCOL_TRANSFER_SRGB) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  if (fixed->stop_count > store->limits.max_resource_elements ||
+      fixed->stop_count > SIZE_MAX / sizeof(GSHSCENE_Gradient_Stop)) {
+    return GSHSCENE_ERR_LIMIT;
+  }
+  GSHSCENE_Gradient g;
+  memset(&g, 0, sizeof g);
+  g.kind = fixed->kind;
+  g.extend = fixed->extend;
+  g.premultiplied = fixed->premultiplied;
+  g.space.primaries = (GCOL_Primaries)fixed->primaries;
+  g.space.transfer = (GCOL_Transfer)fixed->transfer;
+  const int32_t * v = fixed->v;
+  const double unit = (double)((int32_t)1 << fixed->bits); /* an int32_t: i686 converts an unsigned one through x87 */
+  switch (fixed->kind) {
+    case GSHSCENE_FIXED_GRADIENT_LINEAR:
+      g.p0[0] = fixed_value(v[0], fixed->bits);
+      g.p0[1] = fixed_value(v[1], fixed->bits);
+      g.p1[0] = fixed_value(v[2], fixed->bits);
+      g.p1[1] = fixed_value(v[3], fixed->bits);
+      /* COLRv1's rotation point: d = p2 - p0, each difference of two int32_t exact in a double. */
+      g.d[0] = ((double)v[4] - (double)v[0]) / unit;
+      g.d[1] = ((double)v[5] - (double)v[1]) / unit;
+      break;
+    case GSHSCENE_FIXED_GRADIENT_RADIAL:
+      g.c0[0] = fixed_value(v[0], fixed->bits);
+      g.c0[1] = fixed_value(v[1], fixed->bits);
+      g.r0 = fixed_value(v[2], fixed->bits);
+      g.c1[0] = fixed_value(v[3], fixed->bits);
+      g.c1[1] = fixed_value(v[4], fixed->bits);
+      g.r1 = fixed_value(v[5], fixed->bits);
+      break;
+    default:
+      g.center[0] = fixed_value(v[0], fixed->bits);
+      g.center[1] = fixed_value(v[1], fixed->bits);
+      g.angle_unit = GSHGEOM_ANGLE_DEGREES;
+      /* Half turns to degrees: a 31-bit integer times 180 is exact in a double, and so is the power of two. */
+      g.a0 = (double)v[2] * 180.0 / unit;
+      g.a1 = (double)v[3] * 180.0 / unit;
+      break;
+  }
+  GSHSCENE_Result r = gradient_map(run, fixed->ops, fixed->op_count, &g.map);
+  if (r != GSHSCENE_OK) {
+    return r;
+  }
+  GSHSCENE_Gradient_Stop * stops = NULL;
+  if (fixed->stop_count) {
+    stops = gshscene_alloc(&store->alloc, fixed->stop_count * sizeof *stops);
+    if (!stops) {
+      return GSHSCENE_ERR_OOM;
+    }
+  }
+  for (size_t i = 0; i < fixed->stop_count && r == GSHSCENE_OK; i++) {
+    const GSHSCENE_Gradient_Stop_Fixed * s = &fixed->stops[i];
+    if (s->bits > GSHSCENE_FIXED_MAX_BITS) {
+      r = GSHSCENE_ERR_INVALID;
+      break;
+    }
+    stops[i].offset = fixed_value(s->offset, s->bits);
+    r = fixed_paint(&s->color, &stops[i].color);
+  }
+  if (r == GSHSCENE_OK) {
+    g.stop_count = fixed->stop_count;
+    g.stops = stops;
+    r = gshscene_store_intern_gradient(store, &g, out);
+  }
+  gshscene_free(&store->alloc, stops);
+  return r;
 }

@@ -21,8 +21,8 @@
 /**
  * @file
  *
- * The kinds of resource: copy, equality, hash and dump of a path, a glyph run
- * and a picture (resource.h).
+ * The kinds of resource: copy, equality, hash and dump of a path, a glyph run,
+ * a picture, a face and a palette (resource.h; a gradient's are gradient.c's).
  */
 
 #include <ghoti.io/shape-scene/macros.h>
@@ -257,6 +257,8 @@ int gshscene_resource_matches(const GSHSCENE_Resource * resource, const GSHSCENE
       }
       return 1;
     }
+    case GSHSCENE_RESOURCE_GRADIENT:
+      return gshscene_gradient_matches(resource, probe->source);
     default:
       return 0;
   }
@@ -289,6 +291,9 @@ void gshscene_resource_free_content(GSHSCENE_Resource * resource) {
       break;
     case GSHSCENE_RESOURCE_PALETTE:
       gshscene_free(alloc, resource->u.palette.colors);
+      break;
+    case GSHSCENE_RESOURCE_GRADIENT:
+      gshscene_gradient_free(resource);
       break;
     default:
       break;
@@ -828,6 +833,11 @@ GSHSCENE_Result gshscene_resource_dump(const GSHSCENE_Resource * resource, FILE 
       }
       break;
     }
+    case GSHSCENE_RESOURCE_GRADIENT:
+      if (gshscene_gradient_dump(resource, out) < 0) {
+        return GSHSCENE_ERR_IO;
+      }
+      break;
     default:
       break;
   }

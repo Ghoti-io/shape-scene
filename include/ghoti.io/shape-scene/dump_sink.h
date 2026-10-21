@@ -74,11 +74,19 @@
  * Written to a stream target, or to `log` for a raster target, one line per
  * record: `gshscene.dump-sink 1 kind=N unit=N units=T list=<16 hex digits>`; then,
  * for each unit, `U <chain> <record>` where the record is
- * `F res=<kind>:<hash> map=<hash> rule=N box=<x0> <y0> <x1> <y1>` (a fill),
+ * `F res=<kind>:<hash> map=<hash> rule=N box=<x0> <y0> <x1> <y1>` (a fill; a
+ * gradient fill has ` grad=<id>`, the gradient's resource id, before `box=`),
  * `C res=<kind>:<hash> map=<hash> rule=N box=<x0> <y0> <x1> <y1>` (a clip push),
  * `c` (a clip pop), `G opacity=<hex> composite=N` (a group push), `g` (a group pop),
  * `I res=picture:<hash>` (an instance), or `X class=N reason=N` (a unit not
- * drawn: refused, or inside a refused block); for a fill or clip of a run from a
+ * drawn: refused, or inside a refused block, or a gradient fill that draws
+ * nothing, class 5, `NOTICE`, which is not stamped; sink.h, S17); after a
+ * gradient fill's record, the first time the render meets that gradient, its
+ * record `R <id> <hash> space=<space> stops=N` (the interpolation space as
+ * `P:T:<gamma hex>`) and one line `r <offset> <r> <g> <b> <a>` per stop as
+ * `gshscene_gradient_resolve` gives it (each double's bits; the request's list's
+ * foreground and palette, the target's resolved space): once per gradient per
+ * render, by id, as a writer emits one; for a fill or clip of a run from a
  * font, after its record, one line per glyph, `Y <index> f <hash> status=N` (the
  * fast tier: `gshgeom_device_path_hash` of the device path, the whole pixel
  * added, and the provider's hint status), `Y <index> g <hash> status=0` (the
@@ -139,8 +147,9 @@ typedef struct GSHSCENE_Dump_Sink_Config {
 } GSHSCENE_Dump_Sink_Config;
 
 /**
- * @brief The default configuration: both targets; for each, every item kind and operator, the flags `CAN_BLOCK`,
- *   `READBACK` (raster only), `CALLER_MEMORY`, `GLYPHS_FROM_FONT`, `CLIP_AA`, `BLEND_SPACES` and `PREPARE`; cancel
+ * @brief The default configuration: both targets; for each, every item kind, operator and gradient kind, the flags
+ *   `CAN_BLOCK`, `READBACK` (raster only), `CALLER_MEMORY`, `GLYPHS_FROM_FONT`, `CLIP_AA`, `BLEND_SPACES`,
+ *   `GRADIENT_SPACES` and `PREPARE`; cancel
  *   between units with a work bound of 1 unit; in-line; no extent limit; no log.  NULL is ignored.
  */
 GSHSCENE_API void gshscene_dump_sink_config_default(GSHSCENE_Dump_Sink_Config * config);
@@ -152,7 +161,7 @@ GSHSCENE_API void gshscene_dump_sink_config_default(GSHSCENE_Dump_Sink_Config * 
  * @param limits `max_jobs` (sink.h); NULL for the defaults.
  * @param config The configuration (copied), or NULL for the default.
  * @param out The sink; written only on success.  Destroy it with ::gshscene_sink_destroy.
- * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL @p out; caps with undefined bits, a cancel unit outside its
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL @p out; caps with undefined bits (flags or gradient kinds), a cancel unit outside its
  *   enum, a NULL work measure, nonzero reserved bytes; `CAN_BLOCK` and `THREAD_AFFINE` differing between the two
  *   caps; an unknown target bit or completion; a negative or non-finite `max_extent`; an in-line sink that cannot
  *   block); ::GSHSCENE_ERR_OOM.

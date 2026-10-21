@@ -1,7 +1,7 @@
 /**
  * @file
  *
- * The sink conformance suite (story 13a, S1 to S16 of sink.h): one set of tests
+ * The sink conformance suite (story 13a, S1 to S17 of sink.h): one set of tests
  * that every sink passes, run unchanged against each configuration of the test
  * sink now, and against shape-cpu (13b) and the GPU sinks later.  It knows a
  * sink only through the contract: a fixture says how to make one, which target
@@ -1960,6 +1960,159 @@ TEST_P(SinkConformance, N14_APaletteFillIsItsEntryAndAMissingEntryIsRefused) {
       uint64_t from_solids = draw(solid(1.0, 0.0, 0.0, 0.5), solid(0.0, 0.25, 1.0, 0.5), false);
       EXPECT_EQ(from_palette, from_solids) << "a palette fill draws as the solid fill of its entry";
     }
+  }
+}
+
+// S17 (color-paint story P1, G10 to G13): a gradient fill of a kind the sink's caps lack is refused by the plan with
+// GRADIENT, and strict refuses before drawing, so a sink without gradients never draws one wrong; without
+// GRADIENT_SPACES a stated interpolation space other than the target's is approximated; a palette stop the palette
+// lacks refuses the fill; and a gradient fill that draws nothing (degenerate, or a chain that is not invertible) is a
+// NOTICE that never fails a render, strict or not, and changes no pixel.
+TEST_P(SinkConformance, S17_GradientsAreDrawnByKindRefusedOtherwiseAndNoticedWhenTheyDrawNothing) {
+  auto stop = [](double offset, GSHSCENE_Paint color) { return GSHSCENE_Gradient_Stop{offset, color}; };
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    GSHSCENE_Color_Space linear{};
+    linear.primaries = GCOL_PRIMARIES_SRGB;
+    linear.transfer = GCOL_TRANSFER_LINEAR;
+    auto make_gradient = [&](uint32_t gk, bool degenerate, std::vector<GSHSCENE_Gradient_Stop> stops) {
+      GSHSCENE_Gradient g{};
+      g.kind = gk;
+      gshgeom_map_identity(2, &g.map);
+      g.space = linear;
+      if (gk == GSHSCENE_GRADIENT_LINEAR) {
+        g.p0[0] = 4;
+        g.p1[0] = degenerate ? 4 : 12;
+      } else if (gk == GSHSCENE_GRADIENT_RADIAL) {
+        g.c0[0] = g.c1[0] = 8;
+        g.c0[1] = g.c1[1] = 8;
+        g.r1 = 6;
+      } else {
+        g.center[0] = g.center[1] = 8;
+        g.a1 = 360;
+        g.angle_unit = GSHGEOM_ANGLE_DEGREES;
+      }
+      g.stop_count = stops.size();
+      g.stops = stops.data();
+      const GSHSCENE_Resource * r = nullptr;
+      EXPECT_EQ(gshscene_store_intern_gradient(s.store, &g, &r), GSHSCENE_OK);
+      s.held.push_back(r);
+      return r;
+    };
+    GSHSCENE_Paint red = solid(1, 0, 0);
+    GSHSCENE_Paint blue = solid(0, 0, 1);
+    red.space = linear;
+    blue.space = linear;
+    std::vector<GSHSCENE_Gradient_Stop> two = {stop(0, red), stop(1, blue)};
+    auto paint_of = [](const GSHSCENE_Resource * g) {
+      GSHSCENE_Paint p{};
+      p.kind = GSHSCENE_PAINT_GRADIENT;
+      p.gradient = g;
+      p.rgba[3] = 1.0;
+      return p;
+    };
+    bool spaces = (caps.flags & GSHSCENE_CAP_GRADIENT_SPACES) != 0;
+    // One fill of each kind: drawn, approximated or refused, as the caps say.
+    GSHSCENE_List * list = s.open();
+    for (uint32_t gk = GSHSCENE_GRADIENT_LINEAR; gk < GSHSCENE_GRADIENT_KIND_COUNT; gk++) {
+      GSHSCENE_Paint p = paint_of(make_gradient(gk, false, two));
+      ASSERT_EQ(gshscene_list_fill(list, s.sq(4.0 * gk, 4, 8), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK);
+    }
+    ASSERT_EQ(gshscene_list_close(list), GSHSCENE_OK);
+    ReportRef report;
+    auto surface = make_surface(kind);
+    EXPECT_EQ(run(f(), sink.sink, request_for(list, *surface, report.report)).result, GSHSCENE_OK);
+    size_t refusals = 0;
+    for (const GSHSCENE_Report_Entry & e : entries(report.report)) {
+      ASSERT_EQ(e.chain_count, 1u);
+      uint32_t gk = (uint32_t)e.chain[0] + GSHSCENE_GRADIENT_LINEAR;
+      bool drawn = (caps.gradient_kinds & (1u << gk)) != 0;
+      if (e.entry_class == GSHSCENE_ENTRY_REFUSED) {
+        EXPECT_FALSE(drawn) << "kind " << gk;
+        EXPECT_EQ(e.reason, GSHSCENE_REASON_GRADIENT);
+        refusals++;
+      } else {
+        EXPECT_EQ(e.entry_class, GSHSCENE_ENTRY_APPROXIMATED);
+        EXPECT_EQ(e.reason, GSHSCENE_REASON_INTERPOLATION_SPACE);
+        EXPECT_TRUE(drawn && !spaces);
+      }
+    }
+    size_t lacking = 0;
+    for (uint32_t gk = GSHSCENE_GRADIENT_LINEAR; gk < GSHSCENE_GRADIENT_KIND_COUNT; gk++) {
+      lacking += (caps.gradient_kinds & (1u << gk)) ? 0u : 1u;
+    }
+    EXPECT_EQ(refusals, lacking) << "every kind the sink lacks, and only those";
+    EXPECT_EQ(summary(report.report).by_class[GSHSCENE_ENTRY_APPROXIMATED], spaces ? 0u : 3u - lacking);
+    // Strict: a refused kind fails before drawing and the target is untouched.
+    auto strict_surface = make_surface(kind);
+    uint64_t before = strict_surface->snapshot();
+    ReportRef strict;
+    GSHSCENE_Render_Request req = request_for(list, *strict_surface, strict.report);
+    req.flags = GSHSCENE_RENDER_STRICT;
+    EXPECT_EQ(run(f(), sink.sink, req).result, lacking ? GSHSCENE_ERR_REFUSED : GSHSCENE_OK);
+    if (lacking) {
+      EXPECT_EQ(strict_surface->snapshot(), before);
+    }
+    // What draws nothing: a solid fill, then a gradient fill that is degenerate or under a singular map, last.
+    bool linear_drawn = (caps.gradient_kinds & (1u << GSHSCENE_GRADIENT_LINEAR)) != 0;
+    GSHGEOM_Map flat;
+    const double m[4] = {1, 0, 0, 0};
+    const double t[2] = {0, 0};
+    ASSERT_EQ(gshgeom_map_from_matrix(2, m, t, &flat), GSHGEOM_OK);
+    const GSHSCENE_Resource * degenerate = make_gradient(GSHSCENE_GRADIENT_LINEAR, true, two);
+    const GSHSCENE_Resource * fine = make_gradient(GSHSCENE_GRADIENT_LINEAR, false, two);
+    GSHSCENE_Paint green = solid(0, 1, 0);
+    GSHSCENE_List * alone = s.open();
+    ASSERT_EQ(gshscene_list_fill(alone, s.sq(2, 2, 10), nullptr, GSHGEOM_FILL_NONZERO, &green, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_close(alone), GSHSCENE_OK);
+    auto blank = make_surface(kind);
+    ReportRef alone_report;
+    EXPECT_EQ(run(f(), sink.sink, request_for(alone, *blank, alone_report.report)).result, GSHSCENE_OK);
+    struct Nothing {
+      const GSHSCENE_Resource * gradient;
+      const GSHGEOM_Map * map;
+      GSHSCENE_Reason reason;
+    };
+    for (const Nothing & n : {Nothing{degenerate, nullptr, GSHSCENE_REASON_GRADIENT_DEGENERATE},
+             Nothing{fine, &flat, GSHSCENE_REASON_MAP_NOT_INVERTIBLE}}) {
+      GSHSCENE_List * l = s.open();
+      GSHSCENE_Paint p = paint_of(n.gradient);
+      ASSERT_EQ(gshscene_list_fill(l, s.sq(2, 2, 10), nullptr, GSHGEOM_FILL_NONZERO, &green, 0, 0.0), GSHSCENE_OK);
+      ASSERT_EQ(gshscene_list_fill(l, s.sq(20, 20, 10), n.map, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK);
+      ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+      auto out = make_surface(kind);
+      ReportRef r;
+      GSHSCENE_Render_Request rq = request_for(l, *out, r.report);
+      rq.flags = linear_drawn ? GSHSCENE_RENDER_STRICT : 0;
+      EXPECT_EQ(run(f(), sink.sink, rq).result, GSHSCENE_OK) << "a notice never fails strict";
+      // The entry that says so (an approximation of the space may stand beside a notice).
+      auto said = of_class(r.report, linear_drawn ? GSHSCENE_ENTRY_NOTICE : GSHSCENE_ENTRY_REFUSED);
+      ASSERT_EQ(said.size(), 1u);
+      ASSERT_EQ(said[0].chain_count, 1u);
+      EXPECT_EQ(said[0].chain[0], 1u);
+      EXPECT_EQ(said[0].reason, linear_drawn ? n.reason : GSHSCENE_REASON_GRADIENT);
+      if (gshscene_target_kind_has_pixels((GSHSCENE_Target_Kind)kind)) {
+        EXPECT_EQ(out->snapshot(), blank->snapshot()) << "a fill that draws nothing changes no pixel";
+      }
+    }
+    // A palette stop the list's palette lacks (there is none) refuses the fill.
+    GSHSCENE_Paint entry{};
+    entry.kind = GSHSCENE_PAINT_PALETTE;
+    entry.entry = 5;
+    entry.rgba[3] = 1.0;
+    GSHSCENE_List * pl = s.open();
+    GSHSCENE_Paint pp = paint_of(make_gradient(GSHSCENE_GRADIENT_LINEAR, false, {stop(0, entry), stop(1, blue)}));
+    ASSERT_EQ(gshscene_list_fill(pl, s.sq(4, 4, 8), nullptr, GSHGEOM_FILL_NONZERO, &pp, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_close(pl), GSHSCENE_OK);
+    ReportRef pr;
+    auto ps = make_surface(kind);
+    EXPECT_EQ(run(f(), sink.sink, request_for(pl, *ps, pr.report)).result, GSHSCENE_OK);
+    auto refused = of_class(pr.report, GSHSCENE_ENTRY_REFUSED);
+    ASSERT_EQ(refused.size(), 1u);
+    EXPECT_EQ(refused[0].reason, linear_drawn ? GSHSCENE_REASON_PALETTE_ENTRY : GSHSCENE_REASON_GRADIENT);
   }
 }
 

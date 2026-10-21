@@ -300,7 +300,8 @@ static int put_node(FILE * out, const GSHSCENE_Node_Rec * node) {
               (unsigned)p->paint.kind, HEX(gshgeom_f64_bits(p->paint.rgba[0])), HEX(gshgeom_f64_bits(p->paint.rgba[1])),
               HEX(gshgeom_f64_bits(p->paint.rgba[2])), HEX(gshgeom_f64_bits(p->paint.rgba[3]))) < 0 ||
           gshscene_space_dump(out, &p->paint.space) < 0 ||
-          fprintf(out, " entry=%u layer=%lld depth=%016llx", (unsigned)p->paint.entry, (long long)p->layer,
+          fprintf(out, " entry=%u gradient=%016llx layer=%lld depth=%016llx", (unsigned)p->paint.entry,
+              HEX(p->paint.gradient ? gshscene_resource_hash(p->paint.gradient) : 0), (long long)p->layer,
               HEX(gshgeom_f64_bits(p->depth))) < 0) {
         return -1;
       }

@@ -77,7 +77,9 @@
  * layer.  **N10**: a ::GSHSCENE_PAINT_FOREGROUND fill uses the list's foreground
  * (::gshscene_list_set_foreground).  **N14**: a ::GSHSCENE_PAINT_PALETTE fill
  * uses an entry of the list's palette (::gshscene_list_set_palette), and one
- * whose entry is missing is refused.  **N11, N12**: the order is made by
+ * whose entry is missing is refused.  **G1 to G13** (paint.h): a
+ * ::GSHSCENE_PAINT_GRADIENT fill takes its color at each point from a gradient
+ * resource.  **N11, N12**: the order is made by
  * ::gshscene_list_close, as below.
  *
  * ### Order and ties (N11, N12)
@@ -106,16 +108,18 @@
  * list is used from one thread at a time, and a closed list is immutable and may
  * be read from many.
  *
- * ### The hash of a list (version 3)
+ * ### The hash of a list (version 4)
  *
- * In the spelling of shape-geometry's hash.h: `u32` 3 (this format), `u32`
+ * In the spelling of shape-geometry's hash.h: `u32` 4 (this format; 3 had no
+ * gradient hash in a paint), `u32`
  * `0x5453494c`, the foreground (four `f64` and a space), `u64` the palette's
  * content hash (0 for none), `u64` the item count; then for each item a `u8`
  * kind (::GSHSCENE_Item_Kind, pinned) and:
  *
  * - **fill**: `u64` the resource's content hash, `u64` the map's hash
  *   (`gshgeom_map_hash`), `u8` the fill rule, the paint (`u8` kind, four `f64`, a
- *   space, `u32` entry), `i32` layer, `f64` depth.
+ *   space, `u32` entry, `u64` the gradient's content hash, 0 for another kind),
+ *   `i32` layer, `f64` depth.
  * - **clip push**: `u64` resource hash, `u64` map hash, `u8` fill rule, `i32`
  *   layer, `f64` depth.
  * - **group push**: `f64` opacity, a space (the blend space), `u8` composite,
@@ -128,9 +132,9 @@
  *
  * ### The dump
  *
- * `gshscene.list 3 items=N ties=T fg=<r> <g> <b> <a> <space> palette=<hash> hash=<16 hex digits>`
+ * `gshscene.list 4 items=N ties=T fg=<r> <g> <b> <a> <space> palette=<hash> hash=<16 hex digits>`
  * (the palette's content hash, 0 for none) and one line per item:
- * `F res=<kind>:<hash> map=<hash> rule=N paint=N <r> <g> <b> <a> space=<space> entry=E layer=N depth=<hex>`,
+ * `F res=<kind>:<hash> map=<hash> rule=N paint=N <r> <g> <b> <a> space=<space> entry=E gradient=<hash> layer=N depth=<hex>`,
  * `C res=<kind>:<hash> map=<hash> rule=N layer=N depth=<hex>`, `c`,
  * `G opacity=<hex> blend=<space> composite=N order=N layer=N depth=<hex>`, `g`,
  * `I res=<kind>:<hash> map=<hash> layer=N depth=<hex>`, then one line per tie,
@@ -285,7 +289,8 @@ GSHSCENE_API GSHSCENE_Result gshscene_list_reset(GSHSCENE_List * list);
  * @param resource A path or glyph run of the list's store.
  * @param map The placement, or NULL for the 2D identity.
  * @param rule The fill rule.
- * @param paint The paint (solid, foreground or palette), or NULL for opaque black.
+ * @param paint The paint (solid, foreground, palette, or a gradient of the list's store, which the list retains), or
+ *   NULL for opaque black.
  * @param layer The declared layer.
  * @param depth The declared depth: finite (else ::GSHSCENE_ERR_INVALID).
  */

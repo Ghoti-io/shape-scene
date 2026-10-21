@@ -405,7 +405,7 @@ TEST(Paint, AForegroundPaintCarriesOnlyItsAlphaAndAZeroSpace) {
   q.space = srgb_space();
   EXPECT_EQ(fill(q), GSHSCENE_ERR_INVALID) << "and so is its space";
   q.kind = GSHSCENE_PAINT_GRADIENT;
-  EXPECT_EQ(fill(q), GSHSCENE_ERR_UNSUPPORTED);
+  EXPECT_EQ(fill(q), GSHSCENE_ERR_INVALID) << "a gradient paint names a gradient resource (G1)";
 }
 
 TEST(Paint, ASolidPaintInEveryAcceptedSpaceReadsBack) {

@@ -19,9 +19,13 @@
 #include <ghoti.io/shape-scene/shape-scene.h>
 
 #include <ghoti.io/math/math.h>
+#include <ghoti.io/shape-geometry/orient.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
+#include <cstring>
+#include <utility>
 #include <vector>
 
 namespace refc {
@@ -320,6 +324,248 @@ inline Px evaluate(const GSHSCENE_List * list, const std::vector<double> & cover
     }
   }
   return stack.back().layer;
+}
+
+/* --- gradients (G4 to G11; color-paint story P1) --------------------------------------------------------------------- */
+
+/** A stop of a resolved color line: its offset and straight rgba in the interpolation space. */
+struct GStop {
+  double offset;
+  double rgba[4];
+};
+
+/** A 2D map: x' = m[0] x + m[1] y + m[4], y' = m[2] x + m[3] y + m[5]. */
+struct GMap {
+  double m[6];
+};
+
+/** What a gradient paints at a point: drawn (0: G8's outside, G10, G11, with reason 1, 2 or 3), t, straight rgba. */
+struct GPoint {
+  int drawn = 0;
+  int reason = 0;
+  double t = 0.0;
+  double rgba[4] = {0, 0, 0, 0};
+};
+
+/** G11: an exactly zero determinant, by shape-geometry's exact orientation of the columns. */
+inline bool g_singular(const GMap & m) {
+  GSHGEOM_Point o = {0, 0, 0};
+  GSHGEOM_Point a = {m.m[0], m.m[2], 0};
+  GSHGEOM_Point b = {m.m[1], m.m[3], 0};
+  int sign = 1;
+  gshgeom_orient2d(o, a, b, &sign);
+  return sign == 0;
+}
+
+/** p = m^-1 (q), the matrix scaled by its largest entry first so a tiny or huge scale neither under- nor overflows. */
+inline void g_unmap(const GMap & m, double & x, double & y) {
+  double s = 0.0;
+  for (int i = 0; i < 4; i++) {
+    s = std::max(s, m.m[i] < 0 ? -m.m[i] : m.m[i]);
+  }
+  double a = m.m[0] / s, b = m.m[1] / s, c = m.m[2] / s, d = m.m[3] / s;
+  double det = a * d - b * c;
+  double u = x - m.m[4], v = y - m.m[5];
+  x = (d * u - b * v) / det / s;
+  y = (-c * u + a * v) / det / s;
+}
+
+inline void g_interpolant(const GStop & s, int premul, double out[4]) {
+  double a = s.rgba[3];
+  for (int k = 0; k < 3; k++) {
+    out[k] = premul ? s.rgba[k] * a : s.rgba[k];
+  }
+  out[3] = a;
+}
+
+/** G4: C(t) for t in [o_first, o_last], at least two stops, o_first < o_last. */
+inline void g_line(const std::vector<GStop> & stops, int premul, double t, double out[4]) {
+  if (!(t < stops.back().offset)) {
+    g_interpolant(stops.back(), premul, out);
+    return;
+  }
+  size_t j = 0;
+  while (j < stops.size() && !(t < stops[j].offset)) {
+    j++;
+  }
+  size_t i = j - 1;
+  double a[4], b[4];
+  g_interpolant(stops[i], premul, a);
+  g_interpolant(stops[j], premul, b);
+  double f = (t - stops[i].offset) / (stops[j].offset - stops[i].offset);
+  for (int k = 0; k < 4; k++) {
+    out[k] = a[k] + f * (b[k] - a[k]);
+  }
+}
+
+/** G4, G5: the interpolant at t; false where nothing is drawn. */
+inline bool g_extended(const std::vector<GStop> & stops, int extend, int premul, double t, double out[4]) {
+  size_t n = stops.size();
+  if (n == 0) {
+    out[0] = out[1] = out[2] = out[3] = 0.0;
+    return true;
+  }
+  if (n == 1) {
+    g_interpolant(stops[0], premul, out);
+    return true;
+  }
+  double o0 = stops.front().offset, o1 = stops.back().offset, period = o1 - o0;
+  if (period == 0.0) {
+    if (extend != GSHSCENE_EXTEND_PAD) {
+      return false;
+    }
+    g_interpolant(t < o0 ? stops.front() : stops.back(), premul, out);
+    return true;
+  }
+  if (t < o0 || t > o1) {
+    if (extend == GSHSCENE_EXTEND_PAD) {
+      g_interpolant(t < o0 ? stops.front() : stops.back(), premul, out);
+      return true;
+    }
+    if (extend == GSHSCENE_EXTEND_REPEAT) {
+      t = o0 + (t - o0 - std::floor((t - o0) / period) * period);
+    } else {
+      double m = t - o0 - std::floor((t - o0) / (2 * period)) * (2 * period);
+      t = o0 + period - std::fabs(m - period);
+    }
+  }
+  g_line(stops, premul, t, out);
+  return true;
+}
+
+/**
+ * The gradient's straight color at target point (qx, qy) (G6 to G12), in doubles: the chain's maps (target first,
+ * gradient last), the stops already resolved into the interpolation space (sorted), the paint's alpha.
+ */
+inline GPoint gradient_at(int kind, const double geom[6], int unit, int extend, int premul,
+    const std::vector<GStop> & stops, const std::vector<GMap> & chain, double qx, double qy, double alpha) {
+  GPoint r;
+  for (const GMap & m : chain) {
+    if (g_singular(m)) {
+      r.reason = 3;
+      return r;
+    }
+  }
+  double x = qx, y = qy;
+  for (const GMap & m : chain) {
+    g_unmap(m, x, y);
+  }
+  double t = 0.0;
+  if (kind == GSHSCENE_GRADIENT_LINEAR) {
+    double vx = geom[2] - geom[0], vy = geom[3] - geom[1];
+    double nx = vx, ny = vy;
+    if (geom[4] != 0.0 || geom[5] != 0.0) {
+      nx = -geom[5];
+      ny = geom[4];
+    }
+    double den = vx * nx + vy * ny;
+    if (den == 0.0) {
+      r.reason = 2;
+      return r;
+    }
+    t = ((x - geom[0]) * nx + (y - geom[1]) * ny) / den;
+  } else if (kind == GSHSCENE_GRADIENT_RADIAL) {
+    double c0x = geom[0], c0y = geom[1], r0 = geom[2], c1x = geom[3], c1y = geom[4], r1 = geom[5];
+    if (c0x == c1x && c0y == c1y && r0 == r1) {
+      r.reason = 2;
+      return r;
+    }
+    double dcx = c1x - c0x, dcy = c1y - c0y, dr = r1 - r0, px = x - c0x, py = y - c0y;
+    double a = dcx * dcx + dcy * dcy - dr * dr;
+    double b = px * dcx + py * dcy + r0 * dr;
+    double c = px * px + py * py - r0 * r0;
+    double w[2];
+    int nw = 0;
+    if (a == 0.0) {
+      if (b != 0.0) {
+        w[nw++] = c / (2 * b);
+      }
+    } else {
+      double disc = b * b - a * c;
+      if (disc >= 0.0) {
+        double sq = gmath_sqrt(disc);
+        double hi = (b + sq) / a, lo = (b - sq) / a;
+        if (hi < lo) {
+          std::swap(hi, lo);
+        }
+        w[nw++] = hi;
+        w[nw++] = lo;
+      }
+    }
+    bool found = false;
+    for (int i = 0; i < nw && !found; i++) {
+      if (r0 + w[i] * dr > 0.0) {
+        t = w[i];
+        found = true;
+      }
+    }
+    if (!found) {
+      r.reason = 1;
+      return r;
+    }
+  } else {
+    double dx = x - geom[0], dy = y - geom[1];
+    double per_turn = unit == GSHGEOM_ANGLE_DEGREES ? 360.0 : unit == GSHGEOM_ANGLE_GRADIANS ? 400.0
+        : unit == GSHGEOM_ANGLE_TURNS ? 1.0 : 2.0 * 3.141592653589793238462643383279502884;
+    double theta;
+    if (dy == 0.0 && dx >= 0.0) {
+      theta = 0.0;
+    } else if (dx == 0.0) {
+      theta = per_turn * (dy > 0 ? 0.25 : 0.75);
+    } else if (dy == 0.0) {
+      theta = per_turn * 0.5;
+    } else {
+      double rad = gmath_atan2(dy, dx);
+      const double two_pi = 2.0 * 3.141592653589793238462643383279502884;
+      if (rad < 0) {
+        rad += two_pi;
+      }
+      theta = unit == GSHGEOM_ANGLE_RADIANS ? rad : rad / two_pi * per_turn;
+    }
+    double a0 = geom[2], a1 = geom[3];
+    if (a0 == a1) {
+      if (extend != GSHSCENE_EXTEND_PAD) {
+        r.reason = 2;
+        return r;
+      }
+      double c[4] = {0, 0, 0, 0};
+      if (!stops.empty()) {
+        g_interpolant(theta < a0 ? stops.front() : stops.back(), premul, c);
+      }
+      r.drawn = 1;
+      r.t = 0.0;
+      for (int k = 0; k < 4; k++) {
+        r.rgba[k] = c[k];
+      }
+      goto finish;
+    }
+    t = (theta - a0) / (a1 - a0);
+  }
+  {
+    double c[4];
+    if (!g_extended(stops, extend, premul, t, c)) {
+      r.reason = 2;
+      return r;
+    }
+    r.drawn = 1;
+    r.t = t;
+    for (int k = 0; k < 4; k++) {
+      r.rgba[k] = c[k];
+    }
+  }
+finish:
+  if (premul) {
+    double a = r.rgba[3];
+    if (a == 0.0) {
+      r.rgba[0] = r.rgba[1] = r.rgba[2] = 0.0;
+    } else {
+      for (int k = 0; k < 3; k++) {
+        r.rgba[k] = r.rgba[k] / a;
+      }
+    }
+  }
+  r.rgba[3] = r.rgba[3] * alpha;
+  return r;
 }
 
 }  // namespace refc

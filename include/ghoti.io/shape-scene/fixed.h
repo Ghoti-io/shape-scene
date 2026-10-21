@@ -22,8 +22,9 @@
  * @file fixed.h
  *
  * Recording without floats (story 14c): the calls a front end whose headers
- * name no floating type (`font`, AD-5) records a list with, the palette's
- * integer constructor, and the truncation that makes a lowering atomic.
+ * name no floating type (`font`, AD-5) records a list with, the palette's and
+ * the gradient's integer constructors, and the truncation that makes a lowering
+ * atomic.
  *
  * **This header is float-free**, on the same terms as glyph_provider.h: no
  * floating type appears in it or in a header of the suite it includes, and the
@@ -72,6 +73,30 @@
  * N14) with its alpha `alpha / 2^bits`, in `[0, 1]`.  A palette entry of
  * `0xFFFF`, a font's foreground, **becomes the foreground paint**: this is
  * where `0xFFFF` is lowered, so every front end lowers it the same way.
+ *
+ * ### A gradient (color-paint story P1, G1 to G13 of paint.h)
+ *
+ * ::gshscene_store_intern_gradient_fixed interns a gradient whose numbers are
+ * COLRv1's, placed for a **run from a font** as a fill of that run is: in the
+ * face's design space (units, y up) under a design map of ops (above), about the
+ * run's first glyph `g` at the run's scale `s = size / upem`.  The gradient map is
+ * `gshgeom_map_compose_chain` of `gshgeom_map_design_to_model(s, g_x, g_y)` and
+ * `T`, the ops' chain (no ops: `T` is the identity): a design point lands where
+ * the run's glyph outline puts it, and a fill's own design map composes in front
+ * of it as the item map.  Every value is `v / 2^bits`, exactly:
+ *
+ * | Kind | `v[0..5]` | The gradient |
+ * | --- | --- | --- |
+ * | `LINEAR` | `x0 y0 x1 y1 x2 y2` | `p0 = (x0, y0)`, `p1 = (x1, y1)`, `d = (x2 - x0, y2 - y0)` (COLRv1's rotation point, G7) |
+ * | `RADIAL` | `x0 y0 r0 x1 y1 r1` | the circles `(x0, y0), r0` and `(x1, y1), r1` |
+ * | `SWEEP` | `cx cy a0 a1 0 0` | the center, and the angles in half turns (COLRv1's: 1.0 is 180 degrees), stored as `v * 180 / 2^bits` degrees |
+ *
+ * Each difference and product is exact in a double (an `int32_t` has 31 bits).
+ * The space is primaries and transfer (linear or sRGB) with no gamma; COLRv1's
+ * is sRGB primaries, linear transfer, premultiplied 1.  Each stop is an offset
+ * `offset / 2^bits` and a ::GSHSCENE_Paint_Fixed (an entry of `0xFFFF` is the
+ * foreground); the store sorts them stably.  The rules and failures are
+ * `gshscene_store_intern_gradient`'s.
  *
  * ### Atomic lowering
  *
@@ -135,6 +160,45 @@ typedef struct GSHSCENE_Paint_Fixed {
   uint32_t bits;  ///< At most ::GSHSCENE_FIXED_MAX_BITS.
 } GSHSCENE_Paint_Fixed;
 
+/** The gradient kinds (`GSHSCENE_GRADIENT_*`, paint.h; a test pins them together). */
+#define GSHSCENE_FIXED_GRADIENT_LINEAR 1u
+#define GSHSCENE_FIXED_GRADIENT_RADIAL 2u
+#define GSHSCENE_FIXED_GRADIENT_SWEEP 3u
+
+/** @brief One stop of a fixed gradient. */
+typedef struct GSHSCENE_Gradient_Stop_Fixed {
+  int32_t offset;              ///< `offset / 2^bits`.
+  uint32_t bits;               ///< At most ::GSHSCENE_FIXED_MAX_BITS.
+  GSHSCENE_Paint_Fixed color;  ///< A foreground or palette paint (`0xFFFF` is the foreground).
+} GSHSCENE_Gradient_Stop_Fixed;
+
+/** @brief A gradient in integers (see the file comment). */
+typedef struct GSHSCENE_Gradient_Fixed {
+  uint32_t kind;          ///< ::GSHSCENE_FIXED_GRADIENT_LINEAR, `_RADIAL` or `_SWEEP`.
+  uint32_t extend;        ///< 0 pad, 1 repeat, 2 reflect (`GSHSCENE_Extend`).
+  uint32_t bits;          ///< The fraction bits of @p v, at most ::GSHSCENE_FIXED_MAX_BITS.
+  int32_t v[6];           ///< The geometry (see the table); the values a kind does not use are zero.
+  uint32_t primaries;     ///< A `GCOL_Primaries` value: sRGB, Adobe RGB, Display P3 or BT.2020.
+  uint32_t transfer;      ///< A `GCOL_Transfer` value: linear or sRGB.
+  uint32_t premultiplied; ///< 0 or 1 (G4).
+  const GSHSCENE_Fixed_Op * ops; ///< The design map of the gradient (`T`), or NULL with @p op_count 0.
+  size_t op_count;        ///< At most ::GSHSCENE_FIXED_MAX_OPS.
+  size_t stop_count;      ///< The stops.
+  const GSHSCENE_Gradient_Stop_Fixed * stops; ///< NULL only with no stops.
+} GSHSCENE_Gradient_Fixed;
+
+/**
+ * @brief Intern a gradient (resource.h's `gshscene_store_intern_gradient`) from integers, placed for @p run (see the
+ *   file comment).
+ *
+ * @param run A run from a bound face with a glyph, of @p store.
+ * @return As `gshscene_store_intern_gradient`; ::GSHSCENE_ERR_INVALID for a value outside its rules, a run that is not
+ *   one from a bound face with a glyph, or a NULL; ::GSHSCENE_ERR_LIMIT for more than ::GSHSCENE_FIXED_MAX_OPS ops or
+ *   a map past shape-geometry's bounds.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_store_intern_gradient_fixed(GSHSCENE_Store * store, const GSHSCENE_Resource * run,
+    const GSHSCENE_Gradient_Fixed * gradient, const GSHSCENE_Resource ** out);
+
 /**
  * @brief Record a fill (list.h's `gshscene_list_fill`) with a design map, a fixed paint, and depth 0.
  *
@@ -146,6 +210,16 @@ typedef struct GSHSCENE_Paint_Fixed {
 GSHSCENE_API GSHSCENE_Result gshscene_list_fill_fixed(GSHSCENE_List * list, const GSHSCENE_Resource * resource,
     const GSHSCENE_Fixed_Op * ops, size_t op_count, GSHGEOM_Fill_Rule rule, const GSHSCENE_Paint_Fixed * paint,
     int32_t layer);
+
+/**
+ * @brief Record a fill with a design map whose paint is @p gradient (a gradient resource of the list's store, G1) with
+ *   the alpha multiplier `alpha / 2^bits`, in `[0, 1]`, at depth 0.
+ *
+ * @return As ::gshscene_list_fill_fixed.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_list_fill_gradient_fixed(GSHSCENE_List * list, const GSHSCENE_Resource * resource,
+    const GSHSCENE_Fixed_Op * ops, size_t op_count, GSHGEOM_Fill_Rule rule, const GSHSCENE_Resource * gradient,
+    int32_t alpha, uint32_t bits, int32_t layer);
 
 /** @brief Begin a clip (list.h's `gshscene_list_clip_push`) with a design map, at depth 0. */
 GSHSCENE_API GSHSCENE_Result gshscene_list_clip_push_fixed(GSHSCENE_List * list, const GSHSCENE_Resource * resource,

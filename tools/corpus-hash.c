@@ -41,6 +41,12 @@
  * target must round alike), lists and versions with a palette parameter and palette fills (some entries missing,
  * which every sink refuses), the item maps of the float-free design maps (rotations and skews through shape-geometry's
  * rotation, composed by the one composer), their renders and a diff of a palette change.
+ * Since color-paint story P1 a gradient section folds in gradients of every kind, extend and flag (geometry and
+ * offsets that are not exact in binary, stops of every paint kind in random spaces), their hashes, the stops the one
+ * conversion gives at draw time (gshscene_gradient_resolve: `math`'s `gmath_pow` and the gamut matrices, which every
+ * target must round alike), what the notice predicate says of each under composed maps, the float-free constructor's
+ * gradients (a run's scale is a division), and lists of gradient fills rendered by the test sinks (whose dumps carry
+ * the resolved stops and the notices).
  * It is built by `make check-corpus-hash` on the host and by
  * suite/tools/xarch/shape.sh and suite/tools/xwin/shape.sh for the others.
  *
@@ -943,6 +949,226 @@ static void palette_section(void) {
   gshscene_store_destroy(store);
 }
 
+/* --- gradients (color-paint story P1) ----------------------------------------------------------------- */
+
+static void feed_double(double x) {
+  feed(gshgeom_f64_bits(x));
+}
+
+static const GSHSCENE_Resource * random_gradient(GSHSCENE_Store * store) {
+  GSHSCENE_Gradient g;
+  memset(&g, 0, sizeof g);
+  g.kind = between(1, 3);
+  double v[6];
+  for (int i = 0; i < 6; i++) {
+    v[i] = entry() * 8.0;
+  }
+  unsigned degenerate = between(0, 7);
+  if (g.kind == GSHSCENE_GRADIENT_LINEAR) {
+    g.p0[0] = v[0];
+    g.p0[1] = v[1];
+    g.p1[0] = degenerate == 0 ? v[0] : v[2];
+    g.p1[1] = degenerate == 0 ? v[1] : v[3];
+    if (between(0, 2) == 0) {
+      g.d[0] = v[4];
+      g.d[1] = v[5];
+    }
+  } else if (g.kind == GSHSCENE_GRADIENT_RADIAL) {
+    g.c0[0] = v[0];
+    g.c0[1] = v[1];
+    g.r0 = v[2];
+    g.c1[0] = degenerate == 0 ? v[0] : v[3];
+    g.c1[1] = degenerate == 0 ? v[1] : v[4];
+    g.r1 = degenerate == 0 ? v[2] : v[5];
+  } else {
+    g.center[0] = v[0];
+    g.center[1] = v[1];
+    g.angle_unit = between(0, 3);
+    g.a0 = v[2];
+    g.a1 = degenerate == 0 ? v[2] : v[3];
+  }
+  g.map = random_map();
+  g.extend = between(0, 2);
+  g.premultiplied = between(0, 1);
+  g.space = random_space();
+  GSHSCENE_Gradient_Stop stops[6];
+  memset(stops, 0, sizeof stops);
+  g.stop_count = between(0, 6);
+  for (size_t i = 0; i < g.stop_count; i++) {
+    stops[i].offset = entry() * 1.5;
+    unsigned k = between(0, 5);
+    if (k == 0) {
+      stops[i].color.kind = GSHSCENE_PAINT_FOREGROUND;
+      stops[i].color.rgba[3] = entry() < 0 ? 0.5 : 1.0;
+    } else if (k == 1) {
+      stops[i].color.kind = GSHSCENE_PAINT_PALETTE;
+      stops[i].color.entry = between(0, 2);
+      stops[i].color.rgba[3] = 0.75;
+    } else {
+      stops[i].color.kind = GSHSCENE_PAINT_SOLID;
+      stops[i].color.rgba[0] = entry();
+      stops[i].color.rgba[1] = entry() + 0.5;
+      stops[i].color.rgba[2] = entry() * 2.0;
+      stops[i].color.rgba[3] = (entry() + 1.0) / 2.0;
+      stops[i].color.space = random_space();
+      if (gshscene_color_space_is_target(&stops[i].color.space) && !gshscene_color_space_is_target(&g.space)) {
+        stops[i].color.space = g.space; /* a target-space solid only in a target-space gradient (G3) */
+      }
+    }
+  }
+  g.stops = stops;
+  const GSHSCENE_Resource * r = NULL;
+  check(gshscene_store_intern_gradient(store, &g, &r), "intern gradient");
+  return r;
+}
+
+static void gradient_section(void) {
+  GSHSCENE_Store * store = NULL;
+  check(gshscene_store_create(NULL, NULL, &store), "gradient store");
+  static const uint8_t entries[12] = {255, 128, 0, 255, 10, 20, 30, 40, 1, 2, 254, 128};
+  const GSHSCENE_Resource * palette = NULL;
+  check(gshscene_store_intern_palette_rgba8(store, 3, entries, &palette), "gradient palette");
+  const GSHSCENE_Resource * gradients[24];
+  static const GSHSCENE_Color_Space targets[3] = {{GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_SRGB, 0.0},
+      {GCOL_PRIMARIES_DISPLAY_P3, GCOL_TRANSFER_LINEAR, 0.0}, {GCOL_PRIMARIES_BT2020, GCOL_TRANSFER_GAMMA, 2.4}};
+  for (unsigned i = 0; i < 24; i++) {
+    gradients[i] = random_gradient(store);
+    feed(gshscene_resource_hash(gradients[i]));
+    GSHSCENE_Gradient back;
+    check(gshscene_resource_gradient(gradients[i], &back), "read gradient");
+    GSHSCENE_Color fg = random_foreground();
+    for (unsigned t = 0; t < 3; t++) {
+      GSHSCENE_Resolved_Stop out[6];
+      GSHSCENE_Color_Space into;
+      memset(&into, 0, sizeof into);
+      GSHSCENE_Result r = gshscene_gradient_resolve(gradients[i], &fg, palette, &targets[t], &into, out, 6);
+      feed((uint64_t)r);
+      for (size_t k = 0; r == GSHSCENE_OK && k < back.stop_count; k++) {
+        feed_double(out[k].offset);
+        for (int c = 0; c < 4; c++) {
+          feed_double(out[k].rgba[c]);
+        }
+      }
+      feed((uint64_t)into.primaries);
+    }
+    /* The notice under maps composed from inexact entries, and under a map that is exactly singular. */
+    GSHSCENE_Item item;
+    memset(&item, 0, sizeof item);
+    item.kind = GSHSCENE_ITEM_FILL;
+    item.map = random_map();
+    item.paint.kind = GSHSCENE_PAINT_GRADIENT;
+    item.paint.gradient = gradients[i];
+    GSHGEOM_Map instances[2];
+    instances[0] = random_map();
+    instances[1] = random_map();
+    GSHGEOM_Map target = random_map();
+    feed((uint64_t)gshscene_gradient_notice(&item, instances, 2, &target));
+    double flat[4] = {0.0, 0.0, 0.0, 0.0}; /* rank one: its second column zero */
+    flat[0] = entry();
+    flat[2] = entry();
+    const double t0[2] = {0.0, 0.0};
+    if (gshgeom_map_from_matrix(2, flat, t0, &item.map) != GSHGEOM_OK) {
+      fail("flat map");
+    }
+    feed((uint64_t)gshscene_gradient_notice(&item, instances, 2, &target));
+  }
+  /* The float-free constructor on a run of a 2048-unit face at a size that is not a power of two. */
+  const GSHSCENE_Resource * face = test_face(store, 0, 0);
+  GSHSCENE_Glyph glyph = {3, 0.0, 0.0, NULL};
+  glyph.x = coord();
+  glyph.y = coord();
+  GSHSCENE_Glyph_Run run;
+  memset(&run, 0, sizeof run);
+  run.source = GSHSCENE_GLYPHS_FROM_FONT;
+  run.face = face;
+  run.size = 13.37;
+  run.glyph_count = 1;
+  run.glyphs = &glyph;
+  const GSHSCENE_Resource * glyphs = NULL;
+  check(gshscene_store_intern_glyph_run(store, &run, &glyphs), "gradient run");
+  for (unsigned i = 0; i < 6; i++) {
+    GSHSCENE_Gradient_Fixed f;
+    memset(&f, 0, sizeof f);
+    f.kind = 1u + i % 3u;
+    f.extend = between(0, 2);
+    f.bits = between(0, 14);
+    for (int k = 0; k < (f.kind == GSHSCENE_FIXED_GRADIENT_SWEEP ? 4 : 6); k++) {
+      f.v[k] = (int32_t)between(0, 65535) - 32768;
+    }
+    if (f.kind == GSHSCENE_FIXED_GRADIENT_RADIAL) {
+      f.v[2] = (int32_t)between(0, 65535);
+      f.v[5] = (int32_t)between(0, 65535);
+    }
+    f.primaries = GCOL_PRIMARIES_SRGB;
+    f.transfer = GCOL_TRANSFER_LINEAR;
+    f.premultiplied = 1;
+    GSHSCENE_Fixed_Op op;
+    memset(&op, 0, sizeof op);
+    op.kind = GSHSCENE_FIXED_ROTATE;
+    op.bits = 16;
+    op.v[0] = (int32_t)between(0, 65535);
+    f.ops = &op;
+    f.op_count = i % 2;
+    GSHSCENE_Gradient_Stop_Fixed fs[2];
+    memset(fs, 0, sizeof fs);
+    fs[0].bits = 14;
+    fs[0].color.kind = GSHSCENE_FIXED_PAINT_PALETTE;
+    fs[0].color.entry = between(0, 2);
+    fs[0].color.alpha = 1;
+    fs[1].offset = 16384;
+    fs[1].bits = 14;
+    fs[1].color.kind = GSHSCENE_FIXED_PAINT_PALETTE;
+    fs[1].color.entry = 0xFFFFu;
+    fs[1].color.alpha = (int32_t)between(0, 16384);
+    fs[1].color.bits = 14;
+    f.stop_count = 2;
+    f.stops = fs;
+    const GSHSCENE_Resource * g = NULL;
+    check(gshscene_store_intern_gradient_fixed(store, glyphs, &f, &g), "fixed gradient");
+    feed(gshscene_resource_hash(g));
+    GSHSCENE_Gradient back;
+    check(gshscene_resource_gradient(g, &back), "read fixed gradient");
+    feed(gshgeom_map_hash(&back.map));
+    gshscene_resource_release(g);
+  }
+  /* Lists of gradient fills (with solids, a palette and a foreground), rendered by both test sinks. */
+  for (unsigned l = 0; l < 8; l++) {
+    GSHSCENE_List * list = NULL;
+    check(gshscene_list_create(NULL, NULL, store, &list), "gradient list");
+    GSHSCENE_Color fg = random_foreground();
+    check(gshscene_list_set_foreground(list, &fg), "gradient list foreground");
+    if (l % 2 == 0) {
+      check(gshscene_list_set_palette(list, palette), "gradient list palette");
+    }
+    GSHGEOM_Path * path = random_path(2);
+    const GSHSCENE_Resource * shape = NULL;
+    check(gshscene_store_intern_path(store, path, &shape), "gradient path");
+    gshgeom_path_destroy(path);
+    unsigned n = between(1, 8);
+    for (unsigned i = 0; i < n; i++) {
+      GSHSCENE_Paint p;
+      memset(&p, 0, sizeof p);
+      p.kind = GSHSCENE_PAINT_GRADIENT;
+      p.gradient = gradients[between(0, 23)];
+      p.rgba[3] = (entry() + 1.0) / 2.0;
+      GSHGEOM_Map map = random_map();
+      check(gshscene_list_fill(list, shape, &map, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), "gradient fill");
+    }
+    check(gshscene_list_close(list), "gradient close");
+    feed(gshscene_list_hash(list));
+    feed_render(list);
+    gshscene_list_destroy(list);
+    gshscene_resource_release(shape);
+  }
+  gshscene_resource_release(glyphs);
+  gshscene_resource_release(face);
+  for (unsigned i = 0; i < 24; i++) {
+    gshscene_resource_release(gradients[i]);
+  }
+  gshscene_resource_release(palette);
+  gshscene_store_destroy(store);
+}
+
 int main(void) {
   gshgeom_hash_init(&total);
   GSHSCENE_Store * store = NULL;
@@ -1112,6 +1338,7 @@ int main(void) {
   scene_section();
   glyph_section();
   palette_section();
+  gradient_section();
 
   printf("shape-scene.hash %016" PRIx64 "\n", gshgeom_hash_value(&total));
   printf("shape-scene.count %lu\n", count);

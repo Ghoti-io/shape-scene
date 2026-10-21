@@ -43,7 +43,7 @@
 struct GSHSCENE_Version;
 
 /** The format of a version's hash and dump. */
-#define VERSION_FORMAT_VERSION 3u
+#define VERSION_FORMAT_VERSION 4u
 
 /** The kind field of a version's hash: "SCEN" in little-endian ASCII. */
 #define VERSION_HASH_KIND UINT32_C(0x4e454353)
@@ -230,8 +230,6 @@ int gshscene_key_compare(const GSHSCENE_Key * a, const GSHSCENE_Key * b);
 
 /* --- the list.c helpers the node validation shares ---------------------------------- */
 
-GSHSCENE_Result gshscene_list_canonical_map(const GSHGEOM_Map * map, GSHGEOM_Map * out);
-GSHSCENE_Result gshscene_list_canonical_paint(const GSHSCENE_Paint * paint, GSHSCENE_Paint * out);
 GSHSCENE_Result gshscene_list_check_rule(GSHGEOM_Fill_Rule rule);
 
 /* --- edit.c ----------------------------------------------------------------------- */

@@ -52,6 +52,7 @@
  * | `APPROXIMATED` | the item was drawn, differently from the definition (a clip without antialiasing, a group blended in another space) |
  * | `RESOLVED_AMBIGUITY` | a depth tie of the list (N11): `second` is the first item of the unit painted after, in the same list, `depth` the depth they share |
  * | `HINT_STATUS` | a run from a font not hinted as it asked (glyph.h, D7): one entry per run for a run-level cause, `second` 0; one per glyph for a glyph-level cause, `second` the glyph's index in the run |
+ * | `NOTICE` | the item was drawn as defined, and the definition draws nothing there: a gradient fill whose chain is not invertible or whose gradient is degenerate (paint.h, G10, G11).  It never fails a render, strict or not |
  *
  * A `REFUSED` entry of one glyph of a run (glyph.h) likewise has the glyph's
  * index in `second`; the rest of the run was drawn.
@@ -79,11 +80,12 @@
  * S7); and the failure, if the render did not return ::GSHSCENE_OK: its result,
  * the chain of the unit it stopped at (empty when none) and a static reason.
  *
- * ### The hash of a report (format 1)
+ * ### The hash of a report (format 2)
  *
- * FNV-1a 64 in the spelling of shape-geometry's hash.h: `u32` 1 (this format),
- * `u32` `0x54525052`, `u32` the result, `u64` units total, processed and done,
- * `u64` counted, `u8` overflowed, `u64` each of `by_class[1]` to `by_class[4]`,
+ * FNV-1a 64 in the spelling of shape-geometry's hash.h: `u32` 2 (this format; 1
+ * had no `NOTICE` class), `u32` `0x54525052`, `u32` the result, `u64` units
+ * total, processed and done, `u64` counted, `u8` overflowed, `u64` each of
+ * `by_class[1]` to `by_class[5]`,
  * `u64` static bytes and work max, `u32` the failure's result, `u64` its chain
  * length and `u64` each index; `u64` the entries stored, then for each entry in
  * order `u8` class, `u32` reason, `u64` chain length, `u64` each index, `u64`
@@ -93,7 +95,7 @@
  *
  * ### The dump
  *
- * `gshscene.report 1 result=N units=T/P/D entries=E counted=C overflowed=O static=N frame=N workspace=N work=N hash=<16 hex digits>`,
+ * `gshscene.report 2 result=N units=T/P/D entries=E counted=C overflowed=O static=N frame=N workspace=N work=N hash=<16 hex digits>`,
  * then, if the result is not 0, `failure result=N chain=<chain> reason=<text>`,
  * then one line per entry `E class=N reason=N chain=<chain> second=N depth=<16 hex digits>`;
  * a chain is its indices in decimal joined by `.`, or `-` when empty; numbers
@@ -122,6 +124,7 @@ typedef enum GSHSCENE_Entry_Class {
   GSHSCENE_ENTRY_APPROXIMATED = 2,       ///< Drawn, not as the definition says.
   GSHSCENE_ENTRY_RESOLVED_AMBIGUITY = 3, ///< A depth tie the list resolved (N11).
   GSHSCENE_ENTRY_HINT_STATUS = 4,        ///< A run from a font not hinted as it asked (glyph.h).
+  GSHSCENE_ENTRY_NOTICE = 5,             ///< Drawn as defined, and the definition draws nothing there (paint.h, G10, G11).
   GSHSCENE_ENTRY_CLASS_COUNT             ///< Closes the enum.
 } GSHSCENE_Entry_Class;
 
@@ -146,11 +149,15 @@ typedef enum GSHSCENE_Reason {
   GSHSCENE_REASON_HINT_STRICT_ROUTE = 17, ///< Refused, per run: a strict-hinted run whose map or size sends it to the general route (D6).
   GSHSCENE_REASON_GLYPH_UNAVAILABLE = 18, ///< Refused, per glyph: the provider cannot give the glyph.
   GSHSCENE_REASON_FACE_UNBOUND = 19,  ///< Refused, per run: the run's face has no glyph path provider.
-  GSHSCENE_REASON_PALETTE_ENTRY = 20, ///< Refused, per fill: its palette paint names an entry the palette in force does not have (N14).
+  GSHSCENE_REASON_PALETTE_ENTRY = 20, ///< Refused, per fill: its palette paint, or a stop of its gradient, names an entry the palette in force does not have (N14, G3).
+  GSHSCENE_REASON_GRADIENT = 21,      ///< Refused, per fill: the sink does not draw this kind of gradient (G13).
+  GSHSCENE_REASON_INTERPOLATION_SPACE = 22, ///< Approximated, per fill: the gradient's stated interpolation space is not the one the sink interpolates in (G13).
+  GSHSCENE_REASON_MAP_NOT_INVERTIBLE = 23,  ///< Notice, per fill: a map of the gradient fill's chain is not invertible, so it draws nothing (G11).
+  GSHSCENE_REASON_GRADIENT_DEGENERATE = 24, ///< Notice, per fill: the gradient is degenerate, so it draws nothing (G10).
   GSHSCENE_REASON_COUNT               ///< Closes the enum.
 } GSHSCENE_Reason;
 
-/** @brief Name a class ("refused", "approximated", "resolved-ambiguity", "hint-status"), or "unknown class". */
+/** @brief Name a class ("refused", "approximated", "resolved-ambiguity", "hint-status", "notice"), or "unknown class". */
 GSHSCENE_API const char * gshscene_entry_class_string(GSHSCENE_Entry_Class entry_class);
 
 /** @brief Name a reason ("item-kind", "composite", ...), or "unknown reason". */

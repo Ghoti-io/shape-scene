@@ -294,7 +294,9 @@ std::string item_text(const GSHSCENE_Item * item) {
              " paint=" + std::to_string((int)item->paint.kind) + " " + hex16(gshgeom_f64_bits(item->paint.rgba[0])) +
              " " + hex16(gshgeom_f64_bits(item->paint.rgba[1])) + " " + hex16(gshgeom_f64_bits(item->paint.rgba[2])) +
              " " + hex16(gshgeom_f64_bits(item->paint.rgba[3])) + " space=" + space_text(item->paint.space) +
-             " entry=" + std::to_string(item->paint.entry) + layer_depth_text(item);
+             " entry=" + std::to_string(item->paint.entry) +
+             " gradient=" + hex16(item->paint.gradient ? gshscene_resource_hash(item->paint.gradient) : 0) +
+             layer_depth_text(item);
     case GSHSCENE_ITEM_CLIP_PUSH:
       return "C" + res + map + " rule=" + std::to_string((int)item->fill_rule) + layer_depth_text(item);
     case GSHSCENE_ITEM_CLIP_POP:
@@ -323,7 +325,7 @@ TEST(Dump, ParsesBackToTheHashedFields) {
     GSHSCENE_Color fg;
     ASSERT_EQ(gshscene_list_foreground(list, &fg), GSHSCENE_OK);
     const GSHSCENE_Resource * palette = gshscene_list_palette(list);
-    EXPECT_EQ(lines[0], "gshscene.list 3 items=" + std::to_string(n) + " ties=" + std::to_string(ties) + " fg=" +
+    EXPECT_EQ(lines[0], "gshscene.list 4 items=" + std::to_string(n) + " ties=" + std::to_string(ties) + " fg=" +
                             hex16(gshgeom_f64_bits(fg.rgba[0])) + " " + hex16(gshgeom_f64_bits(fg.rgba[1])) + " " +
                             hex16(gshgeom_f64_bits(fg.rgba[2])) + " " + hex16(gshgeom_f64_bits(fg.rgba[3])) + " " +
                             space_text(fg.space) + " palette=" + hex16(palette ? gshscene_resource_hash(palette) : 0) +
@@ -346,7 +348,7 @@ TEST(Dump, ParsesBackToTheHashedFields) {
 TEST(Dump, ADumpOfAnOpenAndAnEmptyListIsWellFormed) {
   StoreHolder s;
   ListHolder l(s.store);
-  EXPECT_EQ(dump_list(l.list), "gshscene.list 3 items=0 ties=0 fg=0000000000000000 0000000000000000 0000000000000000 "
+  EXPECT_EQ(dump_list(l.list), "gshscene.list 4 items=0 ties=0 fg=0000000000000000 0000000000000000 0000000000000000 "
                                    "3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=" +
                                    hex16(gshscene_list_hash(l.list)) + "\n");
   Ref sq(intern_square(s.store));
@@ -594,6 +596,22 @@ TEST(Dump, EveryWriteOfEveryDumpIsChecked) {
   expect_every_write_checked(gshscene_resource_dump, f.outline_run, "outline run");
   expect_every_write_checked(gshscene_resource_dump, f.picture, "picture");
   expect_every_write_checked(gshscene_resource_dump, f.palette, "palette");
+  // A gradient of each kind (color-paint story P1): every line of its own and of its stops.
+  GSHSCENE_Gradient_Stop stops[2] = {{0.0, solid(0, 0, 0, 1)}, {1.0, solid(1, 1, 1, 1)}};
+  for (uint32_t kind : {GSHSCENE_GRADIENT_LINEAR, GSHSCENE_GRADIENT_RADIAL, GSHSCENE_GRADIENT_SWEEP}) {
+    GSHSCENE_Gradient g{};
+    g.kind = kind;
+    gshgeom_map_identity(2, &g.map);
+    g.p1[0] = kind == GSHSCENE_GRADIENT_LINEAR ? 1.0 : 0.0;
+    g.r1 = kind == GSHSCENE_GRADIENT_RADIAL ? 1.0 : 0.0;
+    g.a1 = kind == GSHSCENE_GRADIENT_SWEEP ? 1.0 : 0.0;
+    g.stop_count = 2;
+    g.stops = stops;
+    const GSHSCENE_Resource * r = nullptr;
+    ASSERT_EQ(gshscene_store_intern_gradient(s.store, &g, &r), GSHSCENE_OK);
+    expect_every_write_checked(gshscene_resource_dump, r, "gradient");
+    gshscene_resource_release(r);
+  }
 }
 #endif
 

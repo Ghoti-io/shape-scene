@@ -351,12 +351,12 @@ TEST(VersionDump, ParsesBackToTheFieldsTheHashIsOver) {
   std::vector<std::string> lines = lines_of(dump_version(f.v.get()));
   ASSERT_GE(lines.size(), 2u);
   auto header = fields_of(lines[0], 2);
-  ASSERT_EQ(lines[0].substr(0, 18), "gshscene.version 3");
+  ASSERT_EQ(lines[0].substr(0, 18), "gshscene.version 4");
   EXPECT_EQ(std::stoull(header["nodes"]), lines.size() - 1);
   EXPECT_EQ(header["root"], "1");
   GSHGEOM_Hash h;
   gshgeom_hash_init(&h);
-  gshgeom_hash_u32(&h, 3);
+  gshgeom_hash_u32(&h, 4);
   gshgeom_hash_u32(&h, 0x4e454353u);
   {
     // The foreground: four bare doubles and a space after `fg=`.
@@ -455,6 +455,7 @@ TEST(VersionDump, ParsesBackToTheFieldsTheHashIsOver) {
       }
       hash_space(&h, fld["space"]);
       gshgeom_hash_u32(&h, (uint32_t)std::stoul(fld["entry"]));
+      gshgeom_hash_u64(&h, hex(fld["gradient"]));
       gshgeom_hash_i32(&h, (int32_t)std::stol(fld["layer"]));
       gshgeom_hash_f64(&h, dbl(fld["depth"]));
     } else {

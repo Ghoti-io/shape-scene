@@ -104,6 +104,12 @@ struct GSHSCENE_Resource {
       GSHSCENE_Color * colors; /* count of them, copied */
       size_t count;
     } palette;
+    struct {
+      GSHSCENE_Gradient g;            /* canonical; stops points at the copy below */
+      GSHSCENE_Gradient_Stop * stops; /* sorted stably by offset, stop_count of them */
+      uint32_t palette_need;          /* the largest palette entry a stop names, plus one; 0 for none */
+      int foreground;                 /* a stop is a foreground paint */
+    } gradient;
   } u;
 };
 
@@ -217,6 +223,23 @@ void gshscene_resource_free_content(GSHSCENE_Resource * resource);
 /** Whether two paths are the same content, bit for bit. */
 int gshscene_path_equal(const GSHGEOM_Path * a, const GSHGEOM_Path * b);
 
+/* --- gradient.c ------------------------------------------------------------- */
+
+/** Whether a gradient resource has the canonical content @p source (a GSHSCENE_Gradient, stops sorted). */
+int gshscene_gradient_matches(const GSHSCENE_Resource * resource, const void * source);
+
+/** Free a gradient's stops. */
+void gshscene_gradient_free(GSHSCENE_Resource * resource);
+
+/** The payload of a gradient's dump (resource.h); the result of the writes, negative on failure. */
+int gshscene_gradient_dump(const GSHSCENE_Resource * resource, FILE * out);
+
+/* --- convert.c -------------------------------------------------------------- */
+
+/** N2, N3: a straight color from space @p from to space @p to, both concrete (not zero); exact when they are equal. */
+void gshscene_convert_straight(const GSHSCENE_Color_Space * from, const GSHSCENE_Color_Space * to, const double in[3],
+    double out[3]);
+
 /* --- list.c ---------------------------------------------------------------- */
 
 /** Make a list with limits already effective (no zero field). */
@@ -261,6 +284,13 @@ void gshscene_space_hash(GSHGEOM_Hash * h, const GSHSCENE_Color_Space * space);
 void gshscene_color_hash(GSHGEOM_Hash * h, const GSHSCENE_Color * color);
 /** A space as `P:T:G` in a dump (the gamma as 16 hexadecimal digits); the result of fprintf. */
 int gshscene_space_dump(FILE * out, const GSHSCENE_Color_Space * space);
+
+/** A paint by a fill's rules (list.h), for the list of @p store: a gradient must be a gradient resource of it. */
+GSHSCENE_Result gshscene_list_canonical_paint(const GSHSCENE_Store * store, const GSHSCENE_Paint * paint,
+    GSHSCENE_Paint * out);
+
+/** A map by an item's rules (list.h): valid, and only the entries a map of its dimension uses. */
+GSHSCENE_Result gshscene_list_canonical_map(const GSHGEOM_Map * map, GSHGEOM_Map * out);
 
 /** The same checks as a record call's, for a retained scene's nodes. */
 GSHSCENE_Result gshscene_list_canonical_group(const GSHSCENE_Group * group, GSHSCENE_Group * out);

@@ -78,7 +78,7 @@ enum {
   OP_SCENE_DESTROY, OP_OPEN_EDIT, OP_DESTROY_EDIT, OP_ADD, OP_SET, OP_REMOVE, OP_MOVE, OP_UPSERT, OP_REMOVE_KEY,
   OP_PUBLISH, OP_MERGE, OP_HOLD, OP_RELEASE_VERSION, OP_DIFF, OP_EMIT, OP_VISIT, OP_DUMP, OP_SCENE_INTERN,
   OP_FILL_EX, OP_CLIP_PUSH_EX, OP_GROUP_PUSH_EX, OP_LIST_FOREGROUND, OP_NODE_PROPS, OP_EDIT_FOREGROUND, OP_LIST_PALETTE,
-  OP_FILL_FIXED, OP_TRUNCATE, OP_EDIT_PALETTE, OP_COUNT
+  OP_FILL_FIXED, OP_TRUNCATE, OP_EDIT_PALETTE, OP_INTERN_GRADIENT, OP_FILL_GRADIENT, OP_COUNT
 };
 
 /* --- the outcomes the corpus must reach ------------------------------------------------------------ */
@@ -86,13 +86,15 @@ enum {
 enum {
   OUT_LIST_LIMIT = 0, OUT_INTERN_LIMIT, OUT_EDIT_LIMIT, OUT_PUBLISH_LIMIT, OUT_PUBLISH_REFUSED, OUT_PUBLISH_INVALID,
   OUT_PUBLISH_OK, OUT_MERGE_OK, OUT_EMIT_OK, OUT_DIFF_OK, OUT_INSTANCE_PICTURE, OUT_LIST_TIES, OUT_FOREGROUND_VERSION,
-  OUT_PARAMETER_REFUSED, OUT_EMIT_TIES, OUT_PALETTE_FILL, OUT_TRUNCATED, OUT_COUNT
+  OUT_PARAMETER_REFUSED, OUT_EMIT_TIES, OUT_PALETTE_FILL, OUT_TRUNCATED, OUT_GRADIENT_FILL, OUT_GRADIENT_DEGENERATE,
+  OUT_GRADIENT_REFUSED, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limit", "edit limit", "publish limit",
     "publish refused", "publish invalid", "publish ok", "merge ok", "emit ok", "diff ok", "instance of a picture",
     "a closed list with ties", "a version whose foreground changed", "a merge refused over the foreground",
-    "an emitted list with ties", "a palette fill recorded", "a list truncated"};
+    "an emitted list with ties", "a palette fill recorded", "a list truncated", "a gradient fill recorded",
+    "a degenerate gradient interned", "a gradient refused at intern"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -168,6 +170,7 @@ typedef struct S {
   GSHSCENE_Scene * scene;
   unsigned scene_generation;
   const GSHSCENE_Resource * sres[POOL];    /* in the scene's store */
+  const GSHSCENE_Resource * grads[4];      /* gradients, in the standalone store (color-paint story P1) */
   GSHSCENE_Edit * edits[EDITS];
   unsigned edit_generation[EDITS];
   const GSHSCENE_Version * versions[VERSIONS];
@@ -1304,6 +1307,157 @@ static void op(S * s, unsigned code) {
       CHECK(memcmp(&after, r == GSHSCENE_OK ? &c : &before, sizeof c) == 0);
       break;
     }
+    case OP_INTERN_GRADIENT: {
+      /* G1, G2: a gradient of every kind, extend and flag from bytes, valid or not; read back, hashed, dumped, resolved,
+       * and asked what it draws (G10).  Or, a quarter of the time, the float-free constructor on a run of the pool. */
+      unsigned slot = pick(s, 4);
+      GSHSCENE_Gradient_Stop stops[5];
+      memset(stops, 0, sizeof stops);
+      unsigned n = pick(s, 6);
+      for (unsigned i = 0; i < n && i < 5; i++) {
+        stops[i].offset = ((double)pick(s, 9) - 2.0) / 4.0; /* -0.5 to 1.5, repeats likely */
+        unsigned k = pick(s, 5);
+        stops[i].color.kind = k < 2 ? GSHSCENE_PAINT_SOLID : k == 2 ? GSHSCENE_PAINT_FOREGROUND
+                              : k == 3 ? GSHSCENE_PAINT_PALETTE : GSHSCENE_PAINT_GRADIENT;
+        stops[i].color.rgba[3] = (double)pick(s, 5) / 4.0;
+        if (stops[i].color.kind == GSHSCENE_PAINT_SOLID) {
+          stops[i].color.rgba[0] = (double)pick(s, 3) / 2.0;
+          stops[i].color.space = pool_space(arg(s));
+        } else if (stops[i].color.kind == GSHSCENE_PAINT_PALETTE) {
+          stops[i].color.entry = pick(s, 4);
+        }
+      }
+      const GSHSCENE_Resource * g = NULL;
+      if (pick(s, 4) == 0) {
+        GSHSCENE_Gradient_Fixed f;
+        memset(&f, 0, sizeof f);
+        f.kind = pick(s, 5);
+        f.extend = pick(s, 4);
+        f.bits = pick(s, 3);
+        for (int v = 0; v < 6; v++) {
+          f.v[v] = pick(s, 3) ? (int32_t)arg(s) - 128 : 0;
+        }
+        f.primaries = 1u + pick(s, 4);
+        f.transfer = 1u + pick(s, 3);
+        f.premultiplied = pick(s, 2);
+        GSHSCENE_Gradient_Stop_Fixed fs[3];
+        memset(fs, 0, sizeof fs);
+        f.stop_count = pick(s, 4);
+        for (size_t i = 0; i < f.stop_count; i++) {
+          fs[i].offset = (int32_t)pick(s, 5);
+          fs[i].bits = pick(s, 3);
+          fs[i].color.kind = 2u + pick(s, 2);
+          fs[i].color.alpha = (int32_t)pick(s, 3);
+          unsigned e = arg(s);
+          fs[i].color.entry = e == 255 ? 0xFFFFu : e % 4;
+        }
+        f.stops = fs;
+        r = gshscene_store_intern_gradient_fixed(s->store, s->res[pick(s, POOL)], &f, &g);
+      } else {
+        GSHSCENE_Gradient d;
+        memset(&d, 0, sizeof d);
+        d.kind = pick(s, 5);
+        double v[6];
+        for (int k = 0; k < 6; k++) {
+          unsigned b = arg(s);
+          v[k] = b == 255 ? (pick(s, 2) ? 1e308 * 10.0 : 0.0 / 0.0) : ((double)(b % 9) - 4.0);
+        }
+        int other = pick(s, 8) == 0; /* sometimes a field of another kind is set */
+        if (d.kind == GSHSCENE_GRADIENT_LINEAR || other) {
+          d.p0[0] = v[0], d.p0[1] = v[1], d.p1[0] = v[2], d.p1[1] = v[3], d.d[0] = v[4], d.d[1] = v[5];
+        }
+        if (d.kind == GSHSCENE_GRADIENT_RADIAL) {
+          d.c0[0] = v[0], d.c0[1] = v[1], d.r0 = v[2], d.c1[0] = v[3], d.c1[1] = v[4], d.r1 = v[5];
+        }
+        if (d.kind == GSHSCENE_GRADIENT_SWEEP) {
+          d.center[0] = v[0], d.center[1] = v[1], d.a0 = v[2] * 45.0, d.a1 = v[3] * 45.0;
+          d.angle_unit = pick(s, 5);
+        }
+        d.extend = pick(s, 4);
+        d.premultiplied = pick(s, 3) == 2 ? 2 : pick(s, 2);
+        d.space = pool_space(arg(s));
+        int use;
+        d.map = pool_map(arg(s), &use);
+        if (!use) {
+          gshgeom_map_identity(2, &d.map);
+        }
+        d.stop_count = n;
+        d.stops = stops;
+        r = gshscene_store_intern_gradient(s->store, &d, &g);
+      }
+      CHECK(r == GSHSCENE_OK || r == GSHSCENE_ERR_INVALID || r == GSHSCENE_ERR_UNSUPPORTED || r == GSHSCENE_ERR_LIMIT ||
+            r == GSHSCENE_ERR_OOM);
+      if (r != GSHSCENE_OK) {
+        CHECK(g == NULL);
+        outcomes[OUT_GRADIENT_REFUSED]++;
+        outcomes[OUT_INTERN_LIMIT] += r == GSHSCENE_ERR_LIMIT;
+        break;
+      }
+      GSHSCENE_Gradient back;
+      CHECK(gshscene_resource_kind(g) == GSHSCENE_RESOURCE_GRADIENT);
+      CHECK(gshscene_resource_gradient(g, &back) == GSHSCENE_OK);
+      for (size_t i = 1; i < back.stop_count; i++) {
+        CHECK(back.stops[i - 1].offset <= back.stops[i].offset);
+      }
+      CHECK(gshscene_resource_hash(g) == gshscene_resource_hash(g));
+      CHECK(gshscene_resource_dump(g, s->null) == GSHSCENE_OK);
+      /* The same content again is the same handle. */
+      const GSHSCENE_Resource * again = NULL;
+      if (gshscene_store_intern_gradient(s->store, &back, &again) == GSHSCENE_OK) {
+        CHECK(again == g);
+        gshscene_resource_release(again);
+      }
+      GSHSCENE_Color fg;
+      gshscene_color_init(&fg);
+      GSHSCENE_Color_Space target;
+      memset(&target, 0, sizeof target);
+      target.primaries = GCOL_PRIMARIES_SRGB;
+      target.transfer = GCOL_TRANSFER_SRGB;
+      GSHSCENE_Resolved_Stop out[5];
+      r = gshscene_gradient_resolve(g, &fg, s->list ? gshscene_list_palette(s->list) : NULL, &target, NULL, out, 5);
+      CHECK(r == GSHSCENE_OK || r == GSHSCENE_ERR_REFUSED);
+      for (size_t i = 0; r == GSHSCENE_OK && i < back.stop_count; i++) {
+        CHECK(out[i].offset == back.stops[i].offset);
+        CHECK(out[i].rgba[3] >= 0.0 && out[i].rgba[3] <= 1.0);
+      }
+      GSHSCENE_Item item;
+      memset(&item, 0, sizeof item);
+      item.kind = GSHSCENE_ITEM_FILL;
+      gshgeom_map_identity(2, &item.map);
+      item.paint.kind = GSHSCENE_PAINT_GRADIENT;
+      item.paint.gradient = g;
+      GSHSCENE_Reason why = gshscene_gradient_notice(&item, NULL, 0, NULL);
+      CHECK(why == 0 || why == GSHSCENE_REASON_GRADIENT_DEGENERATE || why == GSHSCENE_REASON_MAP_NOT_INVERTIBLE);
+      outcomes[OUT_GRADIENT_DEGENERATE] += why == GSHSCENE_REASON_GRADIENT_DEGENERATE;
+      gshscene_resource_release(s->grads[slot]);
+      s->grads[slot] = g;
+      break;
+    }
+    case OP_FILL_GRADIENT: {
+      /* A fill with a gradient paint (G1): one of the pool, sometimes none or a path, an alpha in range or not. */
+      if (!s->list) {
+        break;
+      }
+      ListSnap b = snap(s->list);
+      GSHSCENE_Paint paint;
+      memset(&paint, 0, sizeof paint);
+      paint.kind = GSHSCENE_PAINT_GRADIENT;
+      unsigned k = pick(s, 6);
+      paint.gradient = k < 4 ? s->grads[k] : k == 4 ? s->res[0] : NULL;
+      paint.rgba[3] = (double)pick(s, 6) / 4.0; /* up to 1.25: invalid above 1 */
+      int use;
+      GSHGEOM_Map m = pool_map(arg(s), &use);
+      r = gshscene_list_fill(s->list, s->res[pick(s, POOL)], use ? &m : NULL, GSHGEOM_FILL_NONZERO, &paint, 0, 0);
+      list_after(s, b, r, 0, 0);
+      if (r == GSHSCENE_OK) {
+        const GSHSCENE_Item * item;
+        CHECK(gshscene_list_item(s->list, b.count, &item) == GSHSCENE_OK);
+        CHECK(item->paint.kind == GSHSCENE_PAINT_GRADIENT && item->paint.gradient == paint.gradient);
+        CHECK(gshscene_resource_kind(item->paint.gradient) == GSHSCENE_RESOURCE_GRADIENT);
+        outcomes[OUT_GRADIENT_FILL]++;
+      }
+      break;
+    }
     default:
       break;
   }
@@ -1381,6 +1535,9 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
     gshscene_resource_release(s->res[i]);
     gshscene_resource_release(s->pictures[i]);
     gshscene_resource_release(s->sres[i]);
+  }
+  for (int i = 0; i < 4; i++) {
+    gshscene_resource_release(s->grads[i]);
   }
   gshscene_scene_destroy(s->scene);
   GSHSCENE_Store_Stats stats;

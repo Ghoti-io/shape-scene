@@ -23,6 +23,9 @@
 #   check-composite    (story 12) the exact rational reference of the compositing
 #                      definition passes its own selftest, and tests/composite_vectors.h
 #                      is what tools/gen-composite-vectors.py writes from it
+#   check-gradient     (color-paint story P1) the gradient oracle passes its own
+#                      selftest, and tests/gradient_vectors.h is what
+#                      tools/gen-gradient-vectors.py writes from it
 #   check-corpus-hash  the cross-target probe prints the hash committed in
 #                      tests/corpus/scene.hash (xarch/shape.sh and xwin/shape.sh
 #                      check the other targets)
@@ -58,9 +61,11 @@ PROJECT := shape-scene
 # counts the store's reference counting needs, on every target (it is the
 # suite's one cross-platform layer); color supplies the types of a color
 # description and the gamut names (story 12); image supplies the raster of a
-# target and of a readback, which the test sink stamps (story 13a);
-# EDGES_ALLOWED below stays the end-of-milestone policy.
-DEPS := cutil color image shape-geometry
+# target and of a readback, which the test sink stamps (story 13a); math
+# supplies gmath_pow for the one conversion the scene evaluates, a gradient's
+# stops at draw time (color-paint story P1, G3); EDGES_ALLOWED below stays the
+# end-of-milestone policy.
+DEPS := cutil color math image shape-geometry
 
 # The libraries whose headers this one may include and whose shared objects it
 # may link (check-edges), as a regular expression alternation. Itself is always
@@ -291,7 +296,7 @@ TESTFLAGS := `PKG_CONFIG_PATH=$(PKG_CONFIG_LOOKUP_PATH) pkg-config --libs --cfla
 # check-symbols is right to reject in a shipping library.
 PLANT_JOBS ?= 4
 
-TEST_GATES ?= check-symbols check-aliasing check-stamps check-fp-contract check-edges check-libm check-no-x87 check-gates check-float-free check-vectors check-sink-vectors check-composite check-corpus-hash check-publish-types check-fuzz-corpus fuzz-replay run-examples
+TEST_GATES ?= check-symbols check-aliasing check-stamps check-fp-contract check-edges check-libm check-no-x87 check-gates check-float-free check-vectors check-sink-vectors check-composite check-gradient check-corpus-hash check-publish-types check-fuzz-corpus fuzz-replay run-examples
 
 VALGRIND_FLAGS := --leak-check=full --show-leak-kinds=definite,indirect,possible --track-origins=yes --error-exitcode=1 --suppressions=tests/valgrind.supp
 
@@ -410,7 +415,7 @@ $(APP_DIR)/examples/%$(EXE_EXTENSION): examples/%.c $(APP_DIR)/$(STATIC_TARGET) 
 .PHONY: clean cloc docs docs-pdf examples coverage check-symbols check-stamps check-aliasing
 .PHONY: run-examples
 .PHONY: check-fp-contract check-edges check-libm check-no-x87 check-gates libver-gen
-.PHONY: check-vectors check-sink-vectors check-composite check-corpus-hash check-planted check-publish-types check-fuzz-corpus fuzz-replay
+.PHONY: check-vectors check-sink-vectors check-composite check-gradient check-corpus-hash check-planted check-publish-types check-fuzz-corpus fuzz-replay
 .PHONY: all install test test-quiet test-asan test-valgrind test-valgrind-quiet test-watch uninstall watch
 .PHONY: all-debug install-debug test-debug test-valgrind-debug test-watch-debug uninstall-debug watch-debug
 .PHONY: fuzz fuzz-clean
@@ -522,6 +527,10 @@ check-sink-vectors: ## Fail if tests/sink_answers.h is not what the independent 
 check-composite: ## Fail if the exact reference does not agree with itself, or tests/composite_vectors.h is not what it writes
 	@python3 tools/composite-oracle.py --selftest
 	@python3 tools/gen-composite-vectors.py --check
+
+check-gradient: ## Fail if the gradient oracle does not agree with itself, or tests/gradient_vectors.h is not what it writes
+	@python3 tools/gradient-oracle.py --selftest
+	@python3 tools/gen-gradient-vectors.py --check
 
 # Only the application publishes (AD-9, CAP-11): what an edit can reach has no publish, and an edit cannot stand where
 # the scene goes.  The probes in tests/types are compiled, never linked: the control must compile, the violations must not.
@@ -819,13 +828,16 @@ PKGCONFIG_INSTALL_PATH ?= $(PC_INSTALL_PATH)
 # What a sink library's tests take from this one (story 13b): the conformance
 # suite every sink passes unchanged, the allocator it counts with, and the
 # oracle's composite vectors a compositing sink is gated against, and (story
-# 14a) the test glyph provider every sink's glyph tests and probes use. Installed as
+# 14a) the test glyph provider every sink's glyph tests and probes use, and
+# (color-paint story P1) the gradient oracle's known answers a gradient sink is
+# gated against (shape-cpu, story P2). Installed as
 # <ghoti.io/shape-scene/testing/...>, so a sink finds them the way it finds
 # everything else of this library, through pkg-config, and runs the very text
 # this library's own tests run. They are C++ (GoogleTest), but for the glyph
 # provider, which is C so that a probe can use it, and only a test or a probe
 # includes them.
-TESTING_HEADERS := tests/sink_conformance.h tests/alloc_tracker.h tests/composite_vectors.h tests/glyph_test_provider.h
+TESTING_HEADERS := tests/sink_conformance.h tests/alloc_tracker.h tests/composite_vectors.h tests/glyph_test_provider.h \
+	tests/gradient_vectors.h
 
 install: all ## Install the library
 	@mkdir -p $(LIB_INSTALL_PATH)/$(SUITE)

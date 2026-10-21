@@ -36,12 +36,13 @@ TEST(Report, EveryClassAndReasonHasItsOwnString) {
   EXPECT_STREQ(gshscene_entry_class_string(GSHSCENE_ENTRY_APPROXIMATED), "approximated");
   EXPECT_STREQ(gshscene_entry_class_string(GSHSCENE_ENTRY_RESOLVED_AMBIGUITY), "resolved-ambiguity");
   EXPECT_STREQ(gshscene_entry_class_string(GSHSCENE_ENTRY_HINT_STATUS), "hint-status");
+  EXPECT_STREQ(gshscene_entry_class_string(GSHSCENE_ENTRY_NOTICE), "notice");
   EXPECT_STREQ(gshscene_entry_class_string((GSHSCENE_Entry_Class)0), "unknown class");
   EXPECT_STREQ(gshscene_entry_class_string(GSHSCENE_ENTRY_CLASS_COUNT), "unknown class");
   const char * names[] = {"item-kind", "composite", "glyph-source", "blend-space", "clip-aliased", "resource-limit",
       "seamless", "caller-memory", "tie-layer", "tie-path", "tie-declared", "hint-route", "hint-size",
       "hint-no-program", "hint-program-failed", "hint-with-errors", "hint-strict-route", "glyph-unavailable",
-      "face-unbound", "palette-entry"};
+      "face-unbound", "palette-entry", "gradient", "interpolation-space", "map-not-invertible", "gradient-degenerate"};
   ASSERT_EQ(sizeof names / sizeof names[0], (size_t)GSHSCENE_REASON_COUNT - 1);
   for (int r = GSHSCENE_REASON_ITEM_KIND; r < GSHSCENE_REASON_COUNT; r++) {
     EXPECT_STREQ(gshscene_reason_string((GSHSCENE_Reason)r), names[r - 1]) << r;
@@ -55,7 +56,8 @@ TEST(Report, ThePinnedValuesArePinned) {
   EXPECT_EQ((int)GSHSCENE_ENTRY_APPROXIMATED, 2);
   EXPECT_EQ((int)GSHSCENE_ENTRY_RESOLVED_AMBIGUITY, 3);
   EXPECT_EQ((int)GSHSCENE_ENTRY_HINT_STATUS, 4);
-  EXPECT_EQ((int)GSHSCENE_ENTRY_CLASS_COUNT, 5);
+  EXPECT_EQ((int)GSHSCENE_ENTRY_NOTICE, 5);
+  EXPECT_EQ((int)GSHSCENE_ENTRY_CLASS_COUNT, 6);
   EXPECT_EQ((int)GSHSCENE_REASON_ITEM_KIND, 1);
   EXPECT_EQ((int)GSHSCENE_REASON_COMPOSITE, 2);
   EXPECT_EQ((int)GSHSCENE_REASON_GLYPH_SOURCE, 3);
@@ -70,7 +72,11 @@ TEST(Report, ThePinnedValuesArePinned) {
   EXPECT_EQ((int)GSHSCENE_REASON_HINT_ROUTE, 12);
   EXPECT_EQ((int)GSHSCENE_REASON_FACE_UNBOUND, 19);
   EXPECT_EQ((int)GSHSCENE_REASON_PALETTE_ENTRY, 20);
-  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 21);
+  EXPECT_EQ((int)GSHSCENE_REASON_GRADIENT, 21);
+  EXPECT_EQ((int)GSHSCENE_REASON_INTERPOLATION_SPACE, 22);
+  EXPECT_EQ((int)GSHSCENE_REASON_MAP_NOT_INVERTIBLE, 23);
+  EXPECT_EQ((int)GSHSCENE_REASON_GRADIENT_DEGENERATE, 24);
+  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 25);
 }
 
 TEST(Report, CreateDestroyAndTheEmptyReport) {

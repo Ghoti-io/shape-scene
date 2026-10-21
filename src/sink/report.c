@@ -41,7 +41,7 @@
 #define REPORT_TAG UINT32_C(0x54525052)
 
 /** The report's format, in its hash and its dump. */
-#define REPORT_FORMAT 1u
+#define REPORT_FORMAT 2u
 
 const char * gshscene_entry_class_string(GSHSCENE_Entry_Class entry_class) {
   switch (entry_class) {
@@ -53,6 +53,8 @@ const char * gshscene_entry_class_string(GSHSCENE_Entry_Class entry_class) {
       return "resolved-ambiguity";
     case GSHSCENE_ENTRY_HINT_STATUS:
       return "hint-status";
+    case GSHSCENE_ENTRY_NOTICE:
+      return "notice";
     case GSHSCENE_ENTRY_CLASS_COUNT:
       break;
   }
@@ -101,6 +103,14 @@ const char * gshscene_reason_string(GSHSCENE_Reason reason) {
       return "face-unbound";
     case GSHSCENE_REASON_PALETTE_ENTRY:
       return "palette-entry";
+    case GSHSCENE_REASON_GRADIENT:
+      return "gradient";
+    case GSHSCENE_REASON_INTERPOLATION_SPACE:
+      return "interpolation-space";
+    case GSHSCENE_REASON_MAP_NOT_INVERTIBLE:
+      return "map-not-invertible";
+    case GSHSCENE_REASON_GRADIENT_DEGENERATE:
+      return "gradient-degenerate";
     case GSHSCENE_REASON_COUNT:
       break;
   }

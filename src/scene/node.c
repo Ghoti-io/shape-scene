@@ -248,7 +248,7 @@ GSHSCENE_Result gshscene_node_canonical(const GSHSCENE_Store * store, const GSHS
         result = gshscene_list_check_rule(in->fill_rule);
       }
       if (result == GSHSCENE_OK) {
-        result = gshscene_list_canonical_paint(&in->paint, &node.paint);
+        result = gshscene_list_canonical_paint(store, &in->paint, &node.paint);
       }
       if (result != GSHSCENE_OK) {
         return result;
@@ -332,11 +332,13 @@ int gshscene_node_equal(const GSHSCENE_Node_Rec * a, const GSHSCENE_Node_Rec * b
 static void props_retain(const GSHSCENE_Node * p) {
   gshscene_resource_retain(p->clip);
   gshscene_resource_retain(p->resource);
+  gshscene_resource_retain(p->paint.gradient);
 }
 
 static void props_release(const GSHSCENE_Node * p) {
   gshscene_resource_release(p->clip);
   gshscene_resource_release(p->resource);
+  gshscene_resource_release(p->paint.gradient);
 }
 
 GSHSCENE_Node_Rec * gshscene_node_new(
@@ -486,6 +488,7 @@ void gshscene_node_hash(GSHGEOM_Hash * h, const GSHSCENE_Node_Rec * node) {
       }
       gshscene_space_hash(h, &p->paint.space);
       gshgeom_hash_u32(h, p->paint.entry);
+      gshgeom_hash_u64(h, p->paint.gradient ? gshscene_resource_hash(p->paint.gradient) : 0);
       gshgeom_hash_i32(h, p->layer);
       gshgeom_hash_f64(h, p->depth);
       break;

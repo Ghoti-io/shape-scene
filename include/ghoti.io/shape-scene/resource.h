@@ -28,9 +28,10 @@
  *
  * A **resource** is a path, a glyph run, a picture (a closed list, frozen),
  * a face (glyph_provider.h: a font's face and variation instance, which a run
- * from a font names) or a palette (a table of colors, which a palette paint's
- * entry indexes; paint.h, N14); two further kinds, a gradient and an image, are
- * named and reserved.  A
+ * from a font names), a palette (a table of colors, which a palette paint's
+ * entry indexes; paint.h, N14) or a gradient (a color line over a geometry,
+ * which a gradient paint names; paint.h, G1 to G13); one further kind, an
+ * image, is named and reserved.  A
  * **store** interns resources: asking it for content it already holds, while a
  * handle to that content is held, returns that handle, so equality of content
  * is equality of pointers within one store.  The store decides by the index
@@ -59,9 +60,9 @@
  * the id, nor the pointer, nor the allocator, nor the limits, nor a face's
  * binding are part of it.  Each stream starts with `u32` the format of its
  * kind and `u32` the resource's kind (::GSHSCENE_Resource_Kind, pinned).  The
- * format is per kind: a path's, a picture's, a face's and a palette's are 1; a
- * glyph run's is 2 (story 14a: the run names a face where format 1 named a
- * key).  It goes on:
+ * format is per kind: a path's, a picture's, a face's, a palette's and a
+ * gradient's are 1; a glyph run's is 2 (story 14a: the run names a face where
+ * format 1 named a key).  It goes on:
  *
  * - **path** (1): `u64` the path's own hash (`gshgeom_path_hash`).
  * - **glyph run** (2): `u32` the source, `u64` the content hash of the face
@@ -75,6 +76,13 @@
  * - **palette** (1): `u64` the entry count, then per entry four `f64` (straight
  *   `r, g, b, a`) and its space (`u8` primaries, `u8` transfer, `f64` gamma, as
  *   list.h spells a space).
+ * - **gradient** (1): `u8` kind, `u8` extend, the interpolation space, `u8`
+ *   premultiplied, `u64` the map's hash (`gshgeom_map_hash`); the geometry
+ *   (linear: six `f64`, `p0`, `p1`, `d`; radial: six `f64`, `c0`, `r0`, `c1`,
+ *   `r1`; sweep: two `f64` the center, `u8` the unit, two `f64` `a0`, `a1`);
+ *   `u64` the stop count; then per stop, in sorted order, `f64` offset and its
+ *   paint as list.h spells a fill's (`u8` kind, four `f64`, a space, `u32`
+ *   entry).  The stops are hashed as given: nothing converted is.
  *
  * The hash is of the content, not of the reference to it: a glyph run hashes
  * its face's and its outlines' content hashes, so two stores that were given
@@ -92,7 +100,11 @@
  * coordinate in signed decimal, and a line `bound=B upem=N flags=N` (B 0 for an
  * unbound face, whose upem and flags are 0); a palette is a line `palette
  * entries=N` and a line `p <r> <g> <b> <a> <space>` per entry, a space spelled
- * `P:T:<gamma hex>` as in list.h.
+ * `P:T:<gamma hex>` as in list.h; a gradient is a line `gradient kind=K
+ * extend=E space=<space> premul=N map=<hash> stops=N`, a line of its geometry
+ * (`linear p0=<x> <y> p1=<x> <y> d=<x> <y>`, `radial c0=<x> <y> r0=<r> c1=<x> <y>
+ * r1=<r>` or `sweep c=<x> <y> unit=U a0=<a> a1=<a>`) and a line `s <offset>
+ * paint=K <r> <g> <b> <a> space=<space> entry=E` per stop.
  */
 
 #ifndef GHOTI_IO_GSHSCENE_RESOURCE_H
@@ -120,7 +132,7 @@ typedef enum GSHSCENE_Resource_Kind {
   GSHSCENE_RESOURCE_PATH = 1,      ///< A model path.
   GSHSCENE_RESOURCE_GLYPH_RUN = 2, ///< Glyphs, by font and id or as outlines.
   GSHSCENE_RESOURCE_PICTURE = 3,   ///< A closed list, frozen: what an instance draws.
-  GSHSCENE_RESOURCE_GRADIENT = 4,  ///< Reserved for story 12: no constructor yet.
+  GSHSCENE_RESOURCE_GRADIENT = 4,  ///< A gradient: a color line over a geometry, which a gradient paint names (paint.h, G1).
   GSHSCENE_RESOURCE_IMAGE = 5,     ///< Reserved for the raster stories: no constructor yet.
   GSHSCENE_RESOURCE_FACE = 6,      ///< A font's face and variation instance, bound to a glyph path provider (glyph_provider.h).
   GSHSCENE_RESOURCE_PALETTE = 7,   ///< A table of colors, which a palette paint's entry indexes (paint.h, N14).
@@ -185,8 +197,8 @@ typedef struct GSHSCENE_Glyph_Run {
  * for each element (the most a path element, a rational cubic in 3D, can take),
  * for a glyph run the per-glyph figure for each glyph, and for a picture the
  * per-item figure for each item of its list, for a face the per-axis
- * figure for each coordinate, and for a palette the per-color figure for each
- * entry.  What a resource holds by handle (a run's face,
+ * figure for each coordinate, for a palette the per-color figure for each
+ * entry, and for a gradient the per-stop figure for each stop.  What a resource holds by handle (a run's face,
  * a glyph's outline, an instanced picture) is a resource of its own and is
  * counted there.  An intern that would pass the limit is
  * ::GSHSCENE_ERR_LIMIT and builds and keeps nothing; a hit costs nothing; the
@@ -199,6 +211,7 @@ typedef struct GSHSCENE_Glyph_Run {
 #define GSHSCENE_BYTES_PER_ITEM ((size_t)256)    ///< Added for each item of a picture's list.
 #define GSHSCENE_BYTES_PER_AXIS ((size_t)8)      ///< Added for each variation coordinate of a face.
 #define GSHSCENE_BYTES_PER_COLOR ((size_t)48)    ///< Added for each entry of a palette.
+#define GSHSCENE_BYTES_PER_STOP ((size_t)96)     ///< Added for each stop of a gradient.
 /** @} */
 
 /** @brief Counters of a store, for tests and diagnostics. */
@@ -365,6 +378,32 @@ GSHSCENE_API size_t gshscene_resource_palette_count(const GSHSCENE_Resource * re
  */
 GSHSCENE_API GSHSCENE_Result gshscene_resource_palette_color(
     const GSHSCENE_Resource * resource, size_t index, GSHSCENE_Color * out);
+
+/**
+ * @brief Intern a gradient (paint.h, G1 to G3): its content is copied and its stops sorted stably by offset.
+ *
+ * Nothing is converted (G3): the stops are kept as given, and ::gshscene_gradient_resolve converts them at draw
+ * time.  A degenerate gradient (G10) is legal.
+ *
+ * @param gradient The content.  Each stop's color is checked as a fill's paint is (list.h), and must not be a
+ *   gradient; a solid stop in the target's (zero) space needs a gradient whose `space` is zero.
+ * @param out The handle, with a reference for the caller; written only on success.
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, a kind, extend, unit or flag outside its range, a non-finite
+ *   double, a nonzero field of another kind, an invalid or 3D map, an invalid stop); ::GSHSCENE_ERR_UNSUPPORTED (a
+ *   reserved space); ::GSHSCENE_ERR_LIMIT (more stops than `max_resource_elements`, the store's other limits);
+ *   ::GSHSCENE_ERR_OOM.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_store_intern_gradient(GSHSCENE_Store * store, const GSHSCENE_Gradient * gradient,
+    const GSHSCENE_Resource ** out);
+
+/**
+ * @brief Read a gradient resource back.
+ *
+ * @param out The content as stored (G2: the stops sorted); `stops` points into the resource and is valid while a
+ *   handle is held.  Written only on success.
+ * @return ::GSHSCENE_OK or ::GSHSCENE_ERR_INVALID (NULL, not a gradient).
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_resource_gradient(const GSHSCENE_Resource * resource, GSHSCENE_Gradient * out);
 
 /**
  * @brief Take another reference.

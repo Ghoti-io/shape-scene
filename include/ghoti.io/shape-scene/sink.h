@@ -27,7 +27,7 @@
  * every backend the family will have: the CPU reference (shape-cpu), GPU sinks
  * (Vulkan, WebGPU, WebGL), and writers whose target is a document (SVG and PDF
  * export, a plotter's or a machine's program).  The rules are numbered S1 to
- * S16; tests, plants and the conformance suite cite them, and
+ * S17; tests, plants and the conformance suite cite them, and
  * documentation/design.md has the same text.
  *
  * ### The rules (normative)
@@ -85,14 +85,15 @@
  * refusal and approximation that is a property of the list and the caps
  * (::gshscene_caps_disposition is the one predicate, and a sink decides each item
  * with it too), the entry of each run from a font's route (::gshscene_glyph_route:
- * a run-level `HINT_STATUS`, or a refusal, D6), and every depth tie of the list as
+ * a run-level `HINT_STATUS`, or a refusal, D6), the `NOTICE` of each gradient
+ * fill that draws nothing (S17), and every depth tie of the list as
  * `RESOLVED_AMBIGUITY`.  A
  * refused push or instance skips its whole block.  Best effort returns
  * ::GSHSCENE_OK.  With ::GSHSCENE_RENDER_STRICT a planned refusal is
  * ::GSHSCENE_ERR_REFUSED before the sink is called, so the target is untouched; a
  * refusal that arises while drawing (one of the sink's own resource limits) stops
  * the render at that unit with the finished prefix in the target, and is
- * ::GSHSCENE_ERR_REFUSED too.  `APPROXIMATED` never fails a render.
+ * ::GSHSCENE_ERR_REFUSED too.  `APPROXIMATED` and `NOTICE` never fail a render.
  *
  * **S7 Cancel.**  The token (cancel.h) is the caller's and is set from any
  * thread.  **The unit and the bound are the sink's, declared in its caps**:
@@ -163,6 +164,23 @@
  * a writer dedupes by and a cache is keyed by.  The planning pass composes maps to
  * decide (a run from a font's route, glyph.h), and never hands composed geometry
  * to a sink.
+ *
+ * **S17 Gradients (paint.h, G1 to G13).**  A gradient reaches a sink by handle,
+ * as every resource does, and a sink reads it with `gshscene_resource_gradient`.
+ * The caps' `gradient_kinds` name the kinds it draws; a fill of another kind is
+ * refused by the planning pass (`GRADIENT`), so a sink that has none, such as
+ * one written before gradients, never draws one wrong: under strict the render
+ * fails before the sink is called.  Without ::GSHSCENE_CAP_GRADIENT_SPACES a
+ * stated interpolation space other than the target's is approximated
+ * (`INTERPOLATION_SPACE`).  A gradient with a palette stop the palette in force
+ * lacks is refused (`PALETTE_ENTRY`).  The planning pass writes a `NOTICE`
+ * (`MAP_NOT_INVERTIBLE` before `GRADIENT_DEGENERATE`, one entry a fill) for each
+ * gradient fill ::gshscene_gradient_notice says draws nothing, and a sink skips
+ * that fill's effect by the same predicate.  A sink converts the stops with
+ * `gshscene_gradient_resolve`, against the request's list's foreground and
+ * palette and the target's resolved space, **once per gradient per render** (by
+ * resource id), and bakes what it needs from them itself; a writer emits a
+ * gradient once per id and refers to it after.
  *
  * ### For sink implementations
  *
@@ -288,7 +306,8 @@ typedef struct GSHSCENE_Target {
 #define GSHSCENE_CAP_CLIP_AA (UINT32_C(1) << 5)          ///< Clips are antialiased (else each is approximated, AD-12).
 #define GSHSCENE_CAP_BLEND_SPACES (UINT32_C(1) << 6)     ///< Groups blend in their stated space (else approximated, AD-23).
 #define GSHSCENE_CAP_PREPARE (UINT32_C(1) << 7)          ///< `prepare` holds resources across frames (S9).
-#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 8) - 1)  ///< Every flag defined.
+#define GSHSCENE_CAP_GRADIENT_SPACES (UINT32_C(1) << 8)  ///< Gradients interpolate in their stated space (else approximated, S17).
+#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 9) - 1)  ///< Every flag defined.
 /** @} */
 
 /** @brief Where a sink checks its cancel token (S7).  The values are pinned. */
@@ -307,7 +326,9 @@ typedef struct GSHSCENE_Sink_Caps {
   /** The most work between two cancel checks, in @p work_measure; `UINT64_MAX` when the sink states none (before-submit). */
   uint64_t cancel_work_bound;
   const char * work_measure;  ///< A static string naming the measure ("units", "cells+points+pixels"); not NULL.
-  uint8_t _reserved[16];      ///< Zero.
+  /** Bit `1 << kind` for each ::GSHSCENE_Gradient_Kind drawn (S17); 0, a sink that draws no gradient. */
+  uint32_t gradient_kinds;
+  uint8_t _reserved[12];      ///< Zero.
 } GSHSCENE_Sink_Caps;
 
 /* --- the request (S1) and the job (S3) -------------------------------------------- */
@@ -621,14 +642,36 @@ typedef struct GSHSCENE_Disposition {
  *   space is @p target_space, under the palette @p palette (the request's list's, or NULL for none; N14).
  *
  * In this order: a kind the caps do not draw is refused (`ITEM_KIND`); a fill or clip of a glyph run from a font
- * without `GLYPHS_FROM_FONT` is refused (`GLYPH_SOURCE`); a fill whose palette paint names an entry @p palette does
- * not have (::gshscene_paint_resolve) is refused (`PALETTE_ENTRY`); a group whose operator the caps do not composite is refused
- * (`COMPOSITE`); a clip push without `CLIP_AA` is approximated (`CLIP_ALIASED`); a group whose own blend space is
- * stated and differs from @p target_space, without `BLEND_SPACES`, is approximated (`BLEND_SPACE`).  A pop is drawn
- * as its push was decided (the walk tells).  Anything else is drawn.
+ * without `GLYPHS_FROM_FONT` is refused (`GLYPH_SOURCE`); a gradient fill of a kind not in `gradient_kinds` is refused
+ * (`GRADIENT`); a fill whose palette paint, or a stop of whose gradient, names an entry @p palette does not have
+ * (::gshscene_paint_resolve, G3) is refused (`PALETTE_ENTRY`); a group whose operator the caps do not composite is
+ * refused (`COMPOSITE`); a clip push without `CLIP_AA` is approximated (`CLIP_ALIASED`); a group whose own blend space
+ * is stated and differs from @p target_space, without `BLEND_SPACES`, is approximated (`BLEND_SPACE`); a gradient
+ * fill whose interpolation space is stated and differs from @p target_space, without `GRADIENT_SPACES`, is
+ * approximated (`INTERPOLATION_SPACE`).  A pop is drawn as its push was decided (the walk tells).  Anything else is
+ * drawn.
  */
 GSHSCENE_API GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps,
     const GSHSCENE_Item * item, const GSHSCENE_Color_Space * target_space, const GSHSCENE_Resource * palette);
+
+/**
+ * @brief Whether a gradient fill draws nothing (S17; paint.h, G10 and G11), and why.
+ *
+ * The one predicate of the planning pass's `NOTICE` and of every sink's skip.  G11 first: some map of the chain
+ * (@p target_map, @p instance_maps root to leaf, the item's map, the gradient's map) has a 2x2 linear part whose
+ * determinant is exactly zero (`gshgeom_orient2d`'s exact sign of the two columns); then G10: the gradient is
+ * degenerate (linear with an exactly zero denominator, `gshgeom_orient3d`'s exact sign; radial with equal circles;
+ * two or more stops at one offset under repeat or reflect; sweep with equal angles under repeat or reflect).
+ *
+ * @param item A fill; anything else, or a fill whose paint is not a gradient, draws as stated (0).
+ * @param instance_maps The maps of the enclosing instances, root to leaf; may be NULL when @p instance_count is 0.
+ * @param instance_count How many.
+ * @param target_map The target's map, or NULL for the identity.
+ * @return 0 when the fill draws as G6 to G9 say; ::GSHSCENE_REASON_MAP_NOT_INVERTIBLE; or
+ *   ::GSHSCENE_REASON_GRADIENT_DEGENERATE.
+ */
+GSHSCENE_API GSHSCENE_Reason gshscene_gradient_notice(const GSHSCENE_Item * item, const GSHGEOM_Map * instance_maps,
+    size_t instance_count, const GSHGEOM_Map * target_map);
 
 /**
  * @brief A walk over a closed list's expansion in paint order (S16): every item, an instance followed by its

@@ -393,7 +393,7 @@ TEST(ListRecord, EveryInvalidArgumentIsRefusedAndTheListIsAsItWas) {
     EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &p), INV) << "alpha below 0";
     p = ok_paint;
     p.kind = GSHSCENE_PAINT_GRADIENT;
-    EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &p), UNS) << "a gradient is reserved";
+    EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &p), INV) << "a gradient paint names a gradient resource";
     p.kind = GSHSCENE_PAINT_FOREGROUND;
     EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &p), INV) << "a foreground paint's color is the version's: only its alpha is its own";
     p.kind = GSHSCENE_PAINT_PALETTE;

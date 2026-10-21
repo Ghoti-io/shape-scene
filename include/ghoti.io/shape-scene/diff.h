@@ -42,8 +42,9 @@
  *   damages every occurrence of its whole subtree; a changed key or a changed
  *   parent alone damages nothing by itself;
  * - a changed foreground damages every occurrence of every shape that paints with
- *   it (N10), and nothing else; a changed palette, every occurrence of every shape
- *   that paints from it (N14), and nothing else;
+ *   it (N10, and a gradient shape with a foreground stop, G3), and nothing else; a
+ *   changed palette, every occurrence of every shape that paints from it (N14, and a
+ *   gradient shape with a palette stop), and nothing else;
  * - an occurrence of a group whose composite operator is unbounded (N4: it changes
  *   the backdrop where it has no content) that lies in a damaged subtree makes the
  *   damage unbounded;

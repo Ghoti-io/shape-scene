@@ -38,7 +38,7 @@
 #include <string.h>
 
 /** The format of a list's hash and dump. */
-#define LIST_FORMAT_VERSION 3u
+#define LIST_FORMAT_VERSION 4u
 
 /** The kind field of a list's hash: "LIST" in little-endian ASCII. */
 #define LIST_HASH_KIND UINT32_C(0x5453494c)
@@ -260,6 +260,7 @@ static GSHSCENE_Item * item_at(const GSHSCENE_List * list, size_t index) {
 static void items_release(GSHSCENE_List * list) {
   for (size_t i = 0; i < list->count; i++) {
     gshscene_resource_release(item_at(list, i)->resource);
+    gshscene_resource_release(item_at(list, i)->paint.gradient);
   }
 }
 
@@ -321,6 +322,7 @@ static GSHSCENE_Result list_append(GSHSCENE_List * list, const GSHSCENE_Item * i
   }
   *item_at(list, list->count) = *item;
   gshscene_resource_retain(item->resource);
+  gshscene_resource_retain(item->paint.gradient);
   note_item(list, item);
   list->count++;
   list->expansion = total;
@@ -372,19 +374,21 @@ static GSHSCENE_Result check_rule(GSHGEOM_Fill_Rule rule) {
   return (unsigned)rule < (unsigned)GSHGEOM_FILL_RULE_COUNT ? GSHSCENE_OK : GSHSCENE_ERR_INVALID;
 }
 
-static GSHSCENE_Result canonical_paint(const GSHSCENE_Paint * paint, GSHSCENE_Paint * out) {
+static GSHSCENE_Result canonical_paint(const GSHSCENE_Store * store, const GSHSCENE_Paint * paint, GSHSCENE_Paint * out) {
   memset(out, 0, sizeof *out);
   out->kind = GSHSCENE_PAINT_SOLID;
   out->rgba[3] = 1.0;
   if (!paint) {
     return GSHSCENE_OK;
   }
-  if (paint->kind == GSHSCENE_PAINT_GRADIENT) {
-    return GSHSCENE_ERR_UNSUPPORTED;
+  if (paint->kind != GSHSCENE_PAINT_SOLID && paint->kind != GSHSCENE_PAINT_FOREGROUND &&
+      paint->kind != GSHSCENE_PAINT_PALETTE && paint->kind != GSHSCENE_PAINT_GRADIENT) {
+    return GSHSCENE_ERR_INVALID;
   }
-  if ((paint->kind != GSHSCENE_PAINT_SOLID && paint->kind != GSHSCENE_PAINT_FOREGROUND &&
-          paint->kind != GSHSCENE_PAINT_PALETTE) ||
-      paint->gradient) {
+  /* One spelling: only a gradient paint names a resource, a gradient of the list's store (G1). */
+  if (paint->kind == GSHSCENE_PAINT_GRADIENT
+          ? (!paint->gradient || paint->gradient->store != store || paint->gradient->kind != GSHSCENE_RESOURCE_GRADIENT)
+          : paint->gradient != NULL) {
     return GSHSCENE_ERR_INVALID;
   }
   /* One spelling: only a palette paint has an entry, and 0xFFFF (a font's foreground) is never one (N14). */
@@ -409,6 +413,7 @@ static GSHSCENE_Result canonical_paint(const GSHSCENE_Paint * paint, GSHSCENE_Pa
     out->kind = paint->kind;
     out->rgba[3] = paint->rgba[3];
     out->entry = paint->entry;
+    out->gradient = paint->gradient;
     return GSHSCENE_OK;
   }
   GSHSCENE_Result result = gshscene_color_space_check(&paint->space);
@@ -460,8 +465,9 @@ GSHSCENE_Result gshscene_list_canonical_map(const GSHGEOM_Map * map, GSHGEOM_Map
   return canonical_map(map, out);
 }
 
-GSHSCENE_Result gshscene_list_canonical_paint(const GSHSCENE_Paint * paint, GSHSCENE_Paint * out) {
-  return canonical_paint(paint, out);
+GSHSCENE_Result gshscene_list_canonical_paint(const GSHSCENE_Store * store, const GSHSCENE_Paint * paint,
+    GSHSCENE_Paint * out) {
+  return canonical_paint(store, paint, out);
 }
 
 GSHSCENE_Result gshscene_list_canonical_group(const GSHSCENE_Group * group, GSHSCENE_Group * out) {
@@ -513,7 +519,7 @@ GSHSCENE_Result gshscene_list_fill(GSHSCENE_List * list, const GSHSCENE_Resource
     result = check_rule(rule);
   }
   if (result == GSHSCENE_OK) {
-    result = canonical_paint(paint, &item.paint);
+    result = canonical_paint(list->store, paint, &item.paint);
   }
   if (result == GSHSCENE_OK) {
     result = gshscene_list_canonical_depth(depth, &item.depth);
@@ -636,6 +642,7 @@ GSHSCENE_Result gshscene_list_truncate(GSHSCENE_List * list, size_t count) {
   }
   for (size_t i = count; i < list->count; i++) {
     gshscene_resource_release(item_at(list, i)->resource);
+    gshscene_resource_release(item_at(list, i)->paint.gradient);
   }
   list->count = count;
   /* What recording the first @p count items made, counted again: the open pushes, the expansion, the deepest
@@ -1255,6 +1262,7 @@ uint64_t gshscene_list_hash(const GSHSCENE_List * list) {
         }
         gshscene_space_hash(&h, &item->paint.space);
         gshgeom_hash_u32(&h, item->paint.entry);
+        gshgeom_hash_u64(&h, item->paint.gradient ? gshscene_resource_hash(item->paint.gradient) : 0);
         gshgeom_hash_i32(&h, item->layer);
         gshgeom_hash_f64(&h, item->depth);
         break;
@@ -1335,7 +1343,8 @@ GSHSCENE_Result gshscene_list_dump(const GSHSCENE_List * list, FILE * out) {
           written = gshscene_space_dump(out, &item->paint.space);
         }
         if (written >= 0) {
-          written = fprintf(out, " entry=%u", (unsigned)item->paint.entry);
+          written = fprintf(out, " entry=%u gradient=%016llx", (unsigned)item->paint.entry,
+              HEX(item->paint.gradient ? gshscene_resource_hash(item->paint.gradient) : 0));
         }
         if (written >= 0) {
           written = dump_layer_depth(out, item);

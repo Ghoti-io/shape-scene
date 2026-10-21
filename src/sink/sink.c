@@ -139,6 +139,24 @@ GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps,
     d.reason = GSHSCENE_REASON_GLYPH_SOURCE;
     return d;
   }
+  const GSHSCENE_Resource * gradient =
+      item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT ? item->paint.gradient : NULL;
+  if (gradient) {
+    /* S17: a kind the sink does not draw is refused, never drawn wrong. */
+    uint32_t gk = gradient->u.gradient.g.kind;
+    if (gk >= 32 || !(caps->gradient_kinds & (UINT32_C(1) << gk))) {
+      d.entry_class = GSHSCENE_ENTRY_REFUSED;
+      d.reason = GSHSCENE_REASON_GRADIENT;
+      return d;
+    }
+    /* G3, N14: a palette stop whose entry the palette in force does not have refuses the fill. */
+    uint32_t need = gradient->u.gradient.palette_need;
+    if (need && (!palette || palette->kind != GSHSCENE_RESOURCE_PALETTE || need > palette->u.palette.count)) {
+      d.entry_class = GSHSCENE_ENTRY_REFUSED;
+      d.reason = GSHSCENE_REASON_PALETTE_ENTRY;
+      return d;
+    }
+  }
   if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_PALETTE) {
     /* N14: the one resolution decides; the foreground is not read for a palette paint. */
     GSHSCENE_Color unused;
@@ -166,6 +184,13 @@ GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps,
       !(target_space && gshscene_space_equal(&item->group.blend_space, target_space))) {
     d.entry_class = GSHSCENE_ENTRY_APPROXIMATED;
     d.reason = GSHSCENE_REASON_BLEND_SPACE;
+    return d;
+  }
+  if (gradient && !(caps->flags & GSHSCENE_CAP_GRADIENT_SPACES) &&
+      !gshscene_color_space_is_target(&gradient->u.gradient.g.space) &&
+      !(target_space && gshscene_space_equal(&gradient->u.gradient.g.space, target_space))) {
+    d.entry_class = GSHSCENE_ENTRY_APPROXIMATED;
+    d.reason = GSHSCENE_REASON_INTERPOLATION_SPACE;
     return d;
   }
   return d;
@@ -628,8 +653,8 @@ static int plan_route(const GSHSCENE_Job * job, const GSHSCENE_Item * item, GSHG
 }
 
 /**
- * Walk the list against the caps: every refusal and approximation the caps decide, the entry of each run from a
- * font's route, every tie.  @p refused is set to the refusals found.
+ * Walk the list against the caps: every refusal and approximation the caps decide, the notice of each gradient fill
+ * that draws nothing (S17), the entry of each run from a font's route, every tie.  @p refused is set to the refusals found.
  */
 static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
   GSHSCENE_Report * report = job->request.report;
@@ -675,6 +700,14 @@ static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
       (*refused)++;
       gshscene_skip_begin(&skip, item, count);
       continue;
+    }
+    /* S17: a gradient fill that draws nothing is drawn as defined, and the report says so. */
+    GSHSCENE_Reason notice = gshscene_gradient_notice(item, maps, count - 1, &job->target.map);
+    if (notice) {
+      result = gshscene_report_add(report, GSHSCENE_ENTRY_NOTICE, notice, chain, count, 0, 0.0);
+      if (result != GSHSCENE_OK) {
+        return result;
+      }
     }
     GSHSCENE_Glyph_Route route;
     if (plan_route(job, item, maps, count, &route) && route.entry_class) {

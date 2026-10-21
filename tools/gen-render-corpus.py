@@ -102,6 +102,13 @@ def scripted():
     out["scripted-damage-extent.bin"] = header(request=64 | 128, step=3, write=5, alloc=0) + ops(
         fill(0, 0, 19), fill(30, 30, 19), (FREEZE, 0, 0, 0), (INSTANCE, 7, 9, 0), (OUTLINE_RUN, 3, 0, 0),
         (FOREGROUND, 1, 2, 3))
+    # Gradients (color-paint story P1, S17): op FOREGROUND with a & 12 == 12 is a gradient fill, b % 6 the gradient
+    # (0 linear, 1 radial, 2 sweep, 3 and 4 degenerate, 5 a missing palette stop), c & 0xe0 == 0xe0 a singular map.
+    gradients = ops((FOREGROUND, 12, 0, 3), (FOREGROUND, 13, 1, 4), (FOREGROUND, 12, 2, 5), (FOREGROUND, 12, 3, 6),
+                    (FOREGROUND, 12, 4, 7), (FOREGROUND, 12, 5, 8), (FOREGROUND, 12, 0, 0xE3), fill())
+    out["scripted-gradients-stream.bin"] = header(request=4) + gradients
+    out["scripted-gradients-strict.bin"] = header(request=1, step=32 | 128) + gradients
+    out["scripted-gradients-none.bin"] = header(request=4, step=64) + gradients
     return out
 
 

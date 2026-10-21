@@ -5,7 +5,9 @@ retained scene above it (versions, edits, identity, merge, diff and damage), and
 it is drawn (color, paint, composition and order, below) are implemented, and so is the sink contract
 with its report and the test sink (story 13a). The first real sink, shape-cpu's, is story 13b. Runs from a
 font reach the waist through a face resource and the glyph path provider seam (story 14a, below); `font`
-implements the provider in story 14b.
+implements the provider in story 14b. Gradients (color-paint story P1: the resource, the paint, G1 to G13, the one
+conversion of their stops at draw time, the notices of what draws nothing) are implemented scene-side; shape-cpu draws
+them in story P2 and until then refuses them in its planning pass.
 
 The shape family waist: resources and lists, and the versioned scene above them.
 
@@ -35,13 +37,19 @@ F2.14 (trailing zeros dropped, so equal instances are one handle), with the prov
 non-content field: the first intern of a content builds the face, asks `face_info` once and retains the
 binding, and the face's last release releases it once. A run from a font names a face handle, which it
 holds. The formats are per kind: a glyph run's hash and dump are format 2 since the face replaced the key; a
-path's, a picture's, a face's and a palette's are 1.
+path's, a picture's, a face's, a palette's and a gradient's are 1.
 
 A palette (story 14c, N14) is a resource too: a table of at most 65,535 colors, each straight `double`s and a
 space, interned by content. A font's CPAL reaches it through the float-free `gshscene_store_intern_palette_rgba8`
 (fixed.h): each 8-bit component becomes `c / 255`, the double nearest (one correctly rounded division of two exact
 integers, so every target gives the same bits; the probe checks it), and the space is sRGB, which is what CPAL
 states.
+
+A gradient (color-paint story P1, G1) is a resource too: a kind (linear, radial, sweep), its geometry in gradient
+space, a 2D map into the item's local space, a color line of stops (an offset and a solid, foreground or palette paint),
+an extend, an interpolation space and a premultiplied flag, interned by content with its stops sorted stably by offset
+and `-0` stored as `+0`, so equal gradients are one handle and a writer or a GPU sink dedupes them by id. Nothing in it
+is converted: the stops are kept as given and hashed as given, so a better `gmath_pow` changes pixels and never handles.
 
 ## Lists
 
@@ -83,9 +91,9 @@ it or none.
 
 ## Reserved
 
-The gradient and image resource kinds and a gradient paint are named and refused with
-`ERR_UNSUPPORTED`; their values are pinned because they are hashed. A story that gives one a meaning adds a
-constructor or loosens one check. (The palette paint, refused until story 14c, is N14 below.) Also refused with `ERR_UNSUPPORTED` are ProPhoto
+The image resource kind is named and has no constructor; its value is pinned because it is hashed. A story that gives
+it a meaning adds a constructor. (The palette paint, refused until story 14c, is N14 below; the gradient paint and
+resource, reserved until color-paint story P1, are G1 to G13.) Also refused with `ERR_UNSUPPORTED` are ProPhoto
 (D50: converting to it needs a chromatic adaptation), the parametric, BT.1886, PQ and HLG transfers and ICC
 profiles, and every blend mode (multiply, screen, ...): the composite operator has room for them.
 
@@ -103,9 +111,10 @@ evaluated). A sink's own test is measured against the same table.
 real number computed from the doubles given, with no rounding and no clamping unless the text says so. A
 sink's finite precision, its coverage definition (AD-12: 8-bit exact area for `shape-cpu`) and its tolerance
 (AD-18) are its own and are settled with the sink contract; what is fixed here is what the answer is, so a
-sink's error can be measured. The scene itself never evaluates a color: `color`'s transfer functions are
-libm's `pow`, `exp` and `log`, which AD-22 forbids in the shape family, so converting a color between spaces
-is the sink's, with `math`'s `gmath_pow`, against the formulas below.
+sink's error can be measured. The scene converts one thing itself, a gradient's stops at draw time (G3), through
+`math`'s `gmath_pow` in the one function every sink calls; every other conversion between spaces is the sink's, with
+`math`, against the formulas below. `color`'s transfer functions are libm's `pow`, `exp` and `log`, which AD-22 forbids
+in the shape family, and `check-libm` still judges this library.
 
 **N1 Color space.** A space is `(primaries, transfer, gamma)`, held as `GSHSCENE_Color_Space` (`GCOL_*`
 enums from `color`). The zero value is the target's space. Otherwise `primaries` is one of four gamuts, all
@@ -216,9 +225,91 @@ each be a color the author did not state). The one resolution is `gshscene_paint
 (`gshscene_caps_disposition`) takes the palette, so a writer, a GPU sink and shape-cpu refuse the same fills. A
 palette change is a new parameter, never a re-lowering (AD-23): a theme picks another handle.
 
-**Not decided here, and where it is recorded.** Blend modes (multiply, screen, ...), the other color spaces,
-gradients, the depth predicate for 3D maps, and the merge of adds to one parent are Deferred rows in the
-spine; `notes/shape/merge-adds-to-one-parent.md` assesses the last.
+**Not decided here, and where it is recorded.** Blend modes (multiply, screen, ...; color-paint story P3), the other
+color spaces, the depth predicate for 3D maps, and the merge of adds to one parent are Deferred rows in the spine;
+`notes/shape/merge-adds-to-one-parent.md` assesses the last.
+
+## Gradients (normative; color-paint story P1)
+
+In real arithmetic, as N1 to N14. Each rule is in `paint.h` too; tests, plants, the oracle and the vectors cite them.
+`tools/gradient-oracle.py` states them a second time, sharing no code with the library: exact rationals for linear,
+exact arithmetic in Q(sqrt D) for radial (every comparison decided by signs), and a 110-digit `decimal` angle for sweep
+with a stated bound (1e-60 on `t` for `|a1 - a0| >= 1e-6` turn); `tools/gen-gradient-vectors.py` commits its answers
+as `tests/gradient_vectors.h` (installed for sink libraries), rejecting a sample point within 1e-30 of a
+discontinuity, and `tests/ref_composite.h`'s evaluator agrees with them, bit for bit where the case is exact and within
+1e-12 otherwise.
+
+**G1 The resource.** `{kind, geometry, map, stops, extend, space, premultiplied}`: `kind` linear, radial or sweep; `map`
+a valid 2D map from gradient space to the local space of the item that paints with it (before the item's map);
+`space` an N1 space, the interpolation space (zero: the target's); `premultiplied` 0 or 1. Every double is finite.
+Equal content is one handle; a hash never decides equality.
+
+**G2 The color line.** `n` stops, `0 <= n <= max_resource_elements`, each an offset (any finite double) and a stop
+color, sorted stably by offset when interned; hash, dump and equality see the sorted line. `o_first`, `o_last` and
+`P = o_last - o_first` are of the sorted line.
+
+**G3 Stop colors.** A stop color is a solid, foreground or palette paint by N7, N10 and N14's rules. Nothing is
+converted at intern. At draw time every stop is resolved (a foreground or palette stop against the drawing list's
+foreground and palette) and converted by N2/N3 into the interpolation space (`space`, or the target's resolved space
+when zero; a stop's zero space is the target's too) by `gshscene_gradient_resolve`, which every sink calls once per
+gradient per render; each component is within `GSHSCENE_RESOLVE_TOLERANCE * max(1, |c|)` (1e-13) of N3's exact value,
+measured against the oracle (the worst measured is about 4.5e-15). A stop already in the interpolation space is copied
+exactly. A missing palette entry refuses the fill (`PALETTE_ENTRY`). A solid stop in the target's space is allowed only
+in a gradient whose space is zero.
+
+**G4 The color function.** A stop `(r, g, b, a)`'s interpolant is `(a r, a g, a b, a)` (flag 1) or `(r, g, b, a)`
+(flag 0). With no stops `C` is transparent black; with one, that stop's interpolant everywhere. Otherwise, among stops
+of one offset the first is used below it and the last at and above it, and between adjacent distinct offsets `C` is the
+linear interpolation of the interpolants; `C(o_last)` is the last stop's. The straight color is `C` (flag 0) or `C`
+un-premultiplied (flag 1; alpha 0 gives `(0, 0, 0, 0)`).
+
+**G5 Extend.** Outside `[o_first, o_last]` with two or more stops: `PAD` takes the first stop below and the last
+above; with `P > 0`, `REPEAT` takes `C(o_first + ((t - o_first) mod P))` and `REFLECT` `C(o_first + P - |((t -
+o_first) mod 2P) - P|)`; with `P = 0`, `PAD` is G4's step and `REPEAT` and `REFLECT` draw nothing.
+
+**G6 Where a point gets its color (AD-24).** For a fill whose chain is the target map `T`, the instance maps, the item
+map `M` and the gradient map `G`, target point `q` takes the gradient-space value at `p = (T I ... M G)^-1 (q)`. A sink
+samples where its own coverage definition says.
+
+**G7 Linear.** `p0`, `p1` and an isoline direction `d` (zero: perpendicular to `p1 - p0`). With `n_d = (-d_y, d_x)`,
+or `p1 - p0` when `d` is zero, `t = ((p - p0) . n_d) / ((p1 - p0) . n_d)`; an exactly zero denominator is degenerate.
+COLRv1's three points lower to `d = p2 - p0` exactly, and Canvas's and SVG's two points to `d = 0`.
+
+**G8 Radial: the two-circle cone.** With `c(w) = c0 + w (c1 - c0)` and `r(w) = r0 + w (r1 - r0)`, the value at `p` is
+the color at the largest `w` with `r(w) > 0` and `|p - c(w)| = r(w)`; with none, `p` gets nothing. Negative radii are
+COLRv1's and are read through `r(w) > 0`. Equal circles are degenerate. Canvas's and COLRv1's cones are this one; SVG
+2 adopted it, and SVG 1.1's focal clamping is `vector`'s lowering.
+
+**G9 Sweep (AD-6).** `theta(p)`, the angle of `p - c` in `[0, one turn)` from `+x` toward `+y` (0 at `p = c`), in the
+source's unit; `t = (theta - a0) / (a1 - a0)`. With `a0 = a1`, `REPEAT` and `REFLECT` draw nothing and `PAD` is the
+first stop below `a0` and the last at and above it.
+
+**G10 Degenerate.** Never refused at record. G7's zero denominator, G8's equal circles and G9's `a0 = a1` under repeat or
+reflect draw nothing whatever the stops; G5's `P = 0` with two or more stops under repeat or reflect draws nothing.
+
+**G11 Not invertible (AD-24's open question, Corey's D7).** A gradient fill's chain is not invertible exactly when some
+map of it (`T`, each instance map, `M`, `G`) has a 2x2 linear part whose determinant is exactly zero, by
+`shape-geometry`'s exact orientation of that map's own doubles; no composition is formed, so a determinant too small for
+a double is still nonzero. The fill draws nothing. (A retained scene's group maps are composed into the item maps of
+the list it emits, and the list's chain is what G11 reads.)
+
+**G12 The fill.** N7 with the straight color at `t` in the interpolation space, its alpha multiplied by the paint's
+`rgba[3]`, converted to the layer's blend space and premultiplied; where G8, G10 or G11 says nothing, the source is
+`(0, 0, 0, 0)`. A picture's foreground and palette stops resolve against the list that draws it.
+
+**G13 Sinks.** By handle (`gshscene_resource_gradient`, `gshscene_gradient_resolve`); the scene bakes no ramp. The caps'
+`gradient_kinds` name the kinds a sink draws; another kind is refused (`GRADIENT`) by the planning pass, so a sink
+without gradients never draws one wrong. Without `GRADIENT_SPACES` a stated space other than the target's is
+approximated (`INTERPOLATION_SPACE`). The planning pass reports G11, then G10, as one `NOTICE` per fill
+(`MAP_NOT_INVERTIBLE`, `GRADIENT_DEGENERATE`) by the one predicate `gshscene_gradient_notice`, which a sink also skips
+by; a notice never fails a render. N13 extends to gradients: a changed foreground damages the shapes whose gradient has
+a foreground stop, and a changed palette those with a palette stop.
+
+**Recording without floats.** `gshscene_store_intern_gradient_fixed` (fixed.h) takes COLRv1's numbers for a run from a
+font: integer geometry over `2^bits` (linear's rotation point becomes `d = p2 - p0`, a sweep's half turns become `v *
+180 / 2^bits` degrees, each exact in a double), palette and foreground stops, and a design map of ops; the gradient map
+is `design_to_model(size / upem, g) . T` about the run's first glyph `g`, where a design point lands where the glyph's
+outline puts it. `gshscene_list_fill_gradient_fixed` fills a run with a gradient and a fixed alpha.
 
 ## The retained scene
 
@@ -356,6 +447,12 @@ conformance suite (`tests/sink_conformance.h`) cite the rules by number.
   geometry with curves intact; nothing in `sink.h` composes, flattens or rounds. A writer emits
   curves and dedupes resources by id. The planning pass composes maps to decide (a run from a font's
   route), and never hands composed geometry to a sink.
+- **S17 Gradients** (color-paint story P1). A gradient reaches a sink by handle. A kind not in the caps'
+  `gradient_kinds` is refused (`GRADIENT`) by the planning pass, so strict fails before the sink is called; without
+  `GRADIENT_SPACES` a stated interpolation space other than the target's is approximated; a palette stop the palette
+  lacks refuses the fill; a gradient fill that draws nothing (G10, G11) is a `NOTICE`, which never fails a render. A
+  sink converts the stops with `gshscene_gradient_resolve` once per gradient per render, by id, against the request's
+  list's foreground and palette and the target's resolved space; a writer emits a gradient once per id.
 
 **The test sink** (`dump_sink.h`) is the second backend AD-11 asks for, independent of shape-cpu. It
 composites nothing: it writes a dump of every unit (a box per fill and clip: the resource's model
@@ -364,7 +461,10 @@ into an RGBA8 raster (a group is gathered and stamped once at its pop, so an ope
 stamped). Its caps, its completion (in-line, or deferred to a step the way an event loop turns), its
 affinity, its cancel unit and its one resource limit (`max_extent`) are configuration, so that every
 path of the contract is reachable. `tests/sink_conformance.h` runs the same tests against each of its
-configurations now and against shape-cpu in 13b; `tools/gen-sink-vectors.py` restates the report's
+configurations now and against shape-cpu in 13b. A gradient fill's record carries ` grad=<id>`, and the first time a
+render meets a gradient the sink writes its record (`R <id> <hash> space=<space> stops=N` and `r <offset> <r> <g> <b>
+<a>` per resolved stop, the doubles' bits); a fill that draws nothing is an `X class=5` record and is not stamped.
+`tools/gen-sink-vectors.py` restates the report's
 and the test sink's spellings, and `tests/fuzz/fuzz_render.c` drives requests through it.
 
 
