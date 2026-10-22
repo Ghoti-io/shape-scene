@@ -2243,6 +2243,13 @@ PLANTS += [
     ('sc2-alignment', 'src', SKC, '  g.alignment = s->alignment;', '  g.alignment = 0;', K),
     ('sc2-alignment-rule', 'src', SKC, '  g.alignment_rule = s->alignment_rule;', '  g.alignment_rule = GSHGEOM_FILL_NONZERO;', K),
     ('sc2-check-dropped', 'src', SKC, '  if (gshgeom_stroke_check(&g) != GSHGEOM_OK) {', '  if (0) {', K),
+    # strokes story S4 (SC10): the test sink's outline= field
+    ('ds-s20-outline-pixel-scale', 'src', DS, '        gshgeom_map_scale(2, 1.0 / size, 1.0 / size, 1.0, &scale) != GSHGEOM_OK ||', '        gshgeom_map_scale(2, size, size, 1.0, &scale) != GSHGEOM_OK ||', ["testDump_sink"]),
+    ('ds-s20-outline-not-canonical', 'src', DS, '  if (gshgeom_stroke_expand(path, &params, &canon, &run->glyphs.self, NULL, &outline) != GSHGEOM_OK) {', '  if (gshgeom_stroke_expand(path, &params, &pixels, &run->glyphs.self, NULL, &outline) != GSHGEOM_OK) {', ["testDump_sink"]),
+    ('ds-s20-outline-unmapped', 'src', DS, '  GSHGEOM_Map pixels = *map;', '  GSHGEOM_Map pixels;\n  gshgeom_map_identity(2, &pixels);', ["testDump_sink"]),
+    ('ds-s20-outline-limit-ignored', 'src', DS, '  if (gshgeom_stroke_expand(path, &params, &canon, &run->glyphs.self, NULL, &outline) != GSHGEOM_OK) {\n    return GSHSCENE_ERR_LIMIT;', '  if (gshgeom_stroke_expand(path, &params, &canon, &run->glyphs.self, NULL, &outline) != GSHGEOM_OK) {\n    return GSHSCENE_ERR_INTERNAL;', ["testDump_sink"]),
+    ('ds-s20-outline-run-spelled', 'src', DS, '    snprintf(outline_text, sizeof outline_text, "-");', '    snprintf(outline_text, sizeof outline_text, "0");', ["testDump_sink"]),
+    ('ds-s20-outline-hash-not-written', 'src', DS, '    snprintf(outline_text, sizeof outline_text, "%016" PRIx64, outline_hash);', '    snprintf(outline_text, sizeof outline_text, "%016" PRIx64, (uint64_t)0);', ["testDump_sink"]),
     ('sc2-status-of-bad-style', 'src', SKC, '    return GSHSCENE_ERR_INTERNAL; /* SK2 equals SG2: a style the store holds passes */', '    return GSHSCENE_ERR_INVALID;', K),
 ]
 

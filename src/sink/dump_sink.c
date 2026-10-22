@@ -801,6 +801,53 @@ static GSHSCENE_Result refuse_here(Run * run, const GSHSCENE_Item * item, const 
 }
 
 /**
+ * The hash of the stroke's expansion (strokes story S4, SC10): the style converted by the one conversion, the composed
+ * map in pixels split by shape-geometry's canonical map, expanded at the default tolerance, and
+ * `gshgeom_stroke_outline_hash` of the outline, status outlines (EMPTY, NOT_INVERTIBLE) included.  On a raster target
+ * this is the very outline shape-cpu draws.  The expansion is made in the glyph scratch (a stroke calls no
+ * provider), so it allocates nothing and a stroke whose expansion does not fit it is the sink's resource limit, in
+ * every mode alike.  A run has no expansion until strokes story S5: @p has is 0 and the field is `-`.
+ *
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_LIMIT (the scratch, or shape-geometry's limits).
+ */
+static GSHSCENE_Result stroke_outline_hash(Run * run, const GSHSCENE_Item * item, const GSHGEOM_Map * map, uint64_t * hash,
+    int * has) {
+  *has = 0;
+  const GSHGEOM_Path * path = gshscene_resource_path(item->resource);
+  GSHGEOM_Stroke params;
+  if (!path) {
+    return GSHSCENE_OK;
+  }
+  if (gshscene_resource_stroke_geometry(item->style, &params) != GSHSCENE_OK) {
+    return GSHSCENE_ERR_INTERNAL;
+  }
+  GSHGEOM_Map pixels = *map;
+  double size = gshscene_stroke_pixel_size(run->job->target.unit);
+  if (size != 1.0) {
+    GSHGEOM_Map scale;
+    if (!(size > 0.0) || gshgeom_map_scale(2, 1.0 / size, 1.0 / size, 1.0, &scale) != GSHGEOM_OK ||
+        gshgeom_map_compose(&scale, map, &pixels) != GSHGEOM_OK) {
+      return GSHSCENE_ERR_LIMIT;
+    }
+  }
+  GSHGEOM_Map canon;
+  int64_t sx;
+  int64_t sy;
+  if (gshgeom_stroke_canonical_map(&pixels, &canon, &sx, &sy) != GSHGEOM_OK) {
+    return GSHSCENE_ERR_LIMIT;
+  }
+  run->glyphs.used = 0;
+  GSHGEOM_Stroke_Outline * outline = NULL;
+  if (gshgeom_stroke_expand(path, &params, &canon, &run->glyphs.self, NULL, &outline) != GSHGEOM_OK) {
+    return GSHSCENE_ERR_LIMIT;
+  }
+  *hash = gshgeom_stroke_outline_hash(outline);
+  *has = 1;
+  gshgeom_stroke_outline_destroy(outline);
+  return GSHSCENE_OK;
+}
+
+/**
  * A stroke (S20): its notice (SK8, SK9: an `X` record, not stamped); its box, SK10's bound of its centerline's box
  * (the model box a fill of it would have) under the composed map, in target units; the features it requires that the
  * caps do not emit (expanded, since the plan let it through); then its record, the style's record and the gradient's
@@ -840,6 +887,21 @@ static GSHSCENE_Result stroke_unit(Run * run, const GSHSCENE_Item * item, const 
   if (bad || (limit > 0.0 && !b.empty && (b.max.x - b.min.x > limit || b.max.y - b.min.y > limit))) {
     return refuse_here(run, item, chain, count, GSHSCENE_REASON_RESOURCE_LIMIT, failed);
   }
+  uint64_t outline_hash = 0;
+  int has_outline = 0;
+  GSHSCENE_Result sr = stroke_outline_hash(run, item, &map, &outline_hash, &has_outline);
+  if (sr == GSHSCENE_ERR_LIMIT) {
+    return refuse_here(run, item, chain, count, GSHSCENE_REASON_RESOURCE_LIMIT, failed);
+  }
+  if (sr != GSHSCENE_OK) {
+    return sr;
+  }
+  char outline_text[24];
+  if (has_outline) {
+    snprintf(outline_text, sizeof outline_text, "%016" PRIx64, outline_hash);
+  } else {
+    snprintf(outline_text, sizeof outline_text, "-");
+  }
   uint32_t expand =
       gshscene_stroke_required(item, run->maps, count - 1, &run->job->target.map) & ~run->job->caps.stroke_native;
   snprintf(run->line, LINE_BYTES, " K res=%s:%016" PRIx64 " style=%" PRIu64 " map=%016" PRIx64,
@@ -851,12 +913,12 @@ static GSHSCENE_Result stroke_unit(Run * run, const GSHSCENE_Item * item, const 
     emit_text(run, run->line, &failed);
   }
   if (b.empty) {
-    snprintf(run->line, LINE_BYTES, " box=- expand=%u outline=-\n", (unsigned)expand);
+    snprintf(run->line, LINE_BYTES, " box=- expand=%u outline=%s\n", (unsigned)expand, outline_text);
   } else {
     snprintf(run->line, LINE_BYTES,
-        " box=%016" PRIx64 " %016" PRIx64 " %016" PRIx64 " %016" PRIx64 " expand=%u outline=-\n",
+        " box=%016" PRIx64 " %016" PRIx64 " %016" PRIx64 " %016" PRIx64 " expand=%u outline=%s\n",
         gshgeom_f64_bits(b.min.x), gshgeom_f64_bits(b.min.y), gshgeom_f64_bits(b.max.x), gshgeom_f64_bits(b.max.y),
-        (unsigned)expand);
+        (unsigned)expand, outline_text);
   }
   emit_text(run, run->line, &failed);
   GSHSCENE_Result r = style_record(run, item->style, &failed);

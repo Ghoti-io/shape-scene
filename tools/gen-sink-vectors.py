@@ -725,8 +725,10 @@ def stroke_render(kind, unit, target_map, native, expand, area=None):
             entries.append((REFUSED, R_STROKE_STYLE, (i,), missing, 0.0))
             continue
         box = stroke_box(st, (x, y, sz), composed, unit)
-        lines.append("%s K res=path:%016x style=%d map=%016x box=%s expand=%d outline=-" % (
-            head, rhash(x, y, sz), STYLE_IDS[k], mhash(composed), " ".join("%016x" % bits(v) for v in box), missing))
+        outline = OUTLINE_HASH["stream" if kind == KIND_STREAM else "raster"][i]
+        lines.append("%s K res=path:%016x style=%d map=%016x box=%s expand=%d outline=%016x" % (
+            head, rhash(x, y, sz), STYLE_IDS[k], mhash(composed), " ".join("%016x" % bits(v) for v in box), missing,
+            outline))
         if k not in seen:
             seen.add(k)
             lines += style_record(k)
@@ -739,6 +741,18 @@ def stroke_render(kind, unit, target_map, native, expand, area=None):
     lines.append("E result=0 processed=%d done=%d" % (n, n))
     text = "\n".join(lines) + "\n"
     return text, fnv(text.encode()), entries, stamps
+
+
+# Strokes story S4 (SC10): the K record's outline field is gshgeom_stroke_outline_hash of the expansion, which this
+# generator cannot restate (the expansion is shape-geometry's, and writing it again here would be a second
+# implementation).  The values below were measured once, on x86-64 in ghoti-build:gcc16, from the library, and are
+# committed; the test checks each against shape-geometry called directly (tests/unit/test_dump_sink.cpp), and the
+# cross-target gate (suite/tools/xarch/shape.sh) must reproduce them on every other target.  Keyed by the target
+# (the stream is in millimetres under a scale of 1/2, the raster is the identity) and the unit's index.
+OUTLINE_HASH = {
+    "stream": {0: 0x845034f9903ae5a6, 1: 0xed61a34621d91f1c, 2: 0x7ff7274b48be3546, 4: 0xad019422ffef6356},
+    "raster": {0: 0x32d3ab0c5ec389eb, 1: 0xec807991aece5d6b, 2: 0x488dce675fe7c3c4, 4: 0xf7a18d0f7a0b57c3},
+}
 
 
 STROKE_STREAM_TEXT, STROKE_STREAM_HASH, STROKE_STREAM_ENTRIES, _ = stroke_render(KIND_STREAM, UNIT_MM, scale(0.5),

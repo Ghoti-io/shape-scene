@@ -90,8 +90,12 @@
  * `K res=<kind>:<hash> style=<id> map=<hash> box=<x0> <y0> <x1> <y1> expand=N outline=-` (a stroke, S20: `style`
  * the style's resource id, `map` the composed map's hash, `box` SK10's bound of the centerline's box in target units
  * (`-` when empty), `expand` the `GSHSCENE_STROKE_NATIVE_*` bits, in decimal, of the features the stroke requires that
- * the caps do not emit (0 for a stroke drawn as a stroke; the rest are expanded, `STROKE_EXPAND`), `outline` reserved
- * for the hash of the stroke's expansion and `-` until the sink computes one; a gradient stroke has ` grad=<id>` before
+ * the caps do not emit (0 for a stroke drawn as a stroke; the rest are expanded, `STROKE_EXPAND`), `outline` the 16 hex
+ * digits of `gshgeom_stroke_outline_hash` of the stroke's expansion (strokes story S4, SC10: the style converted by
+ * `gshscene_resource_stroke_geometry`, the composed map in pixels, `gshgeom_stroke_canonical_map`, the default tolerance;
+ * for every configuration and disposition, a status outline included; on a raster target the very outline shape-cpu
+ * draws) and `-` for a run, which has no expansion until strokes story S5; a stroke whose expansion does not fit the
+ * sink's scratch is refused, `RESOURCE_LIMIT`; a gradient stroke has ` grad=<id>` before
  * `box=`), or `X class=N reason=N` (a unit not
  * drawn: refused, or inside a refused block, or a gradient fill or a stroke that draws
  * nothing, class 5, `NOTICE`, which is not stamped; sink.h, S17, S20); after a

@@ -27,10 +27,10 @@ static const std::uint64_t kGradientBHash = UINT64_C(0x66b66bbe31c59cf1);
 static const std::uint64_t kGradientStreamOutputHash = UINT64_C(0x3c087ea5466bcd54);
 static const std::uint64_t kGradientStreamReportHash = UINT64_C(0xb1af2b8d2b335553);
 static const std::uint64_t kStrokeListHash = UINT64_C(0x5f7c1170f9c04837);
-static const std::uint64_t kStrokeStreamOutputHash = UINT64_C(0xcbe40661814a097c);
-static const std::uint64_t kStrokeRasterOutputHash = UINT64_C(0xd87bf0e147912dc3);
+static const std::uint64_t kStrokeStreamOutputHash = UINT64_C(0xb7c0d61a9e957e16);
+static const std::uint64_t kStrokeRasterOutputHash = UINT64_C(0x773bfa92f1990a1e);
 static const std::uint64_t kStrokeRasterPixelsHash = UINT64_C(0x2f76731c7c7bdadc);
-static const std::uint64_t kStrokeWriterOutputHash = UINT64_C(0xf1b6595a2791d083);
+static const std::uint64_t kStrokeWriterOutputHash = UINT64_C(0x00368c384f034e07);
 static const std::uint64_t kStrokeToolpathOutputHash = UINT64_C(0x381ab2ddba912702);
 static const std::uint64_t kStrokeStreamReportHash = UINT64_C(0x4a4d87e9e4a6644f);
 static const std::uint64_t kStrokeWriterReportHash = UINT64_C(0x4a4d87e9e4a6644f);
@@ -149,13 +149,13 @@ E class=5 reason=24 chain=3 second=0 depth=0000000000000000
 )DUMP";
 static const char * const kStrokeStreamDump =
 R"DUMP(gshscene.dump-sink 1 kind=2 unit=2 units=5 list=5f7c1170f9c04837
-U 0 K res=path:9a8490040d04ed76 style=1 map=c530824dc0bebfa4 box=bcd0000000000000 bcd0000000000000 4018000000000001 4018000000000001 expand=0 outline=-
+U 0 K res=path:9a8490040d04ed76 style=1 map=c530824dc0bebfa4 box=bcd0000000000000 bcd0000000000000 4018000000000001 4018000000000001 expand=0 outline=845034f9903ae5a6
 Q 1 ec1048adcb87f83b width=3ff0000000000000 space=0 join=0 miter=4010000000000000 cap=0 degenerate=0 align=0 rule=0 scope=0 offset=0000000000000000 dashes=0 profile=0000000000000000
-U 1 K res=path:ed085beb9d35c102 style=2 map=c530824dc0bebfa4 box=4012f11111111110 3ffbc44444444443 4020877777777778 40150eeeeeeeeef0 expand=0 outline=-
+U 1 K res=path:ed085beb9d35c102 style=2 map=c530824dc0bebfa4 box=4012f11111111110 3ffbc44444444443 4020877777777778 40150eeeeeeeeef0 expand=0 outline=ed61a34621d91f1c
 Q 2 d18fad68c5280599 width=4000000000000000 space=1 join=1 miter=4010000000000000 cap=1 degenerate=0 align=0 rule=0 scope=0 offset=0000000000000000 dashes=0 profile=0000000000000000
-U 2 K res=path:5f8c4746a1476c3a style=1 map=c530824dc0bebfa4 box=4021ffffffffffff 4021ffffffffffff 402c000000000001 402c000000000001 expand=0 outline=-
+U 2 K res=path:5f8c4746a1476c3a style=1 map=c530824dc0bebfa4 box=4021ffffffffffff 4021ffffffffffff 402c000000000001 402c000000000001 expand=0 outline=7ff7274b48be3546
 U 3 X class=5 reason=29
-U 4 K res=path:63da02ecc4fa01c1 style=4 map=c530824dc0bebfa4 box=4032dfffffffffff 4032dfffffffffff 4037200000000001 4037200000000001 expand=0 outline=-
+U 4 K res=path:63da02ecc4fa01c1 style=4 map=c530824dc0bebfa4 box=4032dfffffffffff 4032dfffffffffff 4037200000000001 4037200000000001 expand=0 outline=ad019422ffef6356
 Q 4 e9d1a3fdc854b6f8 width=3ff8000000000000 space=0 join=2 miter=4010000000000000 cap=2 degenerate=1 align=1 rule=1 scope=1 offset=bfe0000000000000 dashes=6 profile=0000000000000000
 d 3ff0000000000000
 d 4000000000000000
@@ -167,16 +167,16 @@ E result=0 processed=5 done=5
 )DUMP";
 static const char * const kStrokeRasterDump =
 R"DUMP(gshscene.dump-sink 1 kind=1 unit=0 units=5 list=5f7c1170f9c04837
-U 0 K res=path:9a8490040d04ed76 style=1 map=1f5787abb2e02a06 box=bce0000000000000 bce0000000000000 4028000000000001 4028000000000001 expand=0 outline=-
+U 0 K res=path:9a8490040d04ed76 style=1 map=1f5787abb2e02a06 box=bce0000000000000 bce0000000000000 4028000000000001 4028000000000001 expand=0 outline=32d3ab0c5ec389eb
 Q 1 ec1048adcb87f83b width=3ff0000000000000 space=0 join=0 miter=4010000000000000 cap=0 degenerate=0 align=0 rule=0 scope=0 offset=0000000000000000 dashes=0 profile=0000000000000000
 S 0 0 13 13 4dea4c24
-U 1 K res=path:ed085beb9d35c102 style=2 map=1f5787abb2e02a06 box=4021ffffffffffff 4007fffffffffffe 4031000000000001 4026000000000001 expand=0 outline=-
+U 1 K res=path:ed085beb9d35c102 style=2 map=1f5787abb2e02a06 box=4021ffffffffffff 4007fffffffffffe 4031000000000001 4026000000000001 expand=0 outline=ec807991aece5d6b
 Q 2 d18fad68c5280599 width=4000000000000000 space=1 join=1 miter=4010000000000000 cap=1 degenerate=0 align=0 rule=0 scope=0 offset=0000000000000000 dashes=0 profile=0000000000000000
 S 8 2 18 12 58d99645
-U 2 K res=path:5f8c4746a1476c3a style=1 map=1f5787abb2e02a06 box=4031ffffffffffff 4031ffffffffffff 403c000000000001 403c000000000001 expand=0 outline=-
+U 2 K res=path:5f8c4746a1476c3a style=1 map=1f5787abb2e02a06 box=4031ffffffffffff 4031ffffffffffff 403c000000000001 403c000000000001 expand=0 outline=488dce675fe7c3c4
 S 17 17 29 29 63c8e066
 U 3 X class=5 reason=29
-U 4 K res=path:63da02ecc4fa01c1 style=4 map=1f5787abb2e02a06 box=4042dfffffffffff 4042dfffffffffff 4047200000000001 4047200000000001 expand=0 outline=-
+U 4 K res=path:63da02ecc4fa01c1 style=4 map=1f5787abb2e02a06 box=4042dfffffffffff 4042dfffffffffff 4047200000000001 4047200000000001 expand=0 outline=f7a18d0f7a0b57c3
 Q 4 e9d1a3fdc854b6f8 width=3ff8000000000000 space=0 join=2 miter=4010000000000000 cap=2 degenerate=1 align=1 rule=1 scope=1 offset=bfe0000000000000 dashes=6 profile=0000000000000000
 d 3ff0000000000000
 d 4000000000000000
@@ -189,13 +189,13 @@ E result=0 processed=5 done=5
 )DUMP";
 static const char * const kStrokeWriterDump =
 R"DUMP(gshscene.dump-sink 1 kind=2 unit=2 units=5 list=5f7c1170f9c04837
-U 0 K res=path:9a8490040d04ed76 style=1 map=c530824dc0bebfa4 box=bcd0000000000000 bcd0000000000000 4018000000000001 4018000000000001 expand=0 outline=-
+U 0 K res=path:9a8490040d04ed76 style=1 map=c530824dc0bebfa4 box=bcd0000000000000 bcd0000000000000 4018000000000001 4018000000000001 expand=0 outline=845034f9903ae5a6
 Q 1 ec1048adcb87f83b width=3ff0000000000000 space=0 join=0 miter=4010000000000000 cap=0 degenerate=0 align=0 rule=0 scope=0 offset=0000000000000000 dashes=0 profile=0000000000000000
-U 1 K res=path:ed085beb9d35c102 style=2 map=c530824dc0bebfa4 box=4012f11111111110 3ffbc44444444443 4020877777777778 40150eeeeeeeeef0 expand=33792 outline=-
+U 1 K res=path:ed085beb9d35c102 style=2 map=c530824dc0bebfa4 box=4012f11111111110 3ffbc44444444443 4020877777777778 40150eeeeeeeeef0 expand=33792 outline=ed61a34621d91f1c
 Q 2 d18fad68c5280599 width=4000000000000000 space=1 join=1 miter=4010000000000000 cap=1 degenerate=0 align=0 rule=0 scope=0 offset=0000000000000000 dashes=0 profile=0000000000000000
-U 2 K res=path:5f8c4746a1476c3a style=1 map=c530824dc0bebfa4 box=4021ffffffffffff 4021ffffffffffff 402c000000000001 402c000000000001 expand=0 outline=-
+U 2 K res=path:5f8c4746a1476c3a style=1 map=c530824dc0bebfa4 box=4021ffffffffffff 4021ffffffffffff 402c000000000001 402c000000000001 expand=0 outline=7ff7274b48be3546
 U 3 X class=5 reason=29
-U 4 K res=path:63da02ecc4fa01c1 style=4 map=c530824dc0bebfa4 box=4032dfffffffffff 4032dfffffffffff 4037200000000001 4037200000000001 expand=28672 outline=-
+U 4 K res=path:63da02ecc4fa01c1 style=4 map=c530824dc0bebfa4 box=4032dfffffffffff 4032dfffffffffff 4037200000000001 4037200000000001 expand=28672 outline=ad019422ffef6356
 Q 4 e9d1a3fdc854b6f8 width=3ff8000000000000 space=0 join=2 miter=4010000000000000 cap=2 degenerate=1 align=1 rule=1 scope=1 offset=bfe0000000000000 dashes=6 profile=0000000000000000
 d 3ff0000000000000
 d 4000000000000000

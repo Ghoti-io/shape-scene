@@ -2007,7 +2007,8 @@ TEST(StrokePlan, ThePlanningPassRefusesAndNoticesStrokesBeforeTheSinkIsCalled) {
   EXPECT_NE(bytes.find("U 0.0 X class=1 reason=28"), std::string::npos) << bytes;
   EXPECT_NE(bytes.find("U 1 X class=5 reason=29"), std::string::npos) << bytes;
   EXPECT_NE(bytes.find("U 2 K res=path:"), std::string::npos) << bytes;
-  EXPECT_NE(bytes.find("expand=0 outline=-"), std::string::npos) << bytes;
+  EXPECT_NE(bytes.find("expand=0 outline="), std::string::npos) << bytes;
+  EXPECT_EQ(bytes.find("outline=-"), std::string::npos) << "a stroke of a path has its expansion's hash (SC10)\n" << bytes;
   // Strict: the planned refusal fails the render and nothing is written.
   bytes.clear();
   req.flags = GSHSCENE_RENDER_STRICT;
