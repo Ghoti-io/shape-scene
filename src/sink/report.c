@@ -121,6 +121,8 @@ const char * gshscene_reason_string(GSHSCENE_Reason reason) {
       return "stroke-style";
     case GSHSCENE_REASON_STROKE_ZERO_WIDTH:
       return "stroke-zero-width";
+    case GSHSCENE_REASON_STROKE_CENTERLINE:
+      return "stroke-centerline";
     case GSHSCENE_REASON_COUNT:
       break;
   }

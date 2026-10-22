@@ -2662,6 +2662,17 @@ TEST_P(SinkConformance, S20_AStrokedRunIsNeverRefusedForHinting) {
     } else if (!(caps.flags & GSHSCENE_CAP_GLYPHS_FROM_FONT)) {
       ASSERT_EQ(got.size(), 1u);
       EXPECT_EQ(got[0].reason, GSHSCENE_REASON_GLYPH_SOURCE) << "a run from a font needs the provider, stroked or not";
+    } else if (!(caps.flags & GSHSCENE_CAP_STROKE_RUNS)) {
+      // S20 (strokes story S4): a sink that does not stroke runs refuses the stroke for its centerline, whatever its
+      // style, before the style is looked at: found by the plan, so strict fails before the target is touched.
+      ASSERT_EQ(got.size(), 1u);
+      EXPECT_EQ(got[0].reason, GSHSCENE_REASON_STROKE_CENTERLINE);
+      EXPECT_EQ(got[0].entry_class, GSHSCENE_ENTRY_REFUSED);
+      ReportRef sr;
+      auto strict = make_surface(kind);
+      GSHSCENE_Render_Request req = request_for(l, *strict, sr.report);
+      req.flags = GSHSCENE_RENDER_STRICT;
+      EXPECT_EQ(run(f(), sink.sink, req).result, GSHSCENE_ERR_REFUSED) << "strict stops before the target is touched";
     } else if (styled) {
       EXPECT_EQ(got.size(), 0u);
       ReportRef sr;

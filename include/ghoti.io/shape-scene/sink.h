@@ -219,7 +219,13 @@
  * features (::gshscene_stroke_required) are all native is drawn as a stroke; else,
  * with `STROKE_EXPAND`, it is expanded and drawn with no entry (it is drawn as
  * defined); else it is refused by the planning pass, `STROKE_STYLE`, the missing
- * features in the entry's `second`.  A sink reads the style with
+ * features in the entry's `second`.  A stroke whose centerline is a glyph run is
+ * drawn only by a sink whose caps say ::GSHSCENE_CAP_STROKE_RUNS (a run's glyphs
+ * are one region, SG13, and the sink must unite them); else the planning pass refuses it,
+ * `STROKE_CENTERLINE`, after the refusals every item can have and before the
+ * style's, so that strict fails before the target is touched and the stroke is
+ * never drawn as nothing; a stroke that draws nothing (its notice) is not refused for
+ * its centerline.  A sink reads the style with
  * ::gshscene_resource_stroke_style, decides each stroke with
  * ::gshscene_caps_disposition and skips by ::gshscene_stroke_notice (the planning
  * pass wrote the `NOTICE`: width 0, a chain that is not invertible, a degenerate
@@ -361,7 +367,9 @@ typedef struct GSHSCENE_Target {
 #define GSHSCENE_CAP_GROUP_SOFT_MASK (UINT32_C(1) << 11) ///< A group's soft mask is applied (T7; else refused, S19).
 /** A stroke whose required features are not all native is expanded exactly and drawn as a fill (S20, SK11); else refused. */
 #define GSHSCENE_CAP_STROKE_EXPAND (UINT32_C(1) << 12)
-#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 13) - 1) ///< Every flag defined.
+/** A stroke whose centerline is a glyph run is drawn (S20, SK7); without it the planning pass refuses one, `STROKE_CENTERLINE`. */
+#define GSHSCENE_CAP_STROKE_RUNS (UINT32_C(1) << 13)
+#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 14) - 1) ///< Every flag defined.
 /** @} */
 
 /** @brief Where a sink checks its cancel token (S7).  The values are pinned. */

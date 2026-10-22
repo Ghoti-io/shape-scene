@@ -146,6 +146,7 @@ GSHSCENE_Sink * make_writer_like(const GSHSCENE_Allocator * alloc, const GSHSCEN
 GSHSCENE_Dump_Sink_Config config_toolpath_like() {
   GSHSCENE_Dump_Sink_Config c = config_default();
   for (GSHSCENE_Sink_Caps * caps : {&c.raster_caps, &c.stream_caps}) {
+    caps->flags &= ~GSHSCENE_CAP_STROKE_RUNS; // a pen follows one centerline: it does not unite a run's glyphs
     caps->stroke_native = GSHSCENE_STROKE_NATIVE_JOIN_ROUND | GSHSCENE_STROKE_NATIVE_CAP_ROUND |
         GSHSCENE_STROKE_NATIVE_CAP_BUTT | GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL | GSHSCENE_STROKE_NATIVE_WIDTH_DEVICE |
         GSHSCENE_STROKE_NATIVE_DASH;
@@ -1109,7 +1110,8 @@ TEST(DumpSink, TheConfigurationIsValidated) {
     }
   }
   uint32_t common = GSHSCENE_CAP_CAN_BLOCK | GSHSCENE_CAP_CALLER_MEMORY | GSHSCENE_CAP_GLYPHS_FROM_FONT |
-      GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_BLEND_SPACES | GSHSCENE_CAP_GRADIENT_SPACES | GSHSCENE_CAP_PREPARE;
+      GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_BLEND_SPACES | GSHSCENE_CAP_GRADIENT_SPACES | GSHSCENE_CAP_PREPARE |
+      GSHSCENE_CAP_STROKE_RUNS;
   EXPECT_EQ(d.raster_caps.flags, common | GSHSCENE_CAP_READBACK);
   EXPECT_EQ(d.stream_caps.flags, common);
   // Not a test sink, not a test sink's job.

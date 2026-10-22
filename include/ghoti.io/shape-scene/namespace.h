@@ -280,6 +280,7 @@
 #define gshscene_resource_release GHOTIIO_SHAPE_SCENE(gshscene_resource_release)
 #define gshscene_resource_retain GHOTIIO_SHAPE_SCENE(gshscene_resource_retain)
 #define gshscene_resource_stroke_style GHOTIIO_SHAPE_SCENE(gshscene_resource_stroke_style)
+#define gshscene_resource_stroke_geometry GHOTIIO_SHAPE_SCENE(gshscene_resource_stroke_geometry)
 #define gshscene_result_string GHOTIIO_SHAPE_SCENE(gshscene_result_string)
 #define gshscene_scene_create GHOTIIO_SHAPE_SCENE(gshscene_scene_create)
 #define gshscene_scene_current GHOTIIO_SHAPE_SCENE(gshscene_scene_current)

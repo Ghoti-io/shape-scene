@@ -30,6 +30,8 @@
 
 #include "../internal.h"
 
+#include <ghoti.io/shape-geometry/stroke.h>
+
 #include <string.h>
 
 /** The format of a stroke style's hash and dump (resource.h). */
@@ -267,6 +269,68 @@ GSHSCENE_Result gshscene_resource_stroke_style(const GSHSCENE_Resource * resourc
     return GSHSCENE_ERR_INVALID;
   }
   *out = resource->u.stroke.s;
+  return GSHSCENE_OK;
+}
+
+/*
+ * The conversion to shape-geometry's parameters, row by row (strokes story S4, SC2).  The two libraries state the
+ * enumerations separately, so each pair is asserted equal here, at compile time, where both are visible.
+ */
+_Static_assert((int)GSHSCENE_STROKE_WIDTH_LOCAL == (int)GSHGEOM_STROKE_WIDTH_LOCAL &&
+        (int)GSHSCENE_STROKE_WIDTH_DEVICE == (int)GSHGEOM_STROKE_WIDTH_DEVICE &&
+        (int)GSHSCENE_STROKE_WIDTH_SPACE_COUNT == (int)GSHGEOM_STROKE_WIDTH_SPACE_COUNT,
+    "width space");
+_Static_assert((int)GSHSCENE_STROKE_JOIN_MITER == (int)GSHGEOM_STROKE_JOIN_MITER &&
+        (int)GSHSCENE_STROKE_JOIN_ROUND == (int)GSHGEOM_STROKE_JOIN_ROUND &&
+        (int)GSHSCENE_STROKE_JOIN_BEVEL == (int)GSHGEOM_STROKE_JOIN_BEVEL &&
+        (int)GSHSCENE_STROKE_JOIN_MITER_CLIP == (int)GSHGEOM_STROKE_JOIN_MITER_CLIP &&
+        (int)GSHSCENE_STROKE_JOIN_ARCS == (int)GSHGEOM_STROKE_JOIN_ARCS &&
+        (int)GSHSCENE_STROKE_JOIN_COUNT == (int)GSHGEOM_STROKE_JOIN_COUNT,
+    "join");
+_Static_assert((int)GSHSCENE_STROKE_CAP_BUTT == (int)GSHGEOM_STROKE_CAP_BUTT &&
+        (int)GSHSCENE_STROKE_CAP_ROUND == (int)GSHGEOM_STROKE_CAP_ROUND &&
+        (int)GSHSCENE_STROKE_CAP_SQUARE == (int)GSHGEOM_STROKE_CAP_SQUARE &&
+        (int)GSHSCENE_STROKE_CAP_COUNT == (int)GSHGEOM_STROKE_CAP_COUNT,
+    "cap");
+_Static_assert((int)GSHSCENE_STROKE_DEGENERATE_DRAW == (int)GSHGEOM_STROKE_DEGENERATE_DRAW &&
+        (int)GSHSCENE_STROKE_DEGENERATE_OMIT == (int)GSHGEOM_STROKE_DEGENERATE_OMIT &&
+        (int)GSHSCENE_STROKE_DEGENERATE_COUNT == (int)GSHGEOM_STROKE_DEGENERATE_COUNT,
+    "degenerate");
+_Static_assert((int)GSHSCENE_STROKE_DASH_PER_SUBPATH == (int)GSHGEOM_STROKE_DASH_PER_SUBPATH &&
+        (int)GSHSCENE_STROKE_DASH_PATH == (int)GSHGEOM_STROKE_DASH_PATH &&
+        (int)GSHSCENE_STROKE_DASH_SCOPE_COUNT == (int)GSHGEOM_STROKE_DASH_SCOPE_COUNT,
+    "dash scope");
+_Static_assert((int)GSHSCENE_STROKE_ALIGN_CENTER == (int)GSHGEOM_STROKE_ALIGN_CENTER &&
+        (int)GSHSCENE_STROKE_ALIGN_INSIDE == (int)GSHGEOM_STROKE_ALIGN_INSIDE &&
+        (int)GSHSCENE_STROKE_ALIGN_OUTSIDE == (int)GSHGEOM_STROKE_ALIGN_OUTSIDE &&
+        (int)GSHSCENE_STROKE_ALIGN_COUNT == (int)GSHGEOM_STROKE_ALIGN_COUNT,
+    "alignment");
+_Static_assert(GSHSCENE_STROKE_DASHES_MAX == GSHGEOM_STROKE_DASHES_MAX, "dashes");
+
+GSHSCENE_Result gshscene_resource_stroke_geometry(const GSHSCENE_Resource * resource, GSHGEOM_Stroke * out) {
+  if (!resource || !out || resource->kind != GSHSCENE_RESOURCE_STROKE_STYLE) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  const GSHSCENE_Stroke_Style * s = &resource->u.stroke.s;
+  GSHGEOM_Stroke g;
+  gshgeom_stroke_init(&g); /* the _reserved bytes zero, and no field left to chance */
+  g.width = s->width;
+  g.width_space = s->width_space;
+  g.join = s->join;
+  g.miter_limit = s->miter_limit;
+  g.cap = s->cap;
+  g.degenerate = s->degenerate;
+  g.dash_count = s->dash_count;
+  g.dashes = s->dashes; /* into the resource: valid while a handle is held (S10) */
+  g.dash_offset = s->dash_offset;
+  g.dash_scope = s->dash_scope;
+  g.alignment = s->alignment;
+  g.alignment_rule = s->alignment_rule;
+  g.width_profile = NULL; /* reserved: a style with one is not interned (D8) */
+  if (gshgeom_stroke_check(&g) != GSHGEOM_OK) {
+    return GSHSCENE_ERR_INTERNAL; /* SK2 equals SG2: a style the store holds passes */
+  }
+  *out = g;
   return GSHSCENE_OK;
 }
 
@@ -509,17 +573,30 @@ static int stroke_item(const GSHSCENE_Item * item, const GSHGEOM_Map * instance_
       item->style->kind == GSHSCENE_RESOURCE_STROKE_STYLE && (instance_count == 0 || instance_maps);
 }
 
+static GSHGEOM_Result compose_item(const GSHGEOM_Map * instance_maps, size_t instance_count, const GSHGEOM_Map * item_map,
+    const GSHGEOM_Map * target_map, GSHGEOM_Map * out);
+
 GSHSCENE_Reason gshscene_stroke_notice(const GSHSCENE_Item * item, const GSHGEOM_Map * instance_maps,
     size_t instance_count, const GSHGEOM_Map * target_map) {
   if (!stroke_item(item, instance_maps, instance_count)) {
     return (GSHSCENE_Reason)0;
   }
   const GSHSCENE_Resource * gradient = paint_gradient(item);
-  /* SK9: G11's condition on each map of the chain, for both width spaces; no composition is formed. */
+  /* SK9: G11's condition on each map of the chain, for both width spaces ... */
   int not_invertible = (target_map && gshscene_map_singular(target_map)) || gshscene_map_singular(&item->map) ||
       (gradient && gshscene_map_singular(&gradient->u.gradient.g.map));
   for (size_t i = 0; i < instance_count && !not_invertible; i++) {
     not_invertible = gshscene_map_singular(&instance_maps[i]);
+  }
+  /* ... or the composed map's: invertible factors can compose (by underflow) into a map of determinant exactly zero,
+   * which the expansion would meet as SG15 (strokes story S4, E6).  A map that cannot be formed is not decided here:
+   * it is the sink's own limit, as a fill's is. */
+  if (!not_invertible) {
+    GSHGEOM_Map composed;
+    int invertible = 1;
+    memset(&composed, 0, sizeof composed);
+    not_invertible = compose_item(instance_maps, instance_count, &item->map, target_map, &composed) == GSHGEOM_OK &&
+        gshgeom_stroke_map_invertible(&composed, &invertible) == GSHGEOM_OK && !invertible;
   }
   if (not_invertible) {
     return GSHSCENE_REASON_MAP_NOT_INVERTIBLE;

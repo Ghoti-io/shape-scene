@@ -167,7 +167,7 @@ typedef struct GSHSCENE_Dump_Sink_Config {
  * @brief The default configuration: both targets; for each, every item kind, operator and gradient kind, every
  *   stroke feature native (`stroke_native` ::GSHSCENE_STROKE_NATIVE_ALL), the flags
  *   `CAN_BLOCK`, `READBACK` (raster only), `CALLER_MEMORY`, `GLYPHS_FROM_FONT`, `CLIP_AA`, `BLEND_SPACES`,
- *   `GRADIENT_SPACES` and `PREPARE`; cancel
+ *   `GRADIENT_SPACES`, `PREPARE` and `STROKE_RUNS`; cancel
  *   between units with a work bound of 1 unit; in-line; no extent limit; no log.  NULL is ignored.
  */
 GSHSCENE_API void gshscene_dump_sink_config_default(GSHSCENE_Dump_Sink_Config * config);

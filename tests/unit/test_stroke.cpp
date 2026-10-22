@@ -1531,7 +1531,7 @@ GSHSCENE_Sink_Caps all_caps() {
   c.item_kinds = 0xfeu;
   c.composites = 0x0fffffffu;
   c.flags = GSHSCENE_CAP_CAN_BLOCK | GSHSCENE_CAP_GLYPHS_FROM_FONT | GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_BLEND_SPACES |
-      GSHSCENE_CAP_GRADIENT_SPACES;
+      GSHSCENE_CAP_GRADIENT_SPACES | GSHSCENE_CAP_STROKE_RUNS;
   c.gradient_kinds = 0xeu;
   c.stroke_native = GSHSCENE_STROKE_NATIVE_ALL;
   c.cancel_unit = GSHSCENE_CANCEL_BETWEEN_UNITS;
@@ -1618,6 +1618,104 @@ TEST(StrokeNotice, TheOrderIsMapThenWidthThenGradient) {
   GSHSCENE_Item ok = stroke_item(k, k.style.get(), id, black);
   EXPECT_EQ(gshscene_stroke_notice(&ok, nullptr, 0, &zero_filled), 0);
   EXPECT_EQ(gshscene_stroke_notice(&ok, nullptr, 2, nullptr), 0) << "instances counted and not given: not decided";
+}
+
+TEST(StrokeNotice, TheComposedMapIsDecidedToo) {
+  // SK9 as amended by strokes story S4 (E6): invertible factors can compose into a map of determinant exactly zero.
+  Kit k;
+  GSHSCENE_Paint black = solid(0, 0, 0, 1);
+  GSHGEOM_Map tiny = map_of(0x1p-600, 0, 0, 0x1p-600); // determinant 2^-1200, exactly nonzero
+  GSHGEOM_Map huge = map_of(0x1p100, 0, 0, 0x1p100); // the largest entry a map takes
+  GSHGEOM_Map id = translate(0, 0);
+  int invertible = 0;
+  ASSERT_EQ(gshgeom_stroke_map_invertible(&tiny, &invertible), GSHGEOM_OK);
+  ASSERT_EQ(invertible, 1) << "each factor passes the factor test";
+  GSHGEOM_Map composed;
+  ASSERT_EQ(gshgeom_map_compose(&tiny, &tiny, &composed), GSHGEOM_OK);
+  ASSERT_EQ(gshgeom_stroke_map_invertible(&composed, &invertible), GSHGEOM_OK);
+  ASSERT_EQ(invertible, 0) << "the product underflows to a singular map";
+  GSHSCENE_Item item = stroke_item(k, k.style.get(), tiny, black);
+  // The item's map and the target's: each factor passes the factor test, the product does not.
+  EXPECT_EQ(gshscene_stroke_notice(&item, nullptr, 0, &tiny), GSHSCENE_REASON_MAP_NOT_INVERTIBLE);
+  // An instance's map and the item's.
+  EXPECT_EQ(gshscene_stroke_notice(&item, &tiny, 1, nullptr), GSHSCENE_REASON_MAP_NOT_INVERTIBLE);
+  // Two instances and the item, with the target last: every pair of the tiny maps composes to nothing.
+  GSHGEOM_Map two[2] = {tiny, id};
+  EXPECT_EQ(gshscene_stroke_notice(&item, two, 2, nullptr), GSHSCENE_REASON_MAP_NOT_INVERTIBLE);
+  // The same chain with a factor that brings the product back is drawn.
+  GSHSCENE_Item scaled = stroke_item(k, k.style.get(), huge, black);
+  EXPECT_EQ(gshscene_stroke_notice(&scaled, nullptr, 0, &tiny), 0) << "2^100 times 2^-600 is 2^-500: not singular";
+  // Width 0 still follows the map, and a composed map that cannot be formed is no notice (the sink's limit).
+  EXPECT_EQ(gshscene_stroke_notice(&scaled, nullptr, 0, &huge), 0)
+      << "the product passes the map bound (2^100): the sink's resource limit, not a notice";
+  Ref zero;
+  Style z;
+  z.s.width = 0.0;
+  ASSERT_EQ(intern(k.s.store, z, &zero), GSHSCENE_OK);
+  GSHSCENE_Item flat_width = stroke_item(k, zero.get(), tiny, black);
+  EXPECT_EQ(gshscene_stroke_notice(&flat_width, nullptr, 0, &tiny), GSHSCENE_REASON_MAP_NOT_INVERTIBLE)
+      << "the map before the width";
+  EXPECT_EQ(gshscene_stroke_required(&item, nullptr, 0, &tiny), 0u) << "what draws nothing requires nothing";
+}
+
+TEST(StrokeGeometry, TheStyleConvertsRowByRow) {
+  Kit k;
+  // Every field is copied, in the geometry library's own spelling, and the check accepts what the store holds.
+  Style st;
+  st.s.width = 3.25;
+  st.s.width_space = GSHSCENE_STROKE_WIDTH_DEVICE;
+  st.s.join = GSHSCENE_STROKE_JOIN_ARCS;
+  st.s.miter_limit = 7.5;
+  st.s.cap = GSHSCENE_STROKE_CAP_SQUARE;
+  st.s.degenerate = GSHSCENE_STROKE_DEGENERATE_OMIT;
+  static const double dashes[3] = {4.0, 2.0, 1.0};
+  st.dashes.assign(dashes, dashes + 3);
+  st.s.dash_offset = -1.5;
+  st.s.dash_scope = GSHSCENE_STROKE_DASH_PATH;
+  st.s.alignment = GSHSCENE_STROKE_ALIGN_OUTSIDE;
+  st.s.alignment_rule = GSHGEOM_FILL_EVEN_ODD;
+  Ref r;
+  ASSERT_EQ(intern(k.s.store, st, &r), GSHSCENE_OK);
+  GSHGEOM_Stroke g;
+  ASSERT_EQ(gshscene_resource_stroke_geometry(r.get(), &g), GSHSCENE_OK);
+  GSHSCENE_Stroke_Style back;
+  ASSERT_EQ(gshscene_resource_stroke_style(r.get(), &back), GSHSCENE_OK);
+  EXPECT_EQ(g.width, 3.25);
+  EXPECT_EQ(g.width_space, (uint32_t)GSHGEOM_STROKE_WIDTH_DEVICE);
+  EXPECT_EQ(g.join, (uint32_t)GSHGEOM_STROKE_JOIN_ARCS);
+  EXPECT_EQ(g.miter_limit, 7.5);
+  EXPECT_EQ(g.cap, (uint32_t)GSHGEOM_STROKE_CAP_SQUARE);
+  EXPECT_EQ(g.degenerate, (uint32_t)GSHGEOM_STROKE_DEGENERATE_OMIT);
+  EXPECT_EQ(g.dash_count, 6u) << "SK3 doubles an odd array";
+  EXPECT_EQ(g.dashes, back.dashes) << "the dashes are the resource's own, not a copy";
+  EXPECT_EQ(g.dash_offset, -1.5);
+  EXPECT_EQ(g.dash_scope, (uint32_t)GSHGEOM_STROKE_DASH_PATH);
+  EXPECT_EQ(g.alignment, (uint32_t)GSHGEOM_STROKE_ALIGN_OUTSIDE);
+  EXPECT_EQ(g.alignment_rule, GSHGEOM_FILL_EVEN_ODD);
+  EXPECT_EQ(g.width_profile, nullptr);
+  for (uint8_t b : g._reserved) {
+    EXPECT_EQ(b, 0);
+  }
+  EXPECT_EQ(gshgeom_stroke_check(&g), GSHGEOM_OK);
+  // The defaults convert to the geometry library's defaults, field for field.
+  GSHGEOM_Stroke want;
+  gshgeom_stroke_init(&want);
+  GSHGEOM_Stroke got;
+  ASSERT_EQ(gshscene_resource_stroke_geometry(k.style.get(), &got), GSHSCENE_OK);
+  GSHSCENE_Stroke_Style defaults;
+  gshscene_stroke_style_init(&defaults);
+  EXPECT_EQ(defaults.width, want.width);
+  EXPECT_EQ(defaults.miter_limit, want.miter_limit);
+  EXPECT_EQ(GSHSCENE_STROKE_VALUE_MIN, GSHGEOM_STROKE_VALUE_MIN);
+  EXPECT_EQ(GSHSCENE_STROKE_VALUE_MAX, GSHGEOM_STROKE_VALUE_MAX);
+  EXPECT_EQ(GSHSCENE_STROKE_MITER_LIMIT_MAX, GSHGEOM_STROKE_MITER_LIMIT_MAX);
+  EXPECT_EQ(GSHSCENE_STROKE_MITER_LIMIT_DEFAULT, GSHGEOM_STROKE_MITER_LIMIT_DEFAULT);
+  // Not a style: refused; nothing written.
+  GSHGEOM_Stroke untouched = want;
+  EXPECT_EQ(gshscene_resource_stroke_geometry(k.square.get(), &untouched), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_resource_stroke_geometry(nullptr, &untouched), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_resource_stroke_geometry(k.style.get(), nullptr), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(std::memcmp(&untouched, &want, sizeof want), 0);
 }
 
 TEST(StrokeRequired, AnisotropyIsDecidedOnTheComposedChain) {
@@ -1798,6 +1896,59 @@ TEST(StrokeDisposition, StrokeStyleIsDecidedAfterTheOtherRefusalsAndBeforeAnyApp
   fill.kind = GSHSCENE_ITEM_FILL;
   fill.style = nullptr;
   EXPECT_EQ(d(bare, fill).entry_class, 0);
+}
+
+TEST(StrokeDisposition, ARunCenterlineNeedsStrokeRunsAndIsRefusedBeforeTheStyle) {
+  Kit k;
+  GSHSCENE_Paint black = solid(0, 0, 0, 1);
+  GSHGEOM_Map id = translate(0, 0);
+  GSHSCENE_Color_Space srgb = srgb_space();
+  auto d = [&](const GSHSCENE_Sink_Caps & c, const GSHSCENE_Item & it) {
+    return gshscene_caps_disposition(&c, &it, nullptr, 0, nullptr, &srgb, nullptr);
+  };
+  GSHSCENE_Sink_Caps caps = all_caps();
+  GSHSCENE_Sink_Caps no_runs = caps;
+  no_runs.flags &= ~GSHSCENE_CAP_STROKE_RUNS;
+  GSHSCENE_Item outline_run = stroke_item(k, k.style.get(), id, black);
+  outline_run.resource = k.outline_run.get();
+  GSHSCENE_Item font_run = outline_run;
+  font_run.resource = k.font_run.get();
+  // A sink that strokes runs draws both kinds of run; one that does not refuses each, whatever the style says.
+  EXPECT_EQ(d(caps, outline_run).entry_class, 0);
+  EXPECT_EQ(d(caps, font_run).entry_class, 0);
+  for (const GSHSCENE_Item * it : {&outline_run, &font_run}) {
+    GSHSCENE_Disposition x = d(no_runs, *it);
+    EXPECT_EQ(x.entry_class, GSHSCENE_ENTRY_REFUSED);
+    EXPECT_EQ(x.reason, GSHSCENE_REASON_STROKE_CENTERLINE);
+    EXPECT_EQ(x.detail, 0u);
+  }
+  // A path is never refused for its centerline, and a fill of a run is a fill's business, not the stroke's.
+  EXPECT_EQ(d(no_runs, stroke_item(k, k.style.get(), id, black)).entry_class, 0);
+  GSHSCENE_Item fill = outline_run;
+  fill.kind = GSHSCENE_ITEM_FILL;
+  fill.style = nullptr;
+  EXPECT_EQ(d(no_runs, fill).entry_class, 0);
+  // The order: the kind, then a run from a font's provider, then the centerline, then the style.
+  GSHSCENE_Sink_Caps bare = no_runs;
+  bare.stroke_native = 0;
+  EXPECT_EQ(d(bare, outline_run).reason, GSHSCENE_REASON_STROKE_CENTERLINE) << "before the style";
+  GSHSCENE_Sink_Caps no_font = no_runs;
+  no_font.flags &= ~GSHSCENE_CAP_GLYPHS_FROM_FONT;
+  EXPECT_EQ(d(no_font, font_run).reason, GSHSCENE_REASON_GLYPH_SOURCE) << "the provider first";
+  GSHSCENE_Sink_Caps no_kind = no_runs;
+  no_kind.item_kinds &= ~(1u << GSHSCENE_ITEM_STROKE);
+  EXPECT_EQ(d(no_kind, outline_run).reason, GSHSCENE_REASON_ITEM_KIND);
+  // What draws nothing is not refused for what it would have drawn: width 0 and a singular map.
+  Ref zero;
+  Style z;
+  z.s.width = 0.0;
+  ASSERT_EQ(intern(k.s.store, z, &zero), GSHSCENE_OK);
+  GSHSCENE_Item flat_width = stroke_item(k, zero.get(), id, black);
+  flat_width.resource = k.outline_run.get();
+  EXPECT_EQ(d(no_runs, flat_width).entry_class, 0);
+  GSHSCENE_Item flat_map = outline_run;
+  flat_map.map = map_of(0, 0, 0, 1);
+  EXPECT_EQ(d(no_runs, flat_map).entry_class, 0);
 }
 
 TEST(StrokePlan, ThePlanningPassRefusesAndNoticesStrokesBeforeTheSinkIsCalled) {

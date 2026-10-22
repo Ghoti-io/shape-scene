@@ -366,7 +366,10 @@ writes `0 w` for it reports `APPROXIMATED`; neither fails strict.
 
 **SK9 Not invertible.** A stroke draws nothing, with a `NOTICE`, reason `MAP_NOT_INVERTIBLE`, exactly when some map of
 its chain (`T`, `I_1` to `I_k`, `M`, and `G` for a gradient paint) has a 2x2 linear part whose determinant is exactly
-zero (G11's condition), for both width spaces. It never fails strict. One predicate, `gshscene_stroke_notice`, is the
+zero (G11's condition), **or the composed map does** (`gshgeom_map_compose_chain` of `T I_1 ... I_k M`, decided by
+`gshgeom_stroke_map_invertible`): invertible factors can compose, by underflow, into a map of determinant exactly zero,
+which `shape-geometry` meets as its SG15. A composed map that cannot be formed (an overflow) is not a notice but the
+sink's resource limit, as a fill's is. Both width spaces. It never fails strict. One predicate, `gshscene_stroke_notice`, is the
 planning pass's and every sink's: `MAP_NOT_INVERTIBLE`, then `STROKE_ZERO_WIDTH`, then `GRADIENT_DEGENERATE`. A stroke
 that draws nothing requires no feature of a sink (SK11): it is never refused for its style.
 
@@ -388,7 +391,7 @@ dashed stroke, twice the width inside and outside), sharing nothing with that fu
 finds drawn differently to lie inside the damage.
 
 **SK11 Sinks (S20).** A sink that draws strokes has bit `1 << 7` in its caps' `item_kinds`; without it a stroke is
-refused, `ITEM_KIND`, as any kind is (shape-cpu until strokes story S4). `GSHSCENE_Sink_Caps.stroke_native` (carved from
+refused, `ITEM_KIND`, as any kind is. `GSHSCENE_Sink_Caps.stroke_native` (carved from
 `_reserved`) names one bit per feature the sink emits as a stroke: `JOIN_MITER`, `JOIN_ROUND`, `JOIN_BEVEL`,
 `JOIN_MITER_CLIP`, `JOIN_ARCS`, `CAP_BUTT`, `CAP_ROUND`, `CAP_SQUARE`, `WIDTH_LOCAL`, `WIDTH_LOCAL_ANISOTROPIC` (a
 local width under a map that is not a similarity: the elliptical pen), `WIDTH_DEVICE`, `DASH`, `DASH_PATH_SCOPE`,
@@ -408,6 +411,19 @@ the stroke is drawn as a stroke; else, with `STROKE_EXPAND`, it is drawn with no
 alone, and an exact expansion is what was asked, not an approximation); else it is `REFUSED`, reason `STROKE_STYLE`,
 the missing features in the disposition's `detail` and the entry's `second`. A run from a font still needs
 `GLYPHS_FROM_FONT`, and a gradient paint the gradient rules, before the style is decided.
+
+A stroke whose centerline is a glyph run is drawn only by a sink that says so, `GSHSCENE_CAP_STROKE_RUNS` (flag bit 13):
+the glyphs of a run are one region (SG13), which the sink must unite. Without the flag the planning pass refuses the
+stroke, reason `STROKE_CENTERLINE` (30), after the refusals every item can have (`GLYPH_SOURCE`, the gradient and the
+palette) and before the style's, so that strict fails before the target is touched and the stroke is never drawn as
+nothing. A stroke that draws nothing (its notice) is not refused for what it would have drawn, as it requires no
+feature. The test sink's default configuration claims the flag and the toolpath-like one does not; a writer or a GPU
+sink states it for itself.
+
+`gshscene_resource_stroke_geometry` converts a style to `shape-geometry`'s parameters, field by field: every
+enumeration is asserted equal at compile time (the libraries state them separately), the doubles are copied, `dashes`
+points into the resource (valid while a handle is held), the width profile is NULL. A sink and the test sink call it, so
+that no sink restates the table.
 
 **SK12 Hash and dump (the style).** Every format stays 1, and no existing hash or dump changes: no resource from before
 strokes is a style. Resource kind 8, format 1: `u32` 1, `u32` 8, `f64` width, `u8` width space, `u8` join, `f64` miter
@@ -901,7 +917,7 @@ conformance suite (`tests/sink_conformance.h`) cite the rules by number.
 - **S20 Strokes** (strokes story S1; SK1 to SK14 above). A stroke reaches a sink by its centerline and style handles in
   model space: nothing in the contract expands, flattens or offsets it. A sink reads the style with
   `gshscene_resource_stroke_style`, decides each stroke with `gshscene_caps_disposition` (SK11) and skips by
-  `gshscene_stroke_notice` (SK9). A writer emits a native stroke as a stroke, deduped by the style's id, and expands
+  `gshscene_stroke_notice` (SK9), and a stroke of a glyph run only with `STROKE_RUNS`. A writer emits a native stroke as a stroke, deduped by the style's id, and expands
   only a stroke whose required features it lacks; a toolpath sink follows the centerline and refuses what its caps
   lack; a GPU sink later strokes natively within its tolerance or expands. A device width on a stream is in CSS pixels.
 - **S17 Gradients** (color-paint story P1). A gradient reaches a sink by handle. A kind not in the caps'

@@ -192,6 +192,15 @@ GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps, 
       return d;
     }
   }
+  /* S20, SK7: a stroke of a run is one region of all its glyphs (SG13), which only a sink that says so unites.  A
+   * stroke that draws nothing (its notice) is not refused for what it would have drawn. */
+  if (item->kind == GSHSCENE_ITEM_STROKE && !(caps->flags & GSHSCENE_CAP_STROKE_RUNS) && item->resource &&
+      item->resource->kind == GSHSCENE_RESOURCE_GLYPH_RUN &&
+      !gshscene_stroke_notice(item, instance_maps, instance_count, target_map)) {
+    d.entry_class = GSHSCENE_ENTRY_REFUSED;
+    d.reason = GSHSCENE_REASON_STROKE_CENTERLINE;
+    return d;
+  }
   /* S20, SK11: the features the stroke requires and the sink does not emit, unless it expands; after every other
    * refusal and before any approximation, which would otherwise hide it. */
   if (item->kind == GSHSCENE_ITEM_STROKE && !(caps->flags & GSHSCENE_CAP_STROKE_EXPAND)) {

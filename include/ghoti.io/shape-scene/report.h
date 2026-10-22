@@ -161,6 +161,7 @@ typedef enum GSHSCENE_Reason {
   GSHSCENE_REASON_SOFT_MASK = 27,       ///< Refused, per group: a group with a soft mask, which the sink does not apply (T7, S19).
   GSHSCENE_REASON_STROKE_STYLE = 28,    ///< Refused, per stroke: a feature of its style the sink neither emits nor expands; `second` names the missing ones (stroke.h, SK11).
   GSHSCENE_REASON_STROKE_ZERO_WIDTH = 29, ///< Notice, per stroke: its width is 0, so it draws nothing (stroke.h, SK8).
+  GSHSCENE_REASON_STROKE_CENTERLINE = 30, ///< Refused, per stroke: its centerline is a glyph run and the sink does not stroke runs (sink.h, S20).
   GSHSCENE_REASON_COUNT               ///< Closes the enum.
 } GSHSCENE_Reason;
 

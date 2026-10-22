@@ -130,8 +130,12 @@
  * **SK9 Not invertible.**  A stroke draws nothing, with a `NOTICE`, reason
  * `MAP_NOT_INVERTIBLE`, exactly when some map of its chain (`T`, `I_1` to `I_k`,
  * `M`, and `G` for a gradient paint) has a 2x2 linear part whose determinant is
- * exactly zero (G11's condition, `gshgeom_orient2d`'s exact sign), for both width
- * spaces.  It never fails strict.  One predicate, ::gshscene_stroke_notice, is the
+ * exactly zero (G11's condition, `gshgeom_orient2d`'s exact sign), **or the
+ * composed map does** (`gshgeom_map_compose_chain` of `T I_1 ... I_k M`, decided by
+ * `gshgeom_stroke_map_invertible`: invertible factors can compose, by underflow, into
+ * a map of determinant exactly zero, which `shape-geometry` meets as its SG15; a
+ * composed map that cannot be formed is the sink's resource limit, not a notice),
+ * for both width spaces.  It never fails strict.  One predicate, ::gshscene_stroke_notice, is the
  * planning pass's and every sink's: `MAP_NOT_INVERTIBLE`, then `STROKE_ZERO_WIDTH`,
  * then `GRADIENT_DEGENERATE` (G10 of the paint).
  *
@@ -220,6 +224,7 @@
 #include <ghoti.io/shape-geometry/curve.h>
 #include <ghoti.io/shape-geometry/fill.h>
 #include <ghoti.io/shape-geometry/map.h>
+#include <ghoti.io/shape-geometry/stroke.h>
 
 #include <stddef.h>
 #include <stdint.h>
@@ -350,6 +355,17 @@ GSHSCENE_API GSHSCENE_Result gshscene_store_intern_stroke_style(GSHSCENE_Store *
  */
 GSHSCENE_API GSHSCENE_Result gshscene_resource_stroke_style(const GSHSCENE_Resource * resource,
     GSHSCENE_Stroke_Style * out);
+
+/**
+ * @brief A stroke style as `shape-geometry`'s parameters (strokes story S4, SC2): every field copied, row by row, the
+ *   enumerations asserted equal at compile time; the sink calls this and then the expansion.
+ *
+ * @param resource A stroke style.
+ * @param out Written only on success; its `dashes` point into the resource and are valid while a handle is held.
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, not a stroke style); ::GSHSCENE_ERR_INTERNAL if
+ *   `gshgeom_stroke_check` refuses it (SK2 equals SG2, so a style the store holds never is).
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_resource_stroke_geometry(const GSHSCENE_Resource * resource, GSHGEOM_Stroke * out);
 
 /**
  * @brief Whether a stroke draws nothing (SK8, SK9), and why: the one predicate of the planning pass's `NOTICE` and
