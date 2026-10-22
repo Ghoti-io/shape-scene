@@ -41245,28 +41245,10 @@
 ]
 ],
 [
-"bk-141-del",
-"srcl",
-"src/resource/stroke.c",
-"141:out->degenerate = in->degenerate;",
-";",
-[
-"testStroke",
-"testDiff",
-"testDump",
-"testDump_sink",
-"testResource",
-"testSink",
-"fuzz-replay",
-"fuzz-render",
-"probe"
-]
-],
-[
 "bk-142-del",
 "srcl",
 "src/resource/stroke.c",
-"142:out->alignment = in->alignment;",
+"143:out->alignment = in->alignment;",
 ";",
 [
 "testStroke",
@@ -41284,7 +41266,7 @@
 "bk-143-eq",
 "srcl",
 "src/resource/stroke.c",
-"143:==",
+"144:==",
 "!=",
 [
 "testStroke",
@@ -41302,7 +41284,7 @@
 "bk-143-del",
 "srcl",
 "src/resource/stroke.c",
-"143:out->alignment_rule = in->alignment == (uint32_t)GSHSCENE_STROKE_ALIGN_CENTER ? GSHGEOM_FILL_NONZERO : in->alignment_rule;",
+"144:out->alignment_rule = in->alignment == (uint32_t)GSHSCENE_STROKE_ALIGN_CENTER ? GSHGEOM_FILL_NONZERO : in->alignment_rule;",
 ";",
 [
 "testStroke",
@@ -41320,7 +41302,7 @@
 "bk-144-del",
 "srcl",
 "src/resource/stroke.c",
-"144:out->dash_count = count;",
+"145:out->dash_count = count;",
 ";",
 [
 "testStroke",
@@ -41338,7 +41320,7 @@
 "bk-145-del",
 "srcl",
 "src/resource/stroke.c",
-"145:out->dashes = count ? dashes : NULL;",
+"146:out->dashes = count ? dashes : NULL;",
 ";",
 [
 "testStroke",
@@ -41356,7 +41338,7 @@
 "bk-146-neg",
 "srcl",
 "src/resource/stroke.c",
-"146:(count)",
+"147:(count)",
 "(!(count))",
 [
 "testStroke",
@@ -41374,7 +41356,7 @@
 "bk-150-del",
 "srcl",
 "src/resource/stroke.c",
-"150:out->dash_offset = canonical_zero(in->dash_offset);",
+"151:out->dash_offset = canonical_zero(in->dash_offset);",
 ";",
 [
 "testStroke",
@@ -41392,7 +41374,7 @@
 "bk-151-del",
 "srcl",
 "src/resource/stroke.c",
-"151:out->dash_scope = in->dash_scope;",
+"152:out->dash_scope = in->dash_scope;",
 ";",
 [
 "testStroke",
@@ -41410,7 +41392,7 @@
 "bk-163-del",
 "srcl",
 "src/resource/stroke.c",
-"163:gshgeom_hash_init(&h);",
+"164:gshgeom_hash_init(&h);",
 ";",
 [
 "testStroke",
@@ -41428,7 +41410,7 @@
 "bk-164-del",
 "srcl",
 "src/resource/stroke.c",
-"164:gshgeom_hash_u32(&h, STROKE_FORMAT_VERSION);",
+"165:gshgeom_hash_u32(&h, STROKE_FORMAT_VERSION);",
 ";",
 [
 "testStroke",
@@ -41446,7 +41428,7 @@
 "bk-164-hwu32",
 "srcl",
 "src/resource/stroke.c",
-"164:gshgeom_hash_u32(",
+"165:gshgeom_hash_u32(",
 "gshgeom_hash_u64(",
 [
 "testStroke",
@@ -41464,7 +41446,7 @@
 "bk-165-del",
 "srcl",
 "src/resource/stroke.c",
-"165:gshgeom_hash_u32(&h, (uint32_t)GSHSCENE_RESOURCE_STROKE_STYLE);",
+"166:gshgeom_hash_u32(&h, (uint32_t)GSHSCENE_RESOURCE_STROKE_STYLE);",
 ";",
 [
 "testStroke",
@@ -41482,7 +41464,7 @@
 "bk-165-hwu32",
 "srcl",
 "src/resource/stroke.c",
-"165:gshgeom_hash_u32(",
+"166:gshgeom_hash_u32(",
 "gshgeom_hash_u64(",
 [
 "testStroke",
@@ -41500,7 +41482,7 @@
 "bk-166-del",
 "srcl",
 "src/resource/stroke.c",
-"166:gshgeom_hash_f64(&h, s->width);",
+"167:gshgeom_hash_f64(&h, s->width);",
 ";",
 [
 "testStroke",
@@ -41518,7 +41500,7 @@
 "bk-167-del",
 "srcl",
 "src/resource/stroke.c",
-"167:gshgeom_hash_u8(&h, (uint8_t)s->width_space);",
+"168:gshgeom_hash_u8(&h, (uint8_t)s->width_space);",
 ";",
 [
 "testStroke",
@@ -41536,7 +41518,7 @@
 "bk-167-hwu8",
 "srcl",
 "src/resource/stroke.c",
-"167:gshgeom_hash_u8(",
+"168:gshgeom_hash_u8(",
 "gshgeom_hash_u32(",
 [
 "testStroke",
@@ -41554,7 +41536,7 @@
 "bk-168-del",
 "srcl",
 "src/resource/stroke.c",
-"168:gshgeom_hash_u8(&h, (uint8_t)s->join);",
+"169:gshgeom_hash_u8(&h, (uint8_t)s->join);",
 ";",
 [
 "testStroke",
@@ -41572,7 +41554,7 @@
 "bk-168-hwu8",
 "srcl",
 "src/resource/stroke.c",
-"168:gshgeom_hash_u8(",
+"169:gshgeom_hash_u8(",
 "gshgeom_hash_u32(",
 [
 "testStroke",
@@ -41590,7 +41572,7 @@
 "bk-169-del",
 "srcl",
 "src/resource/stroke.c",
-"169:gshgeom_hash_f64(&h, s->miter_limit);",
+"170:gshgeom_hash_f64(&h, s->miter_limit);",
 ";",
 [
 "testStroke",
@@ -41608,7 +41590,7 @@
 "bk-170-del",
 "srcl",
 "src/resource/stroke.c",
-"170:gshgeom_hash_u8(&h, (uint8_t)s->cap);",
+"171:gshgeom_hash_u8(&h, (uint8_t)s->cap);",
 ";",
 [
 "testStroke",
@@ -41626,7 +41608,7 @@
 "bk-170-hwu8",
 "srcl",
 "src/resource/stroke.c",
-"170:gshgeom_hash_u8(",
+"171:gshgeom_hash_u8(",
 "gshgeom_hash_u32(",
 [
 "testStroke",
@@ -41644,7 +41626,7 @@
 "bk-171-del",
 "srcl",
 "src/resource/stroke.c",
-"171:gshgeom_hash_u8(&h, (uint8_t)s->degenerate);",
+"172:gshgeom_hash_u8(&h, (uint8_t)s->degenerate);",
 ";",
 [
 "testStroke",
@@ -41662,7 +41644,7 @@
 "bk-171-hwu8",
 "srcl",
 "src/resource/stroke.c",
-"171:gshgeom_hash_u8(",
+"172:gshgeom_hash_u8(",
 "gshgeom_hash_u32(",
 [
 "testStroke",
@@ -41680,7 +41662,7 @@
 "bk-172-del",
 "srcl",
 "src/resource/stroke.c",
-"172:gshgeom_hash_u8(&h, (uint8_t)s->alignment);",
+"173:gshgeom_hash_u8(&h, (uint8_t)s->alignment);",
 ";",
 [
 "testStroke",
@@ -41698,7 +41680,7 @@
 "bk-172-hwu8",
 "srcl",
 "src/resource/stroke.c",
-"172:gshgeom_hash_u8(",
+"173:gshgeom_hash_u8(",
 "gshgeom_hash_u32(",
 [
 "testStroke",
@@ -41716,7 +41698,7 @@
 "bk-173-del",
 "srcl",
 "src/resource/stroke.c",
-"173:gshgeom_hash_u8(&h, (uint8_t)s->alignment_rule);",
+"174:gshgeom_hash_u8(&h, (uint8_t)s->alignment_rule);",
 ";",
 [
 "testStroke",
@@ -41734,7 +41716,7 @@
 "bk-173-hwu8",
 "srcl",
 "src/resource/stroke.c",
-"173:gshgeom_hash_u8(",
+"174:gshgeom_hash_u8(",
 "gshgeom_hash_u32(",
 [
 "testStroke",
@@ -41752,7 +41734,7 @@
 "bk-174-del",
 "srcl",
 "src/resource/stroke.c",
-"174:gshgeom_hash_u8(&h, (uint8_t)s->dash_scope);",
+"175:gshgeom_hash_u8(&h, (uint8_t)s->dash_scope);",
 ";",
 [
 "testStroke",
@@ -41770,7 +41752,7 @@
 "bk-174-hwu8",
 "srcl",
 "src/resource/stroke.c",
-"174:gshgeom_hash_u8(",
+"175:gshgeom_hash_u8(",
 "gshgeom_hash_u32(",
 [
 "testStroke",
@@ -41788,7 +41770,7 @@
 "bk-175-del",
 "srcl",
 "src/resource/stroke.c",
-"175:gshgeom_hash_f64(&h, s->dash_offset);",
+"176:gshgeom_hash_f64(&h, s->dash_offset);",
 ";",
 [
 "testStroke",
@@ -41806,7 +41788,7 @@
 "bk-176-del",
 "srcl",
 "src/resource/stroke.c",
-"176:gshgeom_hash_u64(&h, (uint64_t)s->dash_count);",
+"177:gshgeom_hash_u64(&h, (uint64_t)s->dash_count);",
 ";",
 [
 "testStroke",
@@ -41824,7 +41806,7 @@
 "bk-176-hwu64",
 "srcl",
 "src/resource/stroke.c",
-"176:gshgeom_hash_u64(",
+"177:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testStroke",
@@ -41842,7 +41824,7 @@
 "bk-177-lt",
 "srcl",
 "src/resource/stroke.c",
-"177:<",
+"178:<",
 "<=",
 [
 "testStroke",
@@ -41860,7 +41842,7 @@
 "bk-178-del",
 "srcl",
 "src/resource/stroke.c",
-"178:gshgeom_hash_f64(&h, s->dashes[i]);",
+"179:gshgeom_hash_f64(&h, s->dashes[i]);",
 ";",
 [
 "testStroke",
@@ -41878,7 +41860,7 @@
 "bk-180-del",
 "srcl",
 "src/resource/stroke.c",
-"180:gshgeom_hash_u64(&h, s->width_profile ? gshscene_resource_hash(s->width_profile) : 0);",
+"181:gshgeom_hash_u64(&h, s->width_profile ? gshscene_resource_hash(s->width_profile) : 0);",
 ";",
 [
 "testStroke",
@@ -41896,7 +41878,7 @@
 "bk-180-hwu64",
 "srcl",
 "src/resource/stroke.c",
-"180:gshgeom_hash_u64(",
+"181:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testStroke",
@@ -41914,7 +41896,7 @@
 "bk-185-eq",
 "srcl",
 "src/resource/stroke.c",
-"185:==",
+"186:==",
 "!=",
 [
 "testStroke",
@@ -41932,7 +41914,7 @@
 "bk-191-ne",
 "srcl",
 "src/resource/stroke.c",
-"191:ce != b-",
+"192:ce != b-",
 "ce == b-",
 [
 "testStroke",
@@ -41950,7 +41932,7 @@
 "bk-191-ne2",
 "srcl",
 "src/resource/stroke.c",
-"191:in != b-",
+"192:in != b-",
 "in == b-",
 [
 "testStroke",
@@ -41968,7 +41950,7 @@
 "bk-192-ne",
 "srcl",
 "src/resource/stroke.c",
-"192:ap != b-",
+"193:ap != b-",
 "ap == b-",
 [
 "testStroke",
@@ -41986,7 +41968,7 @@
 "bk-192-ne2",
 "srcl",
 "src/resource/stroke.c",
-"192:te != b-",
+"193:te != b-",
 "te == b-",
 [
 "testStroke",
@@ -42004,7 +41986,7 @@
 "bk-193-ne",
 "srcl",
 "src/resource/stroke.c",
-"193:nt != b-",
+"194:nt != b-",
 "nt == b-",
 [
 "testStroke",
@@ -42022,7 +42004,7 @@
 "bk-193-ne2",
 "srcl",
 "src/resource/stroke.c",
-"193:le != b-",
+"194:le != b-",
 "le == b-",
 [
 "testStroke",
@@ -42040,7 +42022,7 @@
 "bk-193-ne3",
 "srcl",
 "src/resource/stroke.c",
-"193:pe != b-",
+"194:pe != b-",
 "pe == b-",
 [
 "testStroke",
@@ -42058,7 +42040,7 @@
 "bk-194-ne",
 "srcl",
 "src/resource/stroke.c",
-"194:!=",
+"195:!=",
 "==",
 [
 "testStroke",
@@ -42076,7 +42058,7 @@
 "bk-195-ne",
 "srcl",
 "src/resource/stroke.c",
-"195:!=",
+"196:!=",
 "==",
 [
 "testStroke",
@@ -42094,7 +42076,7 @@
 "bk-198-lt",
 "srcl",
 "src/resource/stroke.c",
-"198:<",
+"199:<",
 "<=",
 [
 "testStroke",
@@ -42112,7 +42094,7 @@
 "bk-199-neg",
 "srcl",
 "src/resource/stroke.c",
-"199:(!same_bits(a->dashes[i], b->dashes[i]))",
+"200:(!same_bits(a->dashes[i], b->dashes[i]))",
 "(!(!same_bits(a->dashes[i], b->dashes[i])))",
 [
 "testStroke",
@@ -42130,7 +42112,7 @@
 "bk-211-neg",
 "srcl",
 "src/resource/stroke.c",
-"211:(!resource)",
+"212:(!resource)",
 "(!(!resource))",
 [
 "testStroke",
@@ -42148,7 +42130,7 @@
 "bk-214-neg",
 "srcl",
 "src/resource/stroke.c",
-"214:(s->dash_count)",
+"215:(s->dash_count)",
 "(!(s->dash_count))",
 [
 "testStroke",
@@ -42166,7 +42148,7 @@
 "bk-215-del",
 "srcl",
 "src/resource/stroke.c",
-"215:resource->u.stroke.dashes = gshscene_alloc(&store->alloc, s->dash_count * sizeof(double));",
+"216:resource->u.stroke.dashes = gshscene_alloc(&store->alloc, s->dash_count * sizeof(double));",
 ";",
 [
 "testStroke",
@@ -42184,7 +42166,7 @@
 "bk-217-del",
 "srcl",
 "src/resource/stroke.c",
-"217:gshscene_store_discard_resource(resource);",
+"218:gshscene_store_discard_resource(resource);",
 ";",
 [
 "testStroke",
@@ -42202,7 +42184,7 @@
 "bk-220-del",
 "srcl",
 "src/resource/stroke.c",
-"220:memcpy(resource->u.stroke.dashes, s->dashes, s->dash_count * sizeof(double));",
+"221:memcpy(resource->u.stroke.dashes, s->dashes, s->dash_count * sizeof(double));",
 ";",
 [
 "testStroke",
@@ -42220,7 +42202,7 @@
 "bk-222-del",
 "srcl",
 "src/resource/stroke.c",
-"222:resource->u.stroke.s = *s;",
+"223:resource->u.stroke.s = *s;",
 ";",
 [
 "testStroke",
@@ -42238,7 +42220,7 @@
 "bk-223-del",
 "srcl",
 "src/resource/stroke.c",
-"223:resource->u.stroke.s.dashes = resource->u.stroke.dashes;",
+"224:resource->u.stroke.s.dashes = resource->u.stroke.dashes;",
 ";",
 [
 "testStroke",
@@ -42256,7 +42238,7 @@
 "bk-234-neg",
 "srcl",
 "src/resource/stroke.c",
-"234:(!store || !style || !out)",
+"235:(!store || !style || !out)",
 "(!(!store || !style || !out))",
 [
 "testStroke",
@@ -42274,7 +42256,7 @@
 "bk-235-ret",
 "srcl",
 "src/resource/stroke.c",
-"235:GSHSCENE_ERR_INVALID",
+"236:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testStroke",
@@ -42292,7 +42274,7 @@
 "bk-238-ne",
 "srcl",
 "src/resource/stroke.c",
-"238:!=",
+"239:!=",
 "==",
 [
 "testStroke",
@@ -42310,7 +42292,7 @@
 "bk-238-neg",
 "srcl",
 "src/resource/stroke.c",
-"238:(result != GSHSCENE_OK)",
+"239:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testStroke",
@@ -42328,7 +42310,7 @@
 "bk-245-or",
 "srcl",
 "src/resource/stroke.c",
-"245:||",
+"246:||",
 "&&",
 [
 "testStroke",
@@ -42346,7 +42328,7 @@
 "bk-245-gt",
 "srcl",
 "src/resource/stroke.c",
-"245:>",
+"246:>",
 ">=",
 [
 "testStroke",
@@ -42364,7 +42346,7 @@
 "bk-245-neg",
 "srcl",
 "src/resource/stroke.c",
-"245:(!bounded(style) || count > most)",
+"246:(!bounded(style) || count > most)",
 "(!(!bounded(style) || count > most))",
 [
 "testStroke",
@@ -42382,7 +42364,7 @@
 "bk-246-ret",
 "srcl",
 "src/resource/stroke.c",
-"246:GSHSCENE_ERR_LIMIT",
+"247:GSHSCENE_ERR_LIMIT",
 "GSHSCENE_ERR_INVALID",
 [
 "testStroke",
@@ -42400,7 +42382,7 @@
 "bk-249-neg",
 "srcl",
 "src/resource/stroke.c",
-"249:(count)",
+"250:(count)",
 "(!(count))",
 [
 "testStroke",
@@ -42418,7 +42400,7 @@
 "bk-250-del",
 "srcl",
 "src/resource/stroke.c",
-"250:dashes = gshscene_alloc(&store->alloc, count * sizeof *dashes);",
+"251:dashes = gshscene_alloc(&store->alloc, count * sizeof *dashes);",
 ";",
 [
 "testStroke",
@@ -42436,7 +42418,7 @@
 "bk-251-neg",
 "srcl",
 "src/resource/stroke.c",
-"251:(!dashes)",
+"252:(!dashes)",
 "(!(!dashes))",
 [
 "testStroke",
@@ -42454,7 +42436,7 @@
 "bk-256-del",
 "srcl",
 "src/resource/stroke.c",
-"256:canonical(style, count, dashes, &s);",
+"257:canonical(style, count, dashes, &s);",
 ";",
 [
 "testStroke",
@@ -42472,7 +42454,7 @@
 "bk-260-del",
 "srcl",
 "src/resource/stroke.c",
-"260:gshscene_free(&store->alloc, dashes);",
+"261:gshscene_free(&store->alloc, dashes);",
 ";",
 [
 "testStroke",
@@ -42490,7 +42472,7 @@
 "bk-265-ne",
 "srcl",
 "src/resource/stroke.c",
-"265:!=",
+"266:!=",
 "==",
 [
 "testStroke",
@@ -42508,7 +42490,7 @@
 "bk-265-neg",
 "srcl",
 "src/resource/stroke.c",
-"265:(!resource || !out || resource->kind != GSHSCENE_RESOURCE_STROKE_STYLE)",
+"266:(!resource || !out || resource->kind != GSHSCENE_RESOURCE_STROKE_STYLE)",
 "(!(!resource || !out || resource->kind != GSHSCENE_RESOURCE_STROKE_STYLE))",
 [
 "testStroke",
@@ -42526,7 +42508,7 @@
 "bk-266-ret",
 "srcl",
 "src/resource/stroke.c",
-"266:GSHSCENE_ERR_INVALID",
+"267:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testStroke",
@@ -42544,7 +42526,7 @@
 "bk-277-str",
 "srcl",
 "src/resource/stroke.c",
-"277:  \"stro",
+"278:  \"stro",
 "  \"Ztro",
 [
 "testStroke",
@@ -42562,7 +42544,7 @@
 "bk-277-wd",
 "srcl",
 "src/resource/stroke.c",
-"277:th=%016llx sp",
+"278:th=%016llx sp",
 "th=%llx sp",
 [
 "testStroke",
@@ -42580,7 +42562,7 @@
 "bk-278-wd",
 "srcl",
 "src/resource/stroke.c",
-"278:et=%016llx da",
+"279:et=%016llx da",
 "et=%llx da",
 [
 "testStroke",
@@ -42598,7 +42580,7 @@
 "bk-278-wd2",
 "srcl",
 "src/resource/stroke.c",
-"278:le=%016llx\\n\"",
+"279:le=%016llx\\n\"",
 "le=%llx\\n\"",
 [
 "testStroke",
@@ -42616,7 +42598,7 @@
 "bk-285-lt",
 "srcl",
 "src/resource/stroke.c",
-"285:<",
+"286:<",
 "<=",
 [
 "testStroke",
@@ -42634,7 +42616,7 @@
 "bk-286-neg",
 "srcl",
 "src/resource/stroke.c",
-"286:(fprintf(out, \"d %016llx\\n\", HEX(gshgeom_f64_bits(s->dashes[i]))) < 0)",
+"287:(fprintf(out, \"d %016llx\\n\", HEX(gshgeom_f64_bits(s->dashes[i]))) < 0)",
 "(!(fprintf(out, \"d %016llx\\n\", HEX(gshgeom_f64_bits(s->dashes[i]))) < 0))",
 [
 "testStroke",
@@ -42652,7 +42634,7 @@
 "bk-320-eq",
 "srcl",
 "src/resource/stroke.c",
-"320:==",
+"321:==",
 "!=",
 [
 "testStroke",
@@ -42670,7 +42652,7 @@
 "bk-320-neg",
 "srcl",
 "src/resource/stroke.c",
-"320:(x == 0.0)",
+"321:(x == 0.0)",
 "(!(x == 0.0))",
 [
 "testStroke",
@@ -42688,7 +42670,7 @@
 "bk-324-del",
 "srcl",
 "src/resource/stroke.c",
-"324:bits = x > 0.0 ? bits + 1u : bits - 1u;",
+"325:bits = x > 0.0 ? bits + 1u : bits - 1u;",
 ";",
 [
 "testStroke",
@@ -42706,7 +42688,7 @@
 "bk-326-del",
 "srcl",
 "src/resource/stroke.c",
-"326:memcpy(&y, &bits, sizeof y);",
+"327:memcpy(&y, &bits, sizeof y);",
 ";",
 [
 "testStroke",
@@ -42724,7 +42706,7 @@
 "bk-335-gt",
 "srcl",
 "src/resource/stroke.c",
-"335:>",
+"336:>",
 ">=",
 [
 "testStroke",
@@ -42742,7 +42724,7 @@
 "bk-346-eq",
 "srcl",
 "src/resource/stroke.c",
-"346:==",
+"347:==",
 "!=",
 [
 "testStroke",
@@ -42760,7 +42742,7 @@
 "bk-346-neg",
 "srcl",
 "src/resource/stroke.c",
-"346:(s->join == (uint32_t)GSHSCENE_STROKE_JOIN_MITER)",
+"347:(s->join == (uint32_t)GSHSCENE_STROKE_JOIN_MITER)",
 "(!(s->join == (uint32_t)GSHSCENE_STROKE_JOIN_MITER))",
 [
 "testStroke",
@@ -42778,7 +42760,7 @@
 "bk-348-eq",
 "srcl",
 "src/resource/stroke.c",
-"348:(s->join == (uint32_",
+"349:(s->join == (uint32_",
 "(s->join != (uint32_",
 [
 "testStroke",
@@ -42796,7 +42778,7 @@
 "bk-348-or",
 "srcl",
 "src/resource/stroke.c",
-"348:||",
+"349:||",
 "&&",
 [
 "testStroke",
@@ -42814,7 +42796,7 @@
 "bk-348-eq2",
 "srcl",
 "src/resource/stroke.c",
-"348: s->join == (uint32_",
+"349: s->join == (uint32_",
 " s->join != (uint32_",
 [
 "testStroke",
@@ -42832,7 +42814,7 @@
 "bk-348-neg",
 "srcl",
 "src/resource/stroke.c",
-"348:(s->join == (uint32_t)GSHSCENE_STROKE_JOIN_MITER_CLIP || s->join == (uint32_t)GSHSCENE_STROKE_JOIN_ARCS)",
+"349:(s->join == (uint32_t)GSHSCENE_STROKE_JOIN_MITER_CLIP || s->join == (uint32_t)GSHSCENE_STROKE_JOIN_ARCS)",
 "(!(s->join == (uint32_t)GSHSCENE_STROKE_JOIN_MITER_CLIP || s->join == (uint32_t)GSHSCENE_STROKE_JOIN_ARCS))",
 [
 "testStroke",
@@ -42850,7 +42832,7 @@
 "bk-351-eq",
 "srcl",
 "src/resource/stroke.c",
-"351:==",
+"352:==",
 "!=",
 [
 "testStroke",
@@ -42868,7 +42850,7 @@
 "bk-351-and",
 "srcl",
 "src/resource/stroke.c",
-"351:&&",
+"352:&&",
 "||",
 [
 "testStroke",
@@ -42886,7 +42868,7 @@
 "bk-351-neg",
 "srcl",
 "src/resource/stroke.c",
-"351:(s->cap == (uint32_t)GSHSCENE_STROKE_CAP_SQUARE && f < 1.5)",
+"352:(s->cap == (uint32_t)GSHSCENE_STROKE_CAP_SQUARE && f < 1.5)",
 "(!(s->cap == (uint32_t)GSHSCENE_STROKE_CAP_SQUARE && f < 1.5))",
 [
 "testStroke",
@@ -42904,7 +42886,7 @@
 "bk-354-eq",
 "srcl",
 "src/resource/stroke.c",
-"354:==",
+"355:==",
 "!=",
 [
 "testStroke",
@@ -42922,7 +42904,7 @@
 "bk-361-ne",
 "srcl",
 "src/resource/stroke.c",
-"361:!=",
+"362:!=",
 "==",
 [
 "testStroke",
@@ -42940,7 +42922,7 @@
 "bk-361-eq",
 "srcl",
 "src/resource/stroke.c",
-"361:==",
+"362:==",
 "!=",
 [
 "testStroke",
@@ -42958,7 +42940,7 @@
 "bk-362-ne",
 "srcl",
 "src/resource/stroke.c",
-"362:im != 2 ",
+"363:im != 2 ",
 "im == 2 ",
 [
 "testStroke",
@@ -42976,7 +42958,7 @@
 "bk-362-ne2",
 "srcl",
 "src/resource/stroke.c",
-"362:d) != GS",
+"363:d) != GS",
 "d) == GS",
 [
 "testStroke",
@@ -42994,7 +42976,7 @@
 "bk-363-ret",
 "srcl",
 "src/resource/stroke.c",
-"363:GSHSCENE_ERR_INVALID",
+"364:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testStroke",
@@ -43012,7 +42994,7 @@
 "bk-368-del",
 "srcl",
 "src/resource/stroke.c",
-"368:b.empty = 1;",
+"369:b.empty = 1;",
 ";",
 [
 "testStroke",
@@ -43030,7 +43012,7 @@
 "bk-369-or",
 "srcl",
 "src/resource/stroke.c",
-"369:||",
+"370:||",
 "&&",
 [
 "testStroke",
@@ -43048,7 +43030,7 @@
 "bk-369-eq",
 "srcl",
 "src/resource/stroke.c",
-"369:==",
+"370:==",
 "!=",
 [
 "testStroke",
@@ -43066,7 +43048,7 @@
 "bk-369-neg",
 "srcl",
 "src/resource/stroke.c",
-"369:(centerline->empty || s->width == 0.0)",
+"370:(centerline->empty || s->width == 0.0)",
 "(!(centerline->empty || s->width == 0.0))",
 [
 "testStroke",
@@ -43084,7 +43066,7 @@
 "bk-373-eq",
 "srcl",
 "src/resource/stroke.c",
-"373:==",
+"374:==",
 "!=",
 [
 "testStroke",
@@ -43102,7 +43084,7 @@
 "bk-379-neg",
 "srcl",
 "src/resource/stroke.c",
-"379:(!device)",
+"380:(!device)",
 "(!(!device))",
 [
 "testStroke",
@@ -43120,7 +43102,7 @@
 "bk-381-del",
 "srcl",
 "src/resource/stroke.c",
-"381:x0 = sub_down(x0, h);",
+"382:x0 = sub_down(x0, h);",
 ";",
 [
 "testStroke",
@@ -43138,7 +43120,7 @@
 "bk-382-del",
 "srcl",
 "src/resource/stroke.c",
-"382:y0 = sub_down(y0, h);",
+"383:y0 = sub_down(y0, h);",
 ";",
 [
 "testStroke",
@@ -43156,7 +43138,7 @@
 "bk-383-del",
 "srcl",
 "src/resource/stroke.c",
-"383:x1 = add_up(x1, h);",
+"384:x1 = add_up(x1, h);",
 ";",
 [
 "testStroke",
@@ -43174,7 +43156,7 @@
 "bk-384-del",
 "srcl",
 "src/resource/stroke.c",
-"384:y1 = add_up(y1, h);",
+"385:y1 = add_up(y1, h);",
 ";",
 [
 "testStroke",
@@ -43192,7 +43174,7 @@
 "bk-388-lt",
 "srcl",
 "src/resource/stroke.c",
-"388:<",
+"389:<",
 "<=",
 [
 "testStroke",
@@ -43210,7 +43192,7 @@
 "bk-389-lt",
 "srcl",
 "src/resource/stroke.c",
-"389:<",
+"390:<",
 "<=",
 [
 "testStroke",
@@ -43228,7 +43210,7 @@
 "bk-391-ne",
 "srcl",
 "src/resource/stroke.c",
-"391:!=",
+"392:!=",
 "==",
 [
 "testStroke",
@@ -43246,7 +43228,7 @@
 "bk-391-neg",
 "srcl",
 "src/resource/stroke.c",
-"391:(gshgeom_map_apply_point(composed, (GSHGEOM_Point){xs[i], ys[j], 0.0}, &q) != GSHGEOM_OK)",
+"392:(gshgeom_map_apply_point(composed, (GSHGEOM_Point){xs[i], ys[j], 0.0}, &q) != GSHGEOM_OK)",
 "(!(gshgeom_map_apply_point(composed, (GSHGEOM_Point){xs[i], ys[j], 0.0}, &q) != GSHGEOM_OK))",
 [
 "testStroke",
@@ -43264,7 +43246,7 @@
 "bk-392-ret",
 "srcl",
 "src/resource/stroke.c",
-"392:GSHSCENE_ERR_LIMIT",
+"393:GSHSCENE_ERR_LIMIT",
 "GSHSCENE_ERR_INVALID",
 [
 "testStroke",
@@ -43282,7 +43264,7 @@
 "bk-394-neg",
 "srcl",
 "src/resource/stroke.c",
-"394:(b.empty)",
+"395:(b.empty)",
 "(!(b.empty))",
 [
 "testStroke",
@@ -43300,7 +43282,7 @@
 "bk-395-del",
 "srcl",
 "src/resource/stroke.c",
-"395:b.min = q;",
+"396:b.min = q;",
 ";",
 [
 "testStroke",
@@ -43318,7 +43300,7 @@
 "bk-396-del",
 "srcl",
 "src/resource/stroke.c",
-"396:b.max = q;",
+"397:b.max = q;",
 ";",
 [
 "testStroke",
@@ -43336,7 +43318,7 @@
 "bk-397-del",
 "srcl",
 "src/resource/stroke.c",
-"397:b.empty = 0;",
+"398:b.empty = 0;",
 ";",
 [
 "testStroke",
@@ -43354,7 +43336,7 @@
 "bk-399-del",
 "srcl",
 "src/resource/stroke.c",
-"399:b.min.x = q.x < b.min.x ? q.x : b.min.x;",
+"400:b.min.x = q.x < b.min.x ? q.x : b.min.x;",
 ";",
 [
 "testStroke",
@@ -43372,7 +43354,7 @@
 "bk-400-del",
 "srcl",
 "src/resource/stroke.c",
-"400:b.min.y = q.y < b.min.y ? q.y : b.min.y;",
+"401:b.min.y = q.y < b.min.y ? q.y : b.min.y;",
 ";",
 [
 "testStroke",
@@ -43390,7 +43372,7 @@
 "bk-401-del",
 "srcl",
 "src/resource/stroke.c",
-"401:b.max.x = q.x > b.max.x ? q.x : b.max.x;",
+"402:b.max.x = q.x > b.max.x ? q.x : b.max.x;",
 ";",
 [
 "testStroke",
@@ -43408,7 +43390,7 @@
 "bk-402-del",
 "srcl",
 "src/resource/stroke.c",
-"402:b.max.y = q.y > b.max.y ? q.y : b.max.y;",
+"403:b.max.y = q.y > b.max.y ? q.y : b.max.y;",
 ";",
 [
 "testStroke",
@@ -43426,7 +43408,7 @@
 "bk-406-neg",
 "srcl",
 "src/resource/stroke.c",
-"406:(device)",
+"407:(device)",
 "(!(device))",
 [
 "testStroke",
@@ -43444,7 +43426,7 @@
 "bk-408-del",
 "srcl",
 "src/resource/stroke.c",
-"408:b.min.x = sub_down(b.min.x, h);",
+"409:b.min.x = sub_down(b.min.x, h);",
 ";",
 [
 "testStroke",
@@ -43462,7 +43444,7 @@
 "bk-409-del",
 "srcl",
 "src/resource/stroke.c",
-"409:b.min.y = sub_down(b.min.y, h);",
+"410:b.min.y = sub_down(b.min.y, h);",
 ";",
 [
 "testStroke",
@@ -43480,7 +43462,7 @@
 "bk-410-del",
 "srcl",
 "src/resource/stroke.c",
-"410:b.max.x = add_up(b.max.x, h);",
+"411:b.max.x = add_up(b.max.x, h);",
 ";",
 [
 "testStroke",
@@ -43498,7 +43480,7 @@
 "bk-411-del",
 "srcl",
 "src/resource/stroke.c",
-"411:b.max.y = add_up(b.max.y, h);",
+"412:b.max.y = add_up(b.max.y, h);",
 ";",
 [
 "testStroke",
@@ -43516,7 +43498,7 @@
 "bk-413-neg",
 "srcl",
 "src/resource/stroke.c",
-"413:(!gshscene_finite(b.min.x) || !gshscene_finite(b.min.y) || !gshscene_finite(b.max.x) || !gshscene_finite(b.max.y))",
+"414:(!gshscene_finite(b.min.x) || !gshscene_finite(b.min.y) || !gshscene_finite(b.max.x) || !gshscene_finite(b.max.y))",
 "(!(!gshscene_finite(b.min.x) || !gshscene_finite(b.min.y) || !gshscene_finite(b.max.x) || !gshscene_finite(b.max.y)))",
 [
 "testStroke",
@@ -43534,7 +43516,7 @@
 "bk-428-neg",
 "srcl",
 "src/resource/stroke.c",
-"428:(path)",
+"429:(path)",
 "(!(path))",
 [
 "testStroke",
@@ -43552,7 +43534,7 @@
 "bk-429-ne",
 "srcl",
 "src/resource/stroke.c",
-"429:h) != 2 ",
+"430:h) != 2 ",
 "h) == 2 ",
 [
 "testStroke",
@@ -43570,7 +43552,7 @@
 "bk-429-or",
 "srcl",
 "src/resource/stroke.c",
-"429:||",
+"430:||",
 "&&",
 [
 "testStroke",
@@ -43588,7 +43570,7 @@
 "bk-429-ne2",
 "srcl",
 "src/resource/stroke.c",
-"429:x) != GS",
+"430:x) != GS",
 "x) == GS",
 [
 "testStroke",
@@ -43606,7 +43588,7 @@
 "bk-429-neg",
 "srcl",
 "src/resource/stroke.c",
-"429:(gshgeom_path_dimension(path) != 2 || gshgeom_path_bounds(path, &box) != GSHGEOM_OK)",
+"430:(gshgeom_path_dimension(path) != 2 || gshgeom_path_bounds(path, &box) != GSHGEOM_OK)",
 "(!(gshgeom_path_dimension(path) != 2 || gshgeom_path_bounds(path, &box) != GSHGEOM_OK))",
 [
 "testStroke",
@@ -43624,7 +43606,7 @@
 "bk-447-neg",
 "srcl",
 "src/resource/stroke.c",
-"447:(gshscene_glyph_box(resource, i, &g) != GSHSCENE_OK || gshscene_glyph_map(resource, &identity, i, &map) != GSHSCENE_OK)",
+"448:(gshscene_glyph_box(resource, i, &g) != GSHSCENE_OK || gshscene_glyph_map(resource, &identity, i, &map) != GSHSCENE_OK)",
 "(!(gshscene_glyph_box(resource, i, &g) != GSHSCENE_OK || gshscene_glyph_map(resource, &identity, i, &map) != GSHSCENE_OK))",
 [
 "testStroke",
@@ -43642,7 +43624,7 @@
 "bk-501-eq",
 "srcl",
 "src/resource/stroke.c",
-"501:==",
+"502:==",
 "!=",
 [
 "testStroke",
@@ -43660,7 +43642,7 @@
 "bk-502-eq",
 "srcl",
 "src/resource/stroke.c",
-"502:==",
+"503:==",
 "!=",
 [
 "testStroke",
@@ -43678,7 +43660,7 @@
 "bk-507-eq",
 "srcl",
 "src/resource/stroke.c",
-"507:==",
+"508:==",
 "!=",
 [
 "testStroke",
@@ -43696,7 +43678,7 @@
 "bk-508-eq",
 "srcl",
 "src/resource/stroke.c",
-"508:nd == GS",
+"509:nd == GS",
 "nd != GS",
 [
 "testStroke",
@@ -43714,7 +43696,7 @@
 "bk-508-eq2",
 "srcl",
 "src/resource/stroke.c",
-"508:nt == 0 ",
+"509:nt == 0 ",
 "nt != 0 ",
 [
 "testStroke",
@@ -43732,7 +43714,7 @@
 "bk-508-or",
 "srcl",
 "src/resource/stroke.c",
-"508:||",
+"509:||",
 "&&",
 [
 "testStroke",
@@ -43750,7 +43732,7 @@
 "bk-513-neg",
 "srcl",
 "src/resource/stroke.c",
-"513:(!stroke_item(item, instance_maps, instance_count))",
+"514:(!stroke_item(item, instance_maps, instance_count))",
 "(!(!stroke_item(item, instance_maps, instance_count)))",
 [
 "testStroke",
@@ -43768,7 +43750,7 @@
 "bk-518-and",
 "srcl",
 "src/resource/stroke.c",
-"518:&&",
+"519:&&",
 "||",
 [
 "testStroke",
@@ -43786,7 +43768,7 @@
 "bk-519-and",
 "srcl",
 "src/resource/stroke.c",
-"519:&&",
+"520:&&",
 "||",
 [
 "testStroke",
@@ -43804,7 +43786,7 @@
 "bk-520-lt",
 "srcl",
 "src/resource/stroke.c",
-"520:<",
+"521:<",
 "<=",
 [
 "testStroke",
@@ -43822,7 +43804,7 @@
 "bk-520-and",
 "srcl",
 "src/resource/stroke.c",
-"520:&&",
+"521:&&",
 "||",
 [
 "testStroke",
@@ -43840,7 +43822,7 @@
 "bk-521-del",
 "srcl",
 "src/resource/stroke.c",
-"521:not_invertible = gshscene_map_singular(&instance_maps[i]);",
+"522:not_invertible = gshscene_map_singular(&instance_maps[i]);",
 ";",
 [
 "testStroke",
@@ -43858,7 +43840,7 @@
 "bk-523-neg",
 "srcl",
 "src/resource/stroke.c",
-"523:(not_invertible)",
+"524:(not_invertible)",
 "(!(not_invertible))",
 [
 "testStroke",
@@ -43876,7 +43858,7 @@
 "bk-526-eq",
 "srcl",
 "src/resource/stroke.c",
-"526:==",
+"527:==",
 "!=",
 [
 "testStroke",
@@ -43894,7 +43876,7 @@
 "bk-526-neg",
 "srcl",
 "src/resource/stroke.c",
-"526:(item->style->u.stroke.s.width == 0.0)",
+"527:(item->style->u.stroke.s.width == 0.0)",
 "(!(item->style->u.stroke.s.width == 0.0))",
 [
 "testStroke",
@@ -43912,7 +43894,7 @@
 "bk-529-and",
 "srcl",
 "src/resource/stroke.c",
-"529:&&",
+"530:&&",
 "||",
 [
 "testStroke",
@@ -43930,7 +43912,7 @@
 "bk-544-eq",
 "srcl",
 "src/resource/stroke.c",
-"544:==",
+"545:==",
 "!=",
 [
 "testStroke",
@@ -43948,7 +43930,7 @@
 "bk-544-and",
 "srcl",
 "src/resource/stroke.c",
-"544:&&",
+"545:&&",
 "||",
 [
 "testStroke",
@@ -43966,7 +43948,7 @@
 "bk-544-le",
 "srcl",
 "src/resource/stroke.c",
-"544:<=",
+"545:<=",
 "<",
 [
 "testStroke",
@@ -43984,7 +43966,7 @@
 "bk-545-lt",
 "srcl",
 "src/resource/stroke.c",
-"545:<",
+"546:<",
 "<=",
 [
 "testStroke",
@@ -44002,7 +43984,7 @@
 "bk-545-del",
 "srcl",
 "src/resource/stroke.c",
-"545:r = gshgeom_map_compose(&acc, i < instance_count ? &instance_maps[i] : item_map, &acc);",
+"546:r = gshgeom_map_compose(&acc, i < instance_count ? &instance_maps[i] : item_map, &acc);",
 ";",
 [
 "testStroke",
@@ -44020,7 +44002,7 @@
 "bk-547-eq",
 "srcl",
 "src/resource/stroke.c",
-"547:==",
+"548:==",
 "!=",
 [
 "testStroke",
@@ -44038,7 +44020,7 @@
 "bk-547-ne",
 "srcl",
 "src/resource/stroke.c",
-"547:!=",
+"548:!=",
 "==",
 [
 "testStroke",
@@ -44056,7 +44038,7 @@
 "bk-547-neg",
 "srcl",
 "src/resource/stroke.c",
-"547:(r == GSHGEOM_OK && target_map && target_map->dim != 0)",
+"548:(r == GSHGEOM_OK && target_map && target_map->dim != 0)",
 "(!(r == GSHGEOM_OK && target_map && target_map->dim != 0))",
 [
 "testStroke",
@@ -44074,7 +44056,7 @@
 "bk-548-del",
 "srcl",
 "src/resource/stroke.c",
-"548:r = gshgeom_map_compose(target_map, &acc, &acc);",
+"549:r = gshgeom_map_compose(target_map, &acc, &acc);",
 ";",
 [
 "testStroke",
@@ -44092,7 +44074,7 @@
 "bk-562-eq",
 "srcl",
 "src/resource/stroke.c",
-"562:(a == d ",
+"563:(a == d ",
 "(a != d ",
 [
 "testStroke",
@@ -44110,7 +44092,7 @@
 "bk-562-and",
 "srcl",
 "src/resource/stroke.c",
-"562: d && b ",
+"563: d && b ",
 " d || b ",
 [
 "testStroke",
@@ -44128,7 +44110,7 @@
 "bk-562-eq2",
 "srcl",
 "src/resource/stroke.c",
-"562: b == -c",
+"563: b == -c",
 " b != -c",
 [
 "testStroke",
@@ -44146,7 +44128,7 @@
 "bk-562-or",
 "srcl",
 "src/resource/stroke.c",
-"562:||",
+"563:||",
 "&&",
 [
 "testStroke",
@@ -44164,7 +44146,7 @@
 "bk-562-eq3",
 "srcl",
 "src/resource/stroke.c",
-"562:(a == -d",
+"563:(a == -d",
 "(a != -d",
 [
 "testStroke",
@@ -44182,7 +44164,7 @@
 "bk-562-and2",
 "srcl",
 "src/resource/stroke.c",
-"562:-d && b ",
+"563:-d && b ",
 "-d || b ",
 [
 "testStroke",
@@ -44200,7 +44182,7 @@
 "bk-562-eq4",
 "srcl",
 "src/resource/stroke.c",
-"562: b == c)",
+"563: b == c)",
 " b != c)",
 [
 "testStroke",
@@ -44218,7 +44200,7 @@
 "bk-567-or",
 "srcl",
 "src/resource/stroke.c",
-"567:||",
+"568:||",
 "&&",
 [
 "testStroke",
@@ -44236,7 +44218,7 @@
 "bk-579-eq",
 "srcl",
 "src/resource/stroke.c",
-"579:==",
+"580:==",
 "!=",
 [
 "testStroke",
@@ -44254,7 +44236,7 @@
 "bk-579-neg",
 "srcl",
 "src/resource/stroke.c",
-"579:(s->width_space == (uint32_t)GSHSCENE_STROKE_WIDTH_DEVICE)",
+"580:(s->width_space == (uint32_t)GSHSCENE_STROKE_WIDTH_DEVICE)",
 "(!(s->width_space == (uint32_t)GSHSCENE_STROKE_WIDTH_DEVICE))",
 [
 "testStroke",
@@ -44272,7 +44254,7 @@
 "bk-584-ne",
 "srcl",
 "src/resource/stroke.c",
-"585:!=",
+"586:!=",
 "==",
 [
 "testStroke",
@@ -44290,7 +44272,7 @@
 "bk-584-or",
 "srcl",
 "src/resource/stroke.c",
-"585:||",
+"586:||",
 "&&",
 [
 "testStroke",
@@ -44308,7 +44290,7 @@
 "bk-589-neg",
 "srcl",
 "src/resource/stroke.c",
-"590:(s->dash_count)",
+"591:(s->dash_count)",
 "(!(s->dash_count))",
 [
 "testStroke",
@@ -44326,7 +44308,7 @@
 "bk-591-eq",
 "srcl",
 "src/resource/stroke.c",
-"592:==",
+"593:==",
 "!=",
 [
 "testStroke",
@@ -44344,7 +44326,7 @@
 "bk-591-neg",
 "srcl",
 "src/resource/stroke.c",
-"592:(s->dash_scope == (uint32_t)GSHSCENE_STROKE_DASH_PATH)",
+"593:(s->dash_scope == (uint32_t)GSHSCENE_STROKE_DASH_PATH)",
 "(!(s->dash_scope == (uint32_t)GSHSCENE_STROKE_DASH_PATH))",
 [
 "testStroke",
@@ -44362,7 +44344,7 @@
 "bk-595-ne",
 "srcl",
 "src/resource/stroke.c",
-"596:!=",
+"597:!=",
 "==",
 [
 "testStroke",
@@ -44380,7 +44362,7 @@
 "bk-595-neg",
 "srcl",
 "src/resource/stroke.c",
-"596:(s->alignment != (uint32_t)GSHSCENE_STROKE_ALIGN_CENTER)",
+"597:(s->alignment != (uint32_t)GSHSCENE_STROKE_ALIGN_CENTER)",
 "(!(s->alignment != (uint32_t)GSHSCENE_STROKE_ALIGN_CENTER))",
 [
 "testStroke",
@@ -44398,7 +44380,7 @@
 "bk-597-eq",
 "srcl",
 "src/resource/stroke.c",
-"598:==",
+"599:==",
 "!=",
 [
 "testStroke",
@@ -44416,7 +44398,7 @@
 "bk-597-neg",
 "srcl",
 "src/resource/stroke.c",
-"598:(s->alignment_rule == GSHGEOM_FILL_EVEN_ODD)",
+"599:(s->alignment_rule == GSHGEOM_FILL_EVEN_ODD)",
 "(!(s->alignment_rule == GSHGEOM_FILL_EVEN_ODD))",
 [
 "testStroke",
@@ -44434,7 +44416,7 @@
 "bk-601-eq",
 "srcl",
 "src/resource/stroke.c",
-"602:==",
+"603:==",
 "!=",
 [
 "testStroke",
@@ -44452,7 +44434,7 @@
 "bk-601-and",
 "srcl",
 "src/resource/stroke.c",
-"602:&&",
+"603:&&",
 "||",
 [
 "testStroke",
@@ -44470,7 +44452,7 @@
 "bk-601-ne",
 "srcl",
 "src/resource/stroke.c",
-"602:!=",
+"603:!=",
 "==",
 [
 "testStroke",
@@ -44488,7 +44470,7 @@
 "bk-601-neg",
 "srcl",
 "src/resource/stroke.c",
-"602:(s->degenerate == (uint32_t)GSHSCENE_STROKE_DEGENERATE_DRAW && s->cap != (uint32_t)GSHSCENE_STROKE_CAP_BUTT)",
+"603:(s->degenerate == (uint32_t)GSHSCENE_STROKE_DEGENERATE_DRAW && s->cap != (uint32_t)GSHSCENE_STROKE_CAP_BUTT)",
 "(!(s->degenerate == (uint32_t)GSHSCENE_STROKE_DEGENERATE_DRAW && s->cap != (uint32_t)GSHSCENE_STROKE_CAP_BUTT))",
 [
 "testStroke",
@@ -45356,7 +45338,7 @@
 "bk-286-wd",
 "srcl",
 "src/resource/stroke.c",
-"286:%016llx",
+"287:%016llx",
 "%llx",
 [
 "testStroke",
@@ -45374,7 +45356,7 @@
 "bk-414-ret",
 "srcl",
 "src/resource/stroke.c",
-"414:GSHSCENE_ERR_LIMIT",
+"415:GSHSCENE_ERR_LIMIT",
 "GSHSCENE_ERR_INVALID",
 [
 "testStroke",
@@ -45392,7 +45374,7 @@
 "bk-426-del",
 "srcl",
 "src/resource/stroke.c",
-"426:box.empty = 1;",
+"427:box.empty = 1;",
 ";",
 [
 "testStroke",
@@ -45410,7 +45392,7 @@
 "bk-436-ne",
 "srcl",
 "src/resource/stroke.c",
-"436:!=",
+"437:!=",
 "==",
 [
 "testStroke",
@@ -45428,7 +45410,7 @@
 "bk-436-neg",
 "srcl",
 "src/resource/stroke.c",
-"436:(gshscene_resource_glyph_run(resource, &run) != GSHSCENE_OK)",
+"437:(gshscene_resource_glyph_run(resource, &run) != GSHSCENE_OK)",
 "(!(gshscene_resource_glyph_run(resource, &run) != GSHSCENE_OK))",
 [
 "testStroke",
@@ -45446,7 +45428,7 @@
 "bk-440-del",
 "srcl",
 "src/resource/stroke.c",
-"440:gshgeom_map_identity(2, &identity);",
+"441:gshgeom_map_identity(2, &identity);",
 ";",
 [
 "testStroke",
@@ -45464,7 +45446,7 @@
 "bk-441-lt",
 "srcl",
 "src/resource/stroke.c",
-"441:<",
+"442:<",
 "<=",
 [
 "testStroke",
@@ -45482,7 +45464,7 @@
 "bk-444-eq",
 "srcl",
 "src/resource/stroke.c",
-"444:==",
+"445:==",
 "!=",
 [
 "testStroke",
@@ -45500,7 +45482,7 @@
 "bk-444-neg",
 "srcl",
 "src/resource/stroke.c",
-"444:(run.source == GSHSCENE_GLYPHS_FROM_FONT)",
+"445:(run.source == GSHSCENE_GLYPHS_FROM_FONT)",
 "(!(run.source == GSHSCENE_GLYPHS_FROM_FONT))",
 [
 "testStroke",
@@ -45518,7 +45500,7 @@
 "bk-447-ne",
 "srcl",
 "src/resource/stroke.c",
-"447:g) != GS",
+"448:g) != GS",
 "g) == GS",
 [
 "testStroke",
@@ -45536,7 +45518,7 @@
 "bk-447-or",
 "srcl",
 "src/resource/stroke.c",
-"447:||",
+"448:||",
 "&&",
 [
 "testStroke",
@@ -45554,7 +45536,7 @@
 "bk-447-ne2",
 "srcl",
 "src/resource/stroke.c",
-"447:p) != GS",
+"448:p) != GS",
 "p) == GS",
 [
 "testStroke",
@@ -45572,7 +45554,7 @@
 "bk-450-neg",
 "srcl",
 "src/resource/stroke.c",
-"450:(g.empty)",
+"451:(g.empty)",
 "(!(g.empty))",
 [
 "testStroke",
@@ -45590,7 +45572,7 @@
 "bk-460-ne",
 "srcl",
 "src/resource/stroke.c",
-"460:e) != 2 ",
+"461:e) != 2 ",
 "e) == 2 ",
 [
 "testStroke",
@@ -45608,7 +45590,7 @@
 "bk-460-ne2",
 "srcl",
 "src/resource/stroke.c",
-"460:b) != GS",
+"461:b) != GS",
 "b) == GS",
 [
 "testStroke",
@@ -45626,7 +45608,7 @@
 "bk-460-neg",
 "srcl",
 "src/resource/stroke.c",
-"460:(!outline || gshgeom_path_dimension(outline) != 2 || gshgeom_path_bounds(outline, &ob) != GSHGEOM_OK)",
+"461:(!outline || gshgeom_path_dimension(outline) != 2 || gshgeom_path_bounds(outline, &ob) != GSHGEOM_OK)",
 "(!(!outline || gshgeom_path_dimension(outline) != 2 || gshgeom_path_bounds(outline, &ob) != GSHGEOM_OK))",
 [
 "testStroke",
@@ -45644,7 +45626,7 @@
 "bk-463-neg",
 "srcl",
 "src/resource/stroke.c",
-"463:(ob.empty)",
+"464:(ob.empty)",
 "(!(ob.empty))",
 [
 "testStroke",
@@ -45662,7 +45644,7 @@
 "bk-470-del",
 "srcl",
 "src/resource/stroke.c",
-"470:gshgeom_map_translate(2, run.glyphs[i].x, run.glyphs[i].y, 0.0, &map);",
+"471:gshgeom_map_translate(2, run.glyphs[i].x, run.glyphs[i].y, 0.0, &map);",
 ";",
 [
 "testStroke",
@@ -45680,7 +45662,7 @@
 "bk-474-lt",
 "srcl",
 "src/resource/stroke.c",
-"474:<",
+"475:<",
 "<=",
 [
 "testStroke",
@@ -45698,7 +45680,7 @@
 "bk-475-lt",
 "srcl",
 "src/resource/stroke.c",
-"475:<",
+"476:<",
 "<=",
 [
 "testStroke",
@@ -45716,7 +45698,7 @@
 "bk-477-ne",
 "srcl",
 "src/resource/stroke.c",
-"477:!=",
+"478:!=",
 "==",
 [
 "testStroke",
@@ -45734,7 +45716,7 @@
 "bk-477-neg",
 "srcl",
 "src/resource/stroke.c",
-"477:(gshgeom_map_apply_point(&map, (GSHGEOM_Point){xs[a], ys[c], 0.0}, &q) != GSHGEOM_OK)",
+"478:(gshgeom_map_apply_point(&map, (GSHGEOM_Point){xs[a], ys[c], 0.0}, &q) != GSHGEOM_OK)",
 "(!(gshgeom_map_apply_point(&map, (GSHGEOM_Point){xs[a], ys[c], 0.0}, &q) != GSHGEOM_OK))",
 [
 "testStroke",
@@ -45752,7 +45734,7 @@
 "bk-480-neg",
 "srcl",
 "src/resource/stroke.c",
-"480:(box.empty)",
+"481:(box.empty)",
 "(!(box.empty))",
 [
 "testStroke",
@@ -45770,7 +45752,7 @@
 "bk-481-del",
 "srcl",
 "src/resource/stroke.c",
-"481:box.min = q;",
+"482:box.min = q;",
 ";",
 [
 "testStroke",
@@ -45788,7 +45770,7 @@
 "bk-483-del",
 "srcl",
 "src/resource/stroke.c",
-"483:box.empty = 0;",
+"484:box.empty = 0;",
 ";",
 [
 "testStroke",
@@ -45806,7 +45788,7 @@
 "bk-486-del",
 "srcl",
 "src/resource/stroke.c",
-"486:box.min.y = q.y < box.min.y ? q.y : box.min.y;",
+"487:box.min.y = q.y < box.min.y ? q.y : box.min.y;",
 ";",
 [
 "testStroke",
@@ -45824,7 +45806,7 @@
 "bk-487-del",
 "srcl",
 "src/resource/stroke.c",
-"487:box.max.x = q.x > box.max.x ? q.x : box.max.x;",
+"488:box.max.x = q.x > box.max.x ? q.x : box.max.x;",
 ";",
 [
 "testStroke",
@@ -45842,7 +45824,7 @@
 "bk-488-del",
 "srcl",
 "src/resource/stroke.c",
-"488:box.max.y = q.y > box.max.y ? q.y : box.max.y;",
+"489:box.max.y = q.y > box.max.y ? q.y : box.max.y;",
 ";",
 [
 "testStroke",
@@ -45860,7 +45842,7 @@
 "bk-482-del",
 "srcl",
 "src/resource/stroke.c",
-"482:box.max = q;",
+"483:box.max = q;",
 ";",
 [
 "testStroke",
@@ -45878,7 +45860,7 @@
 "bk-485-del",
 "srcl",
 "src/resource/stroke.c",
-"485:box.min.x = q.x < box.min.x ? q.x : box.min.x;",
+"486:box.min.x = q.x < box.min.x ? q.x : box.min.x;",
 ";",
 [
 "testStroke",
@@ -45896,7 +45878,7 @@
 "bk-550-eq",
 "srcl",
 "src/resource/stroke.c",
-"550:==",
+"551:==",
 "!=",
 [
 "testStroke",
@@ -45914,7 +45896,7 @@
 "bk-550-neg",
 "srcl",
 "src/resource/stroke.c",
-"550:(r == GSHGEOM_OK)",
+"551:(r == GSHGEOM_OK)",
 "(!(r == GSHGEOM_OK))",
 [
 "testStroke",

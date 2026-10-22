@@ -260,7 +260,9 @@ TEST(StrokeStyle, EqualCanonicalStylesAreOneHandle) {
        [](Style & t) { t.dash({-0.0}); }, [](Style & t) { t.s.dash_offset = 5.0; },
        [](Style & t) { t.s.dash_scope = GSHSCENE_STROKE_DASH_PATH; },
        [](Style & t) { t.dash({-2.0, 3.0, 4.0}).s.dash_offset = -7.0; },
-       [](Style & t) { t.s.alignment_rule = GSHGEOM_FILL_EVEN_ODD; }},
+       [](Style & t) { t.s.alignment_rule = GSHGEOM_FILL_EVEN_ODD; },
+       // A butt cap draws nothing of a degenerate subpath either way: omit is draw there (SK3 (b)).
+       [](Style & t) { t.s.degenerate = GSHSCENE_STROKE_DEGENERATE_OMIT; }},
       // An odd array is its doubled spelling.
       {[](Style & t) { t.dash({1.0, 2.0, 3.0}); }, [](Style & t) { t.dash({1.0, 2.0, 3.0, 1.0, 2.0, 3.0}); }},
       // A join that reads no miter limit: any limit in range is 4.
@@ -269,9 +271,6 @@ TEST(StrokeStyle, EqualCanonicalStylesAreOneHandle) {
        [](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_ROUND; t.s.miter_limit = 1.0; }},
       {[](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_BEVEL; t.s.miter_limit = 65536.0; },
        [](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_BEVEL; }},
-      // A butt cap draws nothing of a degenerate subpath either way: omit is draw there.
-      {[](Style &) {}, [](Style & t) { t.s.degenerate = GSHSCENE_STROKE_DEGENERATE_OMIT; },
-       [](Style & t) { t.s.cap = GSHSCENE_STROKE_CAP_BUTT; t.s.degenerate = GSHSCENE_STROKE_DEGENERATE_OMIT; }},
       // -0 is +0.
       {[](Style & t) { t.s.width = -0.0; }, [](Style & t) { t.s.width = 0.0; }},
       {[](Style & t) { t.dash({-0.0, 1.0}).s.dash_offset = -0.0; }, [](Style & t) { t.dash({0.0, 1.0}); }},
