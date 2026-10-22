@@ -354,6 +354,8 @@ def style(width=1.0, space=WIDTH_LOCAL, join=JOIN_MITER, miter=4.0, cap=CAP_BUTT
         miter = 4.0                       # (b) the miter limit does not apply
     if align == ALIGN_CENTER:
         rule = RULE_NONZERO               # (b) the alignment rule does not apply
+    if cap == CAP_BUTT:
+        degenerate = DEGENERATE_DRAW      # (b) a butt cap draws nothing of a degenerate subpath either way
     return dict(width=z(width), space=space, join=join, miter=miter, cap=cap, degenerate=degenerate, dashes=dashes,
                 offset=z(offset), scope=scope, align=align, rule=rule)
 

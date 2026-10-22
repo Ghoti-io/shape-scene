@@ -2009,7 +2009,8 @@ static void op(S * s, unsigned code) {
           st.join == GSHSCENE_STROKE_JOIN_ARCS;
       CHECK(same_bits(back.width, st.width == 0.0 ? 0.0 : st.width));
       CHECK(back.width_space == st.width_space && back.join == st.join && back.cap == st.cap &&
-            back.degenerate == st.degenerate && back.alignment == st.alignment);
+            back.alignment == st.alignment);
+      CHECK(back.degenerate == (st.cap == GSHSCENE_STROKE_CAP_BUTT ? (uint32_t)GSHSCENE_STROKE_DEGENERATE_DRAW : st.degenerate)); /* SK3 (b) */
       CHECK(same_bits(back.miter_limit, reads_miter ? st.miter_limit : 4.0));
       CHECK(back.alignment_rule == (st.alignment == GSHSCENE_STROKE_ALIGN_CENTER ? GSHGEOM_FILL_NONZERO : st.alignment_rule));
       CHECK(back.dash_count == count && (count == 0) == (back.dashes == NULL));

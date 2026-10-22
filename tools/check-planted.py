@@ -2160,6 +2160,8 @@ PLANTS += [
     ('sk3-zero-sign', 'src', SKC, '  return x == 0.0 ? 0.0 : x;', '  return x;', K),
     ('sk3-odd-not-doubled', 'src', SKC, '  return in->dash_count % 2u ? gshscene_sat_mul(in->dash_count, 2u) : in->dash_count;', '  return in->dash_count;', K),
     ('sk3-miter-kept', 'src', SKC, '  out->miter_limit = join_reads_miter(in->join) ? in->miter_limit : GSHSCENE_STROKE_MITER_LIMIT_DEFAULT;', '  out->miter_limit = in->miter_limit;', K),
+    ('sk3-degenerate-kept-under-butt', 'src', SKC, '  out->degenerate = in->cap == (uint32_t)GSHSCENE_STROKE_CAP_BUTT ? (uint32_t)GSHSCENE_STROKE_DEGENERATE_DRAW : in->degenerate;', '  out->degenerate = in->degenerate;', K),
+    ('sk3-degenerate-reset-under-round', 'src', SKC, 'in->cap == (uint32_t)GSHSCENE_STROKE_CAP_BUTT ? (uint32_t)GSHSCENE_STROKE_DEGENERATE_DRAW : in->degenerate;', 'in->cap != (uint32_t)GSHSCENE_STROKE_CAP_SQUARE ? (uint32_t)GSHSCENE_STROKE_DEGENERATE_DRAW : in->degenerate;', K),
     ('sk3-rule-kept', 'src', SKC, '  out->alignment_rule = in->alignment == (uint32_t)GSHSCENE_STROKE_ALIGN_CENTER ? GSHGEOM_FILL_NONZERO : in->alignment_rule;', '  out->alignment_rule = in->alignment_rule;', K),
     ('sk3-offset-kept', 'src', SKC, '    out->dash_offset = 0.0;\n    out->dash_scope = GSHSCENE_STROKE_DASH_PER_SUBPATH;', '    out->dash_offset = canonical_zero(in->dash_offset);\n    out->dash_scope = in->dash_scope;', K),
     ('sk3-negative-kept', 'src', SKC, '    if (in->dashes[i] < 0.0) {\n      return 0; /* a negative length: solid */\n    }', '', K),

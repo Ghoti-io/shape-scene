@@ -327,7 +327,7 @@ the band is the one gradients already keep finite, and `2^16 * 2^64` keeps a mit
 only it, so equal drawings are one handle and one hash. (a) Dashes (D5): an array with a negative length, or whose
 lengths are all zero, is no dashes (solid); an odd array is repeated once. (b) A field that does not apply takes its
 default: with no dashes the offset 0 and the scope per subpath; with a join other than miter, miter-clip and arcs the
-miter limit 4; with center alignment the rule nonzero. (c) Nothing else is rewritten: the offset is kept as given (not
+miter limit 4; with center alignment the rule nonzero; with a butt cap the degenerate rule draw (a degenerate subpath draws nothing under a butt cap either way, so omit and draw are one style there). (c) Nothing else is rewritten: the offset is kept as given (not
 reduced modulo the period, which is the dash arithmetic's) and width 0 is kept (SK8). The canonical form is where D5's
 meaning becomes one spelling: if the store kept the arrays as given, a writer, a cache keyed by hash and the diff would
 all see two strokes where the drawing has one.

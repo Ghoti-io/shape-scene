@@ -138,7 +138,8 @@ static void canonical(const GSHSCENE_Stroke_Style * in, size_t count, double * d
   out->join = in->join;
   out->miter_limit = join_reads_miter(in->join) ? in->miter_limit : GSHSCENE_STROKE_MITER_LIMIT_DEFAULT;
   out->cap = in->cap;
-  out->degenerate = in->degenerate;
+  /* SK3 (b): a butt cap leaves a degenerate subpath nothing to draw either way, so the field does not apply. */
+  out->degenerate = in->cap == (uint32_t)GSHSCENE_STROKE_CAP_BUTT ? (uint32_t)GSHSCENE_STROKE_DEGENERATE_DRAW : in->degenerate;
   out->alignment = in->alignment;
   out->alignment_rule = in->alignment == (uint32_t)GSHSCENE_STROKE_ALIGN_CENTER ? GSHGEOM_FILL_NONZERO : in->alignment_rule;
   out->dash_count = count;

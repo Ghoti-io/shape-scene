@@ -78,7 +78,9 @@
  * a, b, c]`).  (b) **Fields that do not apply** take their default: with no
  * dashes, `dash_offset` 0 and `dash_scope` `PER_SUBPATH`; with a join other than
  * `MITER`, `MITER_CLIP` and `ARCS`, `miter_limit` 4; with `CENTER` alignment,
- * `alignment_rule` nonzero.  (c) Nothing else is rewritten: the offset is kept as
+ * `alignment_rule` nonzero; with a `BUTT` cap, `degenerate` `DRAW` (a degenerate
+ * subpath draws nothing under a butt cap either way, so `OMIT` and `DRAW` are one
+ * style there).  (c) Nothing else is rewritten: the offset is kept as
  * given (not reduced modulo the period, which is the dash arithmetic's), and width
  * 0 is kept (SK8).
  *

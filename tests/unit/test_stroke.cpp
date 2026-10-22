@@ -269,6 +269,9 @@ TEST(StrokeStyle, EqualCanonicalStylesAreOneHandle) {
        [](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_ROUND; t.s.miter_limit = 1.0; }},
       {[](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_BEVEL; t.s.miter_limit = 65536.0; },
        [](Style & t) { t.s.join = GSHSCENE_STROKE_JOIN_BEVEL; }},
+      // A butt cap draws nothing of a degenerate subpath either way: omit is draw there.
+      {[](Style &) {}, [](Style & t) { t.s.degenerate = GSHSCENE_STROKE_DEGENERATE_OMIT; },
+       [](Style & t) { t.s.cap = GSHSCENE_STROKE_CAP_BUTT; t.s.degenerate = GSHSCENE_STROKE_DEGENERATE_OMIT; }},
       // -0 is +0.
       {[](Style & t) { t.s.width = -0.0; }, [](Style & t) { t.s.width = 0.0; }},
       {[](Style & t) { t.dash({-0.0, 1.0}).s.dash_offset = -0.0; }, [](Style & t) { t.dash({0.0, 1.0}); }},
@@ -321,6 +324,17 @@ TEST(StrokeStyle, FieldsThatApplyAreKept) {
     ASSERT_EQ(gshscene_resource_stroke_style(r.get(), &out), GSHSCENE_OK);
     EXPECT_EQ(out.alignment_rule, GSHGEOM_FILL_EVEN_ODD) << align;
   }
+  // The degenerate rule under a round and a square cap.
+  for (uint32_t cap : {GSHSCENE_STROKE_CAP_ROUND, GSHSCENE_STROKE_CAP_SQUARE}) {
+    Style dg;
+    dg.s.cap = cap;
+    dg.s.degenerate = GSHSCENE_STROKE_DEGENERATE_OMIT;
+    Ref dr;
+    ASSERT_EQ(intern(s.store, dg, &dr), GSHSCENE_OK);
+    GSHSCENE_Stroke_Style dout;
+    ASSERT_EQ(gshscene_resource_stroke_style(dr.get(), &dout), GSHSCENE_OK);
+    EXPECT_EQ(dout.degenerate, (uint32_t)GSHSCENE_STROKE_DEGENERATE_OMIT) << cap;
+  }
   Style st;
   st.dash({2.0, 1.0}).s.dash_offset = 123.0;
   st.s.dash_scope = GSHSCENE_STROKE_DASH_PATH;
@@ -354,7 +368,8 @@ TEST(StrokeStyle, EachFieldChangedAloneIsAnotherHandleEvenUnderACollision) {
       [](Style & t) { t.s.miter_limit = 4.5; },
       [](Style & t) { t.s.cap = GSHSCENE_STROKE_CAP_ROUND; },
       [](Style & t) { t.s.cap = GSHSCENE_STROKE_CAP_SQUARE; },
-      [](Style & t) { t.s.degenerate = GSHSCENE_STROKE_DEGENERATE_OMIT; },
+      [](Style & t) { t.s.cap = GSHSCENE_STROKE_CAP_ROUND; t.s.degenerate = GSHSCENE_STROKE_DEGENERATE_OMIT; },
+      [](Style & t) { t.s.cap = GSHSCENE_STROKE_CAP_SQUARE; t.s.degenerate = GSHSCENE_STROKE_DEGENERATE_OMIT; },
       [](Style & t) { t.dash({1.0, 1.0}); },
       [](Style & t) { t.dash({1.0, 2.0}); },
       [](Style & t) { t.dash({1.0, 1.0, 1.0, 1.0}); },
