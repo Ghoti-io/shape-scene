@@ -350,6 +350,18 @@ the body; inside and outside alignment a centered stroke of twice the width clip
 under the alignment rule, or to its complement, closed subpaths only; one union over the item. Orientation is AD-6's,
 stated by `shape-geometry` and never here.
 
+**The coverage of an aligned stroke is the area of one region.** For a stroke with an aligned part, `R` is `R_o U (R_c & F)`:
+the body of the open subpaths and dashes, and the centered stroke of the closed subpaths clipped to the fill region `F`
+(or, outside, to its complement). `k` is the area of that region in the pixel. A sink that computes areas computes this
+one (`shape-cpu` does, in a pixel where more than one of the three parts has an edge). A sink that holds only the three
+coverages `k_b`, `k_a` and `c' = c` (inside) or `1 - c` (outside), as fractions, may compose them as the union of three
+independent regions, `k = k_b + k_a c' - k_b k_a c'`; that is an approximation, with its error stated: it lies between
+the region's own bounds, `max(k_b, k_a c')` and `min(1, k_b + k_a c')`, and differs from the area by at most
+`min(k_b, t) (1 - max(k_b, t))` with `t = k_a c'`, a quarter of a pixel at the worst, and exactly zero wherever at most one
+of the three has an edge in the pixel (the others are 0 or 1). It is wrong by most for a thin aligned stroke, whose band
+and the fill's edge lie in every pixel along the path (a band `[0.1, 0.5]` against a fill `x < 0.3` is 0.2 of the pixel by
+area and 0.12 by the formula).
+
 **SK6 Paint.** A stroke's paint is sampled in the item's local space for both width spaces: G6's chain unchanged. A
 front end that wants SVG's `objectBoundingBox` on a stroke folds the geometry's box (without the stroke, as SVG says)
 into `G`, as it does for a fill.
