@@ -462,6 +462,32 @@ changes no result, cannot be seen by any test:
                reason, and the test sink's stroke count for its styles array,
                which precedes the glyph scratch that no stroke test fills to its
                end
+
+  The sweep of the whole tree after the strokes (S1 to S5) and color-paint (P1 to P5) stories, with the lists of tests that
+  each generated candidate runs against widened to every test of the library (the plane and placeholder tests had been left
+  out of them), 7504 plants in ghoti-build:gcc16: the hand-written plants and the held ones all caught or, for the six whose
+  program is the same, removed with the reason beside the place they were (sc2-check-dropped, sc2-status-of-bad-style,
+  ds-s20-outline-run-spelled, pl6-sink-extent-applies, pl-space-transfer-gamma, ds-st10-unbound-undefended); the 4182
+  candidates not held were 874 that do not compile (dropped), 2821 caught (now held) and 487 that survive:
+
+  - 219 comparisons flipped at a tie or a loop bound: the minimum or maximum of two equal numbers, a merge sort's extra pass or
+    its empty run, a loop bound one past an array whose next element is unread, ``fprintf(...) < 0`` against ``<= 0`` (the
+    text is never empty), a capacity compared at exactly its size
+  - 179 statements deleted: a store of zero (or of an enumerator whose value is 0) over memory the line before has already
+    zeroed, a ``memset`` over a record every field of which is then written, a ``free`` or a ``destroy`` (a leak, which a
+    sanitizer sees and these builds do not), a ``GCU_MUTEX_LOCK`` or ``_DESTROY`` (a race, seen by ThreadSanitizer only),
+    and the terms of the test sink's workspace size, each smaller than the 320-byte line that no record fills
+  - 43 logic operators and negations where the other operand or an earlier check decides alike, or where only a failing
+    allocation takes the other arm
+  - 23 widths of a hex number (``%016llx`` against ``%llx``) where no fixture's value has a leading zero digit: a hash, a
+    miter limit (at least 1), a width of at least 2^-64
+  - 16 status codes swapped in functions whose callers compare only against ``OK``, and 7 messages of ``_Static_assert``
+
+  Found unseen and now seen, by the tests added with the sweep: the second standard chunk of a list that is reset, a pixel
+  target that moves and the canonical split of its translation, a rectangle clip's corners and its odd fixed numbers, a plane
+  named by a node, the edges of every float-free call (the most bits, an alpha of 0 and of 1, a count of stops equal to the
+  store's most), each fixed gradient's six values, the allocation failures of the fixed gradient and the rectangle clip, and
+  a zero radius or angle in a gradient's dump.
 """
 
 import concurrent.futures
