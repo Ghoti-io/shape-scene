@@ -24,7 +24,9 @@ edit that moves a line means regenerating and re-running the sweep:
   python3 tools/gen-scene-plants.py > /tmp/candidates.json
   PLANT_EXTRA_JSON=/tmp/candidates.json make check-planted PREFIX=...
 
-then keep the lines the sweep reports as ok.  (Strokes story S1 added src/resource/stroke.c, its tag ``bk``, and
+then keep the lines the sweep reports as ok (tools/keep-caught-plants.py).  After an edit that moved only some lines,
+``--new`` (with or without ``--sink``) writes just the candidates that the committed file does not already hold, and
+``keep-caught-plants.py --merge`` adds the ones the sweep caught to it.  (Strokes story S1 added src/resource/stroke.c, its tag ``bk``, and
 the stroke lines of list.c and resource.c to the filters.)
 
 With --sink it writes the candidates of the sink contract's sources (story 13a, src/sink; and story 14a's
@@ -275,6 +277,12 @@ def main():
             if pid in EXCL:
                 continue
             plants.append((pid, "srcl", path, "%d:%s" % (no, frag), new, TESTS_BY_FILE.get(path, TESTS_EXTRA)))
+    if "--new" in sys.argv:
+        # Only the candidates that the committed file (tools/sink-plants.json with --sink, else tools/scene-plants.json)
+        # does not hold: the ones to sweep after a source edit.
+        held_file = "sink-plants.json" if "--sink" in sys.argv else "scene-plants.json"
+        held = {json.dumps(e[:5]) for e in json.load(open(ROOT / "tools" / held_file))}
+        plants = [p for p in plants if json.dumps(list(p[:5])) not in held]
     json.dump(plants, sys.stdout)
 
 
