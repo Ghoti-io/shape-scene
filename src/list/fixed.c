@@ -303,6 +303,122 @@ GSHSCENE_Result gshscene_list_fill_gradient_fixed(GSHSCENE_List * list, const GS
   return r == GSHSCENE_OK ? gshscene_list_fill(list, resource, &map, rule, &p, layer, 0.0) : r;
 }
 
+/* --- the plane, a design-space rectangle clip and a group in a stated space (fixed.h) -------- */
+
+/** A fill of the plane with the paint @p p: the item map is the ops' for @p frame (the identity for none). */
+static GSHSCENE_Result fill_plane(GSHSCENE_List * list, const GSHSCENE_Resource * plane, const GSHSCENE_Resource * frame,
+    const GSHSCENE_Fixed_Op * ops, size_t op_count, GSHGEOM_Fill_Rule rule, const GSHSCENE_Paint * p, int32_t layer) {
+  if (!list || list->closed || !plane || plane->store != list->store || plane->kind != GSHSCENE_RESOURCE_PLANE ||
+      (op_count && !frame)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  GSHGEOM_Map map;
+  GSHSCENE_Result r = design_map(frame, ops, op_count, &map);
+  return r == GSHSCENE_OK ? gshscene_list_fill(list, plane, &map, rule, p, layer, 0.0) : r;
+}
+
+GSHSCENE_Result gshscene_list_fill_plane_fixed(GSHSCENE_List * list, const GSHSCENE_Resource * plane,
+    const GSHSCENE_Resource * frame, const GSHSCENE_Fixed_Op * ops, size_t op_count, GSHGEOM_Fill_Rule rule,
+    const GSHSCENE_Paint_Fixed * paint, int32_t layer) {
+  GSHSCENE_Paint p;
+  GSHSCENE_Result r = fixed_paint(paint, &p);
+  return r == GSHSCENE_OK ? fill_plane(list, plane, frame, ops, op_count, rule, &p, layer) : r;
+}
+
+GSHSCENE_Result gshscene_list_fill_plane_gradient_fixed(GSHSCENE_List * list, const GSHSCENE_Resource * plane,
+    const GSHSCENE_Resource * frame, const GSHSCENE_Fixed_Op * ops, size_t op_count, GSHGEOM_Fill_Rule rule,
+    const GSHSCENE_Resource * gradient, int32_t alpha, uint32_t bits, int32_t layer) {
+  if (bits > GSHSCENE_FIXED_MAX_BITS || alpha < 0 || alpha > ((int32_t)1 << bits)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  GSHSCENE_Paint p;
+  memset(&p, 0, sizeof p);
+  p.kind = GSHSCENE_PAINT_GRADIENT;
+  p.rgba[3] = fixed_value(alpha, bits);
+  p.gradient = gradient;
+  return fill_plane(list, plane, frame, ops, op_count, rule, &p, layer);
+}
+
+GSHSCENE_Result gshscene_list_clip_push_design_rect_fixed(GSHSCENE_List * list, const GSHSCENE_Resource * frame,
+    const GSHSCENE_Fixed_Op * ops, size_t op_count, int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t bits,
+    int32_t layer) {
+  if (!list || list->closed || !frame || frame->store != list->store || bits > GSHGEOM_FIXED_MAX_BITS || x0 > x1 ||
+      y0 > y1) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  GSHSCENE_Result checked = check_ops(ops, op_count);
+  GSHSCENE_Glyph_Run run;
+  double s = 0.0;
+  if (checked == GSHSCENE_OK) {
+    checked = font_run(frame, &run, &s);
+  }
+  /* The map: the ops' item map for the frame in front of design_to_model, so a design point under the ops lands where
+   * the run's glyph outline puts it (the file comment). */
+  GSHGEOM_Map chain[2];
+  if (checked == GSHSCENE_OK) {
+    checked = design_map(frame, ops, op_count, &chain[0]);
+  }
+  if (checked == GSHSCENE_OK) {
+    checked = from_geometry(gshgeom_map_design_to_model(s, run.glyphs[0].x, run.glyphs[0].y, &chain[1]));
+  }
+  GSHGEOM_Map map;
+  if (checked == GSHSCENE_OK) {
+    checked = from_geometry(gshgeom_map_compose_chain(chain, 2, NULL, &map));
+  }
+  if (checked != GSHSCENE_OK) {
+    return checked;
+  }
+  /* The rectangle, exactly (shape-geometry's fixed builder), as a path of the list's store. */
+  GSHGEOM_Limits limits;
+  gshgeom_limits_default(&limits);
+  GSHGEOM_Path * path = NULL;
+  GSHGEOM_Result g = gshgeom_path_create(&list->store->alloc, &limits, 2, &path);
+  if (g == GSHGEOM_OK) {
+    g = gshgeom_path_move_to_fixed(path, x0, y0, bits);
+  }
+  if (g == GSHGEOM_OK) {
+    g = gshgeom_path_line_to_fixed(path, x1, y0, bits);
+  }
+  if (g == GSHGEOM_OK) {
+    g = gshgeom_path_line_to_fixed(path, x1, y1, bits);
+  }
+  if (g == GSHGEOM_OK) {
+    g = gshgeom_path_line_to_fixed(path, x0, y1, bits);
+  }
+  if (g == GSHGEOM_OK) {
+    g = gshgeom_path_close(path);
+  }
+  if (g != GSHGEOM_OK) {
+    gshgeom_path_destroy(path);
+    return g == GSHGEOM_ERR_OOM ? GSHSCENE_ERR_OOM : from_geometry(g);
+  }
+  const GSHSCENE_Resource * shape = NULL;
+  GSHSCENE_Result r = gshscene_store_intern_path(list->store, path, &shape);
+  gshgeom_path_destroy(path);
+  if (r != GSHSCENE_OK) {
+    return r;
+  }
+  r = gshscene_list_clip_push(list, shape, &map, GSHGEOM_FILL_NONZERO, layer, 0.0);
+  gshscene_resource_release(shape); /* the list holds its own */
+  return r;
+}
+
+GSHSCENE_Result gshscene_list_group_push_space_fixed(GSHSCENE_List * list, uint32_t composite, uint32_t primaries,
+    uint32_t transfer, int32_t layer) {
+  if (primaries < (uint32_t)GCOL_PRIMARIES_SRGB || primaries > (uint32_t)GCOL_PRIMARIES_BT2020 ||
+      (transfer != (uint32_t)GCOL_TRANSFER_LINEAR && transfer != (uint32_t)GCOL_TRANSFER_SRGB)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  GSHSCENE_Group group;
+  memset(&group, 0, sizeof group);
+  group.opacity = 1.0;
+  group.ordering = GSHSCENE_ORDER_FLAT;
+  group.composite = composite;
+  group.blend_space.primaries = (GCOL_Primaries)primaries;
+  group.blend_space.transfer = (GCOL_Transfer)transfer;
+  return gshscene_list_group_push(list, &group, layer, 0.0);
+}
+
 /* --- a gradient (fixed.h, G1 to G13) ------------------------------------------------------ */
 
 /** How many values each gradient kind uses (fixed.h's table), by kind. */

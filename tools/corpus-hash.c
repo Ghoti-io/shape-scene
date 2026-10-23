@@ -56,6 +56,10 @@
  * read back in SK3's canonical form, SK10's bounds of random boxes under composed maps in every unit, the notices and
  * required features of strokes under target maps, lists of strokes rendered by test sinks that draw every feature,
  * expand what they lack, or refuse it, and a retained scene of stroke nodes, a change of style and the diff's damage.
+ * Since color-paint story P4 a plane section folds, into a hash and count of their own (`shape-scene.plane-hash` and
+ * `shape-scene.plane-count`), the plane's hash (one handle however often it is interned), lists of design-space
+ * rectangle clips under design maps (their maps through the composer), fills of the plane with palette paints and
+ * gradients, and groups in a stated blend space, and the renders of those lists by the test sinks.
  * It is built by `make check-corpus-hash` on the host and by
  * suite/tools/xarch/shape.sh and suite/tools/xwin/shape.sh for the others.
  *
@@ -90,6 +94,8 @@ static GSHGEOM_Hash total;
 static unsigned long count;
 static GSHGEOM_Hash stroke_total; /* strokes story S1: its own hash, so the one above is unchanged */
 static unsigned long stroke_count;
+static GSHGEOM_Hash plane_total; /* color-paint story P4: its own hash, so the two above are unchanged */
+static unsigned long plane_count;
 static GSHGEOM_Hash * acc = &total; /* where feed folds */
 static unsigned long * acc_count = &count;
 
@@ -1597,6 +1603,104 @@ static void stroke_section(void) {
   acc_count = &count;
 }
 
+
+/*
+ * Color-paint story P4: the plane, the design-space rectangle clip and the group in a stated space (fixed.h).  Lists of
+ * them are recorded without floats and rendered by the test sinks; the clips' maps are products of inexact doubles
+ * (a run's scale is a division) every target must compose alike.
+ */
+static void plane_section(void) {
+  acc = &plane_total;
+  acc_count = &plane_count;
+  gshgeom_hash_init(&plane_total);
+  GSHSCENE_Store * store = NULL;
+  check(gshscene_store_create(NULL, NULL, &store), "plane store");
+  const GSHSCENE_Resource * plane = NULL;
+  const GSHSCENE_Resource * again = NULL;
+  check(gshscene_store_intern_plane(store, &plane), "plane");
+  check(gshscene_store_intern_plane(store, &again), "plane again");
+  if (again != plane) {
+    fail("the plane interned twice is two handles");
+  }
+  gshscene_resource_release(again);
+  feed(gshscene_resource_hash(plane));
+  feed((uint64_t)gshscene_resource_bytes(plane));
+  const GSHSCENE_Resource * face = test_face(store, 0, 0);
+  const GSHSCENE_Glyph_Fixed glyph = {3u, (int32_t)between(0, 4000) - 2000, (int32_t)between(0, 4000) - 2000};
+  const GSHSCENE_Resource * run = NULL;
+  check(gshscene_store_intern_glyph_run_fixed(store, face, 1337, 0, 0, 6u, 1, &glyph, &run), "plane run");
+  GSHSCENE_Gradient_Stop_Fixed stops[2];
+  memset(stops, 0, sizeof stops);
+  stops[0].bits = 14;
+  stops[0].color.kind = GSHSCENE_FIXED_PAINT_PALETTE;
+  stops[0].color.entry = 1;
+  stops[0].color.alpha = 16384;
+  stops[0].color.bits = 14;
+  stops[1].offset = 16384;
+  stops[1].bits = 14;
+  stops[1].color.kind = GSHSCENE_FIXED_PAINT_PALETTE;
+  stops[1].color.entry = 0xFFFFu;
+  stops[1].color.alpha = 8192;
+  stops[1].color.bits = 14;
+  GSHSCENE_Gradient_Fixed gf;
+  memset(&gf, 0, sizeof gf);
+  gf.kind = GSHSCENE_FIXED_GRADIENT_LINEAR;
+  gf.bits = 0;
+  gf.v[2] = 900;
+  gf.v[5] = 700;
+  gf.primaries = GCOL_PRIMARIES_SRGB;
+  gf.transfer = GCOL_TRANSFER_LINEAR;
+  gf.premultiplied = 1;
+  gf.stop_count = 2;
+  gf.stops = stops;
+  const GSHSCENE_Resource * gradient = NULL;
+  check(gshscene_store_intern_gradient_fixed(store, run, &gf, &gradient), "plane gradient");
+  feed(gshscene_resource_hash(gradient));
+  for (unsigned l = 0; l < 8; l++) {
+    GSHSCENE_List * list = NULL;
+    check(gshscene_list_create(NULL, NULL, store, &list), "plane list");
+    GSHSCENE_Fixed_Op op[2];
+    memset(op, 0, sizeof op);
+    op[0].kind = GSHSCENE_FIXED_ROTATE;
+    op[0].bits = 15;
+    op[0].v[0] = (int32_t)between(0, 65535);
+    op[1].kind = GSHSCENE_FIXED_TRANSLATE;
+    op[1].v[0] = (int32_t)between(0, 400) - 200;
+    op[1].v[1] = (int32_t)between(0, 400) - 200;
+    size_t ops = l % 3;
+    check(gshscene_list_group_push_space_fixed(list, l % 2 ? 13u + l : 0u, GCOL_PRIMARIES_SRGB,
+              l % 4 < 2 ? GCOL_TRANSFER_LINEAR : GCOL_TRANSFER_SRGB, 0),
+        "plane group");
+    int32_t x0 = (int32_t)between(0, 2000) - 1000;
+    int32_t y0 = (int32_t)between(0, 2000) - 1000;
+    int32_t x1 = x0 + (int32_t)between(0, 4000);
+    int32_t y1 = y0 + (int32_t)between(0, 4000);
+    check(gshscene_list_clip_push_design_rect_fixed(list, run, op, ops, x0, y0, x1, y1, 2u, 1), "plane rectangle");
+    GSHSCENE_Paint_Fixed paint = {GSHSCENE_FIXED_PAINT_PALETTE, between(0, 2), (int32_t)between(0, 16384), 14u};
+    check(gshscene_list_fill_plane_fixed(list, plane, run, op, ops, GSHGEOM_FILL_NONZERO, &paint, 1), "plane fill");
+    check(gshscene_list_fill_plane_gradient_fixed(list, plane, run, op, ops, GSHGEOM_FILL_NONZERO, gradient,
+              (int32_t)between(0, 16384), 14u, 2),
+        "plane gradient fill");
+    check(gshscene_list_clip_pop(list), "plane clip pop");
+    check(gshscene_list_group_pop(list), "plane group pop");
+    check(gshscene_list_close(list), "plane close");
+    feed(gshscene_list_hash(list));
+    const GSHSCENE_Item * item = NULL;
+    for (size_t i = 0; i < gshscene_list_count(list); i++) {
+      check(gshscene_list_item(list, i, &item), "plane item");
+      feed(gshgeom_map_hash(&item->map));
+      feed(gshscene_resource_hash(item->resource));
+    }
+    feed_render(list);
+    gshscene_list_destroy(list);
+  }
+  gshscene_resource_release(gradient);
+  gshscene_resource_release(run);
+  gshscene_resource_release(face);
+  gshscene_resource_release(plane);
+  gshscene_store_destroy(store);
+}
+
 int main(void) {
   gshgeom_hash_init(&total);
   GSHSCENE_Store * store = NULL;
@@ -1774,5 +1878,8 @@ int main(void) {
   stroke_section();
   printf("shape-scene.stroke-hash %016" PRIx64 "\n", gshgeom_hash_value(&stroke_total));
   printf("shape-scene.stroke-count %lu\n", stroke_count);
+  plane_section();
+  printf("shape-scene.plane-hash %016" PRIx64 "\n", gshgeom_hash_value(&plane_total));
+  printf("shape-scene.plane-count %lu\n", plane_count);
   return 0;
 }

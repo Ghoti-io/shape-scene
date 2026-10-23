@@ -31,8 +31,9 @@
  * from a font names), a palette (a table of colors, which a palette paint's
  * entry indexes; paint.h, N14), a gradient (a color line over a geometry,
  * which a gradient paint names; paint.h, G1 to G13) or a stroke style (how a
- * centerline is stroked: its width, joins, caps, dashes; stroke.h); one further
- * kind, an image, is named and reserved.  A
+ * centerline is stroked: its width, joins, caps, dashes; stroke.h) or the plane
+ * (the shape of a fill that has no outline: every point the clips in force
+ * allow); one further kind, an image, is named and reserved.  A
  * **store** interns resources: asking it for content it already holds, while a
  * handle to that content is held, returns that handle, so equality of content
  * is equality of pointers within one store.  The store decides by the index
@@ -88,6 +89,7 @@
  *   degenerate, `u8` alignment, `u8` alignment rule, `u8` dash scope, `f64` dash
  *   offset, `u64` the dash count, `f64` each dash, `u64` the width profile's
  *   content hash (0 for none).
+ * - **plane** (1): nothing after the format and the kind: there is one plane.
  *
  * The hash is of the content, not of the reference to it: a glyph run hashes
  * its face's and its outlines' content hashes, so two stores that were given
@@ -112,7 +114,20 @@
  * paint=K <r> <g> <b> <a> space=<space> entry=E` per stop; a stroke style is a
  * line `stroke width=<hex> space=N join=N miter=<hex> cap=N degenerate=N align=N
  * rule=N scope=N offset=<hex> dashes=N profile=<hash>` and a line `d <hex>` per
- * dash.
+ * dash; a plane is the line and no other.
+ *
+ * ### The plane (color-paint story P4, C2; PL1 to PL10)
+ *
+ * A fill whose shape is the plane paints, at coverage 1, every point the clips in
+ * force allow, inside the target's extent and damage.  The coverage is the clips'
+ * alone, so a clip's antialiased edge is weighted once, never twice (the reason a
+ * plane is a resource and not a large rectangle).  The plane has no outline and no
+ * box: it is *unbounded*, which is not empty (an empty box draws nothing).  The
+ * item's map does not move it; it is the item map of the paint, as for a path (a
+ * gradient's own map composes behind it, G-rules).  It is the shape of a fill only:
+ * a clip push, a stroke's centerline, a glyph run's member or a retained scene's node
+ * that names it is ::GSHSCENE_ERR_INVALID.  Where a sink has no native fill of the
+ * clip region it fills its own extent (sink.h, PL8).
  */
 
 #ifndef GHOTI_IO_GSHSCENE_RESOURCE_H
@@ -145,6 +160,7 @@ typedef enum GSHSCENE_Resource_Kind {
   GSHSCENE_RESOURCE_FACE = 6,      ///< A font's face and variation instance, bound to a glyph path provider (glyph_provider.h).
   GSHSCENE_RESOURCE_PALETTE = 7,   ///< A table of colors, which a palette paint's entry indexes (paint.h, N14).
   GSHSCENE_RESOURCE_STROKE_STYLE = 8, ///< How a centerline is stroked (stroke.h, SK1 to SK3).
+  GSHSCENE_RESOURCE_PLANE = 9,     ///< The plane: what a fill covers where no shape bounds it, every point the clips allow (PL1 to PL10).
   GSHSCENE_RESOURCE_KIND_COUNT     ///< Closes the enum.
 } GSHSCENE_Resource_Kind;
 
@@ -153,7 +169,7 @@ typedef enum GSHSCENE_Resource_Kind {
  *
  * @param kind The kind, including a value outside the enum.
  * @return A static string, never NULL: "path", "glyph-run", "picture",
- *   "gradient", "image", "face", "palette", "stroke-style", or "unknown resource kind".
+ *   "gradient", "image", "face", "palette", "stroke-style", "plane", or "unknown resource kind".
  */
 GSHSCENE_API const char * gshscene_resource_kind_string(GSHSCENE_Resource_Kind kind);
 
@@ -363,6 +379,17 @@ GSHSCENE_API GSHSCENE_Result gshscene_store_intern_picture(GSHSCENE_Store * stor
 
 /** The most entries a palette holds: an entry is in `[0, 0xFFFE]` (paint.h), so 65,535 of them. */
 #define GSHSCENE_PALETTE_MAX_ENTRIES 65535u
+
+/**
+ * @brief Intern the plane (PL1): the one resource of its kind, which a fill may name where no outline bounds it.
+ *
+ * It has no content, so every call returns the store's plane while a handle to it is held (AD-27).  Declared in
+ * fixed.h too, which is float-free.
+ *
+ * @param out The handle, with a reference for the caller; written only on success.
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL); ::GSHSCENE_ERR_LIMIT (the store's limits); ::GSHSCENE_ERR_OOM.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_store_intern_plane(GSHSCENE_Store * store, const GSHSCENE_Resource ** out);
 
 /**
  * @brief Intern a palette: @p count colors, copied.

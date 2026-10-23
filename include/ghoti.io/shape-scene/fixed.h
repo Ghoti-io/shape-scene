@@ -98,6 +98,18 @@
  * foreground); the store sorts them stably.  The rules and failures are
  * `gshscene_store_intern_gradient`'s.
  *
+ * ### A rectangle clip in design space, the plane, and a group in a stated space (color-paint story P4)
+ *
+ * ::gshscene_list_clip_push_design_rect_fixed begins a clip of a rectangle given in the face's design space (units,
+ * y up) under a design map of ops, placed for a run `frame` exactly as a gradient is (above): the rectangle is built
+ * exactly by shape-geometry's fixed builder (`v / 2^bits`, nothing rounds) and the clip's map is the item map of the
+ * ops composed in front of `design_to_model(size / upem, g)`, so a design point under the ops lands where the run's
+ * glyph outline puts it.  ::gshscene_list_fill_plane_fixed and ::gshscene_list_fill_plane_gradient_fixed record a fill
+ * of the plane (resource.h, PL1 to PL10): the same fills as the run's, with the item map the ops give for `frame`, and
+ * no outline (the plane covers what the clips in force allow).  ::gshscene_list_group_push_space_fixed begins a group
+ * that composites in a stated blend space (a primaries and a linear or sRGB transfer, no gamma), which the plain push
+ * leaves to the enclosing group.
+ *
  * ### Atomic lowering
  *
  * ::gshscene_list_truncate drops the items from a count on, as if they had not
@@ -221,6 +233,39 @@ GSHSCENE_API GSHSCENE_Result gshscene_list_fill_gradient_fixed(GSHSCENE_List * l
     const GSHSCENE_Fixed_Op * ops, size_t op_count, GSHGEOM_Fill_Rule rule, const GSHSCENE_Resource * gradient,
     int32_t alpha, uint32_t bits, int32_t layer);
 
+/**
+ * @brief Record a fill of the plane (resource.h, PL1 to PL10) with the design map @p ops placed for @p frame, a fixed
+ *   paint, and depth 0.
+ *
+ * The plane has no outline, so @p frame only places the ops: a run from a bound face with a glyph of the list's store
+ * (as for ::gshscene_list_fill_fixed), or NULL with @p op_count 0 for the identity.
+ *
+ * @param plane The plane of the list's store (::gshscene_store_intern_plane).
+ * @return As ::gshscene_list_fill_fixed; ::GSHSCENE_ERR_INVALID for a @p plane that is not the plane of the list's store.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_list_fill_plane_fixed(GSHSCENE_List * list, const GSHSCENE_Resource * plane,
+    const GSHSCENE_Resource * frame, const GSHSCENE_Fixed_Op * ops, size_t op_count, GSHGEOM_Fill_Rule rule,
+    const GSHSCENE_Paint_Fixed * paint, int32_t layer);
+
+/** @brief ::gshscene_list_fill_plane_fixed whose paint is @p gradient with the alpha multiplier `alpha / 2^bits`, as ::gshscene_list_fill_gradient_fixed's. */
+GSHSCENE_API GSHSCENE_Result gshscene_list_fill_plane_gradient_fixed(GSHSCENE_List * list,
+    const GSHSCENE_Resource * plane, const GSHSCENE_Resource * frame, const GSHSCENE_Fixed_Op * ops, size_t op_count,
+    GSHGEOM_Fill_Rule rule, const GSHSCENE_Resource * gradient, int32_t alpha, uint32_t bits, int32_t layer);
+
+/**
+ * @brief Begin a clip of the rectangle `x0 y0 x1 y1` (each `v / 2^bits`, design units, y up, `x0 <= x1` and `y0 <= y1`)
+ *   under the design map @p ops, placed for @p frame, nonzero, at depth 0.
+ *
+ * @param frame A run from a bound face with a glyph, of the list's store: it places the design space (the face's
+ *   `size / upem` and the first glyph's position), as for a gradient.
+ * @param bits At most 16 (shape-geometry's fixed builder).
+ * @return As ::gshscene_list_clip_push_fixed; ::GSHSCENE_ERR_INVALID for an inverted rectangle, @p bits past 16 or a
+ *   @p frame that is not a run from a bound face with a glyph.  The list holds the rectangle's path.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_list_clip_push_design_rect_fixed(GSHSCENE_List * list,
+    const GSHSCENE_Resource * frame, const GSHSCENE_Fixed_Op * ops, size_t op_count, int32_t x0, int32_t y0,
+    int32_t x1, int32_t y1, uint32_t bits, int32_t layer);
+
 /** @brief Begin a clip (list.h's `gshscene_list_clip_push`) with a design map, at depth 0. */
 GSHSCENE_API GSHSCENE_Result gshscene_list_clip_push_fixed(GSHSCENE_List * list, const GSHSCENE_Resource * resource,
     const GSHSCENE_Fixed_Op * ops, size_t op_count, GSHGEOM_Fill_Rule rule, int32_t layer);
@@ -231,6 +276,17 @@ GSHSCENE_API GSHSCENE_Result gshscene_list_clip_push_fixed(GSHSCENE_List * list,
  *   depth 0.
  */
 GSHSCENE_API GSHSCENE_Result gshscene_list_group_push_fixed(GSHSCENE_List * list, uint32_t composite, int32_t layer);
+
+/**
+ * @brief ::gshscene_list_group_push_fixed in a stated blend space: the group's pixels are converted to
+ *   @p primaries and @p transfer where it composites and back at its pop (N8), so its content blends there (AD-23).
+ *
+ * @param primaries A `GCOL_Primaries` value: sRGB, Adobe RGB, Display P3 or BT.2020.
+ * @param transfer A `GCOL_Transfer` value: linear or sRGB.
+ * @return As ::gshscene_list_group_push_fixed; ::GSHSCENE_ERR_INVALID for a primaries or transfer outside the above.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_list_group_push_space_fixed(GSHSCENE_List * list, uint32_t composite,
+    uint32_t primaries, uint32_t transfer, int32_t layer);
 
 /** @brief End the innermost clip (list.h, declared here too). */
 GSHSCENE_API GSHSCENE_Result gshscene_list_clip_pop(GSHSCENE_List * list);
@@ -250,6 +306,9 @@ GSHSCENE_API size_t gshscene_list_count(const GSHSCENE_List * list);
  * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, a closed list, @p count past the list's count).
  */
 GSHSCENE_API GSHSCENE_Result gshscene_list_truncate(GSHSCENE_List * list, size_t count);
+
+/** @brief Intern the plane (resource.h, PL1; declared here too): the store's one plane. */
+GSHSCENE_API GSHSCENE_Result gshscene_store_intern_plane(GSHSCENE_Store * store, const GSHSCENE_Resource ** out);
 
 /**
  * @brief Intern a palette (resource.h) from straight 8-bit sRGB, as a font's `CPAL` stores it.

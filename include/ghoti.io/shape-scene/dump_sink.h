@@ -49,7 +49,10 @@
  * (the provider's `glyph_box`) placed by each glyph's position at `size / upem`
  * (a glyph whose box cannot be had adds nothing).  An item whose box is wider or
  * taller than `max_extent` (the sink's one resource limit) is refused while
- * drawing (`RESOURCE_LIMIT`).
+ * drawing (`RESOURCE_LIMIT`).  A fill of the plane (resource.h, PL1) has no box: its record's
+ * box is the literal `*`, `max_extent` does not apply to it (a limit on an item's box, which a plane has none of),
+ * and on a pixel target it stamps the clip region in force (the clips met with the area, as every stamp is), inside
+ * a group adding that region to what the group gathers.
  *
  * **A run from a font** (story 14a) is decided with glyph.h's route, as the plan
  * decided it: a run the route refuses is skipped (the plan reported it).  Each

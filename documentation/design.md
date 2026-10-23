@@ -103,6 +103,40 @@ they had not been recorded (references released, the open pushes, the expansion 
 again from the items kept), so a front end that lowers one construct into several items leaves the list with all of
 it or none.
 
+## The plane (normative; color-paint story P4)
+
+A paint that no outline bounds (COLRv1's gradient or solid that reaches the root of a graph under a clip box, or under a
+glyph through layers) fills what the clips in force allow. The **plane** is the resource a fill names for that: resource
+kind 9, no content, so one value per store. Its hash stream is the format and the kind and nothing else; its dump is the
+resource line and no payload.
+
+**PL2 Meaning.** A fill of the plane paints its paint at coverage 1 at every point the clips in force allow, inside the
+target's extent and damage, so a clip's antialiased edge is weighted once and never squared (the reason it is a resource
+and not a large rectangle: a rectangle has an edge of its own, which the clip's would multiply, or which a writer must
+spell with huge coordinates). The item's map does not move it, as it has no outline; it is the paint's item map exactly as
+for a path (a gradient's own map composes behind it, G-rules; a map that cannot be inverted draws a gradient nothing).
+The fill rule is checked and has no effect. **PL3** It is the shape of a fill only: as a clip push, a stroke's centerline,
+a run's member or a retained scene's node it is `ERR_INVALID` at the call, and a 3D map on its fill is `ERR_UNSUPPORTED`.
+**PL4 Bounds.** A plane has no box. It is *unbounded*, which is not empty (an empty box draws nothing); no consumer sizes
+anything from it, and a sink uses the region it draws, which the target's extent and the sink's own limit bound. **PL5
+Retained scenes.** No node names a plane, so a scene's emission never produces one and its damage never meets one; if a
+later story lets a node name one, an occurrence of it makes the damage unbounded. **PL6 The test sink** records the fill
+with the box `*`, applies no `max_extent` to it (a limit on an item's box, which a plane has none of), and stamps the clip
+region in force, inside a group adding it to what the group gathers. **PL7 `shape-cpu`** fills the region it draws,
+weighing each pixel by the clips alone. **PL8 Writers and GPU sinks** with no native fill of the clip region fill their
+own extent (the raster, the page's media box, the document's viewport, the canvas) in the target's coordinates, with the
+item map applied to the paint only: PDF draws a gradient plane as `sh` and a solid one as `re f` over the media box, SVG a
+`rect` over the viewport, Canvas a `fillRect` over the canvas, a GPU sink a full-target quad, each inside the clip. The
+extent's edges are the target's own, outside every visible pixel, so no edge is weighted twice. A sink with no extent
+reports the fill as it reports any fill it does not draw; there is no reason of its own, and no capability flag.
+
+`fixed.h` records it without floats: a fill of the plane (`gshscene_list_fill_plane_fixed` and the gradient form) whose
+design map is placed for a run exactly as a run's fill is; a **clip of a rectangle in a run's design space**
+(`gshscene_list_clip_push_design_rect_fixed`: the rectangle built exactly by shape-geometry's fixed builder, the clip's
+map the ops' item map in front of `design_to_model`, so a design point under the ops lands where the run's glyph outline
+puts it); and a **group in a stated blend space** (`gshscene_list_group_push_space_fixed`: a primaries and a linear or
+sRGB transfer, which the plain push leaves to the enclosing group). `tests/unit/test_plane.cpp` holds each rule.
+
 ## Reserved
 
 The image resource kind is named and has no constructor; its value is pinned because it is hashed. A story that gives

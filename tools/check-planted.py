@@ -2253,6 +2253,56 @@ PLANTS += [
     ('sc2-status-of-bad-style', 'src', SKC, '    return GSHSCENE_ERR_INTERNAL; /* SK2 equals SG2: a style the store holds passes */', '    return GSHSCENE_ERR_INVALID;', K),
 ]
 
+# color-paint story P4 (PL1 to PL10): the plane, the design-space rectangle clip and the group in a stated space.
+# Written with the story; the sweep is deferred to the consolidated pass (the strokes plan's deferred-verification).
+PLN = ["testPlane"]
+
+PLANTS += [
+    ('pl1-h-kind', 'hdr', HR, '  GSHSCENE_RESOURCE_PLANE = 9,', '  GSHSCENE_RESOURCE_PLANE = 10,', ["testPlane", "testResource"]),
+    ('pl1-hash-kind', 'src', RS, '  hash_begin(&h, GSHSCENE_RESOURCE_PLANE);\n  return gshgeom_hash_value(&h);', '  hash_begin(&h, GSHSCENE_RESOURCE_PICTURE);\n  return gshgeom_hash_value(&h);', PLN),
+    ('pl1-two-planes', 'src', RS, '      return 1; /* no content: any plane of the store is this one */', '      return 0; /* no content: any plane of the store is this one */', PLN),
+    ('pl1-bytes', 'src', RS, '  GSHSCENE_Probe probe = {GSHSCENE_RESOURCE_PLANE, plane_content_hash(), GSHSCENE_BYTES_BASE, NULL, build_plane};', '  GSHSCENE_Probe probe = {GSHSCENE_RESOURCE_PLANE, plane_content_hash(), 0, NULL, build_plane};', PLN),
+    ('pl3-clip-takes-plane', 'src', LS, '''  GSHSCENE_Result result = check_resource(list, resource, TAKES_PATH | TAKES_RUN);
+  if (result == GSHSCENE_OK) {
+    result = canonical_map(map, &item.map);
+  }
+  if (result == GSHSCENE_OK) {
+    result = check_rule(rule);
+  }
+  if (result == GSHSCENE_OK) {
+    result = gshscene_list_canonical_depth(depth, &item.depth);
+  }
+  if (result == GSHSCENE_OK) {
+    result = stack_reserve(list);
+  }''', '''  GSHSCENE_Result result = check_resource(list, resource, TAKES_PATH | TAKES_RUN | TAKES_PLANE);
+  if (result == GSHSCENE_OK) {
+    result = canonical_map(map, &item.map);
+  }
+  if (result == GSHSCENE_OK) {
+    result = check_rule(rule);
+  }
+  if (result == GSHSCENE_OK) {
+    result = gshscene_list_canonical_depth(depth, &item.depth);
+  }
+  if (result == GSHSCENE_OK) {
+    result = stack_reserve(list);
+  }''', PLN),
+    ('pl3-fill-refuses-plane', 'src', LS, '  GSHSCENE_Result result = check_resource(list, resource, TAKES_PATH | TAKES_RUN | TAKES_PLANE);', '  GSHSCENE_Result result = check_resource(list, resource, TAKES_PATH | TAKES_RUN);', PLN),
+    ('pl2-3d-plane-map', 'src', LS, '  if (result == GSHSCENE_OK && resource->kind == GSHSCENE_RESOURCE_PLANE && item.map.dim != 2) {', '  if (result == GSHSCENE_OK && resource->kind == GSHSCENE_RESOURCE_PLANE && item.map.dim != 3) {', PLN),
+    ('pl5-node-takes-plane', 'src', "src/scene/node.c", '  if (resource->kind != GSHSCENE_RESOURCE_PATH && resource->kind != GSHSCENE_RESOURCE_GLYPH_RUN) {', '  if (resource->kind != GSHSCENE_RESOURCE_PATH && resource->kind != GSHSCENE_RESOURCE_GLYPH_RUN && resource->kind != GSHSCENE_RESOURCE_PLANE) {', PLN),
+    ('pl6-sink-box-empty', 'src', DS, '        emit_text(run, "*\\n", &failed); /* PL6: unbounded, not empty */', '        emit_text(run, "-\\n", &failed); /* PL6: unbounded, not empty */', PLN),
+    ('pl6-sink-extent-applies', 'src', DS, '        limit = 0.0;\n      }', '      }', PLN),
+    ('pl6-sink-stamps-nothing', 'src', DS, '      GSHSCENE_Rect r = plane ? run->area : (box.empty', '      GSHSCENE_Rect r = plane ? (GSHSCENE_Rect){0, 0, 0, 0} : (box.empty', PLN),
+    ('pl4-fixed-plane-needs-no-frame', 'src', FX, '      (op_count && !frame)) {', '      0) {', PLN),
+    ('pl-fixed-plane-wrong-kind', 'src', FX, '|| plane->kind != GSHSCENE_RESOURCE_PLANE ||', '||', PLN),
+    ('pl-rect-space', 'src', FX, '  checked = from_geometry(gshgeom_map_compose_chain(chain, 2, NULL, &map));', '  checked = from_geometry(gshgeom_map_compose_chain(chain + 1, 1, NULL, &map));', PLN),
+    ('pl-rect-width', 'src', FX, '    g = gshgeom_path_line_to_fixed(path, x1, y1, bits);', '    g = gshgeom_path_line_to_fixed(path, x0, y1, bits);', PLN),
+    ('pl-rect-rounds', 'src', FX, '    g = gshgeom_path_move_to_fixed(path, x0, y0, bits);', '    g = gshgeom_path_move_to_fixed(path, x0 / 2 * 2, y0, bits);', PLN),
+    ('pl-rect-inverted', 'src', FX, ' || x0 > x1 ||\n      y0 > y1) {', ' ||\n      0) {', PLN),
+    ('pl-space-dropped', 'src', FX, '  group.blend_space.primaries = (GCOL_Primaries)primaries;\n  group.blend_space.transfer = (GCOL_Transfer)transfer;', '', PLN),
+    ('pl-space-transfer-gamma', 'src', FX, '(transfer != (uint32_t)GCOL_TRANSFER_LINEAR && transfer != (uint32_t)GCOL_TRANSFER_SRGB)', '(transfer > (uint32_t)GCOL_TRANSFER_GAMMA)', PLN),
+]
+
 # The generated plants (tools/gen-scene-plants.py): the mutations of src/scene
 # the sweep was seen to catch.  PLANT_EXTRA_JSON names another file to run
 # in addition, which is how a regenerated candidate list is triaged.

@@ -56,6 +56,8 @@ const char * gshscene_resource_kind_string(GSHSCENE_Resource_Kind kind) {
       return "palette";
     case GSHSCENE_RESOURCE_STROKE_STYLE:
       return "stroke-style";
+    case GSHSCENE_RESOURCE_PLANE:
+      return "plane";
     case GSHSCENE_RESOURCE_KIND_COUNT:
       break;
   }
@@ -126,6 +128,13 @@ static uint64_t palette_content_hash(size_t count, const GSHSCENE_Color * colors
   for (size_t i = 0; i < count; i++) {
     gshscene_color_hash(&h, &colors[i]);
   }
+  return gshgeom_hash_value(&h);
+}
+
+/* The plane's content: nothing (PL1), so its hash is the format's and the kind's. */
+static uint64_t plane_content_hash(void) {
+  GSHGEOM_Hash h;
+  hash_begin(&h, GSHSCENE_RESOURCE_PLANE);
   return gshgeom_hash_value(&h);
 }
 
@@ -264,6 +273,8 @@ int gshscene_resource_matches(const GSHSCENE_Resource * resource, const GSHSCENE
       return gshscene_gradient_matches(resource, probe->source);
     case GSHSCENE_RESOURCE_STROKE_STYLE:
       return gshscene_stroke_matches(resource, probe->source);
+    case GSHSCENE_RESOURCE_PLANE:
+      return 1; /* no content: any plane of the store is this one */
     default:
       return 0;
   }
@@ -704,6 +715,26 @@ GSHSCENE_Result gshscene_store_intern_palette_rgba8(
   return result;
 }
 
+/* --- the plane (PL1) ---------------------------------------------------------- */
+
+static GSHSCENE_Result build_plane(GSHSCENE_Store * store, const void * source, GSHSCENE_Resource ** out) {
+  (void)source;
+  GSHSCENE_Resource * resource = gshscene_store_new_resource(store, GSHSCENE_RESOURCE_PLANE);
+  if (!resource) {
+    return GSHSCENE_ERR_OOM;
+  }
+  *out = resource;
+  return GSHSCENE_OK;
+}
+
+GSHSCENE_Result gshscene_store_intern_plane(GSHSCENE_Store * store, const GSHSCENE_Resource ** out) {
+  if (!store || !out) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  GSHSCENE_Probe probe = {GSHSCENE_RESOURCE_PLANE, plane_content_hash(), GSHSCENE_BYTES_BASE, NULL, build_plane};
+  return gshscene_store_intern(store, &probe, out);
+}
+
 size_t gshscene_resource_palette_count(const GSHSCENE_Resource * resource) {
   return resource && resource->kind == GSHSCENE_RESOURCE_PALETTE ? resource->u.palette.count : 0;
 }
@@ -857,6 +888,8 @@ GSHSCENE_Result gshscene_resource_dump(const GSHSCENE_Resource * resource, FILE 
         return GSHSCENE_ERR_IO;
       }
       break;
+    case GSHSCENE_RESOURCE_PLANE:
+      break; /* PL1: the header line is the whole dump */
     default:
       break;
   }

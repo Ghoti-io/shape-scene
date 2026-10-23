@@ -54,6 +54,7 @@
 #define TAKES_PATH 1u
 #define TAKES_RUN 2u
 #define TAKES_PICTURE 4u
+#define TAKES_PLANE 8u /* a fill only (PL3) */
 
 /* --- the arena -------------------------------------------------------------- */
 
@@ -367,6 +368,9 @@ static GSHSCENE_Result check_resource(const GSHSCENE_List * list, const GSHSCENE
   if (resource->kind == GSHSCENE_RESOURCE_PICTURE && (takes & TAKES_PICTURE)) {
     return GSHSCENE_OK;
   }
+  if (resource->kind == GSHSCENE_RESOURCE_PLANE && (takes & TAKES_PLANE)) {
+    return GSHSCENE_OK;
+  }
   return GSHSCENE_ERR_INVALID;
 }
 
@@ -578,9 +582,12 @@ GSHSCENE_Result gshscene_list_fill(GSHSCENE_List * list, const GSHSCENE_Resource
   }
   GSHSCENE_Item item;
   item_init(&item, GSHSCENE_ITEM_FILL);
-  GSHSCENE_Result result = check_resource(list, resource, TAKES_PATH | TAKES_RUN);
+  GSHSCENE_Result result = check_resource(list, resource, TAKES_PATH | TAKES_RUN | TAKES_PLANE);
   if (result == GSHSCENE_OK) {
     result = canonical_map(map, &item.map);
+  }
+  if (result == GSHSCENE_OK && resource->kind == GSHSCENE_RESOURCE_PLANE && item.map.dim != 2) {
+    result = GSHSCENE_ERR_UNSUPPORTED; /* PL2: a plane is planar */
   }
   if (result == GSHSCENE_OK) {
     result = check_rule(rule);

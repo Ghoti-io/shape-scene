@@ -425,6 +425,10 @@ static GSHSCENE_Result add_shape(Damage_Walk * d, const GSHSCENE_Walk * walk, co
     }
     return GSHSCENE_OK;
   }
+  if (gshscene_resource_kind(resource) == GSHSCENE_RESOURCE_PLANE) {
+    d->unbounded = 1; /* PL5: a plane has no box; no node names one today (check_region), and if one did the damage is unbounded */
+    return GSHSCENE_OK;
+  }
   GSHSCENE_Glyph_Run run;
   if (gshscene_resource_glyph_run(resource, &run) != GSHSCENE_OK) {
     d->unbounded = 1;

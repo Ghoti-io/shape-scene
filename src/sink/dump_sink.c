@@ -991,8 +991,16 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
         run->skip_reason = (GSHSCENE_Reason)route.reason;
         return failed;
       }
-      int bad = !mapped || (font && !routed) || resource_box(item->resource, &model) || box_map(&map, &model, &box);
+      /* PL4, PL6: the plane has no box, so no extent limit applies to it and nothing is sized from it. */
+      int plane = item->kind == GSHSCENE_ITEM_FILL && gshscene_resource_kind(item->resource) == GSHSCENE_RESOURCE_PLANE;
+      int bad = !mapped || (font && !routed) ||
+          (plane ? 0 : (resource_box(item->resource, &model) || box_map(&map, &model, &box)));
       double limit = run->sink->config.max_extent;
+      if (plane) {
+        box.empty = 1;
+        box.x0 = box.y0 = box.x1 = box.y1 = 0.0;
+        limit = 0.0;
+      }
       if (bad || (limit > 0.0 && !box.empty && (box.x1 - box.x0 > limit || box.y1 - box.y0 > limit))) {
         /* The sink's own resource limit, found while drawing (S6). */
         snprintf(run->line, LINE_BYTES, " X class=%d reason=%d\n", (int)GSHSCENE_ENTRY_REFUSED,
@@ -1018,7 +1026,9 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
         emit_text(run, run->line, &failed);
       }
       emit_text(run, " box=", &failed);
-      if (box.empty) {
+      if (plane) {
+        emit_text(run, "*\n", &failed); /* PL6: unbounded, not empty */
+      } else if (box.empty) {
         emit_text(run, "-\n", &failed);
       } else {
         snprintf(run->line, LINE_BYTES, "%016" PRIx64 " %016" PRIx64 " %016" PRIx64 " %016" PRIx64 "\n",
@@ -1037,7 +1047,7 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
           return r;
         }
       }
-      GSHSCENE_Rect r = box.empty ? (GSHSCENE_Rect){0, 0, 0, 0} : box_pixels(&box);
+      GSHSCENE_Rect r = plane ? run->area : (box.empty ? (GSHSCENE_Rect){0, 0, 0, 0} : box_pixels(&box));
       if (item->kind == GSHSCENE_ITEM_FILL) {
         if (pixel) {
           draw_rect(run, r, mark_of(chain, count), &failed);

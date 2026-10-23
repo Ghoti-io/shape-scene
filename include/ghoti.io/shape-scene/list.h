@@ -360,7 +360,9 @@ GSHSCENE_API GSHSCENE_Result gshscene_list_reset(GSHSCENE_List * list);
  * magnitude is ::GSHSCENE_ERR_LIMIT (N1, paint.h), decided after every other argument's validity.
  *
  * @param list The list.
- * @param resource A path or glyph run of the list's store.
+ * @param resource A path or glyph run of the list's store, or the plane (resource.h, PL1 to PL3: a fill of the plane
+ *   covers every point the clips in force allow; its map is the paint's alone, must be 2D, and is
+ *   ::GSHSCENE_ERR_UNSUPPORTED otherwise; its fill rule is checked and has no effect).
  * @param map The placement, or NULL for the 2D identity.
  * @param rule The fill rule.
  * @param paint The paint (solid, foreground, palette, or a gradient of the list's store, which the list retains), or

@@ -2378,6 +2378,74 @@ TEST_P(SinkConformance, B7_TheIdentitiesOfTheModesHoldOnEverySink) {
 // S19 (color-paint story P3, T1): a non-isolated group, a knockout group and a group with a soft mask are refused by
 // the planning pass of a sink whose caps lack them, each with its reason; strict leaves the target untouched; a sink
 // whose caps claim one draws it with no entry.
+/**
+ * PL2, PL4, PL6, PL7: a fill of the plane covers what the clips in force allow and nothing else, whole where no clip is
+ * in force and inside the damage where there is one, and no sink refuses it for an extent of its own (a plane has no
+ * box).  The clip is a square on whole pixels, so its coverage is exactly 1 and 0 and the test reads the pixels.
+ */
+TEST_P(SinkConformance, PL2_APlaneFillCoversTheClipRegionAndNothingElse) {
+  bool any = false;
+  for (uint32_t kind : f()->kinds) {
+    if (kind != GSHSCENE_TARGET_RASTER) {
+      continue;
+    }
+    any = true;
+    SinkRef sink(make());
+    Scene s;
+    const GSHSCENE_Resource * plane = nullptr;
+    ASSERT_EQ(gshscene_store_intern_plane(s.store, &plane), GSHSCENE_OK);
+    s.held.push_back(plane);
+    const GSHSCENE_Resource * box = s.sq(8, 12, 16);
+    GSHSCENE_List * clipped = s.open();
+    GSHSCENE_Paint red = solid(1, 0, 0, 1.0);
+    ASSERT_EQ(gshscene_list_clip_push(clipped, box, nullptr, GSHGEOM_FILL_NONZERO, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_fill(clipped, plane, nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_clip_pop(clipped), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_close(clipped), GSHSCENE_OK);
+    GSHSCENE_List * open_plane = s.open();
+    ASSERT_EQ(gshscene_list_fill(open_plane, plane, nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_close(open_plane), GSHSCENE_OK);
+    auto fresh = make_raster();
+    ReportRef report;
+    // Clipped: the square's pixels differ from a fresh target and every other pixel is untouched.
+    auto a = make_raster();
+    ASSERT_EQ(run(f(), sink.sink, request_for(clipped, *a, report.report)).result, GSHSCENE_OK);
+    EXPECT_TRUE(of_class(report.report, GSHSCENE_ENTRY_REFUSED).empty()) << "a plane is never refused";
+    for (uint32_t y = 0; y < 64; y++) {
+      for (uint32_t x = 0; x < 64; x++) {
+        bool inside = x >= 8 && x < 24 && y >= 12 && y < 28;
+        if (inside) {
+          ASSERT_NE(a->pixel(x, y), fresh->pixel(x, y)) << "the clip region is covered: " << x << "," << y;
+        } else {
+          ASSERT_EQ(a->pixel(x, y), fresh->pixel(x, y)) << "outside the clip is untouched: " << x << "," << y;
+        }
+      }
+    }
+    // Unclipped: the whole extent; and inside a damage, exactly the damage.
+    auto b = make_raster();
+    ASSERT_EQ(run(f(), sink.sink, request_for(open_plane, *b, report.report)).result, GSHSCENE_OK);
+    for (uint32_t y = 0; y < 64; y++) {
+      for (uint32_t x = 0; x < 64; x++) {
+        ASSERT_NE(b->pixel(x, y), fresh->pixel(x, y)) << x << "," << y;
+      }
+    }
+    auto c = make_raster();
+    const GSHSCENE_Rect damage{5, 7, 37, 41};
+    c->target.damage = &damage;
+    ASSERT_EQ(run(f(), sink.sink, request_for(open_plane, *c, report.report)).result, GSHSCENE_OK);
+    for (uint32_t y = 0; y < 64; y++) {
+      for (uint32_t x = 0; x < 64; x++) {
+        bool inside = x >= 5 && x < 37 && y >= 7 && y < 41;
+        ASSERT_EQ(c->pixel(x, y), inside ? b->pixel(x, y) : fresh->pixel(x, y)) << x << "," << y;
+      }
+    }
+    EXPECT_TRUE(of_class(report.report, GSHSCENE_ENTRY_REFUSED).empty()) << "a plane is never refused, for an extent or otherwise";
+  }
+  if (!any) {
+    GTEST_SKIP() << "no pixel target: the plane's coverage is read from pixels";
+  }
+}
+
 TEST_P(SinkConformance, S19_PdfGroupFieldsAreRefusedWithoutTheirCaps) {
   int checked = 0;
   for (uint32_t kind : f()->kinds) {
