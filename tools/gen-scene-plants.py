@@ -81,22 +81,22 @@ EXTRA = {
 }
 TESTS_EXTRA = ["testBytes", "testCore", "testStore", "testScene_limits", "testOrder", "testList", "testColor", "testDump",
                "testComposite", "testPaint_scene", "testEmit", "testPalette", "testGradient", "testColor_bound",
-               "testGroup_fields", "testStroke"]
+               "testGroup_fields", "testStroke", "testPlane", "testPlaceholder"]
 TESTS_BY_FILE = {
-    "src/paint/color_space.c": ["testColor", "testColor_bound", "testList", "testNode", "testPaint_scene", "testScene_dump"],
-    "src/scene/node.c": ["testNode", "testEdit", "testScene", "testScene_dump", "testVersion", "testPaint_scene", "testOrder", "testEmit", "testPalette", "testGradient", "testGroup_fields", "testStroke"],
-    "src/scene/edit.c": ["testEdit", "testScene", "testNode", "testPaint_scene", "fuzz-replay", "testPalette"],
-    "src/scene/scene.c": ["testScene", "testEdit", "testScene_limits", "testDiff", "testEmit", "testPaint_scene", "fuzz-replay", "testPalette"],
-    "src/scene/version.c": ["testVersion", "testScene_dump", "testScene", "testEmit", "testDiff", "testPaint_scene", "testOrder", "testPalette", "testGradient", "testGroup_fields", "testStroke"],
+    "src/paint/color_space.c": ["testColor", "testColor_bound", "testList", "testNode", "testPaint_scene", "testScene_dump", "testPlane"],
+    "src/scene/node.c": ["testNode", "testEdit", "testScene", "testScene_dump", "testVersion", "testPaint_scene", "testOrder", "testEmit", "testPalette", "testGradient", "testGroup_fields", "testStroke", "testPlane", "testPlaceholder"],
+    "src/scene/edit.c": ["testEdit", "testScene", "testNode", "testPaint_scene", "fuzz-replay", "testPalette", "testPlane", "testPlaceholder"],
+    "src/scene/scene.c": ["testScene", "testEdit", "testScene_limits", "testDiff", "testEmit", "testPaint_scene", "fuzz-replay", "testPalette", "testPlane", "testPlaceholder"],
+    "src/scene/version.c": ["testVersion", "testScene_dump", "testScene", "testEmit", "testDiff", "testPaint_scene", "testOrder", "testPalette", "testGradient", "testGroup_fields", "testStroke", "testPlane", "testPlaceholder"],
     "src/scene/walk.c": ["testVersion", "testEmit", "testDiff", "testScene_limits", "testOrder", "testStroke"],
-    "src/scene/validate.c": ["testScene", "testScene_limits", "testEdit", "testPaint_scene", "fuzz-replay", "testGroup_fields", "testStroke"],
-    "src/scene/emit.c": ["testEmit", "testScene_limits", "testVersion", "testDiff", "testOrder", "testPaint_scene", "testPalette", "testGroup_fields", "testStroke"],
-    "src/scene/diff.c": ["testDiff", "testScene", "testVersion", "testPaint_scene", "testGlyph", "testPalette", "testGradient", "testGroup_fields", "testStroke"],
-    "src/list/fixed.c": ["testPalette", "testGradient", "fuzz-replay"],
+    "src/scene/validate.c": ["testScene", "testScene_limits", "testEdit", "testPaint_scene", "fuzz-replay", "testGroup_fields", "testStroke", "testPlane", "testPlaceholder"],
+    "src/scene/emit.c": ["testEmit", "testScene_limits", "testVersion", "testDiff", "testOrder", "testPaint_scene", "testPalette", "testGroup_fields", "testStroke", "testPlane", "testPlaceholder"],
+    "src/scene/diff.c": ["testDiff", "testScene", "testVersion", "testPaint_scene", "testGlyph", "testPalette", "testGradient", "testGroup_fields", "testStroke", "testPlane", "testPlaceholder"],
+    "src/list/fixed.c": ["testPalette", "testGradient", "testPlane", "testPlaceholder", "fuzz-replay"],
     "src/resource/gradient.c": ["testGradient", "testColor_bound", "testDump", "testDump_sink", "fuzz-replay", "fuzz-render", "probe", "testStroke"],
     "src/paint/convert.c": ["testGradient", "testColor_bound", "probe"],
     "src/resource/stroke.c": ["testStroke", "testDiff", "testDump", "testDump_sink", "testResource", "testSink",
-                              "fuzz-replay", "fuzz-render", "probe"],
+                              "testPlane", "testPlaceholder", "fuzz-replay", "fuzz-render", "probe"],
 }
 
 SINK_FILES = {
@@ -107,7 +107,7 @@ SINK_FILES = {
     "src/glyph/glyph.c": "gl",
 }
 SINK_TESTS = ["testDump_sink", "testSink", "testReport", "testGlyph", "testPalette", "testGradient", "testGroup_fields",
-              "testStroke", "fuzz-render", "probe"]
+              "testStroke", "testPlane", "testPlaceholder", "fuzz-render", "probe"]
 
 REL = [("==", "!="), ("!=", "=="), ("<=", "<"), (">=", ">"), ("<", "<="), (">", ">=")]
 
