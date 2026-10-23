@@ -172,6 +172,13 @@ typedef struct GSHSCENE_Paint_Fixed {
   uint32_t bits;  ///< At most ::GSHSCENE_FIXED_MAX_BITS.
 } GSHSCENE_Paint_Fixed;
 
+/** The sRGB primaries (`GCOL_PRIMARIES_SRGB`, color.h) as a gradient's or a group's `primaries` value; a test pins the two together. */
+#define GSHSCENE_FIXED_PRIMARIES_SRGB 1u
+/** The linear transfer (`GCOL_TRANSFER_LINEAR`) as a `transfer` value; a test pins it. */
+#define GSHSCENE_FIXED_TRANSFER_LINEAR 1u
+/** The sRGB transfer (`GCOL_TRANSFER_SRGB`) as a `transfer` value; a test pins it. */
+#define GSHSCENE_FIXED_TRANSFER_SRGB 2u
+
 /** The gradient kinds (`GSHSCENE_GRADIENT_*`, paint.h; a test pins them together). */
 #define GSHSCENE_FIXED_GRADIENT_LINEAR 1u
 #define GSHSCENE_FIXED_GRADIENT_RADIAL 2u

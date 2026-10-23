@@ -479,6 +479,12 @@ TEST(PlaneFixed, TheDesignRectangleIsClippedWhereTheRunsGlyphWouldBe) {
   EXPECT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
 }
 
+TEST(PlaneFixed, TheSpaceValuesAFloatFreeCallerPassesArePinnedToTheColorLibrarys) {
+  EXPECT_EQ(GSHSCENE_FIXED_PRIMARIES_SRGB, (uint32_t)GCOL_PRIMARIES_SRGB);
+  EXPECT_EQ(GSHSCENE_FIXED_TRANSFER_LINEAR, (uint32_t)GCOL_TRANSFER_LINEAR);
+  EXPECT_EQ(GSHSCENE_FIXED_TRANSFER_SRGB, (uint32_t)GCOL_TRANSFER_SRGB);
+}
+
 TEST(PlaneFixed, TheSpacedGroupStatesItsBlendSpace) {
   StoreHolder s;
   ListHolder l(s.store);
