@@ -20,6 +20,7 @@
 #include "ref_composite.h"
 #include "../scene_fixtures.h"
 #include "../scene_helpers.h"
+#include "../alloc_tracker.h"
 
 #include <ghoti.io/shape-scene/fixed.h>
 
@@ -1805,6 +1806,207 @@ TEST(GradientVectors, TheEvaluatorAgreesWithTheOracleAndTheLibraryResolvesItsSto
   EXPECT_GT(exact_cases, 100);
   std::printf("gradient vectors: %d points, %d exact; worst color error linear %.3g radial %.3g sweep %.3g, t %.3g\n",
       gradient_vectors::kGradientCaseCount, exact_cases, worst[0], worst[1], worst[2], worst[3]);
+}
+
+namespace {
+
+/**
+ * An allocator whose `malloc` hands back memory already holding a valid stop (offset 5, the foreground) in every slot
+ * of an array of stops and zeros otherwise, so that a stop the code forgot to write reads as a valid one and cannot be
+ * refused by the later checks for what it is.
+ */
+void * stop_filled_malloc(void * ctx, size_t n) {
+  const GSHSCENE_Gradient_Stop * stop = static_cast<const GSHSCENE_Gradient_Stop *>(ctx);
+  void * p = std::calloc(1, n ? n : 1);
+  if (p && n && n % sizeof *stop == 0) {
+    for (size_t at = 0; at < n; at += sizeof *stop) {
+      std::memcpy(static_cast<char *>(p) + at, stop, sizeof *stop);
+    }
+  }
+  return p;
+}
+void * stop_filled_calloc(void *, size_t c, size_t n) { return std::calloc(c ? c : 1, n ? n : 1); }
+void * stop_filled_realloc(void * ctx, void * old, size_t n) {
+  return old ? std::realloc(old, n ? n : 1) : stop_filled_malloc(ctx, n);
+}
+void stop_filled_free(void *, void * p) { std::free(p); }
+
+GSHSCENE_Allocator stop_filled_allocator(const GSHSCENE_Gradient_Stop * stop) {
+  GSHSCENE_Allocator a;
+  a.ctx = const_cast<GSHSCENE_Gradient_Stop *>(stop);
+  a.malloc_fn = stop_filled_malloc;
+  a.calloc_fn = stop_filled_calloc;
+  a.realloc_fn = stop_filled_realloc;
+  a.free_fn = stop_filled_free;
+  return a;
+}
+
+}  // namespace
+
+TEST(GradientFixed, EachKindsSixValuesLandInTheirOwnFieldsAndNowhereElse) {
+  GSHSCENE_Test_Provider tp{};
+  tp.upem = 2048;
+  StoreHolder s;
+  Ref face(gshscene_tp_face(s.store, &tp, 1, 0x77, 0));
+  Ref run(intern_font_run(s.store, face.get(), 20.48, {GSHSCENE_Glyph{3, 10.0, 20.0, nullptr}}));
+  GSHSCENE_Gradient_Fixed f{};
+  f.bits = 1;
+  f.primaries = GCOL_PRIMARIES_SRGB;
+  f.transfer = GCOL_TRANSFER_SRGB;
+  const GSHSCENE_Resource * out = nullptr;
+  GSHSCENE_Gradient back;
+  // Linear: v = x0 y0 x1 y1 x2 y2; d = p2 - p0 in each axis.
+  f.kind = GSHSCENE_FIXED_GRADIENT_LINEAR;
+  const int32_t lv[6] = {1, 2, 3, 4, 7, 12};
+  std::memcpy(f.v, lv, sizeof lv);
+  ASSERT_EQ(gshscene_store_intern_gradient_fixed(s.store, run.get(), &f, &out), GSHSCENE_OK);
+  Ref linear(out);
+  ASSERT_EQ(gshscene_resource_gradient(linear.get(), &back), GSHSCENE_OK);
+  EXPECT_EQ(back.p0[0], 0.5);
+  EXPECT_EQ(back.p0[1], 1.0);
+  EXPECT_EQ(back.p1[0], 1.5);
+  EXPECT_EQ(back.p1[1], 2.0);
+  EXPECT_EQ(back.d[0], 3.0) << "(7 - 1) / 2";
+  EXPECT_EQ(back.d[1], 5.0) << "(12 - 2) / 2";
+  // Radial: v = cx0 cy0 r0 cx1 cy1 r1.
+  f.kind = GSHSCENE_FIXED_GRADIENT_RADIAL;
+  const int32_t rv[6] = {1, 2, 3, 5, 8, 13};
+  std::memcpy(f.v, rv, sizeof rv);
+  ASSERT_EQ(gshscene_store_intern_gradient_fixed(s.store, run.get(), &f, &out), GSHSCENE_OK);
+  Ref radial(out);
+  ASSERT_EQ(gshscene_resource_gradient(radial.get(), &back), GSHSCENE_OK);
+  EXPECT_EQ(back.c0[0], 0.5);
+  EXPECT_EQ(back.c0[1], 1.0);
+  EXPECT_EQ(back.r0, 1.5);
+  EXPECT_EQ(back.c1[0], 2.5);
+  EXPECT_EQ(back.c1[1], 4.0);
+  EXPECT_EQ(back.r1, 6.5);
+  // Sweep: v = cx cy a0 a1 (half turns).
+  f.kind = GSHSCENE_FIXED_GRADIENT_SWEEP;
+  const int32_t wv[6] = {3, 5, 1, 2, 0, 0};
+  std::memcpy(f.v, wv, sizeof wv);
+  ASSERT_EQ(gshscene_store_intern_gradient_fixed(s.store, run.get(), &f, &out), GSHSCENE_OK);
+  Ref sweep(out);
+  ASSERT_EQ(gshscene_resource_gradient(sweep.get(), &back), GSHSCENE_OK);
+  EXPECT_EQ(back.center[0], 1.5);
+  EXPECT_EQ(back.center[1], 2.5);
+  EXPECT_EQ(back.a0, 90.0);
+  EXPECT_EQ(back.a1, 180.0);
+}
+
+TEST(GradientFixed, TheBitsOfAStopAndOfAFillAreCheckedAtTheirExactMost) {
+  // The memory of an array of stops arrives holding a valid stop, so a stop the code never wrote is a valid one: a
+  // refused stop must stop the call, not leave it to a later check to find a hole.
+  GSHSCENE_Gradient_Stop valid{};
+  valid.offset = 5.0;
+  valid.color.kind = GSHSCENE_PAINT_FOREGROUND;
+  valid.color.rgba[3] = 1.0;
+  GSHSCENE_Allocator zeroing = stop_filled_allocator(&valid);
+  GSHSCENE_Test_Provider tp{};
+  StoreHolder s(nullptr, &zeroing);
+  Ref face(gshscene_tp_face(s.store, &tp, 1, 0x77, 0));
+  Ref run(intern_font_run(s.store, face.get(), 12, {GSHSCENE_Glyph{3, 0, 0, nullptr}}));
+  GSHSCENE_Gradient_Fixed f{};
+  f.kind = GSHSCENE_FIXED_GRADIENT_LINEAR;
+  f.v[2] = 10;
+  f.primaries = GCOL_PRIMARIES_SRGB;
+  f.transfer = GCOL_TRANSFER_LINEAR;
+  GSHSCENE_Gradient_Stop_Fixed stops[3] = {
+      {0, 0, {GSHSCENE_FIXED_PAINT_FOREGROUND, 0, 1, 0}},
+      {1, 31, {GSHSCENE_FIXED_PAINT_FOREGROUND, 0, 1, 0}},
+      {2, 0, {GSHSCENE_FIXED_PAINT_FOREGROUND, 0, 1, 0}},
+  };
+  f.stop_count = 3;
+  f.stops = stops;
+  const GSHSCENE_Resource * out = nullptr;
+  EXPECT_EQ(gshscene_store_intern_gradient_fixed(s.store, run.get(), &f, &out), GSHSCENE_ERR_INVALID)
+      << "a stop with 31 bits";
+  EXPECT_EQ(out, nullptr);
+  stops[1].bits = GSHSCENE_FIXED_MAX_BITS;
+  stops[1].offset = 1 << 20;
+  ASSERT_EQ(gshscene_store_intern_gradient_fixed(s.store, run.get(), &f, &out), GSHSCENE_OK) << "30 bits is the most";
+  gshscene_resource_release(out);
+  // A fill's alpha: 0 and 1 are in, at the most bits too; one past either end is out.
+  Ref g(intern_g(s.store, gen_radial()));
+  ListHolder l(s.store);
+  const int32_t one = (int32_t)1 << GSHSCENE_FIXED_MAX_BITS;
+  EXPECT_EQ(gshscene_list_fill_gradient_fixed(l.list, run.get(), nullptr, 0, GSHGEOM_FILL_NONZERO, g.get(), 0,
+                GSHSCENE_FIXED_MAX_BITS, 0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_fill_gradient_fixed(l.list, run.get(), nullptr, 0, GSHGEOM_FILL_NONZERO, g.get(), one,
+                GSHSCENE_FIXED_MAX_BITS, 0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_fill_gradient_fixed(l.list, run.get(), nullptr, 0, GSHGEOM_FILL_NONZERO, g.get(), one + 1,
+                GSHSCENE_FIXED_MAX_BITS, 0), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_list_fill_gradient_fixed(l.list, run.get(), nullptr, 0, GSHGEOM_FILL_NONZERO, g.get(), 0,
+                GSHSCENE_FIXED_MAX_BITS + 1, 0), GSHSCENE_ERR_INVALID);
+  Ref plane;
+  ASSERT_EQ(gshscene_store_intern_plane(s.store, &plane.resource), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_fill_plane_gradient_fixed(l.list, plane.get(), nullptr, nullptr, 0, GSHGEOM_FILL_NONZERO,
+                g.get(), 0, GSHSCENE_FIXED_MAX_BITS, 0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_fill_plane_gradient_fixed(l.list, plane.get(), nullptr, nullptr, 0, GSHGEOM_FILL_NONZERO,
+                g.get(), one, GSHSCENE_FIXED_MAX_BITS, 0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_fill_plane_gradient_fixed(l.list, plane.get(), nullptr, nullptr, 0, GSHGEOM_FILL_NONZERO,
+                g.get(), one + 1, GSHSCENE_FIXED_MAX_BITS, 0), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_list_fill_plane_gradient_fixed(l.list, plane.get(), nullptr, nullptr, 0, GSHGEOM_FILL_NONZERO,
+                g.get(), -1, GSHSCENE_FIXED_MAX_BITS, 0), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_list_fill_plane_gradient_fixed(l.list, plane.get(), nullptr, nullptr, 0, GSHGEOM_FILL_NONZERO,
+                g.get(), 0, GSHSCENE_FIXED_MAX_BITS + 1, 0), GSHSCENE_ERR_INVALID);
+  // The stops of a gradient: exactly as many as the store allows is in, one more is the limit.
+  GSHSCENE_Limits limits;
+  gshscene_limits_default(&limits);
+  limits.max_resource_elements = 3;
+  StoreHolder tight(&limits);
+  Ref tface(gshscene_tp_face(tight.store, &tp, 1, 0x77, 0));
+  Ref trun(intern_font_run(tight.store, tface.get(), 12, {GSHSCENE_Glyph{3, 0, 0, nullptr}}));
+  EXPECT_EQ(gshscene_store_intern_gradient_fixed(tight.store, trun.get(), &f, &out), GSHSCENE_OK) << "three stops, three allowed";
+  gshscene_resource_release(out);
+  GSHSCENE_Gradient_Stop_Fixed four[4] = {stops[0], stops[2], stops[0], stops[2]};
+  four[2].offset = 3;
+  four[3].offset = 4;
+  f.stop_count = 4;
+  f.stops = four;
+  EXPECT_EQ(gshscene_store_intern_gradient_fixed(tight.store, trun.get(), &f, &out), GSHSCENE_ERR_LIMIT);
+}
+
+TEST(GradientFixed, EveryFailingAllocationLeavesNothingHeld) {
+  GSHSCENE_Test_Provider tp{};
+  GSHSCENE_Gradient_Stop_Fixed stops[2] = {
+      {0, 0, {GSHSCENE_FIXED_PAINT_FOREGROUND, 0, 1, 0}},
+      {1, 0, {GSHSCENE_FIXED_PAINT_FOREGROUND, 0, 1, 0}},
+  };
+  GSHSCENE_Gradient_Fixed f{};
+  f.kind = GSHSCENE_FIXED_GRADIENT_LINEAR;
+  f.v[2] = 10;
+  f.primaries = GCOL_PRIMARIES_SRGB;
+  f.transfer = GCOL_TRANSFER_LINEAR;
+  f.stop_count = 2;
+  f.stops = stops;
+  bool through = false;
+  for (long k = 0; k < 80 && !through; k++) {
+    tracker::Tracker t;
+    GSHSCENE_Allocator a = tracker::allocator_for(&t);
+    {
+      StoreHolder s(nullptr, &a);
+      ASSERT_NE(s.store, nullptr);
+      Ref face(gshscene_tp_face(s.store, &tp, 1, 0x77, 0));
+      Ref run(intern_font_run(s.store, face.get(), 12, {GSHSCENE_Glyph{3, 0, 0, nullptr}}));
+      ASSERT_NE(run.get(), nullptr);
+      t.fail_from = t.calls + k;
+      const size_t before = t.live.size();
+      const GSHSCENE_Resource * out = nullptr;
+      GSHSCENE_Result r = gshscene_store_intern_gradient_fixed(s.store, run.get(), &f, &out);
+      if (!t.failed) {
+        EXPECT_EQ(r, GSHSCENE_OK);
+        gshscene_resource_release(out);
+        through = true;
+      } else {
+        EXPECT_EQ(r, GSHSCENE_ERR_OOM) << "allocation " << k;
+        EXPECT_EQ(out, nullptr);
+        EXPECT_EQ(t.live.size(), before) << "the failed call holds nothing: allocation " << k;
+      }
+    }
+    EXPECT_TRUE(t.live.empty()) << "nothing is left once the store is gone: allocation " << k;
+  }
+  EXPECT_TRUE(through) << "a call with no failing allocation was reached";
 }
 
 int main(int argc, char ** argv) {

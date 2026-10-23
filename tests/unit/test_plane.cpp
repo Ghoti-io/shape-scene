@@ -15,6 +15,7 @@
 #include "../glyph_test_provider.h"
 #include "../scene_fixtures.h"
 #include "../scene_helpers.h"
+#include "../alloc_tracker.h"
 
 #include <ghoti.io/shape-scene/fixed.h>
 
@@ -554,6 +555,66 @@ TEST(PlaneFixed, TheSpacedGroupStatesItsBlendSpace) {
   EXPECT_EQ(gshscene_list_group_push_space_fixed(l.list, 9999u, GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_SRGB, 0),
       GSHSCENE_ERR_INVALID);
   EXPECT_EQ(gshscene_list_count(l.list), before);
+}
+
+TEST(PlaneFixed, TheEdgesOfTheFixedCallsAreExact) {
+  Frame f;
+  Ref plane(plane_of(f.s.store));
+  ListHolder l(f.s.store);
+  GSHSCENE_Paint_Fixed paint{GSHSCENE_FIXED_PAINT_PALETTE, 1, 8192, 14};
+  // Ops named by a count and no pointer are the pointer's refusal, not the count's.
+  EXPECT_EQ(gshscene_list_fill_plane_fixed(l.list, plane.get(), f.run.get(), nullptr, 2, GSHGEOM_FILL_NONZERO, &paint, 0),
+      GSHSCENE_ERR_INVALID);
+  // The space of a group: every primaries from sRGB to BT.2020 is in, the ones either side are out.
+  for (uint32_t primaries = GCOL_PRIMARIES_SRGB; primaries <= GCOL_PRIMARIES_BT2020; primaries++) {
+    const GSHSCENE_Result r = gshscene_list_group_push_space_fixed(l.list, 0, primaries, GCOL_TRANSFER_SRGB, 0);
+    if (primaries == GCOL_PRIMARIES_PROPHOTO) {
+      EXPECT_EQ(r, GSHSCENE_ERR_INVALID) << "ProPhoto has a different white point, which a blend space does not take";
+    } else {
+      EXPECT_EQ(r, GSHSCENE_OK) << primaries;
+      EXPECT_EQ(gshscene_list_group_pop(l.list), GSHSCENE_OK);
+    }
+  }
+  EXPECT_EQ(gshscene_list_group_push_space_fixed(l.list, 0, GCOL_PRIMARIES_BT2020 + 1, GCOL_TRANSFER_SRGB, 0),
+      GSHSCENE_ERR_INVALID);
+  // The most fraction bits of a rectangle clip is the geometry library's, and a corner of no extent is a clip.
+  EXPECT_EQ(gshscene_list_clip_push_design_rect_fixed(l.list, f.run.get(), nullptr, 0, 3, 4, 3, 4, GSHGEOM_FIXED_MAX_BITS, 0),
+      GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_clip_pop(l.list), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_clip_push_design_rect_fixed(l.list, f.run.get(), nullptr, 0, 3, 4, 3, 4,
+                GSHGEOM_FIXED_MAX_BITS + 1, 0), GSHSCENE_ERR_INVALID);
+}
+
+TEST(PlaneFixed, ARectangleClipHoldsNothingWhenAnAllocationFailsAndWhenItIsDone) {
+  GSHSCENE_Test_Provider tp{};
+  tp.upem = 2048;
+  bool through = false;
+  for (long k = 0; k < 60 && !through; k++) {
+    tracker::Tracker t;
+    GSHSCENE_Allocator a = tracker::allocator_for(&t);
+    {
+      StoreHolder s(nullptr, &a);
+      ASSERT_NE(s.store, nullptr);
+      Ref face(gshscene_tp_face(s.store, &tp, 1, 0x77, 0));
+      Ref run(intern_font_run(s.store, face.get(), 20.48, {GSHSCENE_Glyph{3, 10.0, 20.0, nullptr}}));
+      ASSERT_NE(run.get(), nullptr);
+      ListHolder l(s.store, nullptr, &a);
+      ASSERT_NE(l.list, nullptr);
+      t.fail_from = t.calls + k;
+      const size_t before = t.live.size();
+      const GSHSCENE_Result r =
+          gshscene_list_clip_push_design_rect_fixed(l.list, run.get(), nullptr, 0, -400, 200, 3600, 7800, 2, 6);
+      if (!t.failed) {
+        EXPECT_EQ(r, GSHSCENE_OK);
+        through = true;
+      } else {
+        EXPECT_EQ(r, GSHSCENE_ERR_OOM) << "allocation " << k;
+        EXPECT_EQ(t.live.size(), before) << "the failed call holds nothing: allocation " << k;
+      }
+    }
+    EXPECT_TRUE(t.live.empty()) << "nothing is left once the list and the store are gone: allocation " << k;
+  }
+  EXPECT_TRUE(through);
 }
 
 int main(int argc, char ** argv) {

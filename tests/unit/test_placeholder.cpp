@@ -324,6 +324,15 @@ TEST(PlaceholderFixed, TheBoxIsPlacedWhereTheRunsGlyphWouldBe) {
   EXPECT_EQ(gshscene_list_placeholder_fixed(l.list, f.run.get(), nullptr, 0, small, 31, COLR, 1, 0, 0), GSHSCENE_ERR_INVALID);
   EXPECT_EQ(gshscene_list_placeholder_fixed(l.list, f.run.get(), nullptr, 0, small, 40, COLR, 1, 0, 0), GSHSCENE_ERR_INVALID)
       << "bits far past the most";
+  {
+    // The most bits is in, with a box; the list gains one item and a refusal is not recorded.
+    ListHolder most(f.s.store);
+    EXPECT_EQ(gshscene_list_placeholder_fixed(most.list, f.run.get(), nullptr, 0, small, GSHSCENE_FIXED_MAX_BITS, COLR, 1, 0, 0),
+        GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_placeholder_fixed(most.list, f.run.get(), nullptr, 0, small, GSHSCENE_FIXED_MAX_BITS + 1, COLR, 1, 0, 0),
+        GSHSCENE_ERR_INVALID);
+    EXPECT_EQ(gshscene_list_count(most.list), 1u);
+  }
   EXPECT_EQ(gshscene_list_placeholder_fixed(l.list, square.get(), nullptr, 0, small, 0, COLR, 1, 0, 0), GSHSCENE_ERR_INVALID);
   EXPECT_EQ(gshscene_list_placeholder_fixed(l.list, nullptr, &move, 1, small, 0, COLR, 1, 0, 0), GSHSCENE_ERR_INVALID);
   EXPECT_EQ(gshscene_list_placeholder_fixed(l.list, f.run.get(), nullptr, 0, small, 0, 0, 1, 0, 0), GSHSCENE_ERR_INVALID);
