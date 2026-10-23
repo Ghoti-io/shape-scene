@@ -90,6 +90,9 @@
  * `c` (a clip pop), `G opacity=<hex> composite=N` (a group push; with ` isolation=N knockout=N mask=<hash>` when a
  * configuration claims PDF's group fields and the group sets one, T1), `g` (a group pop),
  * `I res=picture:<hash>` (an instance),
+ * `P class=N reason=N source=N code=N approx=N map=<hash> box=<x0> <y0> <x1> <y1>` (a placeholder, list.h PH1: the
+ * class and reason the planning pass wrote for it, PH3, in every configuration whatever its caps claim; `map` the
+ * composed map's hash and `box` the item's box under it in target units, `-` for none; nothing is drawn or stamped),
  * `K res=<kind>:<hash> style=<id> map=<hash> box=<x0> <y0> <x1> <y1> expand=N outline=-` (a stroke, S20: `style`
  * the style's resource id, `map` the composed map's hash, `box` SK10's bound of the centerline's box in target units
  * (`-` when empty), `expand` the `GSHSCENE_STROKE_NATIVE_*` bits, in decimal, of the features the stroke requires that

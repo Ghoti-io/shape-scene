@@ -339,21 +339,16 @@ GSHSCENE_Result gshscene_list_fill_plane_gradient_fixed(GSHSCENE_List * list, co
   return fill_plane(list, plane, frame, ops, op_count, rule, &p, layer);
 }
 
-GSHSCENE_Result gshscene_list_clip_push_design_rect_fixed(GSHSCENE_List * list, const GSHSCENE_Resource * frame,
-    const GSHSCENE_Fixed_Op * ops, size_t op_count, int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t bits,
-    int32_t layer) {
-  if (!list || list->closed || !frame || frame->store != list->store || bits > GSHGEOM_FIXED_MAX_BITS || x0 > x1 ||
-      y0 > y1) {
-    return GSHSCENE_ERR_INVALID;
-  }
+/* The item map of a design map for @p frame carried in front of design_to_model, so a design point under the ops lands
+ * where the run's glyph outline puts it (the file comment of fixed.h). */
+static GSHSCENE_Result frame_map(const GSHSCENE_Resource * frame, const GSHSCENE_Fixed_Op * ops, size_t op_count,
+    GSHGEOM_Map * out) {
   GSHSCENE_Result checked = check_ops(ops, op_count);
   GSHSCENE_Glyph_Run run;
   double s = 0.0;
   if (checked == GSHSCENE_OK) {
     checked = font_run(frame, &run, &s);
   }
-  /* The map: the ops' item map for the frame in front of design_to_model, so a design point under the ops lands where
-   * the run's glyph outline puts it (the file comment). */
   GSHGEOM_Map chain[2];
   if (checked == GSHSCENE_OK) {
     checked = design_map(frame, ops, op_count, &chain[0]);
@@ -361,10 +356,43 @@ GSHSCENE_Result gshscene_list_clip_push_design_rect_fixed(GSHSCENE_List * list, 
   if (checked == GSHSCENE_OK) {
     checked = from_geometry(gshgeom_map_design_to_model(s, run.glyphs[0].x, run.glyphs[0].y, &chain[1]));
   }
-  GSHGEOM_Map map;
   if (checked == GSHSCENE_OK) {
-    checked = from_geometry(gshgeom_map_compose_chain(chain, 2, NULL, &map));
+    checked = from_geometry(gshgeom_map_compose_chain(chain, 2, NULL, out));
   }
+  return checked;
+}
+
+GSHSCENE_Result gshscene_list_placeholder_fixed(GSHSCENE_List * list, const GSHSCENE_Resource * frame,
+    const GSHSCENE_Fixed_Op * ops, size_t op_count, const int32_t * box_design, uint32_t bits, uint16_t source,
+    uint16_t code, uint32_t approximated, int32_t layer) {
+  if (!list || list->closed || (frame && frame->store != list->store) || (!frame && op_count != 0) ||
+      (box_design && bits > GSHSCENE_FIXED_MAX_BITS)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  GSHGEOM_Map map;
+  GSHSCENE_Result r = frame ? frame_map(frame, ops, op_count, &map) : from_geometry(gshgeom_map_identity(2, &map));
+  double box[4];
+  if (r == GSHSCENE_OK && box_design) {
+    for (int i = 0; i < 4; i++) {
+      box[i] = fixed_value(box_design[i], bits);
+    }
+  }
+  return r == GSHSCENE_OK
+      ? gshscene_list_placeholder(list, source, code, approximated, box_design ? box : NULL, &map, layer, 0.0)
+      : r;
+}
+
+GSHSCENE_Result gshscene_list_clip_push_design_rect_fixed(GSHSCENE_List * list, const GSHSCENE_Resource * frame,
+    const GSHSCENE_Fixed_Op * ops, size_t op_count, int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t bits,
+    int32_t layer) {
+  if (!list || list->closed || !frame || frame->store != list->store || bits > GSHGEOM_FIXED_MAX_BITS || x0 > x1 ||
+      y0 > y1) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  /* The map: the ops' item map for the frame in front of design_to_model, so a design point under the ops lands where
+   * the run's glyph outline puts it (the file comment). */
+  GSHGEOM_Map map;
+  GSHSCENE_Result checked = frame_map(frame, ops, op_count, &map);
   if (checked != GSHSCENE_OK) {
     return checked;
   }

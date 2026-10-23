@@ -91,7 +91,9 @@ TEST(NodeInit, KindsHavePinnedValuesAndNames) {
   EXPECT_EQ((int)GSHSCENE_NODE_SHAPE, 2);
   EXPECT_EQ((int)GSHSCENE_NODE_INSTANCE, 3);
   EXPECT_EQ((int)GSHSCENE_NODE_STROKE, 4);
-  EXPECT_EQ((int)GSHSCENE_NODE_KIND_COUNT, 5);
+  EXPECT_EQ((int)GSHSCENE_NODE_PLACEHOLDER, 5);
+  EXPECT_EQ((int)GSHSCENE_NODE_KIND_COUNT, 6);
+  EXPECT_STREQ(gshscene_node_kind_string(GSHSCENE_NODE_PLACEHOLDER), "placeholder");
   EXPECT_STREQ(gshscene_node_kind_string(GSHSCENE_NODE_STROKE), "stroke");
   EXPECT_STREQ(gshscene_node_kind_string(GSHSCENE_NODE_GROUP), "group");
   EXPECT_STREQ(gshscene_node_kind_string(GSHSCENE_NODE_SHAPE), "shape");

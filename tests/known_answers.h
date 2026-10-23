@@ -40,6 +40,9 @@ static const std::uint64_t kStrokeDefaultHash = UINT64_C(0xec1048adcb87f83b);
 static const std::uint64_t kStrokeDeviceHash = UINT64_C(0xf6f6bf8e08c31778);
 static const std::uint64_t kStrokeClipHash = UINT64_C(0x299f54062a3730a0);
 static const std::uint64_t kStrokeArcsHash = UINT64_C(0xff4af46904e1496e);
+static const std::uint64_t kPlaceholderListHash = UINT64_C(0x1d4113b91157560c);
+static const std::uint64_t kPlaceholderSceneHash = UINT64_C(0xfae2b51d8bfbdf9d);
+static const std::uint64_t kPlaceholderSceneListHash = UINT64_C(0x7191fb8aa24c04ef);
 static const std::uint64_t kStrokeListHash = UINT64_C(0x5c6ec034e883068b);
 static const std::uint64_t kStrokeSceneHash = UINT64_C(0xb1427b4ea7cfc6b7);
 static const std::uint64_t kStrokeSceneListHash = UINT64_C(0xd59e6d693291e76c);
@@ -282,6 +285,23 @@ G id=1 parent=0 flags=0 key=- map=1f5787abb2e02a06 opacity=3ff0000000000000 blen
 S id=2 parent=1 flags=0 key=- res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=0 3fd0000000000000 3fe0000000000000 3fe8000000000000 3ff0000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=0 depth=0000000000000000
 K id=3 parent=1 flags=0 key=- res=path:b0a83b16e6cec382 style=ec1048adcb87f83b map=1f5787abb2e02a06 rule=0 paint=0 0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=0 depth=0000000000000000
 K id=4 parent=1 flags=0 key=5356470000000001:0000000000000007 res=glyph-run:3228ed152b43de80 style=f6f6bf8e08c31778 map=d242bc481e41cf7c rule=0 paint=2 0000000000000000 0000000000000000 0000000000000000 3fe0000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=3 depth=3ff0000000000000
+)DUMP";
+static const char * const kPlaceholderListDump =
+R"DUMP(gshscene.list 1 items=6 ties=0 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=1d4113b91157560c
+F res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=0 3fd0000000000000 3fe0000000000000 3fe8000000000000 3ff0000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=0 depth=0000000000000000
+P source=1 code=1 approx=0 box=bff8000000000000 0000000000000000 4011000000000000 4018000000000000 map=1f5787abb2e02a06 layer=0 depth=0000000000000000
+P source=1 code=3 approx=1 box=0000000000000000 0000000000000000 4000000000000000 4000000000000000 map=d242bc481e41cf7c layer=2 depth=3ff8000000000000
+F res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=2 0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 space=0:0:0000000000000000 entry=0 gradient=0000000000000000 layer=2 depth=3ff8000000000000
+P source=1 code=2 approx=0 box=- map=ff01deda28fd860d layer=-1 depth=c004000000000000
+P source=65535 code=65535 approx=1 box=0000000000000000 0000000000000000 0000000000000000 0000000000000000 map=1f5787abb2e02a06 layer=0 depth=0000000000000000
+)DUMP";
+static const char * const kPlaceholderSceneDump =
+R"DUMP(gshscene.version 1 nodes=5 root=1 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=fae2b51d8bfbdf9d
+G id=1 parent=0 flags=0 key=- map=1f5787abb2e02a06 opacity=3ff0000000000000 blend=0:0:0000000000000000 composite=0 order=0 layer=0 depth=0000000000000000 clip=- children=2,4,5
+G id=2 parent=1 flags=0 key=- map=d242bc481e41cf7c opacity=3ff0000000000000 blend=0:0:0000000000000000 composite=0 order=0 layer=0 depth=0000000000000000 clip=- children=3
+P id=3 parent=2 flags=0 key=- source=1 code=1 approx=0 box=0000000000000000 0000000000000000 4020000000000000 4020000000000000 map=1f5787abb2e02a06 layer=1 depth=3fe0000000000000
+P id=4 parent=1 flags=0 key=5356470000000001:0000000000000009 source=1 code=3 approx=1 box=bff0000000000000 c000000000000000 4008000000000000 4010000000000000 map=ff01deda28fd860d layer=0 depth=0000000000000000
+P id=5 parent=1 flags=1 key=- source=1 code=2 approx=0 box=- map=1f5787abb2e02a06 layer=0 depth=0000000000000000
 )DUMP";
 
 }  // namespace known

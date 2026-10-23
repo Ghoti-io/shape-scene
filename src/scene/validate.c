@@ -273,6 +273,7 @@ static GSHSCENE_Result visit(Check * c, size_t index, size_t level) {
       break;
     case GSHSCENE_NODE_SHAPE:
     case GSHSCENE_NODE_STROKE: /* one item, as a shape */
+    case GSHSCENE_NODE_PLACEHOLDER: /* one item that draws nothing (PH7) */
       m->depth = 1;
       m->items = 1;
       m->occ = 1;

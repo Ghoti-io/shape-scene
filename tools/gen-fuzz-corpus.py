@@ -35,7 +35,7 @@ OPS = ["LIST_CREATE", "FILL", "CLIP_PUSH", "CLIP_POP", "GROUP_PUSH", "GROUP_POP"
        "PUBLISH", "MERGE", "HOLD", "RELEASE_VERSION", "DIFF", "EMIT", "VISIT", "DUMP", "SCENE_INTERN",
        "FILL_EX", "CLIP_PUSH_EX", "GROUP_PUSH_EX", "LIST_FOREGROUND", "NODE_PROPS", "EDIT_FOREGROUND", "LIST_PALETTE",
        "FILL_FIXED", "TRUNCATE", "EDIT_PALETTE", "INTERN_GRADIENT", "FILL_GRADIENT", "SCENE_GRADIENT", "GRADIENT_NODE",
-       "COLOR_BOUND", "GROUP_PDF", "NODE_PDF", "INTERN_STYLE", "STROKE", "STROKE_NODE"]
+       "COLOR_BOUND", "GROUP_PDF", "NODE_PDF", "INTERN_STYLE", "STROKE", "STROKE_NODE", "PLACEHOLDER", "PLACEHOLDER_NODE"]
 OP = {name: i for i, name in enumerate(OPS)}
 
 BIASED = {
@@ -216,6 +216,20 @@ def scripted():
     node = bytes([OP["STROKE_NODE"], 0, 0, 0, 0, 0, 1, 0])
     seq = bytearray([0xFF, 0xFF]) + styles + strokes + open_edit() + node + publish() + bytes([OP["EMIT"], 0])
     out["scripted-strokes.bin"] = bytes(seq)
+    # Color-paint story P5.  PLACEHOLDER reads the source pick (4), the code pick (4), the approximated pick (3, 2 is
+    # invalid), the box pick (5: 0 none, 1 and 2 valid, 3 inverted, 4 NaN), the map and the 3D pick (8: 0 is 3D).  A valid
+    # one with a box, one with no box approximated, then each invalid shape (a zero source, a zero code, approximated 2, an
+    # inverted box, a NaN box, a 3D map).  PLACEHOLDER_NODE reads the edit slot, the source, the code, the approximated
+    # pick, the box pick (4: 3 is inverted), the map, the set-or-add pick (0: set) and the parent.  A valid node, an invalid one (a
+    # zero source), published and emitted.
+    ph = OP["PLACEHOLDER"]
+    records = (bytes([ph, 1, 1, 0, 1, 0, 1]) + bytes([ph, 2, 3, 1, 0, 1, 1]) + bytes([ph, 0, 1, 0, 1, 0, 1])
+               + bytes([ph, 1, 0, 0, 1, 0, 1]) + bytes([ph, 1, 1, 2, 1, 0, 1]) + bytes([ph, 1, 1, 0, 3, 0, 1])
+               + bytes([ph, 1, 1, 0, 4, 0, 1]) + bytes([ph, 1, 1, 0, 1, 0, 0]))
+    node_ok = bytes([OP["PLACEHOLDER_NODE"], 0, 1, 2, 1, 1, 0, 1, 0])
+    node_bad = bytes([OP["PLACEHOLDER_NODE"], 0, 0, 2, 0, 0, 0, 1, 0])
+    seq = bytearray([0xFF, 0xFF]) + records + open_edit() + node_ok + node_bad + publish() + bytes([OP["EMIT"], 0])
+    out["scripted-placeholders.bin"] = bytes(seq)
     # An instance of a picture: a closed empty list frozen into pool slot 0, a new list, and an instance of it under
     # the identity (INSTANCE reads the map and the picture's slot).  Random inputs reached it by luck until the op
     # table grew (strokes story S1).

@@ -95,6 +95,19 @@
  * the render at that unit with the finished prefix in the target, and is
  * ::GSHSCENE_ERR_REFUSED too.  `APPROXIMATED` and `NOTICE` never fail a render.
  *
+ * **Placeholders (list.h, PH1; the rules PH3 to PH6).**  A placeholder is a unit no sink draws and every sink reports,
+ * so the planning pass decides it from the list alone, before and independent of every caps test: `REFUSED` with
+ * reason `PLACEHOLDER` when it is not marked approximated, `APPROXIMATED` with the same reason when it is (PH3).  No
+ * `item_kinds` bit is needed or consulted.  The entry is the item's chain with `second` = `source << 16 | code`
+ * (report.h, PH4); a placeholder inside a block the pass refuses is skipped with the block, as every item is, and the
+ * block's entry stands.  A `REFUSED` placeholder under ::GSHSCENE_RENDER_STRICT is ::GSHSCENE_ERR_REFUSED before the
+ * sink is called, the target untouched; best effort returns ::GSHSCENE_OK and draws everything else; an `APPROXIMATED`
+ * one never fails a render (PH5).  A sink's `render` treats the item as drawn nothing and writes no entry of its own;
+ * `static_bytes`, the work count and the cancel units count it as nothing (PH6).  Damage does not change whether it is
+ * reported: a placeholder outside the damage rectangle is reported exactly as one inside it is, as a refusal does not
+ * depend on the damage (S4).  A writer may leave a comment or a tagged empty element for it, its choice, stated in its
+ * own documents; nothing requires it.
+ *
  * **S7 Cancel.**  The token (cancel.h) is the caller's and is set from any
  * thread.  **The unit and the bound are the sink's, declared in its caps**:
  * ::GSHSCENE_CANCEL_BETWEEN_UNITS checks before the first unit and after each
@@ -699,7 +712,7 @@ GSHSCENE_API void gshscene_job_complete(GSHSCENE_Job * job, GSHSCENE_Result resu
 typedef struct GSHSCENE_Disposition {
   GSHSCENE_Entry_Class entry_class; ///< 0 to draw as stated, `REFUSED` or `APPROXIMATED`.
   GSHSCENE_Reason reason;           ///< Why, when not 0.
-  /** `STROKE_STYLE`: the `GSHSCENE_STROKE_NATIVE_*` bits of the features the sink lacks (the entry's `second`).  Else 0. */
+  /** `STROKE_STYLE`: the `GSHSCENE_STROKE_NATIVE_*` bits of the features the sink lacks; `PLACEHOLDER`: `source << 16 | code` (PH4); the entry's `second`.  Else 0. */
   uint64_t detail;
 } GSHSCENE_Disposition;
 
@@ -708,7 +721,9 @@ typedef struct GSHSCENE_Disposition {
  *   maps are @p instance_maps on a target of map @p target_map whose resolved blend space is @p target_space, under
  *   the palette @p palette (the request's list's, or NULL for none; N14).
  *
- * In this order: a kind the caps do not draw is refused (`ITEM_KIND`); a fill, clip or stroke of a glyph run from a
+ * First, and independent of every caps test, a placeholder is `REFUSED` (`APPROXIMATED` when it is marked approximated)
+ * with reason `PLACEHOLDER` and `source << 16 | code` in `detail` (PH3, PH4).  Then, in this order: a kind the caps do
+ * not draw is refused (`ITEM_KIND`); a fill, clip or stroke of a glyph run from a
  * font without `GLYPHS_FROM_FONT` is refused (`GLYPH_SOURCE`); a gradient fill or stroke of a kind not in
  * `gradient_kinds` is refused (`GRADIENT`); a fill or stroke whose palette paint, or a stop of whose gradient, names an
  * entry @p palette does not have (::gshscene_paint_resolve, G3) is refused (`PALETTE_ENTRY`); a group whose operator

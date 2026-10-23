@@ -773,6 +773,76 @@ assert [e[3] for e in STROKE_TOOLPATH_ENTRIES if e[0] == REFUSED] == [
     NATIVE["JOIN_BEVEL"] | NATIVE["CAP_SQUARE"] | NATIVE["DASH_PATH_SCOPE"] | NATIVE["ALIGN"] | NATIVE["ALIGN_EVEN_ODD"]]
 
 
+# --- placeholders (color-paint story P5; list.h PH1, sink.h PH3 to PH6, dump_sink.h) ---------------------------------
+# A refused placeholder with a box under a map, an approximated one without a box, a fill between them, and a refused
+# one with a box at the end.  The planning pass writes each entry from the list alone (PH3), so the three configurations
+# of the test sink and both target kinds say the same; the sink writes `P class=N reason=N source=N code=N approx=N
+# map=<hash> box=<4 doubles>|-` for each (the class and reason are the plan's).
+R_PLACEHOLDER = 31
+COLR = 1
+PH_BOX_A = (0.0, 0.0, 5.0, 5.0)
+PH_BOX_C = (-1.0, -2.0, 3.0, 4.0)
+PH_MOVE = translate(3, 4)
+PH_ITEMS = [
+    sv.fill(sv.KIND_PATH, rhash(2, 2, 8), ID, 0, RED),
+    sv.placeholder(COLR, 1, 0, PH_BOX_A, mhash(PH_MOVE)),
+    sv.placeholder(COLR, 3, 1, None, ID, layer=2),
+    sv.fill(sv.KIND_PATH, rhash(20, 20, 6), ID, 0, BLUE),
+    sv.placeholder(COLR, 2, 0, PH_BOX_C, ID),
+]
+PH_LIST_HASH = sv.list_hash(PH_ITEMS)
+PH_UNITS = [  # chain index, item map, source, code, approximated, box or None
+    (1, PH_MOVE, COLR, 1, 0, PH_BOX_A), (2, ident(), COLR, 3, 1, None), (4, ident(), COLR, 2, 0, PH_BOX_C)]
+PH_FILLS = {0: (2, 2, 8), 3: (20, 20, 6)}
+
+
+def placeholder_render(kind, unit, target_map, area=None):
+    """The test sink's dump of the placeholder fixture, the stamps on a pixel target, and the report's entries."""
+    n = len(PH_ITEMS)
+    lines = ["gshscene.dump-sink 1 kind=%d unit=%d units=%d list=%016x" % (kind, unit, n, PH_LIST_HASH)]
+    stamps = []
+    entries = []
+    for i in range(n):
+        head = "U %d" % i
+        if i in PH_FILLS:
+            x, y, sz = PH_FILLS[i]
+            composed = chain([ident()], target_map)
+            b = sq_box(x, y, sz)
+            corners = [apply(composed, px, py) for px in (b[0], b[2]) for py in (b[1], b[3])]
+            box = (min(p[0] for p in corners), min(p[1] for p in corners), max(p[0] for p in corners),
+                   max(p[1] for p in corners))
+            lines.append("%s F res=path:%016x map=%016x rule=0 box=%s" % (
+                head, rhash(x, y, sz), mhash(composed), " ".join("%016x" % bits(v) for v in box)))
+            if area is not None:
+                r = meet((floor(box[0]), floor(box[1]), ceil(box[2]), ceil(box[3])), area)
+                if not empty(r):
+                    stamps.append((r, mark((i,))))
+                    lines.append("S %d %d %d %d %08x" % (r[0], r[1], r[2], r[3], mark((i,))))
+            continue
+        _, item_map, src, code, approx, pbox = [u for u in PH_UNITS if u[0] == i][0]
+        composed = chain([item_map], target_map)
+        cls = APPROXIMATED if approx else REFUSED
+        if pbox is None:
+            box_text = "-"
+        else:
+            corners = [apply(composed, px, py) for px in (pbox[0], pbox[2]) for py in (pbox[1], pbox[3])]
+            box = (min(p[0] for p in corners), min(p[1] for p in corners), max(p[0] for p in corners),
+                   max(p[1] for p in corners))
+            box_text = " ".join("%016x" % bits(v) for v in box)
+        lines.append("%s P class=%d reason=%d source=%d code=%d approx=%d map=%016x box=%s" % (
+            head, cls, R_PLACEHOLDER, src, code, approx, mhash(composed), box_text))
+        entries.append((cls, R_PLACEHOLDER, (i,), (src << 16) | code, 0.0))
+    lines.append("E result=0 processed=%d done=%d" % (n, n))
+    text = "\n".join(lines) + "\n"
+    return text, fnv(text.encode()), stamps, entries
+
+
+PH_STREAM_TEXT, PH_STREAM_HASH, _, PH_ENTRIES = placeholder_render(KIND_STREAM, UNIT_MM, scale(0.5))
+PH_RASTER_TEXT, PH_RASTER_HASH, PH_RASTER_STAMPS, _ = placeholder_render(KIND_RASTER, UNIT_DEFAULT, ident(), (0, 0, 64, 64))
+PH_RASTER_PIXELS = pixels_hash(PH_RASTER_STAMPS)
+PH_REPORT_HASH, PH_REPORT_DUMP = report(OK, (5, 5, 5), PH_ENTRIES)
+
+
 def cxx_string(name, text):
     return sv.cxx_string(name, text)
 
@@ -798,7 +868,10 @@ def render_header():
                     ("kStrokeToolpathOutputHash", STROKE_TOOLPATH_HASH),
                     ("kStrokeStreamReportHash", STROKE_STREAM_REPORT_HASH),
                     ("kStrokeWriterReportHash", STROKE_WRITER_REPORT_HASH),
-                    ("kStrokeToolpathReportHash", STROKE_TOOLPATH_REPORT_HASH)):
+                    ("kStrokeToolpathReportHash", STROKE_TOOLPATH_REPORT_HASH),
+                    ("kPlaceholderListHash", PH_LIST_HASH), ("kPlaceholderStreamOutputHash", PH_STREAM_HASH),
+                    ("kPlaceholderRasterOutputHash", PH_RASTER_HASH), ("kPlaceholderRasterPixelsHash", PH_RASTER_PIXELS),
+                    ("kPlaceholderReportHash", PH_REPORT_HASH)):
         o.append("static const std::uint64_t %s = UINT64_C(0x%016x);\n" % (name, v))
     o.append("\n")
     o.append(cxx_string("kRasterDump", RASTER_TEXT))
@@ -815,6 +888,9 @@ def render_header():
     o.append(cxx_string("kStrokeWriterDump", STROKE_WRITER_TEXT))
     o.append(cxx_string("kStrokeToolpathDump", STROKE_TOOLPATH_TEXT))
     o.append(cxx_string("kStrokeToolpathReportDump", STROKE_TOOLPATH_REPORT_DUMP))
+    o.append(cxx_string("kPlaceholderStreamDump", PH_STREAM_TEXT))
+    o.append(cxx_string("kPlaceholderRasterDump", PH_RASTER_TEXT))
+    o.append(cxx_string("kPlaceholderReportDump", PH_REPORT_DUMP))
     o.append("static const std::uint32_t kStrokeWriterNative = 0x%04xu;\n" % WRITER_NATIVE)
     o.append("static const std::uint32_t kStrokeToolpathNative = 0x%04xu;\n" % TOOLPATH_NATIVE)
     o.append("\n}  // namespace sink_known\n\n#endif\n")

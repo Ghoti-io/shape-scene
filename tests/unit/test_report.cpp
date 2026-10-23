@@ -44,7 +44,7 @@ TEST(Report, EveryClassAndReasonHasItsOwnString) {
       "hint-no-program", "hint-program-failed", "hint-with-errors", "hint-strict-route", "glyph-unavailable",
       "face-unbound", "palette-entry", "gradient", "interpolation-space", "map-not-invertible", "gradient-degenerate",
       "group-isolation", "group-knockout", "soft-mask", "stroke-style", "stroke-zero-width",
-      "stroke-centerline"};
+      "stroke-centerline", "placeholder"};
   ASSERT_EQ(sizeof names / sizeof names[0], (size_t)GSHSCENE_REASON_COUNT - 1);
   for (int r = GSHSCENE_REASON_ITEM_KIND; r < GSHSCENE_REASON_COUNT; r++) {
     EXPECT_STREQ(gshscene_reason_string((GSHSCENE_Reason)r), names[r - 1]) << r;
@@ -84,7 +84,24 @@ TEST(Report, ThePinnedValuesArePinned) {
   EXPECT_EQ((int)GSHSCENE_REASON_STROKE_STYLE, 28);
   EXPECT_EQ((int)GSHSCENE_REASON_STROKE_ZERO_WIDTH, 29);
   EXPECT_EQ((int)GSHSCENE_REASON_STROKE_CENTERLINE, 30);
-  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 31);
+  EXPECT_EQ((int)GSHSCENE_REASON_PLACEHOLDER, 31);
+  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 32);
+}
+
+TEST(Report, ThePlaceholderRegistryIsPinnedAndNamed) {
+  // PH4: the sources and codes are hashed, so their numbers are pinned; the names are what a reader prints.
+  EXPECT_EQ(GSHSCENE_PLACEHOLDER_SOURCE_COLR, 1u);
+  EXPECT_EQ(GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED, 1u);
+  EXPECT_EQ(GSHSCENE_PLACEHOLDER_COLR_NO_RECORD, 2u);
+  EXPECT_EQ(GSHSCENE_PLACEHOLDER_COLR_WALK_LIMIT, 3u);
+  EXPECT_STREQ(gshscene_placeholder_string(1, 1), "colr:unbounded");
+  EXPECT_STREQ(gshscene_placeholder_string(1, 2), "colr:no-record");
+  EXPECT_STREQ(gshscene_placeholder_string(1, 3), "colr:walk-limit");
+  EXPECT_STREQ(gshscene_placeholder_string(1, 0), "unknown");
+  EXPECT_STREQ(gshscene_placeholder_string(1, 4), "unknown");
+  EXPECT_STREQ(gshscene_placeholder_string(0, 1), "unknown");
+  EXPECT_STREQ(gshscene_placeholder_string(2, 1), "unknown");
+  EXPECT_STREQ(gshscene_placeholder_string(0xffffu, 0xffffu), "unknown");
 }
 
 TEST(Report, CreateDestroyAndTheEmptyReport) {

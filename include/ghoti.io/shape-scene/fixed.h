@@ -273,6 +273,27 @@ GSHSCENE_API GSHSCENE_Result gshscene_list_clip_push_design_rect_fixed(GSHSCENE_
     const GSHSCENE_Resource * frame, const GSHSCENE_Fixed_Op * ops, size_t op_count, int32_t x0, int32_t y0,
     int32_t x1, int32_t y1, uint32_t bits, int32_t layer);
 
+/**
+ * @brief Record a placeholder (list.h's `gshscene_list_placeholder`, PH1, PH2) with a design map, at depth 0.
+ *
+ * The box `x0 y0 x1 y1` (each `v / 2^bits`, design units, y up) is the box of what a lowering could not express; the
+ * item's map is placed for @p frame exactly as ::gshscene_list_clip_push_design_rect_fixed places its rectangle, so the
+ * box under the map is where the glyph would have been drawn.  Nothing is drawn.
+ *
+ * @param frame A run from a bound face with a glyph, of the list's store; or NULL with @p op_count 0 for the identity.
+ * @param box_design Four values `x0 y0 x1 y1` with `x0 <= x1` and `y0 <= y1`, or NULL for no box.
+ * @param bits At most ::GSHSCENE_FIXED_MAX_BITS (ignored without a box).
+ * @param source A front end registered in report.h (nonzero).
+ * @param code The front end's reason (nonzero).
+ * @param approximated 0 or 1 (list.h).
+ * @return As `gshscene_list_placeholder`; ::GSHSCENE_ERR_INVALID for an inverted box, @p bits past the maximum, or a
+ *   @p frame that is not a run from a bound face with a glyph; ::GSHSCENE_ERR_LIMIT for more than
+ *   ::GSHSCENE_FIXED_MAX_OPS ops.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_list_placeholder_fixed(GSHSCENE_List * list, const GSHSCENE_Resource * frame,
+    const GSHSCENE_Fixed_Op * ops, size_t op_count, const int32_t * box_design, uint32_t bits, uint16_t source,
+    uint16_t code, uint32_t approximated, int32_t layer);
+
 /** @brief Begin a clip (list.h's `gshscene_list_clip_push`) with a design map, at depth 0. */
 GSHSCENE_API GSHSCENE_Result gshscene_list_clip_push_fixed(GSHSCENE_List * list, const GSHSCENE_Resource * resource,
     const GSHSCENE_Fixed_Op * ops, size_t op_count, GSHGEOM_Fill_Rule rule, int32_t layer);

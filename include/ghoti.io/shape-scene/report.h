@@ -162,8 +162,31 @@ typedef enum GSHSCENE_Reason {
   GSHSCENE_REASON_STROKE_STYLE = 28,    ///< Refused, per stroke: a feature of its style the sink neither emits nor expands; `second` names the missing ones (stroke.h, SK11).
   GSHSCENE_REASON_STROKE_ZERO_WIDTH = 29, ///< Notice, per stroke: its width is 0, so it draws nothing (stroke.h, SK8).
   GSHSCENE_REASON_STROKE_CENTERLINE = 30, ///< Refused, per stroke: its centerline is a glyph run and the sink does not stroke runs (sink.h, S20).
+  GSHSCENE_REASON_PLACEHOLDER = 31,   ///< Refused or approximated, per placeholder: a front end could not express a construct; `second` is `source << 16 | code` (sink.h, PH3, PH4).
   GSHSCENE_REASON_COUNT               ///< Closes the enum.
 } GSHSCENE_Reason;
+
+/**
+ * @name Placeholder sources and codes (PH1, PH4)
+ *
+ * A placeholder (list.h) names a **source**, the front end that recorded it, and a **code**, that front end's own
+ * reason; the entry the planning pass writes for it has `reason` ::GSHSCENE_REASON_PLACEHOLDER and `second` =
+ * `source << 16 | code`.  The registry is additive: a front end takes the next source, and its codes are its own,
+ * registered here with their names so that a reader of a report can print them without the front end.  Zero is never
+ * a source or a code.  The values are pinned (they are hashed).
+ * @{
+ */
+#define GSHSCENE_PLACEHOLDER_SOURCE_COLR 1u        ///< An OpenType `COLR` table's paint graph (font).
+#define GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED 1u     ///< `COLR`: the graph has no finite extent a bounding box could be drawn for (an unbounded paint under a format-2 or format-6 composite).
+#define GSHSCENE_PLACEHOLDER_COLR_NO_RECORD 2u     ///< `COLR`: the glyph has no base glyph or paint record the lowering can use.
+#define GSHSCENE_PLACEHOLDER_COLR_WALK_LIMIT 3u    ///< `COLR`: the graph is deeper or larger than the lowering's walk bound allows (a cycle among them).
+/** @} */
+
+/**
+ * @brief Name a placeholder's source and code: "colr:unbounded", "colr:no-record", "colr:walk-limit", or "unknown" for
+ *   a pair that is not registered.
+ */
+GSHSCENE_API const char * gshscene_placeholder_string(unsigned source, unsigned code);
 
 /** @brief Name a class ("refused", "approximated", "resolved-ambiguity", "hint-status", "notice"), or "unknown class". */
 GSHSCENE_API const char * gshscene_entry_class_string(GSHSCENE_Entry_Class entry_class);

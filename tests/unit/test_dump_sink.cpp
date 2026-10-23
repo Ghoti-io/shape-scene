@@ -638,6 +638,106 @@ TEST(DumpSink, TheStrokeRecordsOnARasterAreTheGenerators) {
   EXPECT_EQ(raster->snapshot(), sink_known::kStrokeRasterPixelsHash);
 }
 
+// Color-paint story P5 (PH3, PH6, PH8): the placeholder records and the report entries in the test sink's configurations,
+// restated by tools/gen-sink-vectors.py.  Every configuration says the same, whatever its caps claim.
+namespace {
+
+const GSHSCENE_List * placeholder_list(Scene & s) {
+  GSHSCENE_Paint red = solid(1, 0, 0);
+  GSHSCENE_Paint blue = solid(0, 0, 1, 0.5);
+  GSHGEOM_Map move;
+  gshgeom_map_translate(2, 3.0, 4.0, 0.0, &move);
+  const double box_a[4] = {0.0, 0.0, 5.0, 5.0};
+  const double box_c[4] = {-1.0, -2.0, 3.0, 4.0};
+  const uint16_t colr = GSHSCENE_PLACEHOLDER_SOURCE_COLR;
+  GSHSCENE_List * l = s.open();
+  EXPECT_EQ(gshscene_list_fill(l, s.sq(2, 2, 8), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_placeholder(l, colr, GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED, 0, box_a, &move, 0, 0.0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_placeholder(l, colr, GSHSCENE_PLACEHOLDER_COLR_WALK_LIMIT, 1, nullptr, nullptr, 2, 0.0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_fill(l, s.sq(20, 20, 6), nullptr, GSHGEOM_FILL_NONZERO, &blue, 0, 0.0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_placeholder(l, colr, GSHSCENE_PLACEHOLDER_COLR_NO_RECORD, 0, box_c, nullptr, 0, 0.0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  return l;
+}
+
+}  // namespace
+
+TEST(DumpSink, ThePlaceholderRecordsAndEntriesAreTheGeneratorsInEveryConfiguration) {
+  const GSHSCENE_Dump_Sink_Config configs[] = {config_default(), config_writer_like(), config_toolpath_like(), config_narrow()};
+  for (const GSHSCENE_Dump_Sink_Config & config : configs) {
+    Scene s;
+    const GSHSCENE_List * list = placeholder_list(s);
+    EXPECT_EQ(gshscene_list_hash(list), sink_known::kPlaceholderListHash);
+    SinkRef sink(make_with(config, nullptr, nullptr));
+    auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+    gshgeom_map_scale(2, 0.5, 0.5, 1.0, &stream->target.map);
+    ReportRef report;
+    Rendered r = render_job(sink.sink, request_for(list, *stream, report.report));
+    ASSERT_EQ(r.result, GSHSCENE_OK);
+    EXPECT_EQ(stream->bytes, sink_known::kPlaceholderStreamDump);
+    EXPECT_EQ(r.output, sink_known::kPlaceholderStreamOutputHash);
+    EXPECT_EQ(gshscene_report_hash(report.report), sink_known::kPlaceholderReportHash);
+    EXPECT_EQ(report_dump(report.report), with_bytes(sink_known::kPlaceholderReportDump, report.report));
+    // Strict stops before the sink is called: the refused ones are planned.
+    auto strict_stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+    ReportRef strict_report;
+    GSHSCENE_Render_Request strict = request_for(list, *strict_stream, strict_report.report);
+    strict.flags = GSHSCENE_RENDER_STRICT;
+    EXPECT_EQ(render_job(sink.sink, strict).result, GSHSCENE_ERR_REFUSED);
+    EXPECT_TRUE(strict_stream->bytes.empty()) << "the target is untouched";
+  }
+}
+
+TEST(DumpSink, ThePlaceholderRecordsOnARasterAreTheGenerators) {
+  Scene s;
+  const GSHSCENE_List * list = placeholder_list(s);
+  Log log;
+  GSHSCENE_Dump_Sink_Config c = config_default();
+  c.log = &log.writer;
+  SinkRef sink(make_with(c, nullptr, nullptr));
+  auto raster = make_raster();
+  ReportRef report;
+  Rendered r = render_job(sink.sink, request_for(list, *raster, report.report));
+  ASSERT_EQ(r.result, GSHSCENE_OK);
+  EXPECT_EQ(log.text, sink_known::kPlaceholderRasterDump);
+  EXPECT_EQ(r.output, sink_known::kPlaceholderRasterOutputHash);
+  EXPECT_EQ(raster->snapshot(), sink_known::kPlaceholderRasterPixelsHash) << "a placeholder stamps nothing";
+  EXPECT_EQ(gshscene_report_hash(report.report), sink_known::kPlaceholderReportHash);
+}
+
+TEST(DumpSink, ASinkThatClaimsEveryKindAndOneThatClaimsNoneReportAPlaceholderAlike) {
+  // PH3: no item_kinds bit is needed or consulted.  A list of placeholders alone is all a sink that draws nothing can
+  // be given and not refuse for its kinds.
+  auto entries_of_config = [&](const GSHSCENE_Dump_Sink_Config & config, std::vector<std::vector<size_t>> * rows) {
+    Scene s;
+    GSHSCENE_List * l = s.open();
+    const double box[4] = {0.0, 0.0, 1.0, 1.0};
+    EXPECT_EQ(gshscene_list_placeholder(l, 1, 1, 0, box, nullptr, 0, 0.0), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_placeholder(l, 1, 2, 1, nullptr, nullptr, 0, 0.0), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+    SinkRef sink(make_with(config, nullptr, nullptr));
+    auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+    ReportRef report;
+    EXPECT_EQ(render_job(sink.sink, request_for(l, *stream, report.report)).result, GSHSCENE_OK);
+    for (size_t i = 0; i < gshscene_report_count(report.report); i++) {
+      GSHSCENE_Report_Entry e{};
+      EXPECT_EQ(gshscene_report_entry(report.report, i, &e), GSHSCENE_OK);
+      rows->push_back({(size_t)e.entry_class, (size_t)e.reason, e.second, e.chain_count ? e.chain[0] : 99});
+    }
+  };
+  GSHSCENE_Dump_Sink_Config all = config_default();
+  all.stream_caps.item_kinds = 0xffffffffu;
+  GSHSCENE_Dump_Sink_Config none = config_default();
+  none.stream_caps.item_kinds = 0;
+  std::vector<std::vector<size_t>> a, b;
+  entries_of_config(all, &a);
+  entries_of_config(none, &b);
+  ASSERT_EQ(a.size(), 2u);
+  EXPECT_EQ(a, b);
+  EXPECT_EQ(a[0], (std::vector<size_t>{GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_PLACEHOLDER, (size_t)65537, 0}));
+  EXPECT_EQ(a[1], (std::vector<size_t>{GSHSCENE_ENTRY_APPROXIMATED, GSHSCENE_REASON_PLACEHOLDER, (size_t)65538, 1}));
+}
+
 namespace {
 
 /** The outline hash of a square's stroke as shape-geometry gives it, called directly: the style copied field by field. */
@@ -1283,7 +1383,7 @@ TEST(DumpSink, TheConfigurationIsValidated) {
     EXPECT_EQ(b, 0);
   }
   for (const GSHSCENE_Sink_Caps * caps : {&d.raster_caps, &d.stream_caps}) {
-    EXPECT_EQ(caps->item_kinds, 0xfeu) << "every kind, the stroke included (S20)";
+    EXPECT_EQ(caps->item_kinds, 0x1feu) << "every kind, the stroke (S20) and the placeholder (PH1) included";
     EXPECT_EQ(caps->stroke_native, (uint32_t)GSHSCENE_STROKE_NATIVE_ALL) << "every stroke feature, as a stroke";
     EXPECT_EQ(caps->composites, 0x0fffffffu) << "every operator and blend mode: it records the number (B13)";
     EXPECT_EQ(caps->cancel_unit, (uint32_t)GSHSCENE_CANCEL_BETWEEN_UNITS);

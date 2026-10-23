@@ -2752,4 +2752,288 @@ TEST_P(SinkConformance, S20_AStrokedRunIsNeverRefusedForHinting) {
   }
 }
 
+
+/* --- placeholders (list.h, PH1; sink.h, PH3 to PH6; color-paint story P5) ---------------------------------------- */
+
+namespace sinkconf {
+
+/** One placeholder the suite recorded and what the report must say of it. */
+struct PlaceholderWant {
+  std::vector<size_t> chain;
+  GSHSCENE_Entry_Class entry_class;
+  size_t second;
+};
+
+inline size_t pair_of(unsigned source, unsigned code) {
+  return ((size_t)source << 16) | (size_t)code;
+}
+
+/**
+ * A list with placeholders in every position a placeholder may stand, and nothing drawn by them: a clip block, a flat
+ * group, a picture the list instances, a group a sink without soft masks refuses (its placeholder is skipped with the
+ * block), and the end of the list.  With @p with 0 the same list without them, which draws exactly the same: every
+ * placeholder is the last item of its block, so no drawn item changes its chain.  @p want gets the entries a sink with
+ * @p caps must write for the placeholders (the group's own entry is not among them).
+ */
+inline const GSHSCENE_List * with_placeholders(Scene & s, const GSHSCENE_Sink_Caps & caps, int with,
+    std::vector<PlaceholderWant> * want, size_t * blocks_refused) {
+  GSHSCENE_Paint red = solid(1, 0, 0);
+  GSHSCENE_Paint blue = solid(0, 0, 1, 0.5);
+  const uint16_t colr = GSHSCENE_PLACEHOLDER_SOURCE_COLR;
+  const double box[4] = {1.0, 2.0, 9.0, 8.0};
+  want->clear();
+  *blocks_refused = 0;
+  // Without the placeholders the same list holds, where each stood, a fill of a point: it takes the index and draws
+  // nothing, so every drawn item keeps its chain and the two lists are comparable pixel for pixel.
+  auto stand_in = [&](GSHSCENE_List * list) {
+    gshscene_list_fill(list, s.sq(0, 0, 0), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0);
+  };
+  GSHSCENE_List * pl = s.open();
+  gshscene_list_fill(pl, s.sq(0, 0, 6), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0);
+  size_t in_picture = gshscene_list_count(pl);
+  if (with) {
+    EXPECT_EQ(gshscene_list_placeholder(pl, colr, GSHSCENE_PLACEHOLDER_COLR_WALK_LIMIT, 1, box, nullptr, 0, 0.0), GSHSCENE_OK);
+  } else {
+    stand_in(pl);
+  }
+  gshscene_list_close(pl);
+  const GSHSCENE_Resource * picture = nullptr;
+  gshscene_store_intern_picture(s.store, pl, &picture);
+  s.held.push_back(picture);
+
+  GSHSCENE_List * l = s.open();
+  gshscene_list_fill(l, s.sq(2, 2, 8), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0);
+  gshscene_list_clip_push(l, s.sq(4, 4, 20), nullptr, GSHGEOM_FILL_NONZERO, 0, 0.0);
+  gshscene_list_fill(l, s.sq(0, 0, 30), nullptr, GSHGEOM_FILL_NONZERO, &blue, 0, 0.0);
+  if (with) {
+    want->push_back({{gshscene_list_count(l)}, GSHSCENE_ENTRY_REFUSED, pair_of(colr, GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED)});
+    gshscene_list_placeholder(l, colr, GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED, 0, box, nullptr, 0, 0.0);
+  } else {
+    stand_in(l);
+  }
+  gshscene_list_clip_pop(l);
+  GSHSCENE_Group group{};
+  group.opacity = 0.5;
+  gshscene_list_group_push(l, &group, 0, 0.0);
+  gshscene_list_fill(l, s.sq(10, 10, 6), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0);
+  if (with) {
+    want->push_back({{gshscene_list_count(l)}, GSHSCENE_ENTRY_APPROXIMATED, pair_of(colr, GSHSCENE_PLACEHOLDER_COLR_NO_RECORD)});
+    gshscene_list_placeholder(l, colr, GSHSCENE_PLACEHOLDER_COLR_NO_RECORD, 1, nullptr, nullptr, 0, 0.0);
+  } else {
+    stand_in(l);
+  }
+  gshscene_list_group_pop(l);
+  GSHGEOM_Map move;
+  gshgeom_map_translate(2, 30.0, 30.0, 0.0, &move);
+  size_t instance_at = gshscene_list_count(l);
+  gshscene_list_instance(l, picture, &move, 0, 0.0);
+  if (with) {
+    want->push_back({{instance_at, in_picture}, GSHSCENE_ENTRY_APPROXIMATED,
+        pair_of(colr, GSHSCENE_PLACEHOLDER_COLR_WALK_LIMIT)});
+  }
+  // A group with a soft mask: a sink that does not apply masks refuses the block (S19), and the placeholder inside it
+  // is skipped with the block (PH3); one that does reports it.
+  GSHSCENE_Group masked{};
+  masked.opacity = 1.0;
+  masked.soft_mask = picture;
+  gshscene_list_group_push(l, &masked, 0, 0.0);
+  gshscene_list_fill(l, s.sq(40, 40, 6), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0);
+  if (with) {
+    if (caps.flags & GSHSCENE_CAP_GROUP_SOFT_MASK) {
+      want->push_back({{gshscene_list_count(l)}, GSHSCENE_ENTRY_REFUSED, pair_of(colr, GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED)});
+    }
+    gshscene_list_placeholder(l, colr, GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED, 0, box, nullptr, 0, 0.0);
+  } else {
+    stand_in(l);
+  }
+  gshscene_list_group_pop(l);
+  *blocks_refused = (caps.flags & GSHSCENE_CAP_GROUP_SOFT_MASK) ? 0 : 1;
+  if (with) {
+    want->push_back({{gshscene_list_count(l)}, GSHSCENE_ENTRY_REFUSED, pair_of(colr, GSHSCENE_PLACEHOLDER_COLR_NO_RECORD)});
+    gshscene_list_placeholder(l, colr, GSHSCENE_PLACEHOLDER_COLR_NO_RECORD, 0, nullptr, nullptr, 0, 0.0);
+  } else {
+    stand_in(l);
+  }
+  EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  return l;
+}
+
+/** The placeholder entries of a report, sorted as the report is. */
+inline std::vector<PlaceholderWant> placeholder_entries(const GSHSCENE_Report * report) {
+  std::vector<PlaceholderWant> out;
+  for (const GSHSCENE_Report_Entry & e : entries(report)) {
+    if (e.reason == GSHSCENE_REASON_PLACEHOLDER) {
+      out.push_back({std::vector<size_t>(e.chain, e.chain + e.chain_count), e.entry_class, e.second});
+    }
+  }
+  return out;
+}
+
+inline bool same_placeholders(std::vector<PlaceholderWant> a, std::vector<PlaceholderWant> b) {
+  auto less = [](const PlaceholderWant & x, const PlaceholderWant & y) {
+    return x.chain < y.chain;
+  };
+  std::sort(a.begin(), a.end(), less);
+  std::sort(b.begin(), b.end(), less);
+  if (a.size() != b.size()) {
+    return false;
+  }
+  for (size_t i = 0; i < a.size(); i++) {
+    if (a[i].chain != b[i].chain || a[i].entry_class != b[i].entry_class || a[i].second != b[i].second) {
+      return false;
+    }
+  }
+  return true;
+}
+
+} // namespace sinkconf
+
+// PH3, PH4, PH6: every placeholder is one entry written by the planning pass from the list alone, at its chain, whatever
+// the sink claims; the sink draws nothing for it (a raster equals the render of the list without it); the unit counts
+// are the list's.
+TEST_P(SinkConformance, PH3_EveryPlaceholderIsReportedAtItsChainAndNeverDrawn) {
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    std::vector<PlaceholderWant> want;
+    size_t blocks = 0;
+    const GSHSCENE_List * list = with_placeholders(s, caps, 1, &want, &blocks);
+    std::vector<PlaceholderWant> ignored;
+    const GSHSCENE_List * bare = with_placeholders(s, caps, 0, &ignored, &blocks);
+    ASSERT_FALSE(want.empty());
+    auto out = make_surface(kind);
+    ReportRef report;
+    Outcome o = run(f(), sink.sink, request_for(list, *out, report.report));
+    EXPECT_EQ(o.result, GSHSCENE_OK) << "best effort draws everything else";
+    auto got = placeholder_entries(report.report);
+    EXPECT_TRUE(same_placeholders(got, want)) << got.size() << " entries for " << want.size() << " placeholders";
+    for (const GSHSCENE_Report_Entry & e : entries(report.report)) {
+      if (e.reason == GSHSCENE_REASON_PLACEHOLDER) {
+        EXPECT_TRUE(e.entry_class == GSHSCENE_ENTRY_REFUSED || e.entry_class == GSHSCENE_ENTRY_APPROXIMATED);
+        EXPECT_EQ(e.depth, 0.0);
+      }
+    }
+    GSHSCENE_Report_Summary sum = summary(report.report);
+    EXPECT_EQ(sum.units_total, gshscene_list_expansion(list)) << "a placeholder is a unit";
+    EXPECT_EQ(sum.units_done, sum.units_total);
+    EXPECT_EQ(sum.result, GSHSCENE_OK);
+    // The report of the list without them has no placeholder entry, and (a raster) the same pixels.
+    auto out2 = make_surface(kind);
+    ReportRef report2;
+    EXPECT_EQ(run(f(), sink.sink, request_for(bare, *out2, report2.report)).result, GSHSCENE_OK);
+    EXPECT_TRUE(placeholder_entries(report2.report).empty());
+    if (kind == GSHSCENE_TARGET_RASTER) {
+      EXPECT_EQ(out->snapshot(), out2->snapshot()) << "PH6: a placeholder draws nothing";
+    }
+    EXPECT_EQ(gshscene_list_expansion(list), gshscene_list_expansion(bare)) << "an item stands where each placeholder does";
+  }
+}
+
+// PH5: a refused placeholder is ERR_REFUSED before the sink is called, with the target untouched; an approximated one
+// alone never fails a render, strict or not.
+TEST_P(SinkConformance, PH5_StrictFailsOnARefusedPlaceholderBeforeDrawingAndNeverOnAnApproximatedOne) {
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    GSHSCENE_Paint red = solid(1, 0, 0);
+    const unsigned colr = GSHSCENE_PLACEHOLDER_SOURCE_COLR;
+    for (int refused = 0; refused < 2; refused++) {
+      GSHSCENE_List * l = s.open();
+      gshscene_list_fill(l, s.sq(2, 2, 8), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0);
+      ASSERT_EQ(gshscene_list_placeholder(l, colr, GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED, refused ? 0 : 1, nullptr, nullptr, 0, 0.0),
+          GSHSCENE_OK);
+      ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+      auto strict = make_surface(kind);
+      uint64_t before = strict->snapshot();
+      ReportRef report;
+      GSHSCENE_Render_Request req = request_for(l, *strict, report.report);
+      req.flags = GSHSCENE_RENDER_STRICT;
+      Outcome o = run(f(), sink.sink, req);
+      GSHSCENE_Report_Summary sum = summary(report.report);
+      if (refused) {
+        EXPECT_EQ(o.result, GSHSCENE_ERR_REFUSED);
+        EXPECT_EQ(strict->snapshot(), before) << "strict touched the target";
+        EXPECT_EQ(sum.units_processed, 0u) << "before the sink is called";
+        EXPECT_EQ(sum.by_class[GSHSCENE_ENTRY_REFUSED], 1u);
+      } else {
+        EXPECT_EQ(o.result, GSHSCENE_OK);
+        EXPECT_EQ(sum.by_class[GSHSCENE_ENTRY_APPROXIMATED], 1u);
+        EXPECT_EQ(sum.by_class[GSHSCENE_ENTRY_REFUSED], 0u);
+      }
+      // Best effort says the same entry and returns OK.
+      auto best = make_surface(kind);
+      ReportRef best_report;
+      EXPECT_EQ(run(f(), sink.sink, request_for(l, *best, best_report.report)).result, GSHSCENE_OK);
+      auto e = placeholder_entries(best_report.report);
+      ASSERT_EQ(e.size(), 1u);
+      EXPECT_EQ(e[0].entry_class, refused ? GSHSCENE_ENTRY_REFUSED : GSHSCENE_ENTRY_APPROXIMATED);
+      EXPECT_EQ(e[0].chain, (std::vector<size_t>{1}));
+      EXPECT_EQ(e[0].second, pair_of(colr, GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED));
+    }
+  }
+}
+
+// PH6: a placeholder outside the damage rectangle is reported exactly as one inside it is.
+TEST_P(SinkConformance, PH6_DamageDoesNotChangeWhetherAPlaceholderIsReported) {
+  bool any = false;
+  for (uint32_t kind : f()->kinds) {
+    if (kind != GSHSCENE_TARGET_RASTER) {
+      continue;
+    }
+    any = true;
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    std::vector<PlaceholderWant> want;
+    size_t blocks = 0;
+    const GSHSCENE_List * list = with_placeholders(s, caps, 1, &want, &blocks);
+    auto whole = make_raster();
+    ReportRef whole_report;
+    ASSERT_EQ(run(f(), sink.sink, request_for(list, *whole, whole_report.report)).result, GSHSCENE_OK);
+    for (const GSHSCENE_Rect damage : {GSHSCENE_Rect{0, 0, 1, 1}, GSHSCENE_Rect{50, 50, 64, 64}, GSHSCENE_Rect{3, 3, 40, 40}}) {
+      auto part = make_raster();
+      part->target.damage = &damage;
+      ReportRef part_report;
+      ASSERT_EQ(run(f(), sink.sink, request_for(list, *part, part_report.report)).result, GSHSCENE_OK);
+      EXPECT_TRUE(same_placeholders(placeholder_entries(part_report.report), want));
+      EXPECT_EQ(entries_of(part_report.report).rows, entries_of(whole_report.report).rows)
+          << "the damage render's entries equal the whole render's";
+    }
+  }
+  if (!any) {
+    GTEST_SKIP() << "no pixel target: damage is a pixel-kind field (S4)";
+  }
+}
+
+// PH5, S5: the entry cap and the counters apply to a placeholder as to any entry.
+TEST_P(SinkConformance, PH5_TheReportCapKeepsTheFirstPlaceholdersAndCountsTheRest) {
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    GSHSCENE_List * l = s.open();
+    for (int i = 0; i < 5; i++) {
+      ASSERT_EQ(gshscene_list_placeholder(l, GSHSCENE_PLACEHOLDER_SOURCE_COLR, (uint16_t)(1 + i % 3), 0, nullptr, nullptr, 0, 0.0),
+          GSHSCENE_OK);
+    }
+    ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+    GSHSCENE_Limits limits{};
+    limits.max_report_entries = 2;
+    ReportRef report(nullptr, &limits);
+    auto out = make_surface(kind);
+    Outcome o = run(f(), sink.sink, request_for(l, *out, report.report));
+    EXPECT_EQ(o.result, GSHSCENE_ERR_LIMIT) << "a render that would have returned OK past the cap says so";
+    GSHSCENE_Report_Summary sum = summary(report.report);
+    EXPECT_EQ(sum.counted, 5u);
+    EXPECT_EQ(sum.by_class[GSHSCENE_ENTRY_REFUSED], 5u);
+    EXPECT_NE(sum.overflowed, 0);
+    auto got = placeholder_entries(report.report);
+    ASSERT_EQ(got.size(), 2u);
+    EXPECT_EQ(got[0].chain, (std::vector<size_t>{0}));
+    EXPECT_EQ(got[1].chain, (std::vector<size_t>{1}));
+  }
+}
+
 #endif /* GHOTI_IO_GSHSCENE_TEST_SINK_CONFORMANCE_H */

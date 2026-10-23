@@ -367,4 +367,14 @@ void gshscene_group_hash_composite(GSHGEOM_Hash * h, uint32_t composite, uint32_
 int gshscene_group_dump_pdf(FILE * out, uint32_t isolation, uint32_t knockout, const GSHSCENE_Resource * soft_mask);
 GSHSCENE_Result gshscene_list_canonical_depth(double depth, double * out);
 
+/** PH1, PH2: a placeholder's fields by the rules of the record call (a retained scene's node shares them); -0 becomes +0. */
+GSHSCENE_Result gshscene_placeholder_canonical(uint16_t source, uint16_t code, uint32_t approximated, const double * box,
+    GSHSCENE_Placeholder * out);
+
+/** PH1: a placeholder's content in a list's or a version's hash (list.h). */
+void gshscene_placeholder_hash(GSHGEOM_Hash * h, const GSHSCENE_Placeholder * p);
+
+/** PH1: ` source=N code=N approx=N box=...` in a dump (list.h).  < 0 on error. */
+int gshscene_placeholder_dump(FILE * out, const GSHSCENE_Placeholder * p);
+
 #endif /* GHOTI_IO_GSHSCENE_INTERNAL_H */

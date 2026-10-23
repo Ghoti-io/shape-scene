@@ -398,6 +398,21 @@ changes no result, cannot be seen by any test:
                nothing reads), truncation's reset of ``nonflat`` (bookkeeping,
                as for ``list_clear``) and a tie of picture depths
 
+  ph1- to ph8- (color-paint story P5): the placeholder at the waist.  The pinned values
+               of the item, node and reason kinds and of the registry's source and codes
+               and their names; the record call's rules one by one (a zero source or
+               code, an approximated flag past 1, a non-finite or inverted box, the sign
+               of a zero, a 3D map, the layer); equality, hash and dump field by field;
+               the float-free call (the box's scale, the frame, the ops without a frame,
+               the bits); the planning pass (the class from the flag, the decision made
+               before the caps and not from ``item_kinds``, the reason, ``second`` as
+               ``source << 16 | code``, the entry skipped, written only under strict or
+               keyed on the damage, a refusal counted or an approximation counted
+               toward strict); the test sink's record (its letter, the pair, the box,
+               the class, never a stamp); and the node (its canonical form, equality,
+               hash, name, emission with its box, map, flag and origin, the dump
+               letter, and the damage a placeholder does not make).  Written with the
+               story and not swept: the sweep is in the consolidated pass
   sk1- to sk13-, s20-, rule-S20-, ds-s20-, and the bk- plants (strokes story S1)
                the stroke at the waist: the style's pinned values and bounds
                (stroke.h, list.h, version.h, resource.h, report.h, sink.h), its
@@ -2295,7 +2310,7 @@ PLANTS += [
     ('pl6-sink-stamps-nothing', 'src', DS, '      GSHSCENE_Rect r = plane ? run->area : (box.empty', '      GSHSCENE_Rect r = plane ? (GSHSCENE_Rect){0, 0, 0, 0} : (box.empty', PLN),
     ('pl4-fixed-plane-needs-no-frame', 'src', FX, '      (op_count && !frame)) {', '      0) {', PLN),
     ('pl-fixed-plane-wrong-kind', 'src', FX, '|| plane->kind != GSHSCENE_RESOURCE_PLANE ||', '||', PLN),
-    ('pl-rect-space', 'src', FX, '  checked = from_geometry(gshgeom_map_compose_chain(chain, 2, NULL, &map));', '  checked = from_geometry(gshgeom_map_compose_chain(chain + 1, 1, NULL, &map));', PLN),
+    ('pl-rect-space', 'src', FX, '    checked = from_geometry(gshgeom_map_compose_chain(chain, 2, NULL, out));', '    checked = from_geometry(gshgeom_map_compose_chain(chain + 1, 1, NULL, out));', PLN + ["testPlaceholder"]),
     ('pl-rect-width', 'src', FX, '    g = gshgeom_path_line_to_fixed(path, x1, y1, bits);', '    g = gshgeom_path_line_to_fixed(path, x0, y1, bits);', PLN),
     ('pl-rect-rounds', 'src', FX, '    g = gshgeom_path_move_to_fixed(path, x0, y0, bits);', '    g = gshgeom_path_move_to_fixed(path, x0 / 2 * 2, y0, bits);', PLN),
     ('pl-rect-inverted', 'src', FX, ' || x0 > x1 ||\n      y0 > y1) {', ' ||\n      0) {', PLN),
@@ -2311,6 +2326,88 @@ for _file in [str(ROOT / "tools" / "scene-plants.json"), str(ROOT / "tools" / "s
         [os.environ["PLANT_EXTRA_JSON"]] if os.environ.get("PLANT_EXTRA_JSON") else []):
     with open(_file) as _f:
         PLANTS += [tuple(x) for x in json.load(_f)]
+
+
+
+# color-paint story P5 (PH1 to PH8): the placeholder item and node, the planning pass's entry for it, the test sink's
+# record.  Written with the story; the sweep is deferred to the consolidated pass (the strokes plan's
+# deferred-verification).  Every needle was checked to occur once; the shape-cpu half is in its own check-planted.py.
+PH = ["testPlaceholder"]
+PHS = ["testPlaceholder", "testDump_sink", "testSink"]
+HVP = "include/ghoti.io/shape-scene/version.h"
+PLANTS += [
+    # the pinned values (list.h, version.h, report.h)
+    ('ph1-h-item-kind', 'hdr', HL, '  GSHSCENE_ITEM_PLACEHOLDER = 8,', '  GSHSCENE_ITEM_PLACEHOLDER = 9,', PH + ["testStroke"]),
+    ('ph7-h-node-kind', 'hdr', HVP, '  GSHSCENE_NODE_PLACEHOLDER = 5,', '  GSHSCENE_NODE_PLACEHOLDER = 6,', PH + ["testNode"]),
+    ('ph4-h-reason', 'hdr', HRP, '  GSHSCENE_REASON_PLACEHOLDER = 31,', '  GSHSCENE_REASON_PLACEHOLDER = 32,', PH + ["testReport"]),
+    ('ph4-h-source-colr', 'hdr', HRP, '#define GSHSCENE_PLACEHOLDER_SOURCE_COLR 1u', '#define GSHSCENE_PLACEHOLDER_SOURCE_COLR 2u', ["testReport"]),
+    ('ph4-h-code-unbounded', 'hdr', HRP, '#define GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED 1u', '#define GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED 2u', ["testReport"]),
+    ('ph4-h-code-walk-limit', 'hdr', HRP, '#define GSHSCENE_PLACEHOLDER_COLR_WALK_LIMIT 3u', '#define GSHSCENE_PLACEHOLDER_COLR_WALK_LIMIT 4u', ["testReport"]),
+    ('ph4-reason-name', 'src', RP, '      return "placeholder";', '      return "placeholders";', ["testReport"]),
+    ('ph4-pair-name', 'src', RP, '        return "colr:no-record";', '        return "colr:no_record";', ["testReport"]),
+    # PH1, PH2: the record call
+    ('ph2-source-zero', 'src', LS, '  if (source == 0 || code == 0 || approximated > 1u) {', '  if (code == 0 || approximated > 1u) {', PH),
+    ('ph2-code-zero', 'src', LS, '  if (source == 0 || code == 0 || approximated > 1u) {', '  if (source == 0 || approximated > 1u) {', PH),
+    ('ph2-approximated-range', 'src', LS, '  if (source == 0 || code == 0 || approximated > 1u) {', '  if (source == 0 || code == 0) {', PH),
+    ('ph2-box-finite', 'src', LS, '      if (!gshscene_finite(box[i])) {', '      if (0) {', PH),
+    ('ph2-box-inverted-x', 'src', LS, '    if (box[0] > box[2] || box[1] > box[3]) {', '    if (box[1] > box[3]) {', PH),
+    ('ph2-box-inverted-y', 'src', LS, '    if (box[0] > box[2] || box[1] > box[3]) {', '    if (box[0] > box[2]) {', PH),
+    ('ph2-box-negative-zero', 'src', LS, '      out->box[i] = box[i] == 0.0 ? 0.0 : box[i]; /* -0 is stored as +0, as a depth is */', '      out->box[i] = box[i];', PH),
+    ('ph2-box-no-flag', 'src', LS, '    out->has_box = 1;', '    out->has_box = 0;', PH),
+    ('ph2-planar', 'src', LS, '  if (result == GSHSCENE_OK && item.map.dim != 2) {\n    result = GSHSCENE_ERR_UNSUPPORTED; /* PH1: a placeholder is planar, as a stroke is */', '  if (0) {\n    result = GSHSCENE_ERR_UNSUPPORTED; /* PH1: a placeholder is planar, as a stroke is */', PH),
+    ('ph2-layer-dropped', 'src', LS, '  item.layer = layer;\n  return list_append(list, &item);\n}\n\nGSHSCENE_Result gshscene_list_clip_push(', '  return list_append(list, &item);\n}\n\nGSHSCENE_Result gshscene_list_clip_push(', PH),
+    # PH1: equality, hash and dump
+    ('ph1-equal-source', 'src', LS, '  if (a->placeholder.source != b->placeholder.source || a->placeholder.code != b->placeholder.code ||', '  if (a->placeholder.code != b->placeholder.code ||', PH),
+    ('ph1-equal-code', 'src', LS, '  if (a->placeholder.source != b->placeholder.source || a->placeholder.code != b->placeholder.code ||', '  if (a->placeholder.source != b->placeholder.source ||', PH),
+    ('ph1-equal-approximated', 'src', LS, '      a->placeholder.approximated != b->placeholder.approximated || a->placeholder.has_box != b->placeholder.has_box) {\n    return 0;\n  }\n  for (int i = 0; i < 4; i++) {\n    if (gshgeom_f64_bits(a->placeholder.box[i])', '      a->placeholder.has_box != b->placeholder.has_box) {\n    return 0;\n  }\n  for (int i = 0; i < 4; i++) {\n    if (gshgeom_f64_bits(a->placeholder.box[i])', PH),
+    ('ph1-equal-box', 'src', LS, '  for (int i = 0; i < 4; i++) {\n    if (gshgeom_f64_bits(a->placeholder.box[i])', '  for (int i = 0; i < 3; i++) {\n    if (gshgeom_f64_bits(a->placeholder.box[i])', PH),
+    ('ph1-hash-source', 'src', LS, '  gshgeom_hash_u16(h, p->source);', '  gshgeom_hash_u16(h, p->code);', PH),
+    ('ph1-hash-code', 'src', LS, '  gshgeom_hash_u16(h, p->code);', '  gshgeom_hash_u16(h, p->source);', PH),
+    ('ph1-hash-approximated', 'src', LS, '  gshgeom_hash_u8(h, (uint8_t)p->approximated);\n', '', PH),
+    ('ph1-hash-has-box', 'src', LS, '  gshgeom_hash_u8(h, (uint8_t)p->has_box);\n', '', PH),
+    ('ph1-hash-box', 'src', LS, '    for (int k = 0; k < 4; k++) {\n      gshgeom_hash_f64(h, p->box[k]);', '    for (int k = 0; k < 3; k++) {\n      gshgeom_hash_f64(h, p->box[k]);', PH),
+    ('ph1-hash-map', 'src', LS, '        gshscene_placeholder_hash(&h, &item->placeholder);\n        gshgeom_hash_u64(&h, gshgeom_map_hash(&item->map));', '        gshscene_placeholder_hash(&h, &item->placeholder);', PH),
+    ('ph1-hash-layer', 'src', LS, '        gshscene_placeholder_hash(&h, &item->placeholder);\n        gshgeom_hash_u64(&h, gshgeom_map_hash(&item->map));\n        gshgeom_hash_i32(&h, item->layer);', '        gshscene_placeholder_hash(&h, &item->placeholder);\n        gshgeom_hash_u64(&h, gshgeom_map_hash(&item->map));', PH),
+    ('ph1-dump-letter', 'src', LS, "        written = fputc('P', out) == EOF ? -1 : gshscene_placeholder_dump(out, &item->placeholder);", "        written = fputc('p', out) == EOF ? -1 : gshscene_placeholder_dump(out, &item->placeholder);", PH),
+    ('ph1-dump-approx-name', 'src', LS, '" source=%u code=%u approx=%u box="', '" source=%u code=%u approximated=%u box="', PH),
+    ('ph1-dump-no-box', 'src', LS, "    return fputc('-', out) == EOF ? -1 : 0;\n  }\n  return fprintf(out, \"%016llx %016llx %016llx %016llx\", HEX(gshgeom_f64_bits(p->box[0]))", "    return fputc('0', out) == EOF ? -1 : 0;\n  }\n  return fprintf(out, \"%016llx %016llx %016llx %016llx\", HEX(gshgeom_f64_bits(p->box[0]))", PH),
+    ('ph2-fixed-bits-unchecked', 'src', FX, '(box_design && bits > GSHSCENE_FIXED_MAX_BITS)) {', '0) {', PH),
+    ('ph2-fixed-box-scaled', 'src', FX, '      box[i] = fixed_value(box_design[i], bits);', '      box[i] = (double)box_design[i];', PH),
+    ('ph2-fixed-ops-without-frame', 'src', FX, '(!frame && op_count != 0) ||', '', PH),
+    ('ph2-fixed-no-frame-map', 'src', FX, '  GSHSCENE_Result r = frame ? frame_map(frame, ops, op_count, &map) : from_geometry(gshgeom_map_identity(2, &map));', '  GSHSCENE_Result r = from_geometry(gshgeom_map_identity(2, &map));', PH),
+    # PH3 to PH6: the planning pass and the test sink
+    ('ph3-class-swapped', 'src', SK, '    d.entry_class = item->placeholder.approximated ? GSHSCENE_ENTRY_APPROXIMATED : GSHSCENE_ENTRY_REFUSED;', '    d.entry_class = item->placeholder.approximated ? GSHSCENE_ENTRY_REFUSED : GSHSCENE_ENTRY_APPROXIMATED;', PHS),
+    ('ph3-decided-from-item-kinds', 'src', SK, '  if (item->kind == GSHSCENE_ITEM_PLACEHOLDER) {\n    d.entry_class', '  if (item->kind == GSHSCENE_ITEM_PLACEHOLDER && (caps->item_kinds & (UINT32_C(1) << GSHSCENE_ITEM_PLACEHOLDER))) {\n    d.entry_class', PHS),
+    ('ph3-decided-after-the-caps', 'src', SK, '  if (item->kind == GSHSCENE_ITEM_PLACEHOLDER) {\n    d.entry_class', '  if (item->kind == GSHSCENE_ITEM_PLACEHOLDER && caps->flags != 0) {\n    d.entry_class', PHS),
+    ('ph4-reason', 'src', SK, '    d.reason = GSHSCENE_REASON_PLACEHOLDER;', '    d.reason = GSHSCENE_REASON_ITEM_KIND;', PHS),
+    ('ph4-second-dropped', 'src', SK, '    d.detail = ((uint64_t)item->placeholder.source << 16) | (uint64_t)item->placeholder.code; /* PH4 */', '    d.detail = 0;', PHS),
+    ('ph4-second-shift', 'src', SK, '    d.detail = ((uint64_t)item->placeholder.source << 16) | (uint64_t)item->placeholder.code; /* PH4 */', '    d.detail = ((uint64_t)item->placeholder.source << 8) | (uint64_t)item->placeholder.code; /* PH4 */', PHS),
+    ('ph4-second-code-only', 'src', SK, '    d.detail = ((uint64_t)item->placeholder.source << 16) | (uint64_t)item->placeholder.code; /* PH4 */', '    d.detail = (uint64_t)item->placeholder.code;', PHS),
+    ('ph6-entry-skipped', 'src', SK, '    if (d.entry_class) {\n      /* A stroke refused for its style', '    if (d.entry_class && d.reason != GSHSCENE_REASON_PLACEHOLDER) {\n      /* A stroke refused for its style', PHS),
+    ('ph6-entry-only-under-strict', 'src', SK, '    if (d.entry_class) {\n      /* A stroke refused for its style', '    if (d.entry_class && (d.reason != GSHSCENE_REASON_PLACEHOLDER || (job->request.flags & GSHSCENE_RENDER_STRICT))) {\n      /* A stroke refused for its style', PHS),
+    ('ph6-entry-keyed-on-damage', 'src', SK, '    if (d.entry_class) {\n      /* A stroke refused for its style', '    if (d.entry_class && (d.reason != GSHSCENE_REASON_PLACEHOLDER || !job->target.damage)) {\n      /* A stroke refused for its style', PHS),
+    ('ph5-refusal-not-counted', 'src', SK, '    if (d.entry_class == GSHSCENE_ENTRY_REFUSED) {\n      (*refused)++;', '    if (d.entry_class == GSHSCENE_ENTRY_REFUSED && d.reason != GSHSCENE_REASON_PLACEHOLDER) {\n      (*refused)++;', PHS),
+    ('ph5-approximated-counted', 'src', SK, '    if (d.entry_class == GSHSCENE_ENTRY_REFUSED) {\n      (*refused)++;', '    if (d.entry_class == GSHSCENE_ENTRY_REFUSED || d.reason == GSHSCENE_REASON_PLACEHOLDER) {\n      (*refused)++;', PHS),
+    ('ph8-test-sink-record-letter', 'src', DS, '  snprintf(run->line, LINE_BYTES, " P class=%d reason=%d source=%u code=%u approx=%u map=", (int)d.entry_class, (int)d.reason,', '  snprintf(run->line, LINE_BYTES, " Q class=%d reason=%d source=%u code=%u approx=%u map=", (int)d.entry_class, (int)d.reason,', ["testDump_sink"]),
+    ('ph8-test-sink-source-code-swapped', 'src', DS, '      (unsigned)p->source, (unsigned)p->code, (unsigned)p->approximated);', '      (unsigned)p->code, (unsigned)p->source, (unsigned)p->approximated);', ["testDump_sink"]),
+    ('ph8-test-sink-box-edge', 'src', DS, '  model.x1 = p->box[2];', '  model.x1 = p->box[0];', ["testDump_sink"]),
+    ('ph8-test-sink-class-from-flag', 'src', DS, '  snprintf(run->line, LINE_BYTES, " P class=%d reason=%d source=%u code=%u approx=%u map=", (int)d.entry_class, (int)d.reason,', '  snprintf(run->line, LINE_BYTES, " P class=%d reason=%d source=%u code=%u approx=%u map=", (int)GSHSCENE_ENTRY_REFUSED, (int)d.reason,', ["testDump_sink"]),
+    ('ph8-test-sink-stamps', 'src', DS, '    return placeholder_unit(run, item, d, count, failed); /* PH6: the plan wrote the entry; this is the record */', '    placeholder_unit(run, item, d, count, failed);\n    run->block_count += 0;\n    draw_rect(run, run->area, mark_of(chain, count), &failed);\n    return failed;', ["testDump_sink"]),
+    # PH7: the node
+    ('ph7-node-canonical-box', 'src', ND, '      if (result == GSHSCENE_OK && !in->placeholder.has_box) {', '      if (0) {', PH),
+    ('ph7-node-equal-source', 'src', ND, '      if (a->placeholder.source != b->placeholder.source || a->placeholder.code != b->placeholder.code ||\n          a->placeholder.approximated', '      if (a->placeholder.code != b->placeholder.code ||\n          a->placeholder.approximated', PH),
+    ('ph7-node-equal-approximated', 'src', ND, '          a->placeholder.approximated != b->placeholder.approximated || a->placeholder.has_box != b->placeholder.has_box) {\n        return 0;\n      }\n      for (int i = 0; i < 4; i++) {', '          a->placeholder.has_box != b->placeholder.has_box) {\n        return 0;\n      }\n      for (int i = 0; i < 4; i++) {', PH),
+    ('ph7-node-equal-box', 'src', ND, '      for (int i = 0; i < 4; i++) {\n        if (gshgeom_f64_bits(a->placeholder.box[i]) != gshgeom_f64_bits(b->placeholder.box[i])) {', '      for (int i = 0; i < 3; i++) {\n        if (gshgeom_f64_bits(a->placeholder.box[i]) != gshgeom_f64_bits(b->placeholder.box[i])) {', PH),
+    ('ph7-node-hash-fields', 'src', ND, '      gshscene_placeholder_hash(h, &p->placeholder);\n      gshgeom_hash_u64(h, gshgeom_map_hash(&p->map));', '      gshgeom_hash_u64(h, gshgeom_map_hash(&p->map));', PH),
+    ('ph7-node-hash-depth', 'src', ND, '      gshscene_placeholder_hash(h, &p->placeholder);\n      gshgeom_hash_u64(h, gshgeom_map_hash(&p->map));\n      gshgeom_hash_i32(h, p->layer);\n      gshgeom_hash_f64(h, p->depth);', '      gshscene_placeholder_hash(h, &p->placeholder);\n      gshgeom_hash_u64(h, gshgeom_map_hash(&p->map));\n      gshgeom_hash_i32(h, p->layer);', PH),
+    ('ph7-node-kind-name', 'src', ND, '      return "placeholder";', '      return "placeholders";', ["testNode"]),
+    ('ph7-emit-box', 'src', EM, '        ph->has_box ? ph->box : NULL, map, shape->p.layer, shape->p.depth);', '        NULL, map, shape->p.layer, shape->p.depth);', PH),
+    ('ph7-emit-uncomposed', 'src', EM, '        ph->has_box ? ph->box : NULL, map, shape->p.layer, shape->p.depth);', '        ph->has_box ? ph->box : NULL, NULL, shape->p.layer, shape->p.depth);', PH),
+    ('ph7-emit-approximated', 'src', EM, '    GSHSCENE_Result placed = gshscene_list_placeholder(s->list, ph->source, ph->code, ph->approximated,', '    GSHSCENE_Result placed = gshscene_list_placeholder(s->list, ph->source, ph->code, 0,', PH),
+    ('ph7-emit-origin', 'src', EM, '    return placed == GSHSCENE_OK ? sink_origin(s, shape->id) : placed;', '    return placed;', PH),
+    ('ph7-version-dump-letter', 'src', VS, "      if (put_common(out, 'P', node) < 0 || gshscene_placeholder_dump(out, &p->placeholder) < 0 ||", "      if (put_common(out, 'Q', node) < 0 || gshscene_placeholder_dump(out, &p->placeholder) < 0 ||", PH),
+    ('ph7-damage-draws-nothing', 'src', DF, '  if (shape->p.kind == GSHSCENE_NODE_PLACEHOLDER) {\n    return GSHSCENE_OK; /* PH7', '  if (0) {\n    return GSHSCENE_OK; /* PH7', PH),
+]
 
 
 def run(cmd, shell=False, env_extra=None, cwd=None, timeout=None, limits=None):

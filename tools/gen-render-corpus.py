@@ -25,7 +25,8 @@ names.  Keep the op numbers in step with the C file.
 import os
 import sys
 
-FILL, CLIP, CLIP_POP, GROUP, GROUP_POP, INSTANCE, FONT_RUN, OUTLINE_RUN, FREEZE, FOREGROUND, STROKE = range(11)
+FILL, CLIP, CLIP_POP, GROUP, GROUP_POP, INSTANCE, FONT_RUN, OUTLINE_RUN, FREEZE, FOREGROUND, STROKE, PLACEHOLDER = range(12)
+RANDOM_OPS = 11  # the random files draw ops 0 to 10: the placeholder (P5) is only in the scripted ones, so they read as they did
 RANDOM_FILES = 96
 
 
@@ -71,7 +72,7 @@ def random_file(i):
     n = 8 + r.byte() % 60
     body = bytearray([n])
     for _ in range(n):
-        body += bytes([r.byte() % 11, r.byte(), r.byte(), r.byte()])
+        body += bytes([r.byte() % RANDOM_OPS, r.byte(), r.byte(), r.byte()])
     return bytes(head) + bytes(body)
 
 
@@ -156,6 +157,17 @@ def scripted():
     out["scripted-strokes-none-strict.bin"] = header(request=1, stroke=6) + strokes
     out["scripted-strokes-no-kind.bin"] = header(stroke=8) + strokes
     out["scripted-strokes-raster.bin"] = header(stroke=1 | 4) + strokes
+    # Color-paint story P5 (PH1, PH3 to PH6).  Op PLACEHOLDER (a, b, c): source 1 + a % 3 (0 when c & 0x80, invalid),
+    # code 1 + b % 3 (0 when c & 0x40, invalid), approximated when c & 1 (2, invalid, with c & 4), a box when c & 0x20, a
+    # translation when a & 0x80.  A refused one with a box between fills, an approximated one, an invalid source, an invalid
+    # code and an invalid flag; strict (a refused placeholder is planned: the sink is never called); the same on a raster
+    # target; and an approximated one alone under strict, which never fails.
+    placeholders = ops(fill(), (PLACEHOLDER, 0, 1, 0x20), (PLACEHOLDER, 0x81, 2, 0x21), fill(10, 10, 5), (PLACEHOLDER, 1, 1, 0x80),
+                       (PLACEHOLDER, 1, 1, 0x40), (PLACEHOLDER, 1, 1, 0x05), (PLACEHOLDER, 2, 0, 0))
+    out["scripted-placeholders.bin"] = header(request=4) + placeholders
+    out["scripted-placeholders-strict.bin"] = header(request=1) + placeholders
+    out["scripted-placeholders-raster.bin"] = header() + placeholders
+    out["scripted-placeholders-approximated.bin"] = header(request=1) + ops(fill(), (PLACEHOLDER, 0, 1, 0x21), fill(4, 4, 3))
     return out
 
 

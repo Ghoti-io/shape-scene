@@ -128,6 +128,14 @@ GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps, 
   if (!caps || !item) {
     return d;
   }
+  /* PH3: a placeholder draws nothing and is reported by the list alone, before every caps test: no sink claims the kind,
+   * and a sink that does is no different. */
+  if (item->kind == GSHSCENE_ITEM_PLACEHOLDER) {
+    d.entry_class = item->placeholder.approximated ? GSHSCENE_ENTRY_APPROXIMATED : GSHSCENE_ENTRY_REFUSED;
+    d.reason = GSHSCENE_REASON_PLACEHOLDER;
+    d.detail = ((uint64_t)item->placeholder.source << 16) | (uint64_t)item->placeholder.code; /* PH4 */
+    return d;
+  }
   uint32_t kind = (uint32_t)item->kind;
   if (kind >= 32 || !(caps->item_kinds & (UINT32_C(1) << kind))) {
     d.entry_class = GSHSCENE_ENTRY_REFUSED;
@@ -733,7 +741,8 @@ static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
     GSHSCENE_Disposition d = gshscene_caps_disposition(
         &job->caps, item, maps, count - 1, &job->target.map, &job->target_space, gshscene_list_palette(list));
     if (d.entry_class) {
-      /* A stroke refused for its style names the missing features (SK11); every other entry's second is 0. */
+      /* A stroke refused for its style names the missing features (SK11), a placeholder its source and code (PH4); every
+      * other entry's second is 0. */
       result = gshscene_report_add(report, d.entry_class, d.reason, chain, count, (size_t)d.detail, 0.0);
       if (result != GSHSCENE_OK) {
         return result;

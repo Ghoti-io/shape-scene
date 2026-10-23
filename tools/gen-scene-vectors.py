@@ -56,6 +56,10 @@ def u8(v):
     return struct.pack("<B", v)
 
 
+def u16(v):
+    return struct.pack("<H", v)
+
+
 def u32(v):
     return struct.pack("<I", v)
 
@@ -396,7 +400,7 @@ STYLE_ARCS_HASH = style_hash(STYLE_ARCS)
 
 
 # --- lists (list.h) ---------------------------------------------------------------
-FILL, CLIP_PUSH, CLIP_POP, GROUP_PUSH, GROUP_POP, INSTANCE, STROKE = 1, 2, 3, 4, 5, 6, 7
+FILL, CLIP_PUSH, CLIP_POP, GROUP_PUSH, GROUP_POP, INSTANCE, STROKE, PLACEHOLDER = 1, 2, 3, 4, 5, 6, 7, 8
 ORDER_FLAT, ORDER_DEPTH, ORDER_OVERLAY = 0, 1, 2
 COMPOSITE = {"src-over": 0, "clear": 1, "src": 2, "dest": 3, "dest-over": 4, "src-in": 5, "dest-in": 6,
              "src-out": 7, "dest-out": 8, "src-atop": 9, "dest-atop": 10, "xor": 11, "plus": 12,
@@ -441,6 +445,24 @@ def stroke(rkind, rhash, shash, mhash, rgba, space=TARGET, layer=0, depth=0.0, p
                 depth=depth, paint=paint, entry=entry, grad=grad)
 
 
+def placeholder(source, code, approx, box, mhash, layer=0, depth=0.0):
+    """A placeholder item (PH1): a source, a code, the approximated flag, a box (x0, y0, x1, y1) or None, a map."""
+    return dict(k=PLACEHOLDER, source=source, code=code, approx=approx, box=box, mhash=mhash, layer=layer, depth=depth)
+
+
+def placeholder_bytes(p):
+    """PH1: u16 source, u16 code, u8 approximated, u8 1 if there is a box, then its four f64 (a list's and a version's)."""
+    out = u16(p["source"]) + u16(p["code"]) + u8(p["approx"]) + u8(0 if p["box"] is None else 1)
+    if p["box"] is not None:
+        out += b"".join(f64(v) for v in p["box"])
+    return out
+
+
+def placeholder_text(p):
+    box = "-" if p["box"] is None else " ".join("%016x" % bits(v) for v in p["box"])
+    return "source=%d code=%d approx=%d box=%s" % (p["source"], p["code"], p["approx"], box)
+
+
 def instance(rkind, rhash, mhash, layer=0, depth=0.0):
     return dict(k=INSTANCE, rkind=rkind, rhash=rhash, mhash=mhash, layer=layer, depth=depth)
 
@@ -469,6 +491,8 @@ def item_bytes(it):
         out += u64(it["rhash"]) + u64(it["shash"]) + u64(it["mhash"]) + u8(it["paint"])
         out += color_bytes(it["rgba"], it["space"]) + u32(it["entry"]) + u64(it["grad"]) + i32(it["layer"])
         out += f64(it["depth"])
+    elif k == PLACEHOLDER:
+        out += placeholder_bytes(it) + u64(it["mhash"]) + i32(it["layer"]) + f64(it["depth"])
     return out
 
 
@@ -500,6 +524,8 @@ def item_line(it):
         return "K res=%s:%016x style=%016x map=%016x paint=%d %s space=%s entry=%d gradient=%016x %s" % (
             KIND_NAME[it["rkind"]], it["rhash"], it["shash"], it["mhash"], it["paint"],
             " ".join("%016x" % bits(c) for c in it["rgba"]), space_text(it["space"]), it["entry"], it["grad"], ld)
+    if k == PLACEHOLDER:
+        return "P %s map=%016x %s" % (placeholder_text(it), it["mhash"], ld)
     return "I res=%s:%016x map=%016x %s" % (KIND_NAME[it["rkind"]], it["rhash"], it["mhash"], ld)
 
 
@@ -674,7 +700,7 @@ ORDER_LIST_HASH = list_hash(ORDER_ITEMS)
 
 
 # --- versions (version.h) ---------------------------------------------------------------------------------
-NODE_GROUP, NODE_SHAPE, NODE_INSTANCE, NODE_STROKE = 1, 2, 3, 4
+NODE_GROUP, NODE_SHAPE, NODE_INSTANCE, NODE_STROKE, NODE_PLACEHOLDER = 1, 2, 3, 4, 5
 DOMAIN = 0x5356470000000001
 SCENE_FG = ((1.0, 0.5, 0.25, 0.75), P3_GAMMA)
 
@@ -703,6 +729,9 @@ def node_bytes(n):
         out += u64(n["map"]) + u8(n["rule"]) + u8(n["paint"])
         out += b"".join(f64(c) for c in n["rgba"]) + space_bytes(n["space"]) + u32(n["entry"]) + u64(n["grad"])
         out += i32(n["layer"]) + f64(n["depth"])
+    elif n["kind"] == NODE_PLACEHOLDER:
+        # PH7: a list item's spelling.
+        out += placeholder_bytes(n) + u64(n["map"]) + i32(n["layer"]) + f64(n["depth"])
     else:
         out += u64(n["target"]) + u64(n["map"]) + i32(n["layer"]) + f64(n["depth"])
     return out
@@ -720,7 +749,7 @@ def key_text(key):
 
 
 def node_line(n):
-    head = "%s id=%d parent=%d flags=%d key=%s" % ("GSIK"[n["kind"] - 1], n["id"], n["parent"], n["flags"], key_text(n["key"]))
+    head = "%s id=%d parent=%d flags=%d key=%s" % ("GSIKP"[n["kind"] - 1], n["id"], n["parent"], n["flags"], key_text(n["key"]))
     if n["kind"] == NODE_GROUP:
         clip = n["clip"]
         clip_text = "-" if clip is None else "%s:%016x:%016x:%d" % (KIND_NAME[clip[0]], clip[1], clip[2], clip[3])
@@ -735,6 +764,8 @@ def node_line(n):
             head, KIND_NAME[n["res"][0]], n["res"][1], style, n["map"], n["rule"], n["paint"],
             " ".join("%016x" % bits(c) for c in n["rgba"]), space_text(n["space"]), n["entry"], n["grad"], n["layer"],
             bits(n["depth"]))
+    if n["kind"] == NODE_PLACEHOLDER:
+        return "%s %s map=%016x layer=%d depth=%016x" % (head, placeholder_text(n), n["map"], n["layer"], bits(n["depth"]))
     return "%s target=%d map=%016x layer=%d depth=%016x" % (head, n["target"], n["map"], n["layer"], bits(n["depth"]))
 
 
@@ -763,6 +794,13 @@ def stroke_node(i, parent, res, style, **kw):
     n = shape_node(i, parent, res, **kw)
     n["kind"] = NODE_STROKE
     n["style"] = style
+    return n
+
+
+def placeholder_node(i, parent, source, code, approx=0, box=None, **kw):
+    n = dict(id=i, kind=NODE_PLACEHOLDER, flags=0, parent=parent, key=None, source=source, code=code, approx=approx,
+             box=box, map=IDENTITY, layer=0, depth=0.0)
+    n.update(kw)
     return n
 
 
@@ -826,6 +864,31 @@ STROKE_SCENE_LIST_HASH = list_hash([
     stroke(KIND_PATH, SQ_RES, STYLE_DEFAULT_HASH, IDENTITY, BLACK),
     stroke(KIND_RUN, OUTLINE_RUN_HASH, STYLE_DEVICE_HASH, TRANSLATE, (0.0, 0.0, 0.0, 0.5), paint=PAINT_FOREGROUND,
            layer=3, depth=1.0),
+])
+# Placeholders (PH1, PH7; color-paint story P5): a list holding every shape of one -- a refused one with a box, an
+# approximated one after a fill (a stand-in), one without a box, a negative-zero edge, a layer and a depth, a map -- and
+# a scene of a group holding a placeholder under a transformed group, a keyed approximated one and a hidden one, with
+# the list it emits (the node's composed map is the item's, so the transformed group's map is the translation).
+PLACEHOLDER_LIST_ITEMS = [
+    fill(KIND_PATH, SQ_RES, IDENTITY, 0, (0.25, 0.5, 0.75, 1.0)),
+    placeholder(1, 1, 0, (-1.5, 0.0, 4.25, 6.0), IDENTITY),
+    placeholder(1, 3, 1, (0.0, 0.0, 2.0, 2.0), TRANSLATE, layer=2, depth=1.5),
+    fill(KIND_PATH, SQ_RES, IDENTITY, 0, (0.0, 0.0, 0.0, 1.0), paint=PAINT_FOREGROUND, layer=2, depth=1.5),
+    placeholder(1, 2, 0, None, DESIGN, layer=-1, depth=-2.5),
+    placeholder(65535, 65535, 1, (0.0, 0.0, 0.0, 0.0), IDENTITY),
+]
+PLACEHOLDER_LIST_HASH = list_hash(PLACEHOLDER_LIST_ITEMS)
+PLACEHOLDER_SCENE_NODES = [
+    group_node(1, 0, [2, 4, 5]),
+    group_node(2, 1, [3], map=TRANSLATE),
+    placeholder_node(3, 2, 1, 1, box=(0.0, 0.0, 8.0, 8.0), layer=1, depth=0.5),
+    placeholder_node(4, 1, 1, 3, approx=1, key=(DOMAIN, 9), map=DESIGN, box=(-1.0, -2.0, 3.0, 4.0)),
+    placeholder_node(5, 1, 1, 2, flags=1),
+]
+PLACEHOLDER_SCENE_HASH = version_hash(PLACEHOLDER_SCENE_NODES)
+PLACEHOLDER_SCENE_LIST_HASH = list_hash([
+    placeholder(1, 1, 0, (0.0, 0.0, 8.0, 8.0), TRANSLATE, layer=1, depth=0.5),
+    placeholder(1, 3, 1, (-1.0, -2.0, 3.0, 4.0), DESIGN),
 ])
 EMPTY_NODES = [group_node(1, 0, [])]
 EMPTY_HASH = version_hash(EMPTY_NODES)
@@ -891,6 +954,8 @@ def render():
                     ("kPdfGroupListHash", PDF_LIST_HASH), ("kPdfGroupSceneHash", PDF_SCENE_HASH),
                     ("kStrokeDefaultHash", STYLE_DEFAULT_HASH), ("kStrokeDeviceHash", STYLE_DEVICE_HASH),
                     ("kStrokeClipHash", STYLE_CLIP_HASH), ("kStrokeArcsHash", STYLE_ARCS_HASH),
+                    ("kPlaceholderListHash", PLACEHOLDER_LIST_HASH), ("kPlaceholderSceneHash", PLACEHOLDER_SCENE_HASH),
+                    ("kPlaceholderSceneListHash", PLACEHOLDER_SCENE_LIST_HASH),
                     ("kStrokeListHash", STROKE_LIST_HASH), ("kStrokeSceneHash", STROKE_SCENE_HASH),
                     ("kStrokeSceneListHash", STROKE_SCENE_LIST_HASH)):
         o.append("static const std::uint64_t %s = UINT64_C(0x%016x);\n" % (name, v))
@@ -924,6 +989,8 @@ def render():
     o.append(cxx_string("kStrokeArcsDump", style_dump(STYLE_ARCS)))
     o.append(cxx_string("kStrokeListDump", list_dump(STROKE_LIST_ITEMS)))
     o.append(cxx_string("kStrokeSceneDump", version_dump(STROKE_SCENE_NODES)))
+    o.append(cxx_string("kPlaceholderListDump", list_dump(PLACEHOLDER_LIST_ITEMS)))
+    o.append(cxx_string("kPlaceholderSceneDump", version_dump(PLACEHOLDER_SCENE_NODES)))
     o.append("\n}  // namespace known\n\n#endif\n")
     return "".join(o)
 

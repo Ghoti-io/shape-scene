@@ -937,6 +937,44 @@ static GSHSCENE_Result stroke_unit(Run * run, const GSHSCENE_Item * item, const 
 }
 
 /**
+ * A placeholder (list.h, PH1): drawn as nothing and recorded as `P class=N reason=N source=N code=N approx=N map=<hash>
+ * box=<x0> <y0> <x1> <y1>` (the box under the composed map, in target units; `-` for none, and for a composition the
+ * map bounds refuse).  The class and reason are the planning pass's, which wrote the entry (PH3, PH6): a configuration
+ * does not decide a placeholder, whatever its caps claim.
+ */
+static GSHSCENE_Result placeholder_unit(Run * run, const GSHSCENE_Item * item, GSHSCENE_Disposition d, size_t count,
+    GSHSCENE_Result failed) {
+  GSHGEOM_Map map;
+  int composed = !unit_map(run, item, count, &map);
+  const GSHSCENE_Placeholder * p = &item->placeholder;
+  snprintf(run->line, LINE_BYTES, " P class=%d reason=%d source=%u code=%u approx=%u map=", (int)d.entry_class, (int)d.reason,
+      (unsigned)p->source, (unsigned)p->code, (unsigned)p->approximated);
+  emit_text(run, run->line, &failed);
+  if (composed) {
+    snprintf(run->line, LINE_BYTES, "%016" PRIx64, gshgeom_map_hash(&map));
+  } else {
+    snprintf(run->line, LINE_BYTES, "-");
+  }
+  emit_text(run, run->line, &failed);
+  emit_text(run, " box=", &failed);
+  Box model;
+  Box box;
+  model.empty = !p->has_box;
+  model.x0 = p->box[0];
+  model.y0 = p->box[1];
+  model.x1 = p->box[2];
+  model.y1 = p->box[3];
+  if (!composed || model.empty || box_map(&map, &model, &box)) {
+    emit_text(run, "-\n", &failed);
+  } else {
+    snprintf(run->line, LINE_BYTES, "%016" PRIx64 " %016" PRIx64 " %016" PRIx64 " %016" PRIx64 "\n",
+        gshgeom_f64_bits(box.x0), gshgeom_f64_bits(box.y0), gshgeom_f64_bits(box.x1), gshgeom_f64_bits(box.y1));
+    emit_text(run, run->line, &failed);
+  }
+  return failed;
+}
+
+/**
  * Go through one unit.  @return 0 to go on; a result to stop with (::GSHSCENE_ERR_REFUSED for a strict refusal while
  * drawing, an I/O error from the stream).
  */
@@ -956,6 +994,9 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
   }
   GSHSCENE_Disposition d = gshscene_caps_disposition(&run->job->caps, item, run->maps, count - 1, &run->job->target.map,
       &run->job->target_space, gshscene_list_palette(run->job->request.list));
+  if (item->kind == GSHSCENE_ITEM_PLACEHOLDER) {
+    return placeholder_unit(run, item, d, count, failed); /* PH6: the plan wrote the entry; this is the record */
+  }
   if (d.entry_class == GSHSCENE_ENTRY_REFUSED) {
     snprintf(run->line, LINE_BYTES, " X class=%d reason=%d\n", (int)d.entry_class, (int)d.reason);
     emit_text(run, run->line, &failed);

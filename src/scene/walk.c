@@ -197,7 +197,8 @@ static GSHSCENE_Result walk_node(GSHSCENE_Walk * w, const GSHSCENE_Node_Rec * no
       return result;
     }
     case GSHSCENE_NODE_SHAPE:
-    case GSHSCENE_NODE_STROKE: { /* a leaf: the shape callback, which reads the kind */
+    case GSHSCENE_NODE_STROKE:
+    case GSHSCENE_NODE_PLACEHOLDER: { /* a leaf: the shape callback, which reads the kind */
       GSHGEOM_Map item_map;
       result = compose(base, &node->p.map, &item_map);
       if (result != GSHSCENE_OK) {

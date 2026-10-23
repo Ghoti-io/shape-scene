@@ -137,6 +137,48 @@ map the ops' item map in front of `design_to_model`, so a design point under the
 puts it); and a **group in a stated blend space** (`gshscene_list_group_push_space_fixed`: a primaries and a linear or
 sRGB transfer, which the plain push leaves to the enclosing group). `tests/unit/test_plane.cpp` holds each rule.
 
+## Placeholders (normative; color-paint story P5)
+
+A front end that lowers a construct it cannot express to a list must not leave a gap that only its own return value
+admits to: an application that renders the list and reads the render report (the one report of the sink contract, AD-11)
+would never learn that something is missing. The mechanism is the waist's, not any front end's, so any lowering uses it.
+
+**PH1 The item.** `GSHSCENE_ITEM_PLACEHOLDER` (8) is a unit that draws nothing. It carries a **source** (`u16`, the front
+end, registered in `report.h`: 1 is the OpenType `COLR` paint graph), a **code** (`u16`, nonzero, that front end's own
+reason, registered with its name), an **approximated** flag (0, or 1 when the front end recorded a stand-in right after
+it), a **box** (`x0 y0 x1 y1`, finite doubles in the item's own space, or none) and the placement map, layer and depth of
+any item (N11 orders it as a unit of its sequence). It holds no resource and no paint, so it is a leaf and never a push. A
+box is for the application: it lets one draw its own hatch, a missing-glyph box or a tooltip with no change to the scene,
+and the library never draws a placeholder itself. In `_hash` and `_dump` it is a new record; no existing spelling moves.
+
+**PH2 Recording.** `gshscene_list_placeholder` takes the fields; `gshscene_list_placeholder_fixed` (`fixed.h`, float-free)
+takes the box as integers in a run's design units under a design map, placed exactly as the design-space rectangle clip is.
+A zero source or code, an approximated flag past 1, a non-finite or inverted box, a bad map or depth is `ERR_INVALID`, a 3D
+map `ERR_UNSUPPORTED`, a limit `ERR_LIMIT`; a failing call leaves the list as it was. A negative zero is stored as a zero.
+
+**PH3 The planning pass.** For a placeholder `gshscene_caps_disposition` answers before, and independent of, every caps
+test: `REFUSED` with reason `PLACEHOLDER` (31) when it is not marked approximated, `APPROXIMATED` with the same reason when
+it is. No `item_kinds` bit is needed or consulted and no sink claims the kind, so a sink that claims every kind and one that
+claims none say the same. A placeholder inside a block the pass refuses (a refused group, an instance) is skipped with the
+block, as every item is, and the block's entry stands. **PH4 The entry** is the item's chain, `second` =
+`source << 16 | code`, `depth` 0. `gshscene_placeholder_string(source, code)` names the pair (`"colr:unbounded"`,
+`"colr:no-record"`, `"colr:walk-limit"`, otherwise `"unknown"`) so a reader of a report can print it without the front end.
+
+**PH5 Strict and best effort.** A `REFUSED` placeholder under strict is `ERR_REFUSED` before the sink is called, the target
+untouched; best effort returns `OK` and draws everything else; an `APPROXIMATED` one never fails a render. The entry cap and
+the overflow counters apply to it as to any entry. **PH6 No sink draws it, none may drop it.** A sink's `render` treats the
+item as drawn nothing and writes no entry of its own (the plan has); it counts as zero work, and a damage rectangle does not
+change whether it is reported, as a refusal does not depend on the damage (S4). A writer may leave a comment or a tagged
+empty element for it, its choice, stated in its own documents; nothing requires it.
+
+**PH7 The retained scene.** `GSHSCENE_NODE_PLACEHOLDER` (5) carries the same fields in `GSHSCENE_Node.placeholder`; the
+box of a node with none must be zero, so a node has one spelling. Emission yields the item under the node's composed map; a
+group's clip or opacity applies to nothing, there being nothing to draw, and the chain of a report entry is the emission's.
+Edits set and clear its fields, `diff` compares them, and a version's hash covers them. A placeholder contributes no damage:
+it changes no pixel. **PH8** `tools/gen-scene-vectors.py` and `tools/gen-sink-vectors.py` state the record, the entries and
+the hashes a second time; the test sink writes `P class=N reason=N source=N code=N approx=N map=<hash> box=...` for each
+placeholder (`dump_sink.h`), the same in every configuration.
+
 ## Reserved
 
 The image resource kind is named and has no constructor; its value is pinned because it is hashed. A story that gives

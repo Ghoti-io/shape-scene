@@ -168,6 +168,8 @@ const char * gshscene_node_kind_string(GSHSCENE_Node_Kind kind) {
       return "instance";
     case GSHSCENE_NODE_STROKE:
       return "stroke";
+    case GSHSCENE_NODE_PLACEHOLDER:
+      return "placeholder";
     case GSHSCENE_NODE_KIND_COUNT:
       break;
   }
@@ -284,6 +286,20 @@ GSHSCENE_Result gshscene_node_canonical(const GSHSCENE_Store * store, const GSHS
       node.resource = in->resource;
       node.style = in->style;
       break;
+    case GSHSCENE_NODE_PLACEHOLDER: /* PH7: a placeholder item's rules (list.h, PH1), so a node and its emitted item agree */
+      result = gshscene_placeholder_canonical(in->placeholder.source, in->placeholder.code, in->placeholder.approximated,
+          in->placeholder.has_box ? in->placeholder.box : NULL, &node.placeholder);
+      if (result == GSHSCENE_OK && !in->placeholder.has_box) {
+        for (int i = 0; i < 4; i++) { /* one spelling: the box of no box is zero */
+          if (gshgeom_f64_bits(in->placeholder.box[i]) != 0) {
+            result = GSHSCENE_ERR_INVALID;
+          }
+        }
+      }
+      if (result != GSHSCENE_OK) {
+        return result;
+      }
+      break;
     default: /* GSHSCENE_NODE_INSTANCE */
       if (in->target == 0) {
         return GSHSCENE_ERR_INVALID;
@@ -335,6 +351,17 @@ int gshscene_props_equal(const GSHSCENE_Node * a, const GSHSCENE_Node * b) {
       }
       for (int i = 0; i < 4; i++) {
         if (gshgeom_f64_bits(a->paint.rgba[i]) != gshgeom_f64_bits(b->paint.rgba[i])) {
+          return 0;
+        }
+      }
+      return 1;
+    case GSHSCENE_NODE_PLACEHOLDER:
+      if (a->placeholder.source != b->placeholder.source || a->placeholder.code != b->placeholder.code ||
+          a->placeholder.approximated != b->placeholder.approximated || a->placeholder.has_box != b->placeholder.has_box) {
+        return 0;
+      }
+      for (int i = 0; i < 4; i++) {
+        if (gshgeom_f64_bits(a->placeholder.box[i]) != gshgeom_f64_bits(b->placeholder.box[i])) {
           return 0;
         }
       }
@@ -521,6 +548,12 @@ void gshscene_node_hash(GSHGEOM_Hash * h, const GSHSCENE_Node_Rec * node) {
       gshgeom_hash_u64(h, gshgeom_map_hash(&p->map));
       gshgeom_hash_u8(h, (uint8_t)p->fill_rule);
       gshscene_paint_hash(h, &p->paint);
+      gshgeom_hash_i32(h, p->layer);
+      gshgeom_hash_f64(h, p->depth);
+      break;
+    case GSHSCENE_NODE_PLACEHOLDER: /* PH7: a list item's spelling */
+      gshscene_placeholder_hash(h, &p->placeholder);
+      gshgeom_hash_u64(h, gshgeom_map_hash(&p->map));
       gshgeom_hash_i32(h, p->layer);
       gshgeom_hash_f64(h, p->depth);
       break;

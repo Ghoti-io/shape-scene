@@ -401,6 +401,9 @@ static void add_stroke(Damage_Walk * d, const GSHSCENE_Node_Rec * stroke, const 
 /* A shape or stroke occurrence's bounds. */
 static GSHSCENE_Result add_shape(Damage_Walk * d, const GSHSCENE_Walk * walk, const GSHSCENE_Node_Rec * shape,
     const GSHGEOM_Map * item_map) {
+  if (shape->p.kind == GSHSCENE_NODE_PLACEHOLDER) {
+    return GSHSCENE_OK; /* PH7: it draws nothing, so no pixel of the target changes where it stands */
+  }
   GSHGEOM_Map composed;
   GSHSCENE_Result result = gshscene_walk_compose(walk, item_map, d->device, &composed);
   if (result == GSHSCENE_ERR_LIMIT) {

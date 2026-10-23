@@ -86,7 +86,8 @@ enum {
   OP_PUBLISH, OP_MERGE, OP_HOLD, OP_RELEASE_VERSION, OP_DIFF, OP_EMIT, OP_VISIT, OP_DUMP, OP_SCENE_INTERN,
   OP_FILL_EX, OP_CLIP_PUSH_EX, OP_GROUP_PUSH_EX, OP_LIST_FOREGROUND, OP_NODE_PROPS, OP_EDIT_FOREGROUND, OP_LIST_PALETTE,
   OP_FILL_FIXED, OP_TRUNCATE, OP_EDIT_PALETTE, OP_INTERN_GRADIENT, OP_FILL_GRADIENT, OP_SCENE_GRADIENT,
-  OP_GRADIENT_NODE, OP_COLOR_BOUND, OP_GROUP_PDF, OP_NODE_PDF, OP_INTERN_STYLE, OP_STROKE, OP_STROKE_NODE, OP_COUNT
+  OP_GRADIENT_NODE, OP_COLOR_BOUND, OP_GROUP_PDF, OP_NODE_PDF, OP_INTERN_STYLE, OP_STROKE, OP_STROKE_NODE, OP_PLACEHOLDER,
+  OP_PLACEHOLDER_NODE, OP_COUNT
 };
 
 /* --- the outcomes the corpus must reach ------------------------------------------------------------ */
@@ -98,7 +99,8 @@ enum {
   OUT_GRADIENT_REFUSED, OUT_GRADIENT_LIMIT, OUT_GRADIENT_NODE, OUT_GRADIENT_EMITTED, OUT_COLOR_LIMIT, OUT_COLOR_AT_BOUND,
   OUT_BLEND_GROUP, OUT_PDF_GROUP, OUT_PDF_INVALID, OUT_PDF_EMITTED, OUT_STYLE_INTERNED, OUT_STYLE_INVALID,
   OUT_STYLE_LIMIT, OUT_STYLE_DOUBLED, OUT_STYLE_SOLID, OUT_STYLE_UNSUPPORTED, OUT_STROKE_RECORDED,
-  OUT_STROKE_UNSUPPORTED, OUT_STROKE_NODE, OUT_STROKE_EMITTED, OUT_COUNT
+  OUT_STROKE_UNSUPPORTED, OUT_STROKE_NODE, OUT_STROKE_EMITTED, OUT_PLACEHOLDER_RECORDED, OUT_PLACEHOLDER_INVALID,
+  OUT_PLACEHOLDER_NODE, OUT_PLACEHOLDER_EMITTED, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limit", "edit limit", "publish limit",
@@ -111,7 +113,8 @@ static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limi
     "a group of PDF's fields recorded", "a group of PDF's fields refused as invalid", "a node of PDF's fields emitted",
     "a stroke style interned", "a stroke style refused as invalid", "a stroke style past SK2's bounds refused",
     "an odd dash array doubled", "a dash array made solid", "a width profile refused (reserved)",
-    "a stroke recorded", "a 3D stroke refused as unsupported", "a stroke node", "an emitted list with a stroke"};
+    "a stroke recorded", "a 3D stroke refused as unsupported", "a stroke node", "an emitted list with a stroke",
+    "a placeholder recorded", "a placeholder refused as invalid", "a placeholder node", "an emitted list with a placeholder"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -1236,6 +1239,15 @@ static void op(S * s, unsigned code) {
             CHECK((need & ~GSHSCENE_STROKE_NATIVE_ALL) == 0 && (why == 0 || need == 0));
             outcomes[OUT_STROKE_EMITTED]++;
           }
+          if (item->kind == GSHSCENE_ITEM_PLACEHOLDER) {
+            /* P5, PH7: a placeholder node's item carries its source, code, flag and box as they are, holds no resource. */
+            CHECK(info.node.kind == GSHSCENE_NODE_PLACEHOLDER && item->resource == NULL &&
+                  item->placeholder.source == info.node.placeholder.source &&
+                  item->placeholder.code == info.node.placeholder.code &&
+                  item->placeholder.approximated == info.node.placeholder.approximated &&
+                  item->placeholder.has_box == info.node.placeholder.has_box);
+            outcomes[OUT_PLACEHOLDER_EMITTED]++;
+          }
           if (item->kind == GSHSCENE_ITEM_INSTANCE) {
             const GSHSCENE_Resource * pic = NULL;
             CHECK(gshscene_version_picture(v, info.node.target, &pic) == GSHSCENE_OK && pic == item->resource);
@@ -2100,6 +2112,95 @@ static void op(S * s, unsigned code) {
         remember(s, id);
         CHECK(which < 2 && n.style && n.resource);
         outcomes[OUT_STROKE_NODE]++;
+      } else {
+        CHECK(gshscene_edit_node_count(e) == before);
+        if (r == GSHSCENE_ERR_LIMIT) {
+          CHECK(before >= lim->max_nodes);
+        }
+      }
+      break;
+    }
+    case OP_PLACEHOLDER: {
+      /* A placeholder in the list (P5, PH1, PH2): a source (0 is invalid) and a code (0 is invalid), the approximated
+       * flag (2 is invalid), no box, a valid box, an inverted one or one with a NaN, a planar map or a 3D one. */
+      if (!s->list) {
+        break;
+      }
+      unsigned source = pick(s, 4);
+      unsigned code = pick(s, 4);
+      unsigned approx = pick(s, 3);
+      unsigned shape = pick(s, 5);
+      double box[4] = {1.0, 2.0, 5.0, 8.0};
+      if (shape == 3) {
+        box[0] = 9.0; /* inverted */
+      } else if (shape == 4) {
+        box[1] = NAN;
+      }
+      int use;
+      GSHGEOM_Map m = pool_map(arg(s), &use);
+      int three = pick(s, 8) == 0;
+      if (three) {
+        gshgeom_map_identity(3, &m);
+        use = 1;
+      }
+      ListSnap b = snap(s->list);
+      r = gshscene_list_placeholder(s->list, (uint16_t)source, (uint16_t)code, approx, shape == 0 ? NULL : box,
+          use ? &m : NULL, 0, 0.0);
+      list_after(s, b, r, 0, 0);
+      int valid = source != 0 && code != 0 && approx <= 1 && shape <= 2 && !three;
+      CHECK(r != GSHSCENE_ERR_UNSUPPORTED || three);
+      if (!valid) {
+        CHECK(r != GSHSCENE_OK);
+        outcomes[OUT_PLACEHOLDER_INVALID] += r == GSHSCENE_ERR_INVALID || r == GSHSCENE_ERR_UNSUPPORTED;
+      }
+      if (r == GSHSCENE_OK) {
+        CHECK(valid);
+        const GSHSCENE_Item * item;
+        CHECK(gshscene_list_item(s->list, b.count, &item) == GSHSCENE_OK);
+        CHECK(item->kind == GSHSCENE_ITEM_PLACEHOLDER && item->resource == NULL && item->placeholder.source == source &&
+              item->placeholder.code == code && item->placeholder.approximated == approx &&
+              item->placeholder.has_box == (shape != 0));
+        outcomes[OUT_PLACEHOLDER_RECORDED]++;
+      }
+      break;
+    }
+    case OP_PLACEHOLDER_NODE: {
+      /* A placeholder node (P5, PH7): the same fields, in an edit. */
+      unsigned k = pick(s, EDITS);
+      if (!has_edit(s, k)) {
+        break;
+      }
+      GSHSCENE_Edit * e = s->edits[k];
+      GSHSCENE_Node n;
+      gshscene_node_init(GSHSCENE_NODE_PLACEHOLDER, &n);
+      unsigned source = pick(s, 4);
+      unsigned code = pick(s, 4);
+      unsigned approx = pick(s, 3);
+      unsigned shape = pick(s, 4);
+      n.placeholder.source = (uint16_t)source;
+      n.placeholder.code = (uint16_t)code;
+      n.placeholder.approximated = approx;
+      if (shape != 0) {
+        n.placeholder.has_box = 1;
+        n.placeholder.box[0] = 0.0;
+        n.placeholder.box[1] = 0.0;
+        n.placeholder.box[2] = shape == 3 ? -1.0 : 4.0; /* inverted */
+        n.placeholder.box[3] = 4.0;
+      }
+      int use;
+      n.map = pool_map(arg(s), &use);
+      size_t before = gshscene_edit_node_count(e);
+      uint64_t id = 0;
+      if (pick(s, 3) == 0) {
+        r = gshscene_edit_set(e, some_id(s), &n);
+      } else {
+        r = gshscene_edit_add(e, some_id(s), GSHSCENE_APPEND, &n, NULL, &id);
+      }
+      CHECK(r != GSHSCENE_ERR_INTERNAL && r != GSHSCENE_ERR_OOM);
+      if (r == GSHSCENE_OK) {
+        remember(s, id);
+        CHECK(source != 0 && code != 0 && approx <= 1 && shape <= 2);
+        outcomes[OUT_PLACEHOLDER_NODE]++;
       } else {
         CHECK(gshscene_edit_node_count(e) == before);
         if (r == GSHSCENE_ERR_LIMIT) {

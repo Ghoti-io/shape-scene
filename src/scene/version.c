@@ -310,6 +310,13 @@ static int put_node(FILE * out, const GSHSCENE_Node_Rec * node) {
         return -1;
       }
       return 0;
+    case GSHSCENE_NODE_PLACEHOLDER:
+      if (put_common(out, 'P', node) < 0 || gshscene_placeholder_dump(out, &p->placeholder) < 0 ||
+          fprintf(out, " map=%016llx layer=%lld depth=%016llx", HEX(gshgeom_map_hash(&p->map)), (long long)p->layer,
+              HEX(gshgeom_f64_bits(p->depth))) < 0) {
+        return -1;
+      }
+      return 0;
     default:
       if (put_common(out, 'I', node) < 0 ||
           fprintf(out, " target=%llu map=%016llx layer=%lld depth=%016llx", HEX(p->target),

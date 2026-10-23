@@ -123,10 +123,28 @@ const char * gshscene_reason_string(GSHSCENE_Reason reason) {
       return "stroke-zero-width";
     case GSHSCENE_REASON_STROKE_CENTERLINE:
       return "stroke-centerline";
+    case GSHSCENE_REASON_PLACEHOLDER:
+      return "placeholder";
     case GSHSCENE_REASON_COUNT:
       break;
   }
   return "unknown reason";
+}
+
+const char * gshscene_placeholder_string(unsigned source, unsigned code) {
+  if (source == GSHSCENE_PLACEHOLDER_SOURCE_COLR) {
+    switch (code) {
+      case GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED:
+        return "colr:unbounded";
+      case GSHSCENE_PLACEHOLDER_COLR_NO_RECORD:
+        return "colr:no-record";
+      case GSHSCENE_PLACEHOLDER_COLR_WALK_LIMIT:
+        return "colr:walk-limit";
+      default:
+        break;
+    }
+  }
+  return "unknown";
 }
 
 GSHSCENE_Result gshscene_report_create(

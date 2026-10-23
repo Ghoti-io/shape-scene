@@ -38,6 +38,7 @@
  * | ::GSHSCENE_ITEM_GROUP_POP | | | | | |
  * | ::GSHSCENE_ITEM_INSTANCE | picture | placement | | | layer, depth |
  * | ::GSHSCENE_ITEM_STROKE | path or glyph run (the centerline) | placement | | yes | style, layer, depth |
+ * | ::GSHSCENE_ITEM_PLACEHOLDER | | placement | | | source, code, approximated, box, layer, depth |
  *
  * The **map** places the resource's own coordinates (the model space of its
  * path) in the space of the list; the sink composes the maps of the enclosing
@@ -50,6 +51,9 @@
  * A **stroke** draws the region its centerline covers under its style (a stroke
  * style resource, stroke.h, SK1 to SK14) with its paint, as a fill draws its
  * shape (SK5).
+ * A **placeholder** (PH1) is a unit that draws nothing: a front end's record that it could not express a construct,
+ * with the front end's registered source and code (report.h) and the box of what it could not express; every sink
+ * reports it (PH3 to PH6) and none draws it.
  * `layer` is the declared layer of AD-10, an `int32`, and `depth` its declared
  * distance from the viewer, a finite `double` (`-0` is stored as `+0`); they
  * order units in a group that says so (N11).
@@ -96,7 +100,7 @@
  * ### Order and ties (N11, N12)
  *
  * A **sequence** is the items directly inside the root, a group or a clip
- * block; its **units** are its fills, strokes, instances, group blocks and clip blocks
+ * block; its **units** are its fills, strokes, placeholders, instances, group blocks and clip blocks
  * (push to matching pop); a unit's key is the layer and depth of its first item.
  * The context of a sequence is the ordering of the group that encloses it (the
  * root's is flat; a clip block has the context of the sequence it is in):
@@ -144,6 +148,8 @@
  *   content hash, `u64` the map's hash, the paint as a fill spells it (`u8` kind,
  *   four `f64`, a space, `u32` entry, `u64` the gradient's content hash), `i32`
  *   layer, `f64` depth.
+ * - **placeholder** (PH1): `u16` source, `u16` code, `u8` approximated, `u8` 1 if there is a box and then four `f64`
+ *   (`x0 y0 x1 y1`), `u64` the map's hash, `i32` layer, `f64` depth.
  * - **clip pop**, **group pop**: nothing.
  *
  * A **space** is `u8` primaries, `u8` transfer, `f64` gamma.  Handles, ids, the
@@ -159,7 +165,8 @@
  * mask=<hash>` after `order=N` when one of them is not the default, T1), `g`,
  * `I res=<kind>:<hash> map=<hash> layer=N depth=<hex>`,
  * `K res=<kind>:<hash> style=<hash> map=<hash> paint=N <r> <g> <b> <a> space=<space> entry=E gradient=<hash> layer=N depth=<hex>`
- * (a stroke), then one line per tie,
+ * (a stroke), `P source=N code=N approx=N box=<x0> <y0> <x1> <y1>|- map=<hash> layer=N depth=<hex>` (a placeholder; the
+ * box's four numbers as 16 hexadecimal digits each), then one line per tie,
  * `T first=I second=J depth=<hex> reason=N`, with every `double` as the 16
  * hexadecimal digits of its bit pattern, every hash as 16 digits and a `<space>`
  * as `P:T:<gamma hex>` (primaries and transfer in decimal).
@@ -195,6 +202,7 @@ typedef enum GSHSCENE_Item_Kind {
   GSHSCENE_ITEM_GROUP_POP = 5,  ///< End the innermost group and composite it.
   GSHSCENE_ITEM_INSTANCE = 6,   ///< Draw a picture under a map.
   GSHSCENE_ITEM_STROKE = 7,     ///< Stroke a centerline under a map with a style and a paint (stroke.h, SK4).
+  GSHSCENE_ITEM_PLACEHOLDER = 8, ///< Draw nothing and say so: a front end's record of what it could not express (PH1).
   GSHSCENE_ITEM_KIND_COUNT      ///< Closes the enum.
 } GSHSCENE_Item_Kind;
 
@@ -295,6 +303,22 @@ typedef struct GSHSCENE_Group {
   const GSHSCENE_Resource * soft_mask;
 } GSHSCENE_Group;
 
+/**
+ * @brief What a placeholder holds (PH1): the front end's own account of a construct it could not express.
+ *
+ * The source and the code are the front end's, registered in report.h (`GSHSCENE_PLACEHOLDER_SOURCE_*` and the codes of
+ * each); the planning pass reports every placeholder with the pair in the entry's `second` (PH4).  The box is in the
+ * item's own space (the placement map, as a fill's, takes it to the list's), for an application that draws its own
+ * stand-in; the library draws nothing.
+ */
+typedef struct GSHSCENE_Placeholder {
+  uint16_t source;       ///< The front end: nonzero, registered in report.h.
+  uint16_t code;         ///< The front end's reason: nonzero.
+  uint32_t approximated; ///< 0: nothing stands in for the construct (reported `REFUSED`); 1: the front end drew a stand-in after it (reported `APPROXIMATED`, PH3).
+  uint32_t has_box;      ///< 0 or 1: whether @p box is the box of what could not be expressed.
+  double box[4];         ///< `x0 y0 x1 y1`, finite and `x0 <= x1`, `y0 <= y1`; all zero without a box.
+} GSHSCENE_Placeholder;
+
 /** @brief One entry of a list, as read back. */
 typedef struct GSHSCENE_Item {
   GSHSCENE_Item_Kind kind;           ///< Which item.
@@ -308,6 +332,8 @@ typedef struct GSHSCENE_Item {
   /** Stroke: the stroke style (stroke.h; the list holds the reference); else NULL.  A stroke's `resource` is its
    *  centerline, its `fill_rule` nonzero and its `group` zero. */
   const GSHSCENE_Resource * style;
+  /** Placeholder: its content (PH1), with the placement in @p map; else zero. */
+  GSHSCENE_Placeholder placeholder;
 } GSHSCENE_Item;
 
 /** @brief What resolved a tie.  The values are pinned (they are dumped). */
@@ -391,6 +417,25 @@ GSHSCENE_API GSHSCENE_Result gshscene_list_fill(GSHSCENE_List * list, const GSHS
  */
 GSHSCENE_API GSHSCENE_Result gshscene_list_stroke(GSHSCENE_List * list, const GSHSCENE_Resource * centerline,
     const GSHSCENE_Resource * style, const GSHGEOM_Map * map, const GSHSCENE_Paint * paint, int32_t layer, double depth);
+
+/**
+ * @brief Record a placeholder (PH1, PH2): a unit that draws nothing and that every sink reports.
+ *
+ * @param source A front end registered in report.h (nonzero).
+ * @param code The front end's reason (nonzero).
+ * @param approximated 0, or 1 when the front end recorded a stand-in right after (the planning pass then reports
+ *   `APPROXIMATED` instead of `REFUSED`, PH3).
+ * @param box `{x0, y0, x1, y1}` in the item's own space, or NULL for none; copied.
+ * @param map The placement, or NULL for the 2D identity.
+ * @param layer The declared layer.
+ * @param depth The declared depth: finite.
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID for a NULL or closed list, a zero source or code, an approximated
+ *   other than 0 or 1, a non-finite or inverted box, an invalid map or a depth that is not finite;
+ *   ::GSHSCENE_ERR_UNSUPPORTED for a 3D map; ::GSHSCENE_ERR_LIMIT and ::GSHSCENE_ERR_OOM.  A failing call leaves the
+ *   list as it was.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_list_placeholder(GSHSCENE_List * list, uint16_t source, uint16_t code,
+    uint32_t approximated, const double * box, const GSHGEOM_Map * map, int32_t layer, double depth);
 
 /** @brief Begin a clip: the region of a path or glyph run, under @p map, by @p rule; its layer and depth order it as a unit (N11). */
 GSHSCENE_API GSHSCENE_Result gshscene_list_clip_push(GSHSCENE_List * list,

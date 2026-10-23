@@ -659,6 +659,57 @@ GSHSCENE_Result gshscene_list_stroke(GSHSCENE_List * list, const GSHSCENE_Resour
   return list_append(list, &item);
 }
 
+/* PH1, PH2: the rules of a placeholder's fields, shared with a retained scene's node (src/scene/node.c). */
+GSHSCENE_Result gshscene_placeholder_canonical(uint16_t source, uint16_t code, uint32_t approximated, const double * box,
+    GSHSCENE_Placeholder * out) {
+  if (source == 0 || code == 0 || approximated > 1u) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  memset(out, 0, sizeof *out);
+  out->source = source;
+  out->code = code;
+  out->approximated = approximated;
+  if (box) {
+    for (int i = 0; i < 4; i++) {
+      if (!gshscene_finite(box[i])) {
+        return GSHSCENE_ERR_INVALID;
+      }
+    }
+    if (box[0] > box[2] || box[1] > box[3]) {
+      return GSHSCENE_ERR_INVALID;
+    }
+    out->has_box = 1;
+    for (int i = 0; i < 4; i++) {
+      out->box[i] = box[i] == 0.0 ? 0.0 : box[i]; /* -0 is stored as +0, as a depth is */
+    }
+  }
+  return GSHSCENE_OK;
+}
+
+GSHSCENE_Result gshscene_list_placeholder(GSHSCENE_List * list, uint16_t source, uint16_t code, uint32_t approximated,
+    const double * box, const GSHGEOM_Map * map, int32_t layer, double depth) {
+  if (!list || list->closed) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  GSHSCENE_Item item;
+  item_init(&item, GSHSCENE_ITEM_PLACEHOLDER);
+  GSHSCENE_Result result = gshscene_placeholder_canonical(source, code, approximated, box, &item.placeholder);
+  if (result == GSHSCENE_OK) {
+    result = canonical_map(map, &item.map);
+  }
+  if (result == GSHSCENE_OK) {
+    result = gshscene_list_canonical_depth(depth, &item.depth);
+  }
+  if (result == GSHSCENE_OK && item.map.dim != 2) {
+    result = GSHSCENE_ERR_UNSUPPORTED; /* PH1: a placeholder is planar, as a stroke is */
+  }
+  if (result != GSHSCENE_OK) {
+    return result;
+  }
+  item.layer = layer;
+  return list_append(list, &item);
+}
+
 GSHSCENE_Result gshscene_list_clip_push(GSHSCENE_List * list, const GSHSCENE_Resource * resource,
     const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, int32_t layer, double depth) {
   if (!list || list->closed) {
@@ -1356,6 +1407,15 @@ static int item_equal(const GSHSCENE_Item * a, const GSHSCENE_Item * b) {
       return 0;
     }
   }
+  if (a->placeholder.source != b->placeholder.source || a->placeholder.code != b->placeholder.code ||
+      a->placeholder.approximated != b->placeholder.approximated || a->placeholder.has_box != b->placeholder.has_box) {
+    return 0;
+  }
+  for (int i = 0; i < 4; i++) {
+    if (gshgeom_f64_bits(a->placeholder.box[i]) != gshgeom_f64_bits(b->placeholder.box[i])) {
+      return 0;
+    }
+  }
   return gshgeom_f64_bits(a->group.opacity) == gshgeom_f64_bits(b->group.opacity) &&
          gshscene_space_equal(&a->group.blend_space, &b->group.blend_space) &&
          a->group.composite == b->group.composite && a->group.ordering == b->group.ordering &&
@@ -1403,6 +1463,19 @@ void gshscene_paint_hash(GSHGEOM_Hash * h, const GSHSCENE_Paint * paint) {
   gshscene_space_hash(h, &paint->space);
   gshgeom_hash_u32(h, paint->entry);
   gshgeom_hash_u64(h, paint->gradient ? gshscene_resource_hash(paint->gradient) : 0);
+}
+
+/* PH1: the content of a placeholder as a list and a version both spell it. */
+void gshscene_placeholder_hash(GSHGEOM_Hash * h, const GSHSCENE_Placeholder * p) {
+  gshgeom_hash_u16(h, p->source);
+  gshgeom_hash_u16(h, p->code);
+  gshgeom_hash_u8(h, (uint8_t)p->approximated);
+  gshgeom_hash_u8(h, (uint8_t)p->has_box);
+  if (p->has_box) {
+    for (int k = 0; k < 4; k++) {
+      gshgeom_hash_f64(h, p->box[k]);
+    }
+  }
 }
 
 uint64_t gshscene_list_hash(const GSHSCENE_List * list) {
@@ -1455,6 +1528,12 @@ uint64_t gshscene_list_hash(const GSHSCENE_List * list) {
         gshgeom_hash_i32(&h, item->layer);
         gshgeom_hash_f64(&h, item->depth);
         break;
+      case GSHSCENE_ITEM_PLACEHOLDER: /* PH1 */
+        gshscene_placeholder_hash(&h, &item->placeholder);
+        gshgeom_hash_u64(&h, gshgeom_map_hash(&item->map));
+        gshgeom_hash_i32(&h, item->layer);
+        gshgeom_hash_f64(&h, item->depth);
+        break;
       default:
         break;
     }
@@ -1491,6 +1570,19 @@ static int dump_paint(FILE * out, const GSHSCENE_Paint * paint) {
         HEX(paint->gradient ? gshscene_resource_hash(paint->gradient) : 0));
   }
   return written;
+}
+
+/* PH1: " source=N code=N approx=N box=<x0> <y0> <x1> <y1>" (four 16-digit patterns) or "box=-". */
+int gshscene_placeholder_dump(FILE * out, const GSHSCENE_Placeholder * p) {
+  int written = fprintf(out, " source=%u code=%u approx=%u box=", (unsigned)p->source, (unsigned)p->code, (unsigned)p->approximated);
+  if (written < 0) {
+    return -1;
+  }
+  if (!p->has_box) {
+    return fputc('-', out) == EOF ? -1 : 0;
+  }
+  return fprintf(out, "%016llx %016llx %016llx %016llx", HEX(gshgeom_f64_bits(p->box[0])), HEX(gshgeom_f64_bits(p->box[1])),
+      HEX(gshgeom_f64_bits(p->box[2])), HEX(gshgeom_f64_bits(p->box[3])));
 }
 
 static int dump_layer_depth(FILE * out, const GSHSCENE_Item * item) {
@@ -1534,6 +1626,15 @@ GSHSCENE_Result gshscene_list_dump(const GSHSCENE_List * list, FILE * out) {
             HEX(gshscene_resource_hash(item->style)), HEX(gshgeom_map_hash(&item->map)));
         if (written >= 0) {
           written = dump_paint(out, &item->paint);
+        }
+        if (written >= 0) {
+          written = dump_layer_depth(out, item);
+        }
+        break;
+      case GSHSCENE_ITEM_PLACEHOLDER: /* PH1 */
+        written = fputc('P', out) == EOF ? -1 : gshscene_placeholder_dump(out, &item->placeholder);
+        if (written >= 0) {
+          written = fprintf(out, " map=%016llx", HEX(gshgeom_map_hash(&item->map)));
         }
         if (written >= 0) {
           written = dump_layer_depth(out, item);

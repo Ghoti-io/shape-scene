@@ -97,7 +97,7 @@ enum {
   OUT_TIES, OUT_DEFERRED, OUT_INVALID, OUT_UNSUPPORTED, OUT_GRADIENT_DRAWN, OUT_GRADIENT_REFUSED, OUT_NOTICE,
   OUT_GRADIENT_BUILT, OUT_GRADIENT_LIMIT, OUT_COLOR_LIMIT, OUT_COLOR_AT_BOUND, OUT_STOP_SATURATED, OUT_BLEND_RECORDED,
   OUT_BLEND_REFUSED, OUT_PDF_REFUSED, OUT_PDF_RECORDED, OUT_STROKE_DRAWN, OUT_STROKE_EXPANDED, OUT_STROKE_REFUSED,
-  OUT_STROKE_NOTICE, OUT_STROKE_KIND_REFUSED, OUT_COUNT
+  OUT_STROKE_NOTICE, OUT_STROKE_KIND_REFUSED, OUT_PLACEHOLDER_REFUSED, OUT_PLACEHOLDER_APPROXIMATED, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"ok", "strict, refused by the plan", "strict, refused while drawing",
@@ -110,7 +110,8 @@ static const char * const outcome_names[OUT_COUNT] = {"ok", "strict, refused by 
     "a fill's color at N1's bound recorded", "a stop resolved to N1's saturation", "a blend-mode group recorded",
     "a blend mode refused by the caps", "a group of PDF's fields refused (S19)", "a group of PDF's fields recorded",
     "a stroke recorded (S20)", "a stroke recorded with features to expand", "a stroke refused for its style",
-    "a stroke that draws nothing (SK8)", "a stroke refused by caps without the kind"};
+    "a stroke that draws nothing (SK8)", "a stroke refused by caps without the kind",
+    "a placeholder reported refused (PH3)", "a placeholder reported approximated (PH3)"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -631,7 +632,7 @@ static GSHSCENE_List * build(Scene * s, Input * in, int * ties) {
     }
   }
   for (size_t i = 0; i < ops && in->at < in->size; i++) {
-    uint8_t op = next(in) % 11;
+    uint8_t op = next(in) % 12; /* 11 is the placeholder (P5); a file made of ops 0 to 10 reads as it did */
     uint8_t a = next(in);
     uint8_t b = next(in);
     uint8_t c = next(in);
@@ -776,6 +777,21 @@ static GSHSCENE_List * build(Scene * s, Input * in, int * ties) {
           gshscene_list_set_palette(list, palette);
         }
         break;
+      case 11: {
+        /* A placeholder (P5, PH1): source 1 to 3 (0, invalid, when c & 0x80), code 1 to 3 (0 when c & 0x40), approximated
+         * when c & 1 (2, invalid, when c & 0x04 too), a box when c & 0x20, a map when a & 0x80. */
+        unsigned source = c & 0x80 ? 0u : 1u + a % 3u;
+        unsigned code = c & 0x40 ? 0u : 1u + b % 3u;
+        unsigned approx = (c & 1u) ? ((c & 4u) ? 2u : 1u) : 0u;
+        const double box[4] = {(double)(a % SIDE), (double)(b % SIDE), (double)(a % SIDE + 1 + c % 20), (double)(b % SIDE + 1 + c % 20)};
+        GSHGEOM_Map move;
+        gshgeom_map_translate(2, (double)(a % 8), (double)(b % 8), 0.0, &move);
+        GSHSCENE_Result pr = gshscene_list_placeholder(list, (uint16_t)source, (uint16_t)code, approx,
+            (c & 0x20) ? box : NULL, (a & 0x80) ? &move : NULL, layer, d);
+        CHECK(pr == ((source && code && approx <= 1) ? GSHSCENE_OK : GSHSCENE_ERR_INVALID) || pr == GSHSCENE_ERR_OOM ||
+              pr == GSHSCENE_ERR_LIMIT);
+        break;
+      }
       case 10: {
         /* A stroke (S1): of a square, or of a glyph run when c & 0x10 (from a font, perhaps unbound, when c & 0x08);
          * style c >> 5; under an anisotropic map when a & 0x80, a singular one when a & 0x40 alone; a gradient paint
@@ -872,6 +888,13 @@ static void check_report(const GSHSCENE_Report * report, size_t cap, GSHSCENE_Re
     }
     outcomes[OUT_STROKE_KIND_REFUSED] += e.reason == GSHSCENE_REASON_ITEM_KIND &&
                                          !(caps->item_kinds & (UINT32_C(1) << GSHSCENE_ITEM_STROKE));
+    if (e.reason == GSHSCENE_REASON_PLACEHOLDER) {
+      /* PH3, PH4: refused or approximated by the list alone, and the entry names a source and a code. */
+      CHECK(e.entry_class == GSHSCENE_ENTRY_REFUSED || e.entry_class == GSHSCENE_ENTRY_APPROXIMATED);
+      CHECK((e.second >> 16) != 0 && (e.second & 0xffffu) != 0 && (e.second >> 16) <= 3 && e.depth == 0.0);
+      outcomes[OUT_PLACEHOLDER_REFUSED] += e.entry_class == GSHSCENE_ENTRY_REFUSED;
+      outcomes[OUT_PLACEHOLDER_APPROXIMATED] += e.entry_class == GSHSCENE_ENTRY_APPROXIMATED;
+    }
     CHECK(e.reason != GSHSCENE_REASON_GRADIENT || e.entry_class == GSHSCENE_ENTRY_REFUSED);
     CHECK(e.reason != GSHSCENE_REASON_INTERPOLATION_SPACE || e.entry_class == GSHSCENE_ENTRY_APPROXIMATED);
     outcomes[OUT_GRADIENT_REFUSED] += e.reason == GSHSCENE_REASON_GRADIENT;

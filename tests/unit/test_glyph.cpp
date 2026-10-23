@@ -134,9 +134,9 @@ TEST(Face, TheKindsAndConstantsArePinned) {
   EXPECT_EQ((int)GSHSCENE_REASON_GLYPH_UNAVAILABLE, 18);
   EXPECT_EQ((int)GSHSCENE_REASON_FACE_UNBOUND, 19);
   EXPECT_EQ((int)GSHSCENE_REASON_PALETTE_ENTRY, 20);
-  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 31)
+  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 32)
       << "S19 (color-paint story P3) added three refusals of PDF's group fields, SK11 and SK8 (strokes story S1) two, "
-         "and S20's refusal of a stroked run (strokes story S4) one";
+         "S20's refusal of a stroked run (strokes story S4) one, and the placeholder (color-paint story P5, PH4) one";
   EXPECT_STREQ(gshscene_reason_string(GSHSCENE_REASON_HINT_ROUTE), "hint-route");
   EXPECT_STREQ(gshscene_reason_string(GSHSCENE_REASON_HINT_SIZE), "hint-size");
   EXPECT_STREQ(gshscene_reason_string(GSHSCENE_REASON_HINT_NO_PROGRAM), "hint-no-program");

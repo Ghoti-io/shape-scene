@@ -35,6 +35,11 @@ static const std::uint64_t kStrokeToolpathOutputHash = UINT64_C(0x381ab2ddba9127
 static const std::uint64_t kStrokeStreamReportHash = UINT64_C(0x4a4d87e9e4a6644f);
 static const std::uint64_t kStrokeWriterReportHash = UINT64_C(0x4a4d87e9e4a6644f);
 static const std::uint64_t kStrokeToolpathReportHash = UINT64_C(0x3ecd001cc4042786);
+static const std::uint64_t kPlaceholderListHash = UINT64_C(0x01a82ffccd7ea3e9);
+static const std::uint64_t kPlaceholderStreamOutputHash = UINT64_C(0x2da264b3aa995d6b);
+static const std::uint64_t kPlaceholderRasterOutputHash = UINT64_C(0x228ab02c90b1ccc8);
+static const std::uint64_t kPlaceholderRasterPixelsHash = UINT64_C(0xd38b1b69ea1c6b15);
+static const std::uint64_t kPlaceholderReportHash = UINT64_C(0x8e40ed4b9d066193);
 
 static const char * const kRasterDump =
 R"DUMP(gshscene.dump-sink 1 kind=1 unit=0 units=15 list=9f362a4217df5fc8
@@ -221,6 +226,32 @@ E class=1 reason=28 chain=1 second=32768 depth=0000000000000000
 E class=1 reason=28 chain=2 second=1 depth=0000000000000000
 E class=5 reason=29 chain=3 second=0 depth=0000000000000000
 E class=1 reason=28 chain=4 second=28804 depth=0000000000000000
+)DUMP";
+static const char * const kPlaceholderStreamDump =
+R"DUMP(gshscene.dump-sink 1 kind=2 unit=2 units=5 list=01a82ffccd7ea3e9
+U 0 F res=path:9a8490040d04ed76 map=c530824dc0bebfa4 rule=0 box=3ff0000000000000 3ff0000000000000 4014000000000000 4014000000000000
+U 1 P class=1 reason=31 source=1 code=1 approx=0 map=d50302caf970d7d0 box=3ff8000000000000 4000000000000000 4010000000000000 4012000000000000
+U 2 P class=2 reason=31 source=1 code=3 approx=1 map=c530824dc0bebfa4 box=-
+U 3 F res=path:5f8c4746a1476c3a map=c530824dc0bebfa4 rule=0 box=4024000000000000 4024000000000000 402a000000000000 402a000000000000
+U 4 P class=1 reason=31 source=1 code=2 approx=0 map=c530824dc0bebfa4 box=bfe0000000000000 bff0000000000000 3ff8000000000000 4000000000000000
+E result=0 processed=5 done=5
+)DUMP";
+static const char * const kPlaceholderRasterDump =
+R"DUMP(gshscene.dump-sink 1 kind=1 unit=0 units=5 list=01a82ffccd7ea3e9
+U 0 F res=path:9a8490040d04ed76 map=1f5787abb2e02a06 rule=0 box=4000000000000000 4000000000000000 4024000000000000 4024000000000000
+S 2 2 10 10 4dea4c24
+U 1 P class=1 reason=31 source=1 code=1 approx=0 map=6400d6ed7a5e7ebf box=4008000000000000 4010000000000000 4020000000000000 4022000000000000
+U 2 P class=2 reason=31 source=1 code=3 approx=1 map=1f5787abb2e02a06 box=-
+U 3 F res=path:5f8c4746a1476c3a map=1f5787abb2e02a06 rule=0 box=4034000000000000 4034000000000000 403a000000000000 403a000000000000
+S 20 20 26 26 6eb82a87
+U 4 P class=1 reason=31 source=1 code=2 approx=0 map=1f5787abb2e02a06 box=bff0000000000000 c000000000000000 4008000000000000 4010000000000000
+E result=0 processed=5 done=5
+)DUMP";
+static const char * const kPlaceholderReportDump =
+R"DUMP(gshscene.report 1 result=0 units=5/5/5 entries=3 counted=3 overflowed=0 static=0 frame=%FRAME% workspace=%WORKSPACE% work=1 hash=8e40ed4b9d066193
+E class=1 reason=31 chain=1 second=65537 depth=0000000000000000
+E class=2 reason=31 chain=2 second=65539 depth=0000000000000000
+E class=1 reason=31 chain=4 second=65538 depth=0000000000000000
 )DUMP";
 static const std::uint32_t kStrokeWriterNative = 0x0be7u;
 static const std::uint32_t kStrokeToolpathNative = 0x0d62u;

@@ -649,6 +649,9 @@ TEST(Sink, TheDispositionPredicate) {
   EXPECT_EQ(gshscene_caps_disposition(&caps, nullptr, nullptr, 0, nullptr, &srgb, nullptr).entry_class, 0);
   // Kinds.
   for (uint32_t k = GSHSCENE_ITEM_FILL; k < GSHSCENE_ITEM_KIND_COUNT; k++) {
+    if (k == GSHSCENE_ITEM_PLACEHOLDER) {
+      continue; // PH3: no caps bit is consulted; the test below
+    }
     GSHSCENE_Sink_Caps c = caps;
     c.item_kinds &= ~(1u << k);
     GSHSCENE_Item item = fill;
@@ -965,3 +968,34 @@ int main(int argc, char ** argv) {
 }
 
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(SinkConformance);
+
+// PH3, PH4: a placeholder is decided before and independent of every caps test, by the item alone.
+TEST(Sink, ThePlaceholderIsDecidedByTheListAloneWhateverTheCapsClaim) {
+  GSHSCENE_Color_Space srgb{GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_SRGB, 0.0};
+  GSHSCENE_Item item{};
+  item.kind = GSHSCENE_ITEM_PLACEHOLDER;
+  item.placeholder.source = GSHSCENE_PLACEHOLDER_SOURCE_COLR;
+  item.placeholder.code = GSHSCENE_PLACEHOLDER_COLR_NO_RECORD;
+  GSHSCENE_Sink_Caps all = blocking_caps();
+  all.item_kinds = 0xffffffffu;
+  all.flags = GSHSCENE_CAP_FLAGS_ALL;
+  GSHSCENE_Sink_Caps none = blocking_caps();
+  none.item_kinds = 0;
+  none.flags = 0;
+  for (const GSHSCENE_Sink_Caps * caps : {&all, &none}) {
+    GSHSCENE_Disposition x = gshscene_caps_disposition(caps, &item, nullptr, 0, nullptr, &srgb, nullptr);
+    EXPECT_EQ(x.entry_class, GSHSCENE_ENTRY_REFUSED);
+    EXPECT_EQ(x.reason, GSHSCENE_REASON_PLACEHOLDER);
+    EXPECT_EQ(x.detail, (uint64_t)((GSHSCENE_PLACEHOLDER_SOURCE_COLR << 16) | GSHSCENE_PLACEHOLDER_COLR_NO_RECORD));
+    item.placeholder.approximated = 1;
+    x = gshscene_caps_disposition(caps, &item, nullptr, 0, nullptr, &srgb, nullptr);
+    EXPECT_EQ(x.entry_class, GSHSCENE_ENTRY_APPROXIMATED) << "a stand-in was drawn after it";
+    EXPECT_EQ(x.reason, GSHSCENE_REASON_PLACEHOLDER);
+    EXPECT_EQ(x.detail, (uint64_t)((GSHSCENE_PLACEHOLDER_SOURCE_COLR << 16) | GSHSCENE_PLACEHOLDER_COLR_NO_RECORD));
+    item.placeholder.approximated = 0;
+  }
+  item.placeholder.source = 0xffff;
+  item.placeholder.code = 0xffff;
+  EXPECT_EQ(gshscene_caps_disposition(&none, &item, nullptr, 0, nullptr, &srgb, nullptr).detail, 0xffffffffull)
+      << "the whole 32 bits are used";
+}

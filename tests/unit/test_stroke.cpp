@@ -740,7 +740,8 @@ TEST(StrokeItem, RecordsTheGeneratorsListAndItsHashAndDump) {
   ASSERT_EQ(gshscene_list_item(l.list, 2, &item), GSHSCENE_OK);
   EXPECT_EQ(item->kind, GSHSCENE_ITEM_STROKE);
   EXPECT_EQ((int)GSHSCENE_ITEM_STROKE, 7);
-  EXPECT_EQ((int)GSHSCENE_ITEM_KIND_COUNT, 8);
+  EXPECT_EQ((int)GSHSCENE_ITEM_PLACEHOLDER, 8);
+  EXPECT_EQ((int)GSHSCENE_ITEM_KIND_COUNT, 9);
   EXPECT_EQ(item->resource, k.outline_run.get());
   EXPECT_EQ(item->style, k.device.get());
   EXPECT_EQ(item->fill_rule, GSHGEOM_FILL_NONZERO);
@@ -952,7 +953,7 @@ TEST(StrokeNode, TheGeneratorsSceneHashesDumpsAndEmitsOneStrokeItemPerNode) {
   EXPECT_EQ(info.node.resource, outline_run.get());
   EXPECT_STREQ(gshscene_node_kind_string(GSHSCENE_NODE_STROKE), "stroke");
   EXPECT_EQ((int)GSHSCENE_NODE_STROKE, 4);
-  EXPECT_EQ((int)GSHSCENE_NODE_KIND_COUNT, 5);
+  EXPECT_EQ((int)GSHSCENE_NODE_KIND_COUNT, 6);
   // The emitted list: the fill, then the strokes (SK14's order), equal to the recorded list that draws the same.
   const GSHSCENE_List * emitted = nullptr;
   ASSERT_EQ(gshscene_version_list(v1.get(), &emitted), GSHSCENE_OK);

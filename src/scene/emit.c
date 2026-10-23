@@ -171,6 +171,12 @@ static GSHSCENE_Result emit_shape(
     void * ctx, const GSHSCENE_Walk * walk, const GSHSCENE_Node_Rec * shape, const GSHGEOM_Map * map) {
   (void)walk;
   Sink * s = ctx;
+  if (shape->p.kind == GSHSCENE_NODE_PLACEHOLDER) { /* PH7: one placeholder item under the composed map */
+    const GSHSCENE_Placeholder * ph = &shape->p.placeholder;
+    GSHSCENE_Result placed = gshscene_list_placeholder(s->list, ph->source, ph->code, ph->approximated,
+        ph->has_box ? ph->box : NULL, map, shape->p.layer, shape->p.depth);
+    return placed == GSHSCENE_OK ? sink_origin(s, shape->id) : placed;
+  }
   GSHSCENE_Result result = shape->p.kind == GSHSCENE_NODE_STROKE
       ? gshscene_list_stroke(s->list, shape->p.resource, shape->p.style, map, &shape->p.paint, shape->p.layer,
             shape->p.depth) /* SK13: one stroke item, its placement composed */

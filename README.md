@@ -27,7 +27,8 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
   when the last reference goes. A store and its handles are thread-safe.
 - **Lists** (`list.h`). An arena-backed sequence of fills, strokes (a path or glyph run as
   centerline, a stroke style and a paint: no mode flag, every format's stroke is fields of the
-  style), clips, groups and instances, with a
+  style), clips, groups, instances and placeholders (a unit that draws nothing and that every
+  sink reports: a front end's record of a construct it could not express), with a
   map, a fill rule, a paint and a declared layer and depth on the items that take them. Closing
   a list puts it in paint order (flat, overlay or depth groups) and records every resolved depth
   tie. The maker owns it and frees it in one call; `reset` reuses the arena for the next frame.

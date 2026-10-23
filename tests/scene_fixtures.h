@@ -143,6 +143,24 @@ inline GSHSCENE_Node stroke_node(const GSHSCENE_Resource * centerline, const GSH
   return n;
 }
 
+/** A placeholder node (list.h, PH1; version.h, PH7): a front end's source and code, approximated or not, with a box or none. */
+inline GSHSCENE_Node placeholder_node(uint16_t source, uint16_t code, uint32_t approximated = 0,
+    const double * box = nullptr, int32_t layer = 0) {
+  GSHSCENE_Node n;
+  gshscene_node_init(GSHSCENE_NODE_PLACEHOLDER, &n);
+  n.placeholder.source = source;
+  n.placeholder.code = code;
+  n.placeholder.approximated = approximated;
+  if (box) {
+    n.placeholder.has_box = 1;
+    for (int i = 0; i < 4; i++) {
+      n.placeholder.box[i] = box[i];
+    }
+  }
+  n.layer = layer;
+  return n;
+}
+
 inline GSHSCENE_Node instance_node(uint64_t target, int32_t layer = 0) {
   GSHSCENE_Node n;
   gshscene_node_init(GSHSCENE_NODE_INSTANCE, &n);
