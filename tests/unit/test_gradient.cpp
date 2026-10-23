@@ -653,6 +653,24 @@ TEST(GradientResource, G14TheStopsNumberAtMost65535) {
 
 // --- hash and dump against the independent generator ---------------------------------------------------------------
 
+TEST(GradientDump, AValueThatIsZeroIsSixteenDigitsToo) {
+  // A radius or an angle of zero is bits 0: sixteen zero digits, as every other number of the dump.
+  StoreHolder s;
+  Desc radial_zero = radial(1.0, 2.0, 0.0, 4.0, 2.0, 6.25);
+  radial_zero.g.map = design_map();
+  radial_zero.stop(0.0, solid(0, 0, 0, 1)).stop(1.0, solid(1, 1, 1, 0));
+  Ref r(intern_g(s.store, radial_zero));
+  const std::string rd = dump_resource(r.get());
+  EXPECT_NE(rd.find(" r0=0000000000000000 "), std::string::npos) << rd;
+  EXPECT_NE(rd.find(" r1=4019000000000000"), std::string::npos) << rd;
+  Desc sweep_zero = sweep(0.0, 0.0, GSHGEOM_ANGLE_DEGREES, 0.0, 0.0);
+  sweep_zero.stop(0.25, solid(0, 0, 0, 1));
+  Ref w(intern_g(s.store, sweep_zero));
+  const std::string wd = dump_resource(w.get());
+  EXPECT_NE(wd.find(" a0=0000000000000000 a1=0000000000000000"), std::string::npos) << wd;
+  EXPECT_NE(wd.find("sweep c=0000000000000000 0000000000000000 "), std::string::npos) << wd;
+}
+
 TEST(GradientDump, TheHashAndDumpAreWhatTheGeneratorWrites) {
   StoreHolder s;
   Ref l(intern_g(s.store, gen_linear()));
