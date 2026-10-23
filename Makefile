@@ -806,13 +806,20 @@ FUZZ_TIME ?= 60
 FUZZ_CFLAGS := -std=c17 -O1 -g -ffp-contract=off $(ARCH_FP_FLAGS) -fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined -DGSHSCENE_BUILD
 FUZZ_CXXFLAGS := -std=c++20 -O1 -g -ffp-contract=off $(ARCH_FP_FLAGS)
 
-fuzz: | $(LIBVER_GEN) ## Build the libFuzzer target and run it for FUZZ_TIME seconds from the committed corpus
+# FUZZ_ONLY=render runs one target.
+FUZZ_TARGETS := record render
+
+fuzz: | $(LIBVER_GEN) ## Build the libFuzzer targets and run each for FUZZ_TIME seconds from its committed corpus
 	@if ! command -v $(FUZZ_CC) >/dev/null 2>&1; then \
 		printf 'fuzz: needs %s (libFuzzer); `make fuzz-replay` runs the committed corpus without it\n' "$(FUZZ_CC)" >&2; exit 1; \
 	fi
-	@mkdir -p $(BUILD_DIR)/fuzz $(BUILD_DIR)/fuzz-corpus
-	$(FUZZ_CC) $(FUZZ_CFLAGS) $(INCLUDE) -o $(BUILD_DIR)/fuzz/fuzz_record tests/fuzz/fuzz_record.c $(SOURCES) $(LDFLAGS) $(DEP_LIBS)
-	LD_LIBRARY_PATH="$(TEST_LD_PATH)" $(BUILD_DIR)/fuzz/fuzz_record -max_total_time=$(FUZZ_TIME) $(BUILD_DIR)/fuzz-corpus tests/fuzz/corpus/record
+	@mkdir -p $(BUILD_DIR)/fuzz
+	@for f in $(or $(FUZZ_ONLY),$(FUZZ_TARGETS)); do \
+		mkdir -p $(BUILD_DIR)/fuzz-corpus-$$f; \
+		echo "$(FUZZ_CC) fuzz_$$f"; \
+		$(FUZZ_CC) $(FUZZ_CFLAGS) $(INCLUDE) -o $(BUILD_DIR)/fuzz/fuzz_$$f tests/fuzz/fuzz_$$f.c $(SOURCES) $(LDFLAGS) $(DEP_LIBS) || exit 1; \
+		LD_LIBRARY_PATH="$(TEST_LD_PATH)" $(BUILD_DIR)/fuzz/fuzz_$$f -max_total_time=$(FUZZ_TIME) $(BUILD_DIR)/fuzz-corpus-$$f tests/fuzz/corpus/$$f || exit 1; \
+	done
 
 fuzz-clean: ## Remove the fuzz build
 	-@rm -rf $(BUILD_DIR)/fuzz
