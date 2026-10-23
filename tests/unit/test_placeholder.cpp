@@ -146,7 +146,9 @@ TEST(Placeholder, EveryInvalidArgumentIsRefusedAndLeavesTheListAsItWas) {
   bad(GSHSCENE_ERR_INVALID, COLR, 1, 0, ninf_box, nullptr, 0.0);
   bad(GSHSCENE_ERR_INVALID, COLR, 1, 0, box, nullptr, kNaN);
   bad(GSHSCENE_ERR_INVALID, COLR, 1, 0, box, nullptr, kInf);
-  GSHGEOM_Map nan_map = translate(kNaN, 0.0);
+  // translate() refuses a NaN and leaves its output unwritten, so the map is made finite and then damaged.
+  GSHGEOM_Map nan_map = translate(0.0, 0.0);
+  nan_map.t[0] = kNaN;
   bad(GSHSCENE_ERR_INVALID, COLR, 1, 0, box, &nan_map, 0.0);
   GSHGEOM_Map map3;
   ASSERT_EQ(gshgeom_map_identity(3, &map3), GSHGEOM_OK);
