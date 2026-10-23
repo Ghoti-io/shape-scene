@@ -751,7 +751,7 @@ namespace {
 
 /** The outline hash of a square's stroke as shape-geometry gives it, called directly: the style copied field by field. */
 uint64_t direct_outline(double x, double y, double size, const GSHSCENE_Stroke_Style & st, const std::vector<double> & dashes,
-    double scale) {
+    double scale, const GSHGEOM_Map * pixels_map = nullptr) {
   GSHGEOM_Stroke g;
   gshgeom_stroke_init(&g);
   g.width = st.width;
@@ -769,6 +769,9 @@ uint64_t direct_outline(double x, double y, double size, const GSHSCENE_Stroke_S
   // The canonical stroke's canonical form (SK3) for the style the fixture interns: a butt cap resets nothing here.
   GSHGEOM_Map map;
   gshgeom_map_scale(2, scale, scale, 1.0, &map);
+  if (pixels_map) {
+    map = *pixels_map;
+  }
   GSHGEOM_Map canon;
   int64_t sx = 0;
   int64_t sy = 0;
@@ -854,6 +857,38 @@ TEST(DumpSink, TheOutlineFieldIsShapeGeometrysHashOfTheCanonicalExpansion) {
           << "unit " << w.index << " kind " << kind << ": " << text.substr(at, end - at) << " wants " << want;
     }
   }
+}
+
+TEST(DumpSink, TheOutlineFieldFollowsAPixelTargetsMapAndTheCanonicalSplitOfItsTranslation) {
+  // The same square strokes under a pixel target whose map scales and moves by a whole and a fractional part: the field
+  // is the hash of the expansion at the canonical map of that map (the whole part of the move is split off), not of
+  // the identity and not of the map as it stands.
+  Scene s;
+  const GSHSCENE_List * list = stroke_list(s);
+  GSHSCENE_Stroke_Style a;
+  gshscene_stroke_style_init(&a);
+  GSHGEOM_Map scale;
+  gshgeom_map_scale(2, 1.5, 1.5, 1.0, &scale);
+  GSHGEOM_Map move;
+  gshgeom_map_translate(2, 37.25, -11.5, 0.0, &move);
+  GSHGEOM_Map target;
+  ASSERT_EQ(gshgeom_map_compose(&move, &scale, &target), GSHGEOM_OK);
+  SinkRef sink(make_with(config_default(), nullptr, nullptr));
+  auto stream = make_stream(GSHSCENE_UNIT_PIXEL);
+  stream->target.map = target;
+  ReportRef report;
+  ASSERT_EQ(render_job(sink.sink, request_for(list, *stream, report.report)).result, GSHSCENE_OK);
+  char want[40];
+  std::snprintf(want, sizeof want, "outline=%016llx", (unsigned long long)direct_outline(2, 2, 8, a, {}, 1.0, &target));
+  const std::string line = "U 0 K ";
+  const size_t at = stream->bytes.find(line);
+  ASSERT_NE(at, std::string::npos) << stream->bytes;
+  const size_t end = stream->bytes.find('\n', at);
+  EXPECT_NE(stream->bytes.substr(at, end - at).find(want), std::string::npos)
+      << stream->bytes.substr(at, end - at) << " wants " << want;
+  // The map matters: the identity's and the scale-only map's hashes are other numbers.
+  EXPECT_NE(direct_outline(2, 2, 8, a, {}, 1.0, &target), direct_outline(2, 2, 8, a, {}, 1.0));
+  EXPECT_NE(direct_outline(2, 2, 8, a, {}, 1.0, &target), direct_outline(2, 2, 8, a, {}, 1.5));
 }
 
 namespace {

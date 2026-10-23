@@ -839,6 +839,42 @@ TEST(ListArena, ResetReleasesEverythingKeepsTheFirstChunkAndReopensTheList) {
   EXPECT_EQ(t.live.size(), 2u) << "the list and its first chunk";
 }
 
+TEST(ListArena, AResetGivesBackEveryStandardChunkButTheFirstAndTheNextFrameStartsInTheFirst) {
+  // A frame that takes more than one standard chunk: a stack of open groups 2048 bytes wide, then the first two segments
+  // of items (5120 and 10240 bytes) after it, so that the second segment does not fit the first chunk.  The reset must
+  // free the chunk past the first and start the arena at the first again, so the same frame takes the same chunks.
+  tracker::Tracker t;
+  GSHSCENE_Allocator a = tracker::allocator_for(&t);
+  StoreHolder s;
+  Ref sq(intern_square(s.store));
+  GSHSCENE_Limits limits{};
+  limits.max_depth = 4096;
+  ListHolder l(s.store, &limits, &a);
+  auto frame = [&]() {
+    for (int i = 0; i < 2000; i++) {
+      ASSERT_EQ(gshscene_list_group_push(l.list, nullptr, 0, 0), GSHSCENE_OK);
+    }
+    for (int i = 0; i < 40; i++) {
+      ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, i, 0), GSHSCENE_OK);
+    }
+    for (int i = 0; i < 2000; i++) {
+      ASSERT_EQ(gshscene_list_group_pop(l.list), GSHSCENE_OK);
+    }
+    ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
+  };
+  const long before = t.calls;
+  frame();
+  const long first = t.calls - before;
+  const size_t held = t.live.size();
+  ASSERT_GE(first, 3) << "the first chunk, a second standard chunk, and the large segments";
+  ASSERT_EQ(gshscene_list_reset(l.list), GSHSCENE_OK);
+  EXPECT_EQ(t.live.size(), 2u) << "the list and its first chunk: every other chunk, standard or large, is given back";
+  const long mark = t.calls;
+  frame();
+  EXPECT_EQ(t.calls - mark, first - 1) << "the same frame takes the same chunks, the first one already held";
+  EXPECT_EQ(t.live.size(), held);
+}
+
 TEST(ListArena, EverySegmentStartsOnTheArenasAlignment) {
   StoreHolder s;
   Ref sq(intern_square(s.store));

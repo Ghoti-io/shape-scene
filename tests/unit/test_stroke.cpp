@@ -1653,6 +1653,15 @@ TEST(StrokeNotice, TheComposedMapIsDecidedToo) {
   // Width 0 still follows the map, and a composed map that cannot be formed is no notice (the sink's limit).
   EXPECT_EQ(gshscene_stroke_notice(&scaled, nullptr, 0, &huge), 0)
       << "the product passes the map bound (2^100): the sink's resource limit, not a notice";
+  // An instance's map of determinant zero is the notice even when the chain cannot be composed (2^100 three times is
+  // past the map bound): each map of the chain is decided by itself first (SK9), not only their product.
+  GSHGEOM_Map flat = map_of(1, 0, 0, 0);
+  GSHGEOM_Map past[2] = {flat, huge};
+  EXPECT_EQ(gshscene_stroke_notice(&scaled, past, 2, &huge), GSHSCENE_REASON_MAP_NOT_INVERTIBLE)
+      << "a singular instance map, and a product past the bound";
+  GSHGEOM_Map past_ok[2] = {huge, huge};
+  EXPECT_EQ(gshscene_stroke_notice(&scaled, past_ok, 2, &huge), 0)
+      << "the same chain without the singular map is no notice (the sink's limit)";
   Ref zero;
   Style z;
   z.s.width = 0.0;

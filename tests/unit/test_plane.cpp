@@ -189,11 +189,19 @@ TEST(Plane, IsTheShapeOfAFillOnly) {
 TEST(Plane, IsNotAShapeOfARetainedNode) {
   SceneHolder sc;
   Ref plane(plane_of(sc.store()));
+  Ref square(intern_square(sc.store()));
   EditHolder e(sc);
-  GSHSCENE_Node node = shape_node(plane.get());
   uint64_t id = 0;
-  GSHSCENE_Result r = gshscene_edit_add(e.edit, 0, GSHSCENE_APPEND, &node, nullptr, &id);
+  GSHSCENE_Node ok = shape_node(square.get());
+  EXPECT_EQ(gshscene_edit_add(e.edit, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, &ok, nullptr, &id), GSHSCENE_OK)
+      << "the same call with a path is taken, so the refusal below is the plane's";
+  GSHSCENE_Node node = shape_node(plane.get());
+  GSHSCENE_Result r = gshscene_edit_add(e.edit, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, &node, nullptr, &id);
   EXPECT_EQ(r, GSHSCENE_ERR_INVALID) << "PL5: a node never names a plane, so damage never meets one";
+  GSHSCENE_Node clip = group_node();
+  clip.clip = plane.get();
+  EXPECT_EQ(gshscene_edit_add(e.edit, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, &clip, nullptr, &id), GSHSCENE_ERR_INVALID)
+      << "nor does a group's clip";
 }
 
 // --- PL6: the test sink --------------------------------------------------------------------------------------------
@@ -374,6 +382,11 @@ TEST(PlaneFixed, TheFillTakesTheItemMapAGlyphFillTakes) {
       GSHSCENE_ERR_INVALID) << "a run is not the plane";
   EXPECT_EQ(gshscene_list_fill_plane_fixed(l.list, plane.get(), nullptr, ops, 2, GSHGEOM_FILL_NONZERO, &paint, 0),
       GSHSCENE_ERR_INVALID) << "ops need a frame to be placed for";
+  std::vector<GSHSCENE_Fixed_Op> many(GSHSCENE_FIXED_MAX_OPS + 1);
+  EXPECT_EQ(gshscene_list_fill_plane_fixed(l.list, plane.get(), nullptr, many.data(), many.size(), GSHGEOM_FILL_NONZERO,
+                &paint, 0), GSHSCENE_ERR_INVALID) << "no frame is refused before the ops are counted";
+  EXPECT_EQ(gshscene_list_fill_plane_fixed(l.list, plane.get(), f.run.get(), many.data(), many.size(),
+                GSHGEOM_FILL_NONZERO, &paint, 0), GSHSCENE_ERR_LIMIT) << "and with one, too many ops are the limit";
   EXPECT_EQ(gshscene_list_fill_plane_fixed(l.list, plane.get(), f.run.get(), ops, 2, GSHGEOM_FILL_NONZERO, nullptr, 0),
       GSHSCENE_ERR_INVALID);
   GSHSCENE_Paint_Fixed bad{GSHSCENE_FIXED_PAINT_PALETTE, 1, 99999, 14};
@@ -443,6 +456,29 @@ TEST(PlaneFixed, TheDesignRectangleIsClippedWhereTheRunsGlyphWouldBe) {
   EXPECT_EQ(b.min.y, 50.0);
   EXPECT_EQ(b.max.x, 900.0);
   EXPECT_EQ(b.max.y, 1950.0);
+  // The path is the rectangle itself, corner by corner, and its edges are the fixed numbers exactly: a bound cannot see
+  // a missing corner, and an even box cannot see a number halved and doubled.
+  auto rect_path = [&](double x0, double y0, double x1, double y1) {
+    GSHGEOM_Path * r = nullptr;
+    EXPECT_EQ(gshgeom_path_create(nullptr, nullptr, 2, &r), GSHGEOM_OK);
+    gshgeom_path_move_to(r, GSHGEOM_Point{x0, y0, 0.0});
+    gshgeom_path_line_to(r, GSHGEOM_Point{x1, y0, 0.0});
+    gshgeom_path_line_to(r, GSHGEOM_Point{x1, y1, 0.0});
+    gshgeom_path_line_to(r, GSHGEOM_Point{x0, y1, 0.0});
+    gshgeom_path_close(r);
+    const GSHSCENE_Resource * res = intern(f.s.store, r);
+    gshgeom_path_destroy(r);
+    return res;
+  };
+  Ref expected(rect_path(-100.0, 50.0, 900.0, 1950.0));
+  EXPECT_EQ(item->resource, expected.get()) << "the same path, so the same resource";
+  ListHolder l2(f.s.store);
+  ASSERT_EQ(gshscene_list_clip_push_design_rect_fixed(l2.list, f.run.get(), nullptr, 0, -401, 203, 3601, 7801, 2, 6),
+      GSHSCENE_OK);
+  const GSHSCENE_Item * odd = nullptr;
+  ASSERT_EQ(gshscene_list_item(l2.list, 0, &odd), GSHSCENE_OK);
+  Ref expected_odd(rect_path(-100.25, 50.75, 900.25, 1950.25));
+  EXPECT_EQ(odd->resource, expected_odd.get()) << "a quarter is kept";
   // A design corner lands where the glyph outline puts it: g + s (x, -y), s = 20.48 / 2048 = 0.01, g = (10, 20).
   GSHGEOM_Point q{};
   ASSERT_EQ(gshgeom_map_apply_point(&item->map, GSHGEOM_Point{900, 1950, 0}, &q), GSHGEOM_OK);

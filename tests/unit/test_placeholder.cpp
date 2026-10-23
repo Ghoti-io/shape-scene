@@ -322,6 +322,8 @@ TEST(PlaceholderFixed, TheBoxIsPlacedWhereTheRunsGlyphWouldBe) {
   Ref square(intern_square(f.s.store));
   EXPECT_EQ(gshscene_list_placeholder_fixed(l.list, f.run.get(), nullptr, 0, inverted, 0, COLR, 1, 0, 0), GSHSCENE_ERR_INVALID);
   EXPECT_EQ(gshscene_list_placeholder_fixed(l.list, f.run.get(), nullptr, 0, small, 31, COLR, 1, 0, 0), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_list_placeholder_fixed(l.list, f.run.get(), nullptr, 0, small, 40, COLR, 1, 0, 0), GSHSCENE_ERR_INVALID)
+      << "bits far past the most";
   EXPECT_EQ(gshscene_list_placeholder_fixed(l.list, square.get(), nullptr, 0, small, 0, COLR, 1, 0, 0), GSHSCENE_ERR_INVALID);
   EXPECT_EQ(gshscene_list_placeholder_fixed(l.list, nullptr, &move, 1, small, 0, COLR, 1, 0, 0), GSHSCENE_ERR_INVALID);
   EXPECT_EQ(gshscene_list_placeholder_fixed(l.list, f.run.get(), nullptr, 0, small, 0, 0, 1, 0, 0), GSHSCENE_ERR_INVALID);
