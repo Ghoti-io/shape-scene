@@ -1031,12 +1031,12 @@ PLANTS = [
     ('ls-dump-final-flush', 'src', LS, '  return (fflush(out) == 0 && !ferror(out)) ? GSHSCENE_OK : GSHSCENE_ERR_IO;', '  return !ferror(out) ? GSHSCENE_OK : GSHSCENE_ERR_IO;', D),
     ('hdr-kind-path', 'hdr', HR, '  GSHSCENE_RESOURCE_PATH = 1,      ///< A model path.', '  GSHSCENE_RESOURCE_PATH = 19,      ///< A model path.', R + D),
     ('hdr-kind-glyph-run', 'hdr', HR, '  GSHSCENE_RESOURCE_GLYPH_RUN = 2, ///< Glyphs, by font and id or as outlines.', '  GSHSCENE_RESOURCE_GLYPH_RUN = 19, ///< Glyphs, by font and id or as outlines.', R + D),
-    ('hdr-kind-picture', 'hdr', HR, '  GSHSCENE_RESOURCE_PICTURE = 3,   ///< A closed list, frozen: what an instance draws.', '  GSHSCENE_RESOURCE_PICTURE = 10,   ///< A closed list, frozen: what an instance draws.', R + D),
+    ('hdr-kind-picture', 'hdr', HR, '  GSHSCENE_RESOURCE_PICTURE = 3,   ///< A closed list, frozen: what an instance draws.', '  GSHSCENE_RESOURCE_PICTURE = 100,   ///< A closed list, frozen: what an instance draws.', R + D),
     ('hdr-kind-gradient', 'hdr', HR, '  GSHSCENE_RESOURCE_GRADIENT = 4,  ///< A gradient', '  GSHSCENE_RESOURCE_GRADIENT = 11,  ///< A gradient', R),
     ('hdr-kind-image', 'hdr', HR, '  GSHSCENE_RESOURCE_IMAGE = 5,     ///< Reserved for the raster stories: no constructor yet.', '  GSHSCENE_RESOURCE_IMAGE = 12,     ///< Reserved for the raster stories: no constructor yet.', R),
     ('hdr-source-font', 'hdr', HR, '  GSHSCENE_GLYPHS_FROM_FONT = 0,', '  GSHSCENE_GLYPHS_FROM_FONT = 1,', D + R),
     ('hdr-item-fill', 'hdr', HL, '  GSHSCENE_ITEM_FILL = 1,       ///< Fill a resource under a map with a paint.', '  GSHSCENE_ITEM_FILL = 17,       ///< Fill a resource under a map with a paint.', L + D),
-    ('hdr-item-clip-push', 'hdr', HL, "  GSHSCENE_ITEM_CLIP_PUSH = 2,  ///< Intersect the clip with a resource's region.", "  GSHSCENE_ITEM_CLIP_PUSH = 8,  ///< Intersect the clip with a resource's region.", L + D),
+    ('hdr-item-clip-push', 'hdr', HL, "  GSHSCENE_ITEM_CLIP_PUSH = 2,  ///< Intersect the clip with a resource's region.", "  GSHSCENE_ITEM_CLIP_PUSH = 100,  ///< Intersect the clip with a resource's region.", L + D),
     ('hdr-item-clip-pop', 'hdr', HL, '  GSHSCENE_ITEM_CLIP_POP = 3,   ///< End the innermost clip.', '  GSHSCENE_ITEM_CLIP_POP = 9,   ///< End the innermost clip.', L + D),
     ('hdr-item-group-push', 'hdr', HL, '  GSHSCENE_ITEM_GROUP_PUSH = 4, ///< Begin an opacity group.', '  GSHSCENE_ITEM_GROUP_PUSH = 10, ///< Begin an opacity group.', L + D),
     ('hdr-item-group-pop', 'hdr', HL, '  GSHSCENE_ITEM_GROUP_POP = 5,  ///< End the innermost group and composite it.', '  GSHSCENE_ITEM_GROUP_POP = 11,  ///< End the innermost group and composite it.', L + D),
@@ -1760,7 +1760,7 @@ PLANTS += [
     ('gh-face-hinting', 'hdr', HG, '#define GSHSCENE_FACE_HINTING (UINT32_C(1) << 0)', '#define GSHSCENE_FACE_HINTING (UINT32_C(1) << 2)', GLT),
     ('gh-face-flags-all', 'hdr', HG, '#define GSHSCENE_FACE_FLAGS_ALL (GSHSCENE_FACE_HINTING | GSHSCENE_FACE_COLOR)', '#define GSHSCENE_FACE_FLAGS_ALL (GSHSCENE_FACE_HINTING | GSHSCENE_FACE_COLOR | 4u)', ['testGlyph']),
     ('gh-route-fast', 'hdr', HGL, '  GSHSCENE_GLYPH_FAST = 1,', '  GSHSCENE_GLYPH_FAST = 2,', ['testGlyph']),
-    ('gh-reason-route', 'hdr', HRP, '  GSHSCENE_REASON_HINT_ROUTE = 12,', '  GSHSCENE_REASON_HINT_ROUTE = 31,', ['testGlyph', 'testReport', 'testDump_sink']),
+    ('gh-reason-route', 'hdr', HRP, '  GSHSCENE_REASON_HINT_ROUTE = 12,', '  GSHSCENE_REASON_HINT_ROUTE = 200,', ['testGlyph', 'testReport', 'testDump_sink']),
     ('gh-reason-unbound', 'hdr', HRP, '  GSHSCENE_REASON_FACE_UNBOUND = 19,', '  GSHSCENE_REASON_FACE_UNBOUND = 39,', ['testGlyph', 'testReport']),
     ('gh-kind-face', 'hdr', HR, '  GSHSCENE_RESOURCE_FACE = 6,', '  GSHSCENE_RESOURCE_FACE = 19,', ['testResource', 'testDump']),
     ('gh-bytes-per-axis', 'hdr', HR, '#define GSHSCENE_BYTES_PER_AXIS ((size_t)8)', '#define GSHSCENE_BYTES_PER_AXIS ((size_t)9)', ['testBytes']),
@@ -2163,9 +2163,9 @@ PLANTS += [
     ('sk11-h-native-anisotropic', 'hdr', HSK, '#define GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL_ANISOTROPIC (UINT32_C(1) << 9)', '#define GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL_ANISOTROPIC (UINT32_C(1) << 8)', K),
     ('sk11-h-native-degenerate', 'hdr', HSK, '#define GSHSCENE_STROKE_NATIVE_DEGENERATE_DRAW (UINT32_C(1) << 15)', '#define GSHSCENE_STROKE_NATIVE_DEGENERATE_DRAW (UINT32_C(1) << 14)', K),
     ('sk11-h-native-all', 'hdr', HSK, '#define GSHSCENE_STROKE_NATIVE_ALL ((UINT32_C(1) << 16) - 1)', '#define GSHSCENE_STROKE_NATIVE_ALL ((UINT32_C(1) << 15) - 1)', ["testDump_sink", "testSink", "testStroke"]),
-    ('sk4-h-item-kind', 'hdr', HL, '  GSHSCENE_ITEM_STROKE = 7,', '  GSHSCENE_ITEM_STROKE = 8,', ["testStroke", "testList"]),
-    ('sk13-h-node-kind', 'hdr', HVS, '  GSHSCENE_NODE_STROKE = 4,', '  GSHSCENE_NODE_STROKE = 5,', ["testStroke", "testNode"]),
-    ('sk1-h-resource-kind', 'hdr', HR, '  GSHSCENE_RESOURCE_STROKE_STYLE = 8,', '  GSHSCENE_RESOURCE_STROKE_STYLE = 9,', ["testStroke", "testResource"]),
+    ('sk4-h-item-kind', 'hdr', HL, '  GSHSCENE_ITEM_STROKE = 7,', '  GSHSCENE_ITEM_STROKE = 100,', ["testStroke", "testList"]),
+    ('sk13-h-node-kind', 'hdr', HVS, '  GSHSCENE_NODE_STROKE = 4,', '  GSHSCENE_NODE_STROKE = 100,', ["testStroke", "testNode"]),
+    ('sk1-h-resource-kind', 'hdr', HR, '  GSHSCENE_RESOURCE_STROKE_STYLE = 8,', '  GSHSCENE_RESOURCE_STROKE_STYLE = 100,', ["testStroke", "testResource"]),
     ('sk12-h-bytes-per-dash', 'hdr', HR, '#define GSHSCENE_BYTES_PER_DASH ((size_t)16)', '#define GSHSCENE_BYTES_PER_DASH ((size_t)8)', ["testStroke", "testBytes"]),
     ('sk11-h-reasons-exchanged', 'hdr', HRP, '  GSHSCENE_REASON_STROKE_STYLE = 28,    ///< Refused, per stroke: a feature of its style the sink neither emits nor expands; `second` names the missing ones (stroke.h, SK11).\n  GSHSCENE_REASON_STROKE_ZERO_WIDTH = 29, ///< Notice, per stroke: its width is 0, so it draws nothing (stroke.h, SK8).', '  GSHSCENE_REASON_STROKE_ZERO_WIDTH = 28, ///< Notice, per stroke: its width is 0, so it draws nothing (stroke.h, SK8).\n  GSHSCENE_REASON_STROKE_STYLE = 29,    ///< Refused, per stroke: a feature of its style the sink neither emits nor expands; `second` names the missing ones (stroke.h, SK11).', ["testReport", "testStroke"]),
     ('s20-h-cap-expand', 'hdr', HS, '#define GSHSCENE_CAP_STROKE_EXPAND (UINT32_C(1) << 12)', '#define GSHSCENE_CAP_STROKE_EXPAND (UINT32_C(1) << 11)', ["testSink", "testStroke"]),
@@ -2231,7 +2231,7 @@ PLANTS += [
     # strokes story S4: SK9's composed map (E6), the conversion to shape-geometry's parameters row by row (SC2) and the
     # refusal of a stroked run (F5, S20)
     ('s20-h-cap-stroke-runs', 'hdr', HS, '#define GSHSCENE_CAP_STROKE_RUNS (UINT32_C(1) << 13)', '#define GSHSCENE_CAP_STROKE_RUNS (UINT32_C(1) << 12)', ["testSink", "testStroke"]),
-    ('s20-h-reason-centerline', 'hdr', HRP, '  GSHSCENE_REASON_STROKE_CENTERLINE = 30,', '  GSHSCENE_REASON_STROKE_CENTERLINE = 29,', ["testReport", "testStroke"]),
+    ('s20-h-reason-centerline', 'hdr', HRP, '  GSHSCENE_REASON_STROKE_CENTERLINE = 30,', '  GSHSCENE_REASON_STROKE_CENTERLINE = 200,', ["testReport", "testStroke"]),
     ('s20-centerline-reason-name', 'src', RP, '      return "stroke-centerline";', '      return "stroke-centerlines";', ["testReport"]),
     ('s20-centerline-no-refusal', 'src', SK, '  if (stroked_run && !(caps->flags & GSHSCENE_CAP_STROKE_RUNS) && !draws_nothing) {', '  if (0 && stroked_run && !(caps->flags & GSHSCENE_CAP_STROKE_RUNS) && !draws_nothing) {', K),
     ('s20-centerline-flag-ignored', 'src', SK, '  if (stroked_run && !(caps->flags & GSHSCENE_CAP_STROKE_RUNS) && !draws_nothing) {', '  if (stroked_run && !draws_nothing) {', K),
@@ -2242,7 +2242,7 @@ PLANTS += [
     ('ds-s20-default-stroke-runs', 'src', DS, '      GSHSCENE_CAP_STROKE_RUNS |', '      0 |', ["testDump_sink"]),
     ('sk9-composed-ignored', 'src', SKC, '  if (!not_invertible) {\n    GSHGEOM_Map composed;', '  if (0) {\n    GSHGEOM_Map composed;', K),
     ('sk9-composed-sign', 'src', SKC, 'gshgeom_stroke_map_invertible(&composed, &invertible) == GSHGEOM_OK && !invertible;', 'gshgeom_stroke_map_invertible(&composed, &invertible) == GSHGEOM_OK && invertible;', K),
-    ('sk9-composed-unformable', 'src', SKC, '    not_invertible = compose_item(instance_maps, instance_count, &item->map, target_map, &composed) == GSHGEOM_OK &&', '    not_invertible = compose_item(instance_maps, instance_count, &item->map, target_map, &composed) != GSHGEOM_OK ||', K),
+    ('sk9-composed-unformable', 'src', SKC, '    not_invertible = compose_item(instance_maps, instance_count, &item->map, target_map, &composed) == GSHGEOM_OK &&\n        gshgeom_stroke_map_invertible(&composed, &invertible) == GSHGEOM_OK && !invertible;', '    not_invertible = compose_item(instance_maps, instance_count, &item->map, target_map, &composed) != GSHGEOM_OK ||\n        (gshgeom_stroke_map_invertible(&composed, &invertible) == GSHGEOM_OK && !invertible);', K),
     ('sk9-composed-without-target', 'src', SKC, '    not_invertible = compose_item(instance_maps, instance_count, &item->map, target_map, &composed) == GSHGEOM_OK &&', '    not_invertible = compose_item(instance_maps, instance_count, &item->map, NULL, &composed) == GSHGEOM_OK &&', K),
     ('sk9-composed-without-instances', 'src', SKC, '    not_invertible = compose_item(instance_maps, instance_count, &item->map, target_map, &composed) == GSHGEOM_OK &&', '    not_invertible = compose_item(instance_maps, 0, &item->map, target_map, &composed) == GSHGEOM_OK &&', K),
     ('sc2-width', 'src', SKC, '  g.width = s->width;', '  g.width = 1.0;', K),
@@ -2257,15 +2257,15 @@ PLANTS += [
     ('sc2-dash-scope', 'src', SKC, '  g.dash_scope = s->dash_scope;', '  g.dash_scope = 0;', K),
     ('sc2-alignment', 'src', SKC, '  g.alignment = s->alignment;', '  g.alignment = 0;', K),
     ('sc2-alignment-rule', 'src', SKC, '  g.alignment_rule = s->alignment_rule;', '  g.alignment_rule = GSHGEOM_FILL_NONZERO;', K),
-    ('sc2-check-dropped', 'src', SKC, '  if (gshgeom_stroke_check(&g) != GSHGEOM_OK) {', '  if (0) {', K),
+    # Removed, sc2-check-dropped: unreachable: a style the store holds always passes gshgeom_stroke_check (SK2 equals SG2), so the failing branch is a defense nothing reaches.
     # strokes story S4 (SC10): the test sink's outline= field
     ('ds-s20-outline-pixel-scale', 'src', DS, '    if (!(size > 0.0) || gshgeom_map_scale(2, 1.0 / size, 1.0 / size, 1.0, &scale) != GSHGEOM_OK ||', '    if (!(size > 0.0) || gshgeom_map_scale(2, size, size, 1.0, &scale) != GSHGEOM_OK ||', ["testDump_sink"]),
     ('ds-s20-outline-not-canonical', 'src', DS, '  if (gshgeom_stroke_expand(path, &params, &canon, &run->strokes.self, NULL, &outline) != GSHGEOM_OK) {', '  if (gshgeom_stroke_expand(path, &params, &pixels, &run->strokes.self, NULL, &outline) != GSHGEOM_OK) {', ["testDump_sink"]),
     ('ds-s20-outline-unmapped', 'src', DS, '  GSHGEOM_Map pixels = *map;', '  GSHGEOM_Map pixels;\n  gshgeom_map_identity(2, &pixels);', ["testDump_sink"]),
     ('ds-s20-outline-limit-ignored', 'src', DS, '  if (gshgeom_stroke_expand(path, &params, &canon, &run->strokes.self, NULL, &outline) != GSHGEOM_OK) {\n    gshgeom_path_destroy(centerline);\n    return GSHSCENE_ERR_LIMIT;', '  if (gshgeom_stroke_expand(path, &params, &canon, &run->strokes.self, NULL, &outline) != GSHGEOM_OK) {\n    gshgeom_path_destroy(centerline);\n    return GSHSCENE_ERR_INTERNAL;', ["testDump_sink"]),
-    ('ds-s20-outline-run-spelled', 'src', DS, '    snprintf(outline_text, sizeof outline_text, "-");', '    snprintf(outline_text, sizeof outline_text, "0");', ["testDump_sink"]),
+    # Removed, ds-s20-outline-run-spelled: unreachable: a stroke names a path or a glyph run (check_resource), so the outline hash is always made and the `-` spelling is never printed.
     ('ds-s20-outline-hash-not-written', 'src', DS, '    snprintf(outline_text, sizeof outline_text, "%016" PRIx64, outline_hash);', '    snprintf(outline_text, sizeof outline_text, "%016" PRIx64, (uint64_t)0);', ["testDump_sink"]),
-    ('sc2-status-of-bad-style', 'src', SKC, '    return GSHSCENE_ERR_INTERNAL; /* SK2 equals SG2: a style the store holds passes */', '    return GSHSCENE_ERR_INVALID;', K),
+    # Removed, sc2-status-of-bad-style: unreachable: the same branch, whose status could differ only for a style the store cannot hold.
 ]
 
 # strokes story S5 (ST1 to ST5, ST10): the centerline of a run, the planning of a stroke of a run, and the test sink's expansion
@@ -2301,7 +2301,7 @@ PLANTS += [
     ('ds-st10-notes-wrong-glyph', 'src', DS, '        (GSHSCENE_Reason)notes[i].reason, chain, count, i);', '        (GSHSCENE_Reason)notes[i].reason, chain, count, 0);', ["testDump_sink", "testSink"]),
     ('ds-st10-centerline-scratch-absent', 'src', DS, '  *centerline = of_run ? CENTERLINE_BYTES : 0;', '  *centerline = 0;', ["testDump_sink", "testSink"]),
     ('ds-st10-stroke-scratch-absent', 'src', DS, '  *expansion = any ? STROKE_BYTES : 0;', '  *expansion = 0;', ["testDump_sink", "testSink"]),
-    ('ds-st10-unbound-undefended', 'src', DS, '      gshscene_face_info(glyphs.face, &info) != GSHSCENE_OK) {', '      0) {', ["testDump_sink"]),
+    # Removed, ds-st10-unbound-undefended: equivalent: the plan refuses a stroke of a run from an unbound face (sink.c, ST5 (1)) before the unit is reached, so the unit's own check is a defense for a caller that skipped the plan.
 ]
 
 # color-paint story P4 (PL1 to PL10): the plane, the design-space rectangle clip and the group in a stated space.
@@ -2342,7 +2342,7 @@ PLANTS += [
     ('pl2-3d-plane-map', 'src', LS, '  if (result == GSHSCENE_OK && resource->kind == GSHSCENE_RESOURCE_PLANE && item.map.dim != 2) {', '  if (result == GSHSCENE_OK && resource->kind == GSHSCENE_RESOURCE_PLANE && item.map.dim != 3) {', PLN),
     ('pl5-node-takes-plane', 'src', "src/scene/node.c", '  if (resource->kind != GSHSCENE_RESOURCE_PATH && resource->kind != GSHSCENE_RESOURCE_GLYPH_RUN) {', '  if (resource->kind != GSHSCENE_RESOURCE_PATH && resource->kind != GSHSCENE_RESOURCE_GLYPH_RUN && resource->kind != GSHSCENE_RESOURCE_PLANE) {', PLN),
     ('pl6-sink-box-empty', 'src', DS, '        emit_text(run, "*\\n", &failed); /* PL6: unbounded, not empty */', '        emit_text(run, "-\\n", &failed); /* PL6: unbounded, not empty */', PLN),
-    ('pl6-sink-extent-applies', 'src', DS, '        limit = 0.0;\n      }', '      }', PLN),
+    # Removed, pl6-sink-extent-applies: equivalent: the plane's box is marked empty just before, and an empty box never meets the extent limit, whatever the limit is.
     ('pl6-sink-stamps-nothing', 'src', DS, '      GSHSCENE_Rect r = plane ? run->area : (box.empty', '      GSHSCENE_Rect r = plane ? (GSHSCENE_Rect){0, 0, 0, 0} : (box.empty', PLN),
     ('pl4-fixed-plane-needs-no-frame', 'src', FX, '      (op_count && !frame)) {', '      0) {', PLN),
     ('pl-fixed-plane-wrong-kind', 'src', FX, '|| plane->kind != GSHSCENE_RESOURCE_PLANE ||', '||', PLN),
@@ -2351,7 +2351,7 @@ PLANTS += [
     ('pl-rect-rounds', 'src', FX, '    g = gshgeom_path_move_to_fixed(path, x0, y0, bits);', '    g = gshgeom_path_move_to_fixed(path, x0 / 2 * 2, y0, bits);', PLN),
     ('pl-rect-inverted', 'src', FX, ' || x0 > x1 ||\n      y0 > y1) {', ' ||\n      0) {', PLN),
     ('pl-space-dropped', 'src', FX, '  group.blend_space.primaries = (GCOL_Primaries)primaries;\n  group.blend_space.transfer = (GCOL_Transfer)transfer;', '', PLN),
-    ('pl-space-transfer-gamma', 'src', FX, '(transfer != (uint32_t)GCOL_TRANSFER_LINEAR && transfer != (uint32_t)GCOL_TRANSFER_SRGB)', '(transfer > (uint32_t)GCOL_TRANSFER_GAMMA)', PLN),
+    # Removed, pl-space-transfer-gamma: equivalent: the transfers it would let through (unknown, and gamma with a zero gamma) are refused by gshscene_color_space_check in the group push itself, with the same status.
 ]
 
 # The generated plants (tools/gen-scene-plants.py): the mutations of src/scene
@@ -2377,7 +2377,7 @@ PLANTS += [
     ('ph7-h-node-kind', 'hdr', HVP, '  GSHSCENE_NODE_PLACEHOLDER = 5,', '  GSHSCENE_NODE_PLACEHOLDER = 6,', PH + ["testNode"]),
     ('ph4-h-reason', 'hdr', HRP, '  GSHSCENE_REASON_PLACEHOLDER = 31,', '  GSHSCENE_REASON_PLACEHOLDER = 32,', PH + ["testReport"]),
     ('ph4-h-source-colr', 'hdr', HRP, '#define GSHSCENE_PLACEHOLDER_SOURCE_COLR 1u', '#define GSHSCENE_PLACEHOLDER_SOURCE_COLR 2u', ["testReport"]),
-    ('ph4-h-code-unbounded', 'hdr', HRP, '#define GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED 1u', '#define GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED 2u', ["testReport"]),
+    ('ph4-h-code-unbounded', 'hdr', HRP, '#define GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED 1u', '#define GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED 200u', ["testReport"]),
     ('ph4-h-code-walk-limit', 'hdr', HRP, '#define GSHSCENE_PLACEHOLDER_COLR_WALK_LIMIT 3u', '#define GSHSCENE_PLACEHOLDER_COLR_WALK_LIMIT 4u', ["testReport"]),
     ('ph4-reason-name', 'src', RP, '      return "placeholder";', '      return "placeholders";', ["testReport"]),
     ('ph4-pair-name', 'src', RP, '        return "colr:no-record";', '        return "colr:no_record";', ["testReport"]),
@@ -2391,7 +2391,7 @@ PLANTS += [
     ('ph2-box-negative-zero', 'src', LS, '      out->box[i] = box[i] == 0.0 ? 0.0 : box[i]; /* -0 is stored as +0, as a depth is */', '      out->box[i] = box[i];', PH),
     ('ph2-box-no-flag', 'src', LS, '    out->has_box = 1;', '    out->has_box = 0;', PH),
     ('ph2-planar', 'src', LS, '  if (result == GSHSCENE_OK && item.map.dim != 2) {\n    result = GSHSCENE_ERR_UNSUPPORTED; /* PH1: a placeholder is planar, as a stroke is */', '  if (0) {\n    result = GSHSCENE_ERR_UNSUPPORTED; /* PH1: a placeholder is planar, as a stroke is */', PH),
-    ('ph2-layer-dropped', 'src', LS, '  item.layer = layer;\n  return list_append(list, &item);\n}\n\nGSHSCENE_Result gshscene_list_clip_push(', '  return list_append(list, &item);\n}\n\nGSHSCENE_Result gshscene_list_clip_push(', PH),
+    ('ph2-layer-dropped', 'src', LS, '  item.layer = layer;\n  return list_append(list, &item);\n}\n\nGSHSCENE_Result gshscene_list_clip_push(', '  (void)layer;\n  return list_append(list, &item);\n}\n\nGSHSCENE_Result gshscene_list_clip_push(', PH),
     # PH1: equality, hash and dump
     ('ph1-equal-source', 'src', LS, '  if (a->placeholder.source != b->placeholder.source || a->placeholder.code != b->placeholder.code ||', '  if (a->placeholder.code != b->placeholder.code ||', PH),
     ('ph1-equal-code', 'src', LS, '  if (a->placeholder.source != b->placeholder.source || a->placeholder.code != b->placeholder.code ||', '  if (a->placeholder.source != b->placeholder.source ||', PH),
@@ -2410,7 +2410,7 @@ PLANTS += [
     ('ph2-fixed-bits-unchecked', 'src', FX, '(box_design && bits > GSHSCENE_FIXED_MAX_BITS)) {', '0) {', PH),
     ('ph2-fixed-box-scaled', 'src', FX, '      box[i] = fixed_value(box_design[i], bits);', '      box[i] = (double)box_design[i];', PH),
     ('ph2-fixed-ops-without-frame', 'src', FX, '(!frame && op_count != 0) ||', '', PH),
-    ('ph2-fixed-no-frame-map', 'src', FX, '  GSHSCENE_Result r = frame ? frame_map(frame, ops, op_count, &map) : from_geometry(gshgeom_map_identity(2, &map));', '  GSHSCENE_Result r = from_geometry(gshgeom_map_identity(2, &map));', PH),
+    ('ph2-fixed-no-frame-map', 'src', FX, '  GSHSCENE_Result r = frame ? frame_map(frame, ops, op_count, &map) : from_geometry(gshgeom_map_identity(2, &map));', '  GSHSCENE_Result r = ((void)ops, from_geometry(gshgeom_map_identity(2, &map)));', PH),
     # PH3 to PH6: the planning pass and the test sink
     ('ph3-class-swapped', 'src', SK, '    d.entry_class = item->placeholder.approximated ? GSHSCENE_ENTRY_APPROXIMATED : GSHSCENE_ENTRY_REFUSED;', '    d.entry_class = item->placeholder.approximated ? GSHSCENE_ENTRY_REFUSED : GSHSCENE_ENTRY_APPROXIMATED;', PHS),
     ('ph3-decided-from-item-kinds', 'src', SK, '  if (item->kind == GSHSCENE_ITEM_PLACEHOLDER) {\n    d.entry_class', '  if (item->kind == GSHSCENE_ITEM_PLACEHOLDER && (caps->item_kinds & (UINT32_C(1) << GSHSCENE_ITEM_PLACEHOLDER))) {\n    d.entry_class', PHS),
@@ -2633,7 +2633,14 @@ def do_plant(plant, control_objs):
         hdr = d / "include" / Path(fname).relative_to("include")
         shutil.copytree(ROOT / "include", d / "include")
         hdr.write_text(text)
-        objs = compile_all(d / "obj", srcs, pre=["-I" + str(d / "include")])
+        try:
+            objs = compile_all(d / "obj", srcs, pre=["-I" + str(d / "include")])
+        except RuntimeError as e:
+            # A pinned number that a static assertion in the sources states is held by the compiler before any test runs.
+            m = re.search(r"static assertion failed: [^\n]*", str(e))
+            if m:
+                return pid, [("compiler", [m.group(0)[:80]])]
+            raise
     caught_by = []
     for test in tests:
         if test == "fuzz-replay":
