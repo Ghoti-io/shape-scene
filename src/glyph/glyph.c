@@ -432,6 +432,149 @@ GSHSCENE_Result gshscene_glyph_outline(const GSHSCENE_Resource * run, size_t ind
   return GSHSCENE_OK;
 }
 
+/* --- the centerline of a run (ST1) ------------------------------------------------------- */
+
+/** @p element mapped by @p map, a close left as it is.  A failure is a point the map takes out of range. */
+static GSHGEOM_Result map_element(const GSHGEOM_Map * map, const GSHGEOM_Element * element, GSHGEOM_Curve * out) {
+  *out = element->curve;
+  if (element->verb == GSHGEOM_VERB_CLOSE) {
+    return GSHGEOM_OK;
+  }
+  return gshgeom_map_apply_curve(map, &element->curve, out);
+}
+
+/** Append the mapped element @p mapped to @p path with the builder verb @p verb names. */
+static GSHGEOM_Result append_element(GSHGEOM_Path * path, GSHGEOM_Verb verb, const GSHGEOM_Curve * mapped) {
+  const GSHGEOM_Point * p = mapped->p;
+  switch (verb) {
+    case GSHGEOM_VERB_MOVE:
+      return gshgeom_path_move_to(path, p[0]);
+    case GSHGEOM_VERB_LINE:
+      return gshgeom_path_line_to(path, p[1]);
+    case GSHGEOM_VERB_QUADRATIC:
+      return gshgeom_path_quadratic_to(path, p[1], p[2]);
+    case GSHGEOM_VERB_CUBIC:
+      return gshgeom_path_cubic_to(path, p[1], p[2], p[3]);
+    case GSHGEOM_VERB_RATIONAL_QUADRATIC:
+      return gshgeom_path_rational_quadratic_to(path, p[1], p[2], mapped->w);
+    case GSHGEOM_VERB_RATIONAL_CUBIC:
+      return gshgeom_path_rational_cubic_to(path, p[1], p[2], p[3], mapped->w);
+    case GSHGEOM_VERB_CLOSE:
+      return gshgeom_path_close(path);
+    default:
+      return GSHGEOM_ERR_INTERNAL;
+  }
+}
+
+/**
+ * Append every element of @p outline under @p map to @p path, all or none of them: the mapping is checked over the
+ * whole outline first, so that a glyph with a point past the range adds nothing.
+ *
+ * @param refused Set to 1 when the map takes a point out of range (nothing is appended).
+ */
+static GSHGEOM_Result append_outline(
+    GSHGEOM_Path * path, const GSHGEOM_Path * outline, const GSHGEOM_Map * map, int * refused) {
+  size_t n = gshgeom_path_element_count(outline);
+  GSHGEOM_Element e;
+  GSHGEOM_Curve mapped;
+  *refused = 0;
+  for (size_t i = 0; i < n; i++) {
+    GSHGEOM_Result r = gshgeom_path_element(outline, i, &e);
+    if (r != GSHGEOM_OK) {
+      return GSHGEOM_ERR_INTERNAL;
+    }
+    if (map_element(map, &e, &mapped) != GSHGEOM_OK) {
+      *refused = 1;
+      return GSHGEOM_OK;
+    }
+  }
+  for (size_t i = 0; i < n; i++) {
+    if (gshgeom_path_element(outline, i, &e) != GSHGEOM_OK || map_element(map, &e, &mapped) != GSHGEOM_OK) {
+      return GSHGEOM_ERR_INTERNAL;
+    }
+    GSHGEOM_Result r = append_element(path, e.verb, &mapped);
+    if (r != GSHGEOM_OK) {
+      return r;
+    }
+  }
+  return GSHGEOM_OK;
+}
+
+GSHSCENE_Result gshscene_glyph_run_centerline(const GSHSCENE_Resource * run, const GSHGEOM_Allocator * alloc,
+    const GSHGEOM_Limits * limits, GSHGEOM_Path ** out, GSHSCENE_Glyph_Note * notes) {
+  if (!run || run->kind != GSHSCENE_RESOURCE_GLYPH_RUN || !out) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  const int from_font = run->u.glyphs.run.source == GSHSCENE_GLYPHS_FROM_FONT;
+  if (from_font && !(run_face(run) && run_face(run)->u.face.bound)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  const size_t count = run->u.glyphs.run.glyph_count;
+  if (notes) {
+    memset(notes, 0, count * sizeof *notes);
+  }
+  GSHGEOM_Map identity;
+  if (gshgeom_map_identity(2, &identity) != GSHGEOM_OK) {
+    return GSHSCENE_ERR_INTERNAL;
+  }
+  GSHGEOM_Path * centerline = NULL;
+  GSHGEOM_Result g = gshgeom_path_create(alloc, limits, 2, &centerline);
+  if (g != GSHGEOM_OK) {
+    return from_geometry(g);
+  }
+  GSHSCENE_Result result = GSHSCENE_OK;
+  for (size_t i = 0; i < count && result == GSHSCENE_OK; i++) {
+    const GSHSCENE_Glyph * glyph = &run->u.glyphs.glyphs[i];
+    GSHSCENE_Glyph_Note note;
+    memset(&note, 0, sizeof note);
+    GSHGEOM_Map glyph_map;
+    GSHGEOM_Path * owned = NULL;
+    const GSHGEOM_Path * outline = NULL;
+    if (from_font) {
+      GSHSCENE_Result m = gshscene_glyph_map(run, &identity, i, &glyph_map);
+      if (m == GSHSCENE_OK) {
+        m = gshscene_glyph_outline(run, i, alloc, limits, &owned, &note);
+      }
+      if (m == GSHSCENE_ERR_OOM) {
+        result = m;
+        break;
+      }
+      if (m != GSHSCENE_OK) {
+        /* A map past shape-geometry's bounds: the glyph is the sink's own limit, as a fill's is. */
+        note_set(&note, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_RESOURCE_LIMIT);
+      }
+      outline = owned;
+    } else {
+      if (gshgeom_map_translate(2, glyph->x, glyph->y, 0.0, &glyph_map) != GSHGEOM_OK) {
+        note_set(&note, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_RESOURCE_LIMIT);
+      } else {
+        outline = gshscene_resource_path(glyph->outline);
+      }
+    }
+    if (outline && gshgeom_path_dimension(outline) != 2) {
+      result = GSHSCENE_ERR_UNSUPPORTED;
+    } else if (outline && !note.entry_class) {
+      int refused = 0;
+      g = append_outline(centerline, outline, &glyph_map, &refused);
+      if (g != GSHGEOM_OK) {
+        result = g == GSHGEOM_ERR_INTERNAL ? GSHSCENE_ERR_INTERNAL : from_geometry(g);
+      } else if (refused) {
+        note_set(&note, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_RESOURCE_LIMIT);
+      }
+    }
+    gshgeom_path_destroy(owned);
+    if (notes) {
+      notes[i] = note;
+    }
+  }
+  if (result != GSHSCENE_OK) {
+    gshgeom_path_destroy(centerline);
+    return result;
+  }
+  *out = centerline;
+  return GSHSCENE_OK;
+}
+
 GSHSCENE_Result gshscene_glyph_box(const GSHSCENE_Resource * run, size_t index, GSHSCENE_Glyph_Box * out) {
   const GSHSCENE_Resource * face = run_face(run);
   if (!face || !face->u.face.bound || !out || !run_glyph(run, index)) {

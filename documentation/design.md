@@ -443,7 +443,55 @@ into `G`, as it does for a fill.
 
 **SK7 A glyph run as centerline.** A stroke of a run always takes the general, unhinted route: the planning pass does
 not route it, writes no `HINT_STATUS` for it and never refuses it for hinting (a `FONT_STRICT` run included). A run from
-a font needs `GLYPHS_FROM_FONT`, as a fill does.
+a font needs `GLYPHS_FROM_FONT`, as a fill does. The rules ST1 to ST7 below elaborate it.
+
+**ST1 The centerline of a run.** `gshscene_glyph_run_centerline` makes the 2D path `P` of the run's model space that
+every sink strokes. For glyph `i` in order, with `G_i` its model map (a font run: `translate(x_i, y_i)` composed with the
+design-to-model scale `size / upem`, y flipped, which is `gshscene_glyph_map` with the identity as the item's map; an
+outlines run: `translate(x_i, y_i)`) and `O_i` its outline (a font run's from the provider's `glyph_outline`, the general
+route, in 26.6 design units; an outlines run's own path), every element of `O_i` in order, each point mapped by
+`gshgeom_map_apply_point` and each weight kept, is appended to `P` with its subpath structure and closes unchanged. `P` is
+**defined** by this construction, as doubles in this order, because the expansion's bits are a function of them (SG18): a
+sink that formed the run's path another way (mapped the matrix, or expanded in design units under a scaled width) would
+get outlines that differ in their last bits, and the sinks' hashes could never agree. A glyph with no outline adds
+nothing. A glyph the provider cannot give, or whose map or mapped point is past `GSHGEOM_COORD_LIMIT`, adds nothing, whole
+and not in part, and has a per-glyph note exactly as a fill's glyph does (`GLYPH_UNAVAILABLE`, `RESOURCE_LIMIT`); the
+rest of the run is stroked. A path past the geometry limits is `ERR_LIMIT`: the run is one region and is never stroked in
+part. A 3D outline is `ERR_UNSUPPORTED`; an unbound face is `ERR_INVALID` (the plan refuses the stroke first).
+
+**ST2 One union across the run.** The region of a stroke of a run is the expansion's region of `P` under the item's
+style and map, one union over the item: glyphs that overlap, touch or are kerned into each other do not darken a
+translucent stroke where they cross, and no join is made between glyphs. This is SVG 2's rule for text (a chunk is
+"filled and stroked as if it were a single path", 11.9) and Canvas's (`strokeText` traces the glyphs' shapes in one stroke
+operation, whose overlapping parts are treated as their union). A front end that wants a stroke for each glyph emits a
+run for each glyph; one SVG text chunk is one run. Local width is built in the run's model space, so a non-uniform map is
+the elliptical pen on text; dashes are measured along `P` and restart per contour or run along the whole path by
+`dash_scope`; inside and outside alignment clip to the fill region of `P`'s closed subpaths under the style's rule.
+
+**ST3 The general route only.** Stroking a run reads the provider's `glyph_outline` and `glyph_box` and nothing else: no
+`gshscene_glyph_route`, no `glyph_device_path`, no hint context, no `HINT_*` entry, and no refusal for hinting. The run's
+`hint_mode` and `hint_version` have no effect on `P`, on the plan's entries or on the pixels. The visible consequence is
+that a hinted fill of the same run (grid-fitted by up to about half a pixel on a grid-aligned map at an integer ppem) and
+its stroke can be off each other; a front end that wants a registered pair sets hint mode `NONE` on the run (SVG's
+`geometricPrecision` is the same request).
+
+**ST4 Color glyphs.** `P` is the outline of the glyph the run names. `COLR`, `CPAL`, `SVG` and bitmap tables are never
+read by a stroke and the face's `COLOR` flag has no effect. A color glyph the font's lowering recorded is a list of fills
+and clip pushes of one-glyph runs, so a stroke of one of those runs is a stroke of that layer's outline; a front end that
+wants a color glyph stroked layer by layer records the strokes beside the fills.
+
+**ST5 Planning.** A stroke of a run is planned in this order, after the refusals every item can have: an unbound face
+(`FACE_UNBOUND`, decided without the route); a font run without `GLYPHS_FROM_FONT` (`GLYPH_SOURCE`); a sink without
+`STROKE_RUNS` (`STROKE_CENTERLINE`); the style (`STROKE_STYLE`). A stroke that draws nothing (its notice) is refused for
+none of the first three. So a stroke of a run is never drawn as nothing, and strict fails before the target is touched.
+
+**ST6 Paint.** A solid or gradient paint is sampled in the item's local space, which for a run is the run's model space:
+one gradient spans the run and does not restart per glyph. SVG's `objectBoundingBox` of text is relative to the entire
+`text` element (11.2): a front end folds that box into the gradient's map, as it does for a fill.
+
+**ST7 Fill and stroke order.** A text element's fill and stroke are two items on the same run resource in the order the
+format gives, so a chunk is painted all its fills then all its strokes (or the reverse), never glyph by glyph (SVG 2, 11.9).
+A front end that needs the pair composited as one wraps both in a group.
 
 **SK8 Width 0 and hairlines.** Width 0 has no special meaning: the region is empty and nothing is drawn, and the
 planning pass writes a `NOTICE`, reason `STROKE_ZERO_WIDTH`, as G10 does for a degenerate gradient. A hairline is device
@@ -500,12 +548,12 @@ the missing features in the disposition's `detail` and the entry's `second`. A r
 `GLYPHS_FROM_FONT`, and a gradient paint the gradient rules, before the style is decided.
 
 A stroke whose centerline is a glyph run is drawn only by a sink that says so, `GSHSCENE_CAP_STROKE_RUNS` (flag bit 13):
-the glyphs of a run are one region (SG13), which the sink must unite. Without the flag the planning pass refuses the
-stroke, reason `STROKE_CENTERLINE` (30), after the refusals every item can have (`GLYPH_SOURCE`, the gradient and the
-palette) and before the style's, so that strict fails before the target is touched and the stroke is never drawn as
-nothing. A stroke that draws nothing (its notice) is not refused for what it would have drawn, as it requires no
-feature. The test sink's default configuration claims the flag and the toolpath-like one does not; a writer or a GPU
-sink states it for itself.
+the glyphs of a run are one region (SG13), which the sink must unite, and the sink strokes the path ST1 defines. Without
+the flag the planning pass refuses the stroke, reason `STROKE_CENTERLINE` (30), after the refusals every item can have
+(`FACE_UNBOUND`, `GLYPH_SOURCE`, the gradient and the palette) and before the style's, so that strict fails before the
+target is touched and the stroke is never drawn as nothing. A stroke that draws nothing (its notice) is not refused for
+what it would have drawn, as it requires no feature. All of the test sink's configurations claim the flag (a writer emits
+`P` as a stroked path; a pen follows it); a GPU sink states it for itself.
 
 `gshscene_resource_stroke_geometry` converts a style to `shape-geometry`'s parameters, field by field: every
 enumeration is asserted equal at compile time (the libraries state them separately), the doubles are copied, `dashes`
@@ -1024,14 +1072,17 @@ path of the contract is reachable. `tests/sink_conformance.h` runs the same test
 configurations now and against shape-cpu in 13b. A gradient fill's record carries ` grad=<id>`, and the first time a
 render meets a gradient the sink writes its record (`R <id> <hash> space=<space> stops=N` and `r <offset> <r> <g> <b>
 <a>` per resolved stop, the doubles' bits); a fill that draws nothing is an `X class=5` record and is not stamped. A
-stroke's record is `K res=<kind>:<hash> style=<id> map=<hash> box=<x0> <y0> <x1> <y1> expand=<bits> outline=-` (SK10's
-box; `expand` the required features the caps do not emit, 0 for a native stroke; `outline` the expansion's hash once a
-sink computes one), and the first time a render meets a style, its record `Q <id> <hash>` with the style's dump fields
+stroke's record is `K res=<kind>:<hash> style=<id> map=<hash> box=<x0> <y0> <x1> <y1> expand=<bits> outline=<hash>` (SK10's
+box; `expand` the required features the caps do not emit, 0 for a native stroke; `outline` the hash of the stroke's
+expansion at the canonical map, and for a run (ST10) the expansion of ST1's centerline, exactly as for a path, made in a
+scratch of one MiB (its own for the centerline and its glyphs' outlines, carved only when the list holds a stroke of a run)
+and recorded with no `Y` record and no hint entry, the notes of its glyphs reported once the expansion is made), and the first time a render meets a style, its record `Q <id> <hash>` with the style's dump fields
 and a `d` line per dash, once per style per render as a writer emits one; strokes are stamped by their box as fills are.
 Besides its default (every stroke feature native), the conformance suite runs it in a **writer-like** configuration
 (`STROKE_EXPAND`; native: miter, round and bevel joins, every cap, a local width under any map, dashes per subpath:
 SVG 1.1's set) and a **toolpath-like** one (no expansion; native: a round join, round and butt caps, a local width
-under a similarity and a device width, dashes), and `tools/gen-sink-vectors.py` restates all three renders of one
+under a similarity and a device width, dashes; every configuration says `STROKE_RUNS`, a writer emitting ST1's path as a
+stroked path and a pen following it), and `tools/gen-sink-vectors.py` restates all three renders of one
 stroke list, SK10's box (the outward rounding in exact rationals) and SK11's features included.
 `tools/gen-sink-vectors.py` restates the report's
 and the test sink's spellings, and `tests/fuzz/fuzz_render.c` drives requests through it: since strokes story S1 with

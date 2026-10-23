@@ -190,6 +190,7 @@
 #define gshscene_glyph_map GHOTIIO_SHAPE_SCENE(gshscene_glyph_map)
 #define gshscene_glyph_origin GHOTIIO_SHAPE_SCENE(gshscene_glyph_origin)
 #define gshscene_glyph_outline GHOTIIO_SHAPE_SCENE(gshscene_glyph_outline)
+#define gshscene_glyph_run_centerline GHOTIIO_SHAPE_SCENE(gshscene_glyph_run_centerline)
 #define gshscene_glyph_route GHOTIIO_SHAPE_SCENE(gshscene_glyph_route)
 #define gshscene_glyph_scale GHOTIIO_SHAPE_SCENE(gshscene_glyph_scale)
 #define gshscene_glyph_snap_map GHOTIIO_SHAPE_SCENE(gshscene_glyph_snap_map)

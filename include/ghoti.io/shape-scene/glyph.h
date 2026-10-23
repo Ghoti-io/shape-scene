@@ -84,6 +84,28 @@
  * fails with), after which the rest of the run is drawn, and under
  * `GSHSCENE_RENDER_STRICT` the render stops at the item with the finished prefix
  * (S6).  Mode `NONE` gives no `HINT_STATUS` entry.
+ *
+ * ### A stroke of a run (strokes story S5, ST1 and ST3; the rest of the ST-rules are stroke.h's)
+ *
+ * **ST1 The centerline of a run.**  ::gshscene_glyph_run_centerline makes the 2D path `P` of the run's model space
+ * that every sink strokes: for glyph `i` in order, with `G_i` its model map (a run from a font: the map
+ * ::gshscene_glyph_map gives with the identity as the item's map, which is `translate(x_i, y_i)` composed with
+ * `design_to_model(size / upem)`, y flipped; a run from outlines: `translate(x_i, y_i)`) and `O_i` its outline (a font
+ * run's the provider's `glyph_outline`, the general route, in 26.6 design units; an outlines run's own path), every
+ * element of `O_i` in order, each point mapped by `gshgeom_map_apply_point` and each weight kept
+ * (`gshgeom_map_apply_curve`), is appended to `P` with its subpath structure and closes unchanged.  `P` is
+ * **defined** by this construction, as doubles in this order: the expansion's bits are a function of them, so no sink
+ * forms the path another way.  A glyph with no outline (a space, a glyph with only bitmaps) adds nothing and is no
+ * error.  A glyph the provider cannot give, or whose map or mapped point is past `GSHGEOM_COORD_LIMIT`, adds nothing
+ * and has a per-glyph note exactly as a fill's glyph has (`GLYPH_UNAVAILABLE`, `RESOURCE_LIMIT`); the rest of the run
+ * is stroked.  A glyph is added whole or not at all.  A 3D outline is ::GSHSCENE_ERR_UNSUPPORTED.  A run with no
+ * subpath gives an empty path and is no error.  The contours of a font outline are closed subpaths; an outlines run
+ * may carry open subpaths, which get caps like any open subpath.
+ *
+ * **ST3 The general route only.**  Stroking a run reads the provider's `glyph_outline` and `glyph_box` and nothing
+ * else: it never calls ::gshscene_glyph_route, ::gshscene_glyph_device_path or a hint context, writes no `HINT_*`
+ * entry, and is never refused for hinting.  The run's `hint_mode` (`FONT_STRICT` included) and `hint_version` have no
+ * effect on `P`, on the plan's entries for the stroke or on the pixels.
  */
 
 #ifndef GHOTI_IO_GSHSCENE_GLYPH_H
@@ -204,6 +226,22 @@ GSHSCENE_API GSHSCENE_Result gshscene_glyph_device_path(const GSHSCENE_Resource 
  */
 GSHSCENE_API GSHSCENE_Result gshscene_glyph_outline(const GSHSCENE_Resource * run, size_t index,
     const GSHGEOM_Allocator * alloc, const GSHGEOM_Limits * limits, GSHGEOM_Path ** out, GSHSCENE_Glyph_Note * note);
+
+/**
+ * @brief The centerline `P` of a run (ST1, see the file comment): its glyphs' outlines placed in the run's model space.
+ *
+ * @param run A glyph run from a bound face, or from outlines.
+ * @param alloc,limits The paths' (NULL for the defaults); the glyphs' outlines are made, and destroyed, from the same
+ *   allocator, in glyph order.
+ * @param out The path, which the caller destroys; written only on success.
+ * @param notes NULL, or room for one note for each glyph of the run, which this function fills: zero for a glyph that
+ *   was added or has no outline, else the refusal (`GLYPH_UNAVAILABLE`, `RESOURCE_LIMIT`) that left it out.
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, not a run, a face that is not bound);
+ *   ::GSHSCENE_ERR_UNSUPPORTED (a 3D outline); ::GSHSCENE_ERR_LIMIT (the path past @p limits' elements: the run is one
+ *   region and is never stroked in part); ::GSHSCENE_ERR_OOM.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_glyph_run_centerline(const GSHSCENE_Resource * run,
+    const GSHGEOM_Allocator * alloc, const GSHGEOM_Limits * limits, GSHGEOM_Path ** out, GSHSCENE_Glyph_Note * notes);
 
 /**
  * @brief The design box of glyph @p index (the provider's `glyph_box`).

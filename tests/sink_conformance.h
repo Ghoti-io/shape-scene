@@ -2753,6 +2753,79 @@ TEST_P(SinkConformance, S20_AStrokedRunIsNeverRefusedForHinting) {
 }
 
 
+// ST5, ST1 (strokes story S5): a stroke of a run is refused by the plan for an unbound face, for a sink without the
+// provider, and for a sink without runs, in that order; a sink that draws it reports a glyph the provider cannot give as
+// a fill's glyph is reported (a refusal, `second` the glyph's index), strict stops there, and the rest is drawn.
+TEST_P(SinkConformance, S20_AStrokedRunIsPlannedByItsFaceAndNotedByItsGlyphs) {
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    if (!(caps.item_kinds & (1u << GSHSCENE_ITEM_STROKE))) {
+      continue;
+    }
+    GSHSCENE_Stroke_Style st;
+    gshscene_stroke_style_init(&st);
+    st.join = GSHSCENE_STROKE_JOIN_ROUND;
+    st.cap = GSHSCENE_STROKE_CAP_ROUND;
+    st.degenerate = GSHSCENE_STROKE_DEGENERATE_OMIT;
+    const GSHSCENE_Resource * style = nullptr;
+    ASSERT_EQ(gshscene_store_intern_stroke_style(s.store, &st, &style), GSHSCENE_OK);
+    s.held.push_back(style);
+    GSHSCENE_Paint red = solid(1, 0, 0);
+    uint32_t need = GSHSCENE_STROKE_NATIVE_JOIN_ROUND | GSHSCENE_STROKE_NATIVE_CAP_ROUND | GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL;
+    bool styled = (need & ~caps.stroke_native) == 0 || (caps.flags & GSHSCENE_CAP_STROKE_EXPAND);
+    auto stroke_of = [&](const GSHSCENE_Resource * run_res) {
+      GSHSCENE_List * l = s.open();
+      EXPECT_EQ(gshscene_list_stroke(l, run_res, style, nullptr, &red, 0, 0.0), GSHSCENE_OK);
+      EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+      return l;
+    };
+    // (1) an unbound face is refused by the plan, whatever else the sink lacks, and strict stops before the target.
+    const GSHSCENE_Resource * unbound = s.glyphs(s.face(1, 0), {1, 2}, 8.0, GSHSCENE_HINT_FONT_STRICT);
+    const GSHSCENE_List * lu = stroke_of(unbound);
+    auto out = make_surface(kind);
+    ReportRef r;
+    EXPECT_EQ(run(f(), sink.sink, request_for(lu, *out, r.report)).result, GSHSCENE_OK);
+    auto got = entries(r.report);
+    ASSERT_EQ(got.size(), 1u);
+    EXPECT_EQ(got[0].entry_class, GSHSCENE_ENTRY_REFUSED);
+    EXPECT_EQ(got[0].reason, GSHSCENE_REASON_FACE_UNBOUND);
+    auto strict = make_surface(kind);
+    uint64_t before = strict->snapshot();
+    ReportRef sr;
+    GSHSCENE_Render_Request req = request_for(lu, *strict, sr.report);
+    req.flags = GSHSCENE_RENDER_STRICT;
+    EXPECT_EQ(run(f(), sink.sink, req).result, GSHSCENE_ERR_REFUSED);
+    EXPECT_EQ(strict->snapshot(), before) << "strict touched the target";
+    // A sink that cannot stroke this run says why; one that can reports the corrupt glyph (the third of four).
+    if (!(caps.flags & GSHSCENE_CAP_GLYPHS_FROM_FONT) || !(caps.flags & GSHSCENE_CAP_STROKE_RUNS) || !styled) {
+      continue;
+    }
+    const GSHSCENE_List * lg = stroke_of(s.glyphs(s.face(), {1, 2, 4, 3}, 8.0, GSHSCENE_HINT_FONT_STRICT));
+    auto out2 = make_surface(kind);
+    ReportRef r2;
+    EXPECT_EQ(run(f(), sink.sink, request_for(lg, *out2, r2.report)).result, GSHSCENE_OK);
+    auto notes = entries(r2.report);
+    ASSERT_EQ(notes.size(), 1u) << "the note of the glyph, and no hint entry";
+    EXPECT_EQ(notes[0].entry_class, GSHSCENE_ENTRY_REFUSED);
+    EXPECT_EQ(notes[0].reason, GSHSCENE_REASON_GLYPH_UNAVAILABLE);
+    EXPECT_EQ(notes[0].second, 2u);
+    auto strict2 = make_surface(kind);
+    ReportRef sr2;
+    GSHSCENE_Render_Request req2 = request_for(lg, *strict2, sr2.report);
+    req2.flags = GSHSCENE_RENDER_STRICT;
+    EXPECT_EQ(run(f(), sink.sink, req2).result, GSHSCENE_ERR_REFUSED) << "a refused glyph stops a strict render at the item";
+    // A run of spaces draws nothing and is no error, in either mode.
+    const GSHSCENE_List * ls = stroke_of(s.glyphs(s.face(), {0, 0}, 8.0, GSHSCENE_HINT_NONE));
+    auto out3 = make_surface(kind);
+    ReportRef r3;
+    EXPECT_EQ(run(f(), sink.sink, request_for(ls, *out3, r3.report)).result, GSHSCENE_OK);
+    EXPECT_EQ(entries(r3.report).size(), 0u);
+  }
+}
+
 /* --- placeholders (list.h, PH1; sink.h, PH3 to PH6; color-paint story P5) ---------------------------------------- */
 
 namespace sinkconf {

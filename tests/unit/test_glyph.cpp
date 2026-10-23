@@ -1173,6 +1173,366 @@ TEST(GlyphDamage, TheFastTiersPathsComeFromTheScenesAllocatorAndAreFreed) {
   EXPECT_TRUE(t.live.empty());
 }
 
+// --- ST1: the centerline of a run (strokes story S5) ---------------------------------------------------------------
+
+namespace {
+
+/** A point of a test glyph (26.6 design units) mapped by @p m, restated here from the provider's tables. */
+GSHGEOM_Point mapped(const GSHGEOM_Map & m, int32_t x, int32_t y) {
+  GSHGEOM_Point in{(double)x / 64.0, (double)y / 64.0, 0.0};
+  GSHGEOM_Point out{};
+  EXPECT_EQ(gshgeom_map_apply_point(&m, in, &out), GSHGEOM_OK);
+  return out;
+}
+
+/**
+ * ST1 restated: glyph @p glyph of the test provider placed at (@p x, @p y) in a font run of @p size, appended to @p out
+ * element for element under `translate(x, y) . design_to_model(size / upem)`, the points mapped one by one.
+ */
+void restate_font_glyph(GSHGEOM_Path * out, const GSHSCENE_Test_Provider & tp, uint32_t glyph, double x, double y,
+    double size, double upem = 2048.0) {
+  GSHGEOM_Map t;
+  GSHGEOM_Map d;
+  GSHGEOM_Map m;
+  ASSERT_EQ(gshgeom_map_translate(2, x, y, 0.0, &t), GSHGEOM_OK);
+  ASSERT_EQ(gshgeom_map_design_to_model(size / upem, 0.0, 0.0, &d), GSHGEOM_OK);
+  ASSERT_EQ(gshgeom_map_compose(&t, &d, &m), GSHGEOM_OK);
+  size_t n = 0;
+  gshscene_tp_element(&tp, glyph, 0, &n);
+  for (size_t i = 0; i < n; i++) {
+    size_t unused = 0;
+    GSHSCENE_TP_Element e = gshscene_tp_element(&tp, glyph, i, &unused);
+    switch (e.verb) {
+      case 'M':
+        ASSERT_EQ(gshgeom_path_move_to(out, mapped(m, e.p[0], e.p[1])), GSHGEOM_OK);
+        break;
+      case 'L':
+        ASSERT_EQ(gshgeom_path_line_to(out, mapped(m, e.p[0], e.p[1])), GSHGEOM_OK);
+        break;
+      case 'Q':
+        ASSERT_EQ(gshgeom_path_quadratic_to(out, mapped(m, e.p[0], e.p[1]), mapped(m, e.p[2], e.p[3])), GSHGEOM_OK);
+        break;
+      case 'C':
+        ASSERT_EQ(gshgeom_path_cubic_to(out, mapped(m, e.p[0], e.p[1]), mapped(m, e.p[2], e.p[3]),
+                      mapped(m, e.p[4], e.p[5])),
+            GSHGEOM_OK);
+        break;
+      default:
+        ASSERT_EQ(gshgeom_path_close(out), GSHGEOM_OK);
+        break;
+    }
+  }
+}
+
+struct Centerline {
+  GSHGEOM_Path * path = nullptr;
+  std::vector<GSHSCENE_Glyph_Note> notes;
+  GSHSCENE_Result result = GSHSCENE_OK;
+  ~Centerline() { gshgeom_path_destroy(path); }
+};
+
+/** ST1's function on @p run, with a note for each glyph. */
+void centerline_of(const GSHSCENE_Resource * run, Centerline * c, const GSHGEOM_Limits * limits = nullptr,
+    const GSHGEOM_Allocator * alloc = nullptr) {
+  GSHSCENE_Glyph_Run info;
+  ASSERT_EQ(gshscene_resource_glyph_run(run, &info), GSHSCENE_OK);
+  c->notes.assign(info.glyph_count, GSHSCENE_Glyph_Note{7, 7, 7}); // overwritten, every entry
+  c->result = gshscene_glyph_run_centerline(run, alloc, limits, &c->path, c->notes.data());
+}
+
+uint64_t hash_of(const GSHGEOM_Path * p) {
+  return gshgeom_path_hash(p);
+}
+
+}  // namespace
+
+TEST(GlyphCenterline, IsTheOutlinesPlacedElementForElementInTheOneOrder) {
+  Glyphs g;
+  GSHGEOM_Path * want = nullptr;
+  ASSERT_EQ(gshgeom_path_create(nullptr, nullptr, 2, &want), GSHGEOM_OK);
+  // Lines (the rectangle), quadratics (the ring), cubics (the curl) and a zigzag, at fractional positions and a
+  // fractional size: the y flip, the scale and the translation are each in the bits.
+  struct Place { uint32_t glyph; double x, y; };
+  const Place places[] = {{1, 0.0, 0.0}, {2, 31.25, -4.5}, {3, -7.75, 19.0}, {8, 100.5, 3.25}, {1, 0.0, 0.0}};
+  std::vector<GSHSCENE_Glyph> glyphs;
+  for (const Place & pl : places) {
+    glyphs.push_back(GSHSCENE_Glyph{pl.glyph, pl.x, pl.y, nullptr});
+    restate_font_glyph(want, g.tp, pl.glyph, pl.x, pl.y, 13.5);
+  }
+  const GSHSCENE_Resource * run = g.run(g.face(), glyphs, 13.5, GSHSCENE_HINT_NONE);
+  Centerline c;
+  centerline_of(run, &c);
+  ASSERT_EQ(c.result, GSHSCENE_OK);
+  ASSERT_NE(c.path, nullptr);
+  EXPECT_EQ(gshgeom_path_dimension(c.path), 2);
+  EXPECT_EQ(gshgeom_path_element_count(c.path), gshgeom_path_element_count(want));
+  EXPECT_EQ(hash_of(c.path), hash_of(want)) << "bit for bit, element for element";
+  for (const GSHSCENE_Glyph_Note & n : c.notes) {
+    EXPECT_EQ(n.entry_class, 0u) << "a glyph that was added has no note";
+    EXPECT_EQ(n.reason, 0u);
+  }
+  // The same bits whatever the hinting request: ST3 (the general route's outline is all a stroke reads).
+  for (uint32_t mode : {(uint32_t)GSHSCENE_HINT_FONT, (uint32_t)GSHSCENE_HINT_FONT_STRICT}) {
+    const GSHSCENE_Resource * hinted = g.run(g.face(), glyphs, 13.5, mode, 77);
+    Centerline h;
+    centerline_of(hinted, &h);
+    ASSERT_EQ(h.result, GSHSCENE_OK);
+    EXPECT_EQ(hash_of(h.path), hash_of(want)) << "mode " << mode;
+  }
+  EXPECT_EQ(gcu_atomic_size_load(&g.tp.fast_calls), 0u) << "a stroke makes no fast-tier call";
+  gshgeom_path_destroy(want);
+}
+
+TEST(GlyphCenterline, AGlyphWithNoOutlineAddsNothingAndAGlyphTheProviderCannotGiveHasANote) {
+  Glyphs g;
+  // 0 is a space, 4 corrupt, 9 unavailable (ERR_INVALID); 5, 6 and 7 are hinting cases with the rectangle's outline.
+  const std::vector<GSHSCENE_Glyph> glyphs = {{1, 0.0, 0.0, nullptr}, {0, 20.0, 0.0, nullptr}, {4, 40.0, 0.0, nullptr},
+      {2, 60.0, 0.0, nullptr}, {9, 80.0, 0.0, nullptr}, {5, 100.0, 0.0, nullptr}, {6, 120.0, 0.0, nullptr},
+      {7, 140.0, 0.0, nullptr}};
+  const GSHSCENE_Resource * run = g.run(g.face(), glyphs, 16.0, GSHSCENE_HINT_FONT_STRICT);
+  Centerline c;
+  centerline_of(run, &c);
+  ASSERT_EQ(c.result, GSHSCENE_OK) << "a refused glyph is a note, never an error";
+  GSHGEOM_Path * want = nullptr;
+  ASSERT_EQ(gshgeom_path_create(nullptr, nullptr, 2, &want), GSHGEOM_OK);
+  restate_font_glyph(want, g.tp, 1, 0.0, 0.0, 16.0);
+  restate_font_glyph(want, g.tp, 2, 60.0, 0.0, 16.0);
+  restate_font_glyph(want, g.tp, 5, 100.0, 0.0, 16.0);
+  restate_font_glyph(want, g.tp, 6, 120.0, 0.0, 16.0);
+  restate_font_glyph(want, g.tp, 7, 140.0, 0.0, 16.0);
+  EXPECT_EQ(hash_of(c.path), hash_of(want)) << "the others are stroked";
+  gshgeom_path_destroy(want);
+  const uint32_t refused[] = {0, 0, 1, 0, 1, 0, 0, 0};
+  for (size_t i = 0; i < c.notes.size(); i++) {
+    if (refused[i]) {
+      EXPECT_EQ(c.notes[i].entry_class, (uint32_t)GSHSCENE_ENTRY_REFUSED) << i;
+      EXPECT_EQ(c.notes[i].reason, (uint32_t)GSHSCENE_REASON_GLYPH_UNAVAILABLE) << i;
+    } else {
+      EXPECT_EQ(c.notes[i].entry_class, 0u) << i;
+      EXPECT_EQ(c.notes[i].reason, 0u) << i;
+    }
+  }
+  // A run of spaces, and an empty run: an empty path, no error, no note.
+  const GSHSCENE_Resource * spaces = g.run(g.face(), {{0, 0.0, 0.0, nullptr}, {0, 9.0, 0.0, nullptr}}, 16.0);
+  Centerline sp;
+  centerline_of(spaces, &sp);
+  ASSERT_EQ(sp.result, GSHSCENE_OK);
+  EXPECT_EQ(gshgeom_path_element_count(sp.path), 0u);
+  const GSHSCENE_Resource * empty = g.run(g.face(), {}, 16.0);
+  Centerline em;
+  centerline_of(empty, &em);
+  ASSERT_EQ(em.result, GSHSCENE_OK);
+  EXPECT_EQ(gshgeom_path_element_count(em.path), 0u);
+  // Notes are optional.
+  GSHGEOM_Path * p = nullptr;
+  EXPECT_EQ(gshscene_glyph_run_centerline(run, nullptr, nullptr, &p, nullptr), GSHSCENE_OK);
+  gshgeom_path_destroy(p);
+}
+
+TEST(GlyphCenterline, AGlyphIsAddedWholeOrNotAtAll) {
+  Glyphs g;
+  // A scale of 2^40 per design unit puts the curl (glyph 3, x from -101 to 1301 units) over 2^100 at x = 2^100 - 6 * 2^47
+  // for its right half only: its first elements are in range and a later one is not.
+  const double edge = 0x1p100 - 6.0 * 0x1p47;
+  const GSHSCENE_Resource * run = g.run(
+      g.face(), {{1, 0.0, 0.0, nullptr}, {3, edge, 0.0, nullptr}, {2, 40.0, 0.0, nullptr}}, 2048.0 * 0x1p40);
+  ASSERT_NE(run, nullptr);
+  Centerline c;
+  centerline_of(run, &c);
+  ASSERT_EQ(c.result, GSHSCENE_OK);
+  EXPECT_EQ(c.notes[0].entry_class, 0u);
+  EXPECT_EQ(c.notes[1].entry_class, (uint32_t)GSHSCENE_ENTRY_REFUSED);
+  EXPECT_EQ(c.notes[1].reason, (uint32_t)GSHSCENE_REASON_RESOURCE_LIMIT);
+  EXPECT_EQ(c.notes[2].entry_class, 0u);
+  GSHGEOM_Path * want = nullptr;
+  ASSERT_EQ(gshgeom_path_create(nullptr, nullptr, 2, &want), GSHGEOM_OK);
+  restate_font_glyph(want, g.tp, 1, 0.0, 0.0, 2048.0 * 0x1p40);
+  restate_font_glyph(want, g.tp, 2, 40.0, 0.0, 2048.0 * 0x1p40);
+  EXPECT_EQ(hash_of(c.path), hash_of(want)) << "nothing of the glyph past the range, not a prefix of it";
+  gshgeom_path_destroy(want);
+  // A glyph map that cannot be formed (a scale that underflows) is the same note.
+  const GSHSCENE_Resource * tiny = g.run(g.face(), {{1, 0.0, 0.0, nullptr}}, 0x1p-1070);
+  Centerline t;
+  centerline_of(tiny, &t);
+  ASSERT_EQ(t.result, GSHSCENE_OK);
+  EXPECT_EQ(t.notes[0].reason, (uint32_t)GSHSCENE_REASON_RESOURCE_LIMIT);
+  EXPECT_EQ(gshgeom_path_element_count(t.path), 0u);
+}
+
+TEST(GlyphCenterline, ThePathPastTheLimitsIsTheRunsLimitAndAGlyphPastThemIsANote) {
+  Glyphs g;
+  const GSHSCENE_Resource * two = g.run(g.face(), {{2, 0.0, 0.0, nullptr}, {2, 50.0, 0.0, nullptr}}, 16.0);
+  GSHGEOM_Limits limits;
+  gshgeom_limits_default(&limits);
+  limits.max_elements = 20; // the ring is 12 elements: one glyph fits, two do not
+  Centerline c;
+  centerline_of(two, &c, &limits);
+  EXPECT_EQ(c.result, GSHSCENE_ERR_LIMIT) << "a run is one region: never stroked in part";
+  EXPECT_EQ(c.path, nullptr);
+  limits.max_elements = 24;
+  Centerline ok;
+  centerline_of(two, &ok, &limits);
+  EXPECT_EQ(ok.result, GSHSCENE_OK);
+  EXPECT_EQ(gshgeom_path_element_count(ok.path), 24u);
+  // A glyph whose own outline is past the limit is that glyph's note, as a fill's glyph is (the rectangle is ten
+  // elements, the ring twelve): the run is then an empty path, and no error.
+  limits.max_elements = 8;
+  const GSHSCENE_Resource * mixed = g.run(g.face(), {{1, 0.0, 0.0, nullptr}, {2, 50.0, 0.0, nullptr}}, 16.0);
+  Centerline m;
+  centerline_of(mixed, &m, &limits);
+  ASSERT_EQ(m.result, GSHSCENE_OK);
+  for (const GSHSCENE_Glyph_Note & n : m.notes) {
+    EXPECT_EQ(n.entry_class, (uint32_t)GSHSCENE_ENTRY_REFUSED);
+    EXPECT_EQ(n.reason, (uint32_t)GSHSCENE_REASON_RESOURCE_LIMIT);
+  }
+  EXPECT_EQ(gshgeom_path_element_count(m.path), 0u);
+}
+
+TEST(GlyphCenterline, ARunFromOutlinesIsItsPathsUnderTheTranslation) {
+  StoreHolder s;
+  // A path with every verb, open subpaths included, and a rational conic: nothing is closed that was not.
+  GSHGEOM_Path * a = new_path();
+  gshgeom_path_move_to(a, P(1.5, 2.25));
+  gshgeom_path_line_to(a, P(4.0, 2.25));
+  gshgeom_path_quadratic_to(a, P(5.0, 3.0), P(4.5, 6.0));
+  gshgeom_path_cubic_to(a, P(4.0, 8.0), P(2.0, 8.5), P(1.0, 7.0));
+  gshgeom_path_close(a);
+  gshgeom_path_move_to(a, P(10.0, 10.0));
+  const double w3[3] = {1.0, 0.70710678118654757, 1.0};
+  gshgeom_path_rational_quadratic_to(a, P(14.0, 10.0), P(14.0, 14.0), w3);
+  const double w4[4] = {1.0, 2.0, 0.5, 1.0};
+  gshgeom_path_rational_cubic_to(a, P(15.0, 17.0), P(11.0, 19.0), P(10.0, 15.0), w4);
+  Ref pa(scene::intern(s.store, a));
+  GSHGEOM_Path * b = new_path();
+  gshgeom_path_move_to(b, P(0.0, 0.0));
+  gshgeom_path_line_to(b, P(3.0, 1.0));
+  Ref pb(scene::intern(s.store, b));
+  GSHGEOM_Path * none = new_path();
+  Ref pn(scene::intern(s.store, none));
+  const double xs[4] = {5.5, -3.0, 0.0, 17.125};
+  GSHSCENE_Glyph glyphs[4] = {{1, xs[0], 1.0, pa.get()}, {2, xs[1], 2.5, pb.get()}, {3, xs[2], 0.0, pn.get()},
+      {4, xs[3], -8.0, pa.get()}};
+  GSHSCENE_Glyph_Run run{};
+  run.source = GSHSCENE_GLYPHS_FROM_OUTLINES;
+  run.glyph_count = 4;
+  run.glyphs = glyphs;
+  const GSHSCENE_Resource * r = nullptr;
+  ASSERT_EQ(gshscene_store_intern_glyph_run(s.store, &run, &r), GSHSCENE_OK);
+  Ref text(r);
+  Centerline c;
+  centerline_of(text.get(), &c);
+  ASSERT_EQ(c.result, GSHSCENE_OK);
+  // The restatement: read each outline back and place it with the library's own map, point by point.
+  GSHGEOM_Path * want = new_path();
+  for (const GSHSCENE_Glyph & gl : glyphs) {
+    GSHGEOM_Map t;
+    ASSERT_EQ(gshgeom_map_translate(2, gl.x, gl.y, 0.0, &t), GSHGEOM_OK);
+    const GSHGEOM_Path * src = gshscene_resource_path(gl.outline);
+    for (size_t i = 0; i < gshgeom_path_element_count(src); i++) {
+      GSHGEOM_Element e;
+      ASSERT_EQ(gshgeom_path_element(src, i, &e), GSHGEOM_OK);
+      GSHGEOM_Curve m;
+      if (e.verb == GSHGEOM_VERB_CLOSE) {
+        ASSERT_EQ(gshgeom_path_close(want), GSHGEOM_OK);
+        continue;
+      }
+      ASSERT_EQ(gshgeom_map_apply_curve(&t, &e.curve, &m), GSHGEOM_OK);
+      switch (e.verb) {
+        case GSHGEOM_VERB_MOVE: gshgeom_path_move_to(want, m.p[0]); break;
+        case GSHGEOM_VERB_LINE: gshgeom_path_line_to(want, m.p[1]); break;
+        case GSHGEOM_VERB_QUADRATIC: gshgeom_path_quadratic_to(want, m.p[1], m.p[2]); break;
+        case GSHGEOM_VERB_CUBIC: gshgeom_path_cubic_to(want, m.p[1], m.p[2], m.p[3]); break;
+        case GSHGEOM_VERB_RATIONAL_QUADRATIC: gshgeom_path_rational_quadratic_to(want, m.p[1], m.p[2], m.w); break;
+        default: gshgeom_path_rational_cubic_to(want, m.p[1], m.p[2], m.p[3], m.w); break;
+      }
+    }
+  }
+  EXPECT_EQ(hash_of(c.path), hash_of(want));
+  // The weights are kept (the hash covers them, but say it): the conic's middle weight reads back.
+  bool conic = false;
+  for (size_t i = 0; i < gshgeom_path_element_count(c.path); i++) {
+    GSHGEOM_Element e;
+    ASSERT_EQ(gshgeom_path_element(c.path, i, &e), GSHGEOM_OK);
+    if (e.verb == GSHGEOM_VERB_RATIONAL_QUADRATIC && e.curve.w[1] == 0.70710678118654757) {
+      conic = true;
+    }
+  }
+  EXPECT_TRUE(conic);
+  // The first glyph's last subpath is open, and stays open in P (no close was added).
+  GSHGEOM_Element last;
+  ASSERT_EQ(gshgeom_path_element(c.path, gshgeom_path_element_count(c.path) - 1, &last), GSHGEOM_OK);
+  EXPECT_EQ(last.verb, GSHGEOM_VERB_RATIONAL_CUBIC);
+  for (const GSHSCENE_Glyph_Note & n : c.notes) {
+    EXPECT_EQ(n.entry_class, 0u);
+  }
+  gshgeom_path_destroy(want);
+  gshgeom_path_destroy(a);
+  gshgeom_path_destroy(b);
+  gshgeom_path_destroy(none);
+}
+
+TEST(GlyphCenterline, RefusesWhatIsNotARunItCanStrokeAndAnOutlineOfThreeDimensions) {
+  Glyphs g;
+  Ref sq(intern_square(g.s.store));
+  GSHGEOM_Path * out = nullptr;
+  EXPECT_EQ(gshscene_glyph_run_centerline(nullptr, nullptr, nullptr, &out, nullptr), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_glyph_run_centerline(sq.get(), nullptr, nullptr, &out, nullptr), GSHSCENE_ERR_INVALID);
+  const GSHSCENE_Resource * run = g.run(g.face(), {{1, 0.0, 0.0, nullptr}}, 16.0);
+  EXPECT_EQ(gshscene_glyph_run_centerline(run, nullptr, nullptr, nullptr, nullptr), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(out, nullptr);
+  Ref unbound(intern_face(g.s.store));
+  const GSHSCENE_Resource * urun = g.run(unbound.get(), {{1, 0.0, 0.0, nullptr}}, 16.0);
+  EXPECT_EQ(gshscene_glyph_run_centerline(urun, nullptr, nullptr, &out, nullptr), GSHSCENE_ERR_INVALID)
+      << "a face with no provider has no outline; the plan refuses the stroke before a sink gets here";
+  EXPECT_EQ(out, nullptr);
+  GSHGEOM_Path * three = new_path(3);
+  gshgeom_path_move_to(three, P(0, 0, 1));
+  gshgeom_path_line_to(three, P(1, 1, 2));
+  Ref p3(scene::intern(g.s.store, three));
+  gshgeom_path_destroy(three);
+  GSHSCENE_Glyph gl[1] = {{1, 0.0, 0.0, p3.get()}};
+  GSHSCENE_Glyph_Run r3{};
+  r3.source = GSHSCENE_GLYPHS_FROM_OUTLINES;
+  r3.glyph_count = 1;
+  r3.glyphs = gl;
+  const GSHSCENE_Resource * h = nullptr;
+  ASSERT_EQ(gshscene_store_intern_glyph_run(g.s.store, &r3, &h), GSHSCENE_OK);
+  Ref run3(h);
+  EXPECT_EQ(gshscene_glyph_run_centerline(run3.get(), nullptr, nullptr, &out, nullptr), GSHSCENE_ERR_UNSUPPORTED);
+  EXPECT_EQ(out, nullptr);
+}
+
+TEST(GlyphCenterline, EveryAllocationCanFailAndNothingIsLeftBehind) {
+  Glyphs g;
+  const GSHSCENE_Resource * run =
+      g.run(g.face(), {{2, 0.0, 0.0, nullptr}, {4, 10.0, 0.0, nullptr}, {3, 30.0, 4.0, nullptr}}, 14.0);
+  long total = 0;
+  {
+    tracker::Tracker t;
+    GSHGEOM_Allocator a = tracker::allocator_for(&t);
+    Centerline c;
+    centerline_of(run, &c, nullptr, &a);
+    ASSERT_EQ(c.result, GSHSCENE_OK);
+    total = t.calls;
+    EXPECT_GT(total, 3);
+    gshgeom_path_destroy(c.path);
+    c.path = nullptr;
+    EXPECT_TRUE(t.live.empty());
+  }
+  for (long fail = 0; fail < total; fail++) {
+    tracker::Tracker t;
+    t.fail_from = fail;
+    t.persistent = true;
+    GSHGEOM_Allocator a = tracker::allocator_for(&t);
+    Centerline c;
+    centerline_of(run, &c, nullptr, &a);
+    // A provider's outline that cannot be allocated is the render's out of memory too (never a note).
+    EXPECT_EQ(c.result, GSHSCENE_ERR_OOM) << fail;
+    EXPECT_EQ(c.path, nullptr) << fail;
+    EXPECT_TRUE(t.live.empty()) << fail;
+  }
+}
+
 int main(int argc, char ** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

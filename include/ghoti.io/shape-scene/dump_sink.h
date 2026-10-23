@@ -65,10 +65,14 @@
  *
  * **A stroke** (S20) is decided by the caps, as the plan decided it, with the maps of the enclosing instances and the
  * target's (a feature it lacks refuses the stroke, `STROKE_STYLE`, unless the caps say `STROKE_EXPAND`); a stroke the
- * notice predicate says draws nothing is an `X class=5` record; a run from an unbound face, which the plan does not
- * route (SK7), is refused while drawing (`FACE_UNBOUND`); a box past `max_extent` is refused as a fill's is.  A stroke
- * of a run calls no provider: what it draws is the geometry's (strokes story S5), and its box is the run's design
- * boxes placed, as a fill's.
+ * notice predicate says draws nothing is an `X class=5` record; a run from an unbound face is refused by the plan
+ * (ST5, `FACE_UNBOUND`); a box past `max_extent` is refused as a fill's is.  A stroke of a run takes no route, makes
+ * no `Y` record and no hint entry (ST3), and calls the provider's outline only: its `outline=` is the hash of the
+ * expansion of ST1's centerline at the canonical map, exactly as for a path, and the notes of its glyphs (ST1) are
+ * reported once the expansion is made, as a fill's glyphs' are (a glyph refused under strict stops the render at the
+ * item).  Its box is the run's design boxes placed, as a fill's.  A stroke's expansion, of a run as of a path, is made in a scratch of one MiB, and a run's
+ * centerline (with the glyphs' outlines it is made from) in another, each carved from the render's memory only when the list
+ * holds such a stroke, so one that does not fit is the sink's resource limit, in every mode alike.
  *
  * **Stamps** (pixel targets only).  A fill or stroke outside every group stamps its box,
  * rounded out to whole pixels and clipped by the clips in force, the extent and
@@ -93,15 +97,15 @@
  * `P class=N reason=N source=N code=N approx=N map=<hash> box=<x0> <y0> <x1> <y1>` (a placeholder, list.h PH1: the
  * class and reason the planning pass wrote for it, PH3, in every configuration whatever its caps claim; `map` the
  * composed map's hash and `box` the item's box under it in target units, `-` for none; nothing is drawn or stamped),
- * `K res=<kind>:<hash> style=<id> map=<hash> box=<x0> <y0> <x1> <y1> expand=N outline=-` (a stroke, S20: `style`
+ * `K res=<kind>:<hash> style=<id> map=<hash> box=<x0> <y0> <x1> <y1> expand=N outline=<hash>` (a stroke, S20: `style`
  * the style's resource id, `map` the composed map's hash, `box` SK10's bound of the centerline's box in target units
  * (`-` when empty), `expand` the `GSHSCENE_STROKE_NATIVE_*` bits, in decimal, of the features the stroke requires that
  * the caps do not emit (0 for a stroke drawn as a stroke; the rest are expanded, `STROKE_EXPAND`), `outline` the 16 hex
  * digits of `gshgeom_stroke_outline_hash` of the stroke's expansion (strokes story S4, SC10: the style converted by
  * `gshscene_resource_stroke_geometry`, the composed map in pixels, `gshgeom_stroke_canonical_map`, the default tolerance;
  * for every configuration and disposition, a status outline included; on a raster target the very outline shape-cpu
- * draws) and `-` for a run, which has no expansion until strokes story S5; a stroke whose expansion does not fit the
- * sink's scratch is refused, `RESOURCE_LIMIT`; a gradient stroke has ` grad=<id>` before
+ * draws; for a run the expansion of its centerline, strokes story S5, ST10); a stroke whose centerline or expansion does
+ * not fit the sink's scratch is refused, `RESOURCE_LIMIT`; a gradient stroke has ` grad=<id>` before
  * `box=`), or `X class=N reason=N` (a unit not
  * drawn: refused, or inside a refused block, or a gradient fill or a stroke that draws
  * nothing, class 5, `NOTICE`, which is not stamped; sink.h, S17, S20); after a

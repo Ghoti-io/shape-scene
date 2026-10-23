@@ -56,6 +56,21 @@
 #define GLYPH_BYTES ((size_t)65536)
 
 /**
+ * The scratch of a stroke's expansion (strokes stories S4 and S5): one MiB, carved from the render's memory only when the
+ * list holds a stroke (so no list without one has a workspace that moves).  The expansion of a line of text is far past the
+ * 64 KiB of a glyph's paths (a flattened ring is some thousand points, and the allocator keeps every block it has handed out
+ * until the stroke is done).  A stroke whose expansion does not fit is the sink's resource limit, in every mode alike, and a
+ * stroke of a run and a stroke of the path the run defines are alike in this (ST11).
+ */
+#define STROKE_BYTES ((size_t)1048576)
+
+/**
+ * The scratch in which a stroke of a run's centerline is made (ST1): the glyphs' outlines it is made from and the path, one
+ * MiB, carved only when the list holds a stroke of a run.  A run that does not fit is the item's resource limit.
+ */
+#define CENTERLINE_BYTES ((size_t)1048576)
+
+/**
  * The range a box edge is clamped to before it is made a whole pixel: an `int32_t`'s.  A double becomes an
  * integer through a 32-bit conversion only, because i686 has no SSE instruction for a 64-bit one and would use the
  * x87 stack (AD-17, the no-x87 gate).  So the test sink stamps within 2^31 - 1 pixels of the origin.
@@ -117,6 +132,8 @@ typedef struct Run {
   size_t stop_count;
   char * line;
   Glyph_Arena glyphs;     /* the scratch of one glyph's provider paths */
+  Glyph_Arena strokes;    /* the scratch of a stroke's expansion (STROKE_BYTES, or none) */
+  Glyph_Arena centerlines; /* the scratch of a stroke of a run's centerline (CENTERLINE_BYTES, or none) */
   uint64_t * gradients;   /* the ids of the gradients written so far (S17: once per gradient per render) */
   size_t gradient_count;
   uint64_t * styles;      /* the ids of the stroke styles written so far (S20: once per style per render) */
@@ -260,6 +277,32 @@ static void gradient_need(const GSHSCENE_List * list, size_t * fills, size_t * s
   }
 }
 
+/** Whether @p list's expansion holds a stroke (@p any) and a stroke of a glyph run (@p of_run). */
+static void stroke_kinds(const GSHSCENE_List * list, int * any, int * of_run) {
+  size_t count = gshscene_list_count(list);
+  for (size_t i = 0; i < count; i++) {
+    const GSHSCENE_Item * item = NULL;
+    if (gshscene_list_item(list, i, &item) != GSHSCENE_OK) {
+      break;
+    }
+    if (item->kind == GSHSCENE_ITEM_STROKE) {
+      *any = 1;
+      *of_run |= item->resource && item->resource->kind == GSHSCENE_RESOURCE_GLYPH_RUN;
+    } else if (item->kind == GSHSCENE_ITEM_INSTANCE) {
+      stroke_kinds(gshscene_resource_picture(item->resource), any, of_run);
+    }
+  }
+}
+
+/** The bytes of the two stroke scratches @p list needs (STROKE_BYTES and CENTERLINE_BYTES), 0 for one it does not. */
+static void stroke_scratch(const GSHSCENE_List * list, size_t * expansion, size_t * centerline) {
+  int any = 0;
+  int of_run = 0;
+  stroke_kinds(list, &any, &of_run);
+  *expansion = any ? STROKE_BYTES : 0;
+  *centerline = of_run ? CENTERLINE_BYTES : 0;
+}
+
 static size_t align_up(size_t n) {
   return gshscene_sat_add(n, CARVE_ALIGN - 1) & ~(size_t)(CARVE_ALIGN - 1);
 }
@@ -284,6 +327,11 @@ static size_t run_bytes(const GSHSCENE_List * list, size_t * levels, size_t * bl
   n = gshscene_sat_add(n, align_up(gshscene_sat_mul(*stops, sizeof(GSHSCENE_Resolved_Stop))));
   n = gshscene_sat_add(n, align_up(gshscene_sat_mul(*strokes, sizeof(uint64_t))));
   n = gshscene_sat_add(n, GLYPH_BYTES);
+  size_t expansion;
+  size_t centerline;
+  stroke_scratch(list, &expansion, &centerline);
+  n = gshscene_sat_add(n, align_up(expansion));
+  n = gshscene_sat_add(n, align_up(centerline));
   return n;
 }
 
@@ -801,21 +849,27 @@ static GSHSCENE_Result refuse_here(Run * run, const GSHSCENE_Item * item, const 
 }
 
 /**
- * The hash of the stroke's expansion (strokes story S4, SC10): the style converted by the one conversion, the composed
- * map in pixels split by shape-geometry's canonical map, expanded at the default tolerance, and
+ * The hash of the stroke's expansion (strokes stories S4 and S5, SC10, ST10): the style converted by the one conversion,
+ * the composed map in pixels split by shape-geometry's canonical map, expanded at the default tolerance, and
  * `gshgeom_stroke_outline_hash` of the outline, status outlines (EMPTY, NOT_INVERTIBLE) included.  On a raster target
- * this is the very outline shape-cpu draws.  The expansion is made in the glyph scratch (a stroke calls no
- * provider), so it allocates nothing and a stroke whose expansion does not fit it is the sink's resource limit, in
- * every mode alike.  A run has no expansion until strokes story S5: @p has is 0 and the field is `-`.
+ * this is the very outline shape-cpu draws.  The centerline is the path, or for a run ST1's `P`, built by the one
+ * function every sink calls.  The centerline is made in the centerline scratch and the expansion in the stroke scratch (a
+ * stroke calls no route and no hint context), so it allocates nothing, and a stroke whose centerline or expansion do not fit
+ * is the sink's resource limit, in every mode alike.  The notes of the run's glyphs (ST1) are reported once the expansion is made, as a fill's are, and
+ * a refused one stops a strict render here: @p stopped is set and nothing is recorded.
  *
- * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_LIMIT (the scratch, or shape-geometry's limits).
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_LIMIT (the scratch, or shape-geometry's limits); an error of the report.
  */
 static GSHSCENE_Result stroke_outline_hash(Run * run, const GSHSCENE_Item * item, const GSHGEOM_Map * map, uint64_t * hash,
-    int * has) {
+    int * has, const size_t * chain, size_t count, int * stopped) {
   *has = 0;
+  *stopped = 0;
   const GSHGEOM_Path * path = gshscene_resource_path(item->resource);
   GSHGEOM_Stroke params;
-  if (!path) {
+  GSHSCENE_Glyph_Run glyphs;
+  memset(&glyphs, 0, sizeof glyphs);
+  int is_run = !path && gshscene_resource_glyph_run(item->resource, &glyphs) == GSHSCENE_OK;
+  if (!path && !is_run) {
     return GSHSCENE_OK;
   }
   if (gshscene_resource_stroke_geometry(item->style, &params) != GSHSCENE_OK) {
@@ -836,14 +890,52 @@ static GSHSCENE_Result stroke_outline_hash(Run * run, const GSHSCENE_Item * item
   if (gshgeom_stroke_canonical_map(&pixels, &canon, &sx, &sy) != GSHGEOM_OK) {
     return GSHSCENE_ERR_LIMIT;
   }
-  run->glyphs.used = 0;
+  Glyph_Arena * scratch = &run->centerlines;
+  run->strokes.used = 0;
+  scratch->used = 0;
+  GSHGEOM_Path * centerline = NULL;
+  GSHSCENE_Glyph_Note * notes = NULL;
+  if (is_run) {
+    /* ST1: the one function; a scratch too small, or a path past the limits, is the item's resource limit (a run is one
+     * region, never stroked in part). */
+    if (glyphs.glyph_count > 0) {
+      notes = scratch->self.calloc_fn(scratch->self.ctx, glyphs.glyph_count, sizeof *notes);
+      if (!notes) {
+        return GSHSCENE_ERR_LIMIT;
+      }
+    }
+    GSHSCENE_Result cr = gshscene_glyph_run_centerline(item->resource, &scratch->self, NULL, &centerline, notes);
+    if (cr == GSHSCENE_ERR_OOM || cr == GSHSCENE_ERR_LIMIT) {
+      return GSHSCENE_ERR_LIMIT;
+    }
+    if (cr != GSHSCENE_OK) {
+      return GSHSCENE_ERR_INTERNAL;
+    }
+    path = centerline;
+  }
   GSHGEOM_Stroke_Outline * outline = NULL;
-  if (gshgeom_stroke_expand(path, &params, &canon, &run->glyphs.self, NULL, &outline) != GSHGEOM_OK) {
+  if (gshgeom_stroke_expand(path, &params, &canon, &run->strokes.self, NULL, &outline) != GSHGEOM_OK) {
+    gshgeom_path_destroy(centerline);
     return GSHSCENE_ERR_LIMIT;
   }
   *hash = gshgeom_stroke_outline_hash(outline);
   *has = 1;
   gshgeom_stroke_outline_destroy(outline);
+  gshgeom_path_destroy(centerline);
+  for (size_t i = 0; notes && i < glyphs.glyph_count; i++) {
+    if (!notes[i].entry_class) {
+      continue;
+    }
+    GSHSCENE_Result r = gshscene_job_report_glyph(run->job, (GSHSCENE_Entry_Class)notes[i].entry_class,
+        (GSHSCENE_Reason)notes[i].reason, chain, count, i);
+    if (r != GSHSCENE_OK) {
+      return r;
+    }
+    if (notes[i].entry_class == GSHSCENE_ENTRY_REFUSED && (run->job->request.flags & GSHSCENE_RENDER_STRICT)) {
+      *stopped = 1;
+      return GSHSCENE_OK;
+    }
+  }
   return GSHSCENE_OK;
 }
 
@@ -851,8 +943,8 @@ static GSHSCENE_Result stroke_outline_hash(Run * run, const GSHSCENE_Item * item
  * A stroke (S20): its notice (SK8, SK9: an `X` record, not stamped); its box, SK10's bound of its centerline's box
  * (the model box a fill of it would have) under the composed map, in target units; the features it requires that the
  * caps do not emit (expanded, since the plan let it through); then its record, the style's record and the gradient's
- * the first time the render meets them, and its stamp.  A run from an unbound face has no geometry: refused
- * (`FACE_UNBOUND`) while drawing, since the plan routes no stroke (SK7).
+ * the first time the render meets them, and its stamp.  A run from an unbound face has no geometry: the plan refuses
+ * it (ST5), and the check here is only a defense for a caller that skipped the plan.
  */
 static GSHSCENE_Result stroke_unit(Run * run, const GSHSCENE_Item * item, const size_t * chain, size_t count,
     GSHSCENE_Result failed) {
@@ -889,12 +981,16 @@ static GSHSCENE_Result stroke_unit(Run * run, const GSHSCENE_Item * item, const 
   }
   uint64_t outline_hash = 0;
   int has_outline = 0;
-  GSHSCENE_Result sr = stroke_outline_hash(run, item, &map, &outline_hash, &has_outline);
+  int stopped = 0;
+  GSHSCENE_Result sr = stroke_outline_hash(run, item, &map, &outline_hash, &has_outline, chain, count, &stopped);
   if (sr == GSHSCENE_ERR_LIMIT) {
     return refuse_here(run, item, chain, count, GSHSCENE_REASON_RESOURCE_LIMIT, failed);
   }
   if (sr != GSHSCENE_OK) {
     return sr;
+  }
+  if (stopped) {
+    return stop_here(run, chain, count, failed);
   }
   char outline_text[24];
   if (has_outline) {
@@ -1269,6 +1365,11 @@ static GSHSCENE_Result op_begin(void * impl, GSHSCENE_Job * job) {
   run->stop_capacity = stops;
   run->styles = carve(&cursor, strokes * sizeof(uint64_t));
   arena_init(&run->glyphs, carve(&cursor, GLYPH_BYTES), GLYPH_BYTES);
+  size_t expansion_bytes;
+  size_t centerline_bytes;
+  stroke_scratch(request->list, &expansion_bytes, &centerline_bytes);
+  arena_init(&run->strokes, carve(&cursor, expansion_bytes), expansion_bytes);
+  arena_init(&run->centerlines, carve(&cursor, centerline_bytes), centerline_bytes);
   run->sink = ds;
   run->job = job;
   run->memory = memory;

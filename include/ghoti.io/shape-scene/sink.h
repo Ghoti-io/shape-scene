@@ -235,10 +235,13 @@
  * features in the entry's `second`.  A stroke whose centerline is a glyph run is
  * drawn only by a sink whose caps say ::GSHSCENE_CAP_STROKE_RUNS (a run's glyphs
  * are one region, SG13, and the sink must unite them); else the planning pass refuses it,
- * `STROKE_CENTERLINE`, after the refusals every item can have and before the
- * style's, so that strict fails before the target is touched and the stroke is
- * never drawn as nothing; a stroke that draws nothing (its notice) is not refused for
- * its centerline.  A sink reads the style with
+ * `STROKE_CENTERLINE`, after the refusals every item can have (a run from an unbound
+ * face is `FACE_UNBOUND` and one from a font needs `GLYPHS_FROM_FONT`, in that order)
+ * and before the style's, so that strict fails before the target is touched and the
+ * stroke is never drawn as nothing; a stroke that draws nothing (its notice) is not
+ * refused for its face, its provider or its centerline (ST5).  Such a sink strokes the
+ * path ::gshscene_glyph_run_centerline makes (ST1), which a pen follows or a writer
+ * emits as a stroked path.  A sink reads the style with
  * ::gshscene_resource_stroke_style, decides each stroke with
  * ::gshscene_caps_disposition and skips by ::gshscene_stroke_notice (the planning
  * pass wrote the `NOTICE`: width 0, a chain that is not invertible, a degenerate

@@ -635,9 +635,11 @@ namespace {
 
 /** A store holding the resources a stroke list names: paths, runs, a picture, a style, a gradient. */
 struct Kit {
+  GSHSCENE_Test_Provider tp{}; // outlives the store's resources: the bound face keeps a pointer to it
   StoreHolder s;
-  Ref square, fixture, three, outline_run, font_run, face, picture, style, device, gradient, run3;
+  Ref square, fixture, three, outline_run, font_run, face, picture, style, device, gradient, run3, bound_face, bound_run;
   Kit() {
+    tp.upem = 2048;
     square = Ref(intern_square(s.store));
     fixture = Ref(intern_fixture(s.store));
     GSHGEOM_Path * p3 = new_path(3);
@@ -659,6 +661,8 @@ struct Kit {
     EXPECT_EQ(gshscene_store_intern_glyph_run(s.store, &run, &r), GSHSCENE_OK);
     run3 = Ref(r);
     face = Ref(intern_face(s.store));
+    bound_face = Ref(gshscene_tp_face(s.store, &tp, 1, 0x51, 0));
+    bound_run = Ref(intern_font_run(s.store, bound_face.get(), 12.5, {{1, 0.0, 0.0, nullptr}, {2, 7.5, 0.25, nullptr}}, 1, 40));
     font_run = Ref(intern_font_run(s.store, face.get(), 12.5,
         {{36, 0.0, 0.0, nullptr}, {37, 7.5, 0.25, nullptr}, {4294967295u, -1.0, 2.0, nullptr}}, 1, 40));
     ListHolder pl(s.store);
@@ -1855,7 +1859,7 @@ TEST(StrokeDisposition, StrokeStyleIsDecidedAfterTheOtherRefusalsAndBeforeAnyApp
   EXPECT_EQ(d(no_kind, stroke_item(k, zero.get(), id, black)).reason, GSHSCENE_REASON_ITEM_KIND);
   // A run from a font needs GLYPHS_FROM_FONT (SK7), before the style.
   GSHSCENE_Item font = item;
-  font.resource = k.font_run.get();
+  font.resource = k.bound_run.get();
   GSHSCENE_Sink_Caps no_font = bare;
   no_font.flags &= ~GSHSCENE_CAP_GLYPHS_FROM_FONT;
   EXPECT_EQ(d(no_font, font).reason, GSHSCENE_REASON_GLYPH_SOURCE);
@@ -1913,7 +1917,7 @@ TEST(StrokeDisposition, ARunCenterlineNeedsStrokeRunsAndIsRefusedBeforeTheStyle)
   GSHSCENE_Item outline_run = stroke_item(k, k.style.get(), id, black);
   outline_run.resource = k.outline_run.get();
   GSHSCENE_Item font_run = outline_run;
-  font_run.resource = k.font_run.get();
+  font_run.resource = k.bound_run.get();
   // A sink that strokes runs draws both kinds of run; one that does not refuses each, whatever the style says.
   EXPECT_EQ(d(caps, outline_run).entry_class, 0);
   EXPECT_EQ(d(caps, font_run).entry_class, 0);
@@ -1950,6 +1954,68 @@ TEST(StrokeDisposition, ARunCenterlineNeedsStrokeRunsAndIsRefusedBeforeTheStyle)
   GSHSCENE_Item flat_map = outline_run;
   flat_map.map = map_of(0, 0, 0, 1);
   EXPECT_EQ(d(no_runs, flat_map).entry_class, 0);
+}
+
+// ST5 (strokes story S5, X6): a stroke of a run is planned in a stated order, and what draws nothing is refused for none of
+// the three centerline refusals.
+TEST(StrokeDisposition, ARunStrokeIsRefusedForItsFaceItsProviderAndItsCenterlineInThatOrder) {
+  Kit k;
+  GSHSCENE_Paint black = solid(0, 0, 0, 1);
+  GSHGEOM_Map id = translate(0, 0);
+  GSHSCENE_Color_Space srgb = srgb_space();
+  auto d = [&](const GSHSCENE_Sink_Caps & c, const GSHSCENE_Item & it) {
+    return gshscene_caps_disposition(&c, &it, nullptr, 0, nullptr, &srgb, nullptr);
+  };
+  GSHSCENE_Sink_Caps caps = all_caps();
+  GSHSCENE_Item bound = stroke_item(k, k.style.get(), id, black);
+  bound.resource = k.bound_run.get();
+  GSHSCENE_Item unbound = bound;
+  unbound.resource = k.font_run.get();
+  GSHSCENE_Item outlines = bound;
+  outlines.resource = k.outline_run.get();
+  // (1) an unbound face: refused by the plan, whatever the hint mode and whatever the sink says of runs.
+  GSHSCENE_Disposition x = d(caps, unbound);
+  EXPECT_EQ(x.entry_class, GSHSCENE_ENTRY_REFUSED);
+  EXPECT_EQ(x.reason, GSHSCENE_REASON_FACE_UNBOUND);
+  EXPECT_EQ(x.detail, 0u);
+  EXPECT_EQ(d(caps, bound).entry_class, 0) << "a bound face is stroked";
+  EXPECT_EQ(d(caps, outlines).entry_class, 0) << "an outlines run has no face";
+  // (2) the provider, (3) the centerline, (4) the style: each is found only when the ones before it pass.
+  GSHSCENE_Sink_Caps no_font = caps;
+  no_font.flags &= ~GSHSCENE_CAP_GLYPHS_FROM_FONT;
+  EXPECT_EQ(d(no_font, bound).reason, GSHSCENE_REASON_GLYPH_SOURCE);
+  EXPECT_EQ(d(no_font, unbound).reason, GSHSCENE_REASON_FACE_UNBOUND) << "the face is asked first (ST5 (1), (2))";
+  GSHSCENE_Sink_Caps no_runs = caps;
+  no_runs.flags &= ~GSHSCENE_CAP_STROKE_RUNS;
+  EXPECT_EQ(d(no_runs, bound).reason, GSHSCENE_REASON_STROKE_CENTERLINE);
+  EXPECT_EQ(d(no_runs, unbound).reason, GSHSCENE_REASON_FACE_UNBOUND) << "the face before the sink's flag";
+  GSHSCENE_Sink_Caps bare = no_runs;
+  bare.flags &= ~GSHSCENE_CAP_STROKE_EXPAND;
+  bare.stroke_native = 0;
+  EXPECT_EQ(d(bare, bound).reason, GSHSCENE_REASON_STROKE_CENTERLINE) << "the flag before the style";
+  bare.flags |= GSHSCENE_CAP_STROKE_RUNS;
+  EXPECT_EQ(d(bare, bound).reason, GSHSCENE_REASON_STROKE_STYLE);
+  // A fill of the unbound run is a fill's business (the route reports it), not the disposition's.
+  GSHSCENE_Item fill = unbound;
+  fill.kind = GSHSCENE_ITEM_FILL;
+  fill.style = nullptr;
+  EXPECT_EQ(d(caps, fill).entry_class, 0);
+  // What draws nothing is refused for none of them: width 0 and a singular map, on an unbound face, a sink without the
+  // provider and a sink without runs alike.
+  Ref zero;
+  Style z;
+  z.s.width = 0.0;
+  ASSERT_EQ(intern(k.s.store, z, &zero), GSHSCENE_OK);
+  GSHSCENE_Item flat_width = unbound;
+  flat_width.style = zero.get();
+  GSHSCENE_Item flat_map = unbound;
+  flat_map.map = map_of(0, 0, 0, 1);
+  GSHSCENE_Sink_Caps neither = no_runs;
+  neither.flags &= ~GSHSCENE_CAP_GLYPHS_FROM_FONT;
+  for (const GSHSCENE_Item * it : {&flat_width, &flat_map}) {
+    EXPECT_EQ(d(caps, *it).entry_class, 0);
+    EXPECT_EQ(d(neither, *it).entry_class, 0) << "its notice, nothing else";
+  }
 }
 
 TEST(StrokePlan, ThePlanningPassRefusesAndNoticesStrokesBeforeTheSinkIsCalled) {

@@ -120,7 +120,64 @@
  * unhinted route: the planning pass does not call ::gshscene_glyph_route for a
  * stroke, writes no `HINT_STATUS` entry for it and never refuses it for hinting (a
  * `FONT_STRICT` run included).  A run from a font needs `GLYPHS_FROM_FONT` as a
- * fill does (`GLYPH_SOURCE`).
+ * fill does (`GLYPH_SOURCE`).  The rules ST1 to ST7 elaborate it (strokes story S5):
+ *
+ * **ST1 The centerline of a run** is the path ::gshscene_glyph_run_centerline
+ * defines (glyph.h): the glyphs' outlines, each placed by its model map, appended in
+ * order as separate subpaths.  Every sink strokes that path, so a stroke of a run
+ * *is* a stroke of a path.
+ *
+ * **ST2 One union across the run.**  The region of a stroke of a run is the
+ * expansion's region of that path under the item's style and map: **one union over
+ * the item**, so glyphs that overlap, touch or are kerned into each other do not
+ * darken a translucent stroke where they cross, and no join is made between glyphs
+ * (they are separate subpaths).  This is SVG 2's rule for text, a chunk "is filled
+ * and stroked as if it were a single path" (11.9), and the Canvas rule, in which
+ * `strokeText` traces the glyphs' shapes in one stroke operation whose overlapping
+ * parts are treated as their union.  A front end that wants a stroke for each glyph
+ * emits a run for each glyph, and follows its format's chunking in choosing the run
+ * (one SVG text chunk is one run).  Width space, joins, caps, miter limit, dashes,
+ * alignment and the degenerate rule are the expansion's, applied to the path: local
+ * width in the run's model space (so a non-uniform map is the elliptical pen on
+ * text), device width around the mapped path, dashes measured along the path and
+ * restarting per contour or running along the whole path by `dash_scope`, and inside
+ * and outside alignment clipping to the fill region of the path's closed subpaths
+ * under the style's `alignment_rule`.
+ *
+ * **ST3 The general route only**: see glyph.h.  Two runs that differ only in
+ * `hint_mode` and `hint_version` have equal paths and equal expansions.
+ *
+ * **ST4 Color glyphs.**  The path is the outline of the glyph the run names.  `COLR`,
+ * `CPAL`, `SVG` and bitmap tables are never read by a stroke and the face's `COLOR`
+ * flag has no effect.  A color glyph the font's lowering recorded is a list of fills
+ * and clip pushes of one-glyph runs; a stroke of one of those runs is a stroke of
+ * that layer's outline, and a front end that wants a color glyph stroked layer by
+ * layer records the strokes it wants beside the fills (SK14).  A glyph with no outline
+ * adds nothing, and a stroke of a run of such glyphs draws nothing, with no entry,
+ * as a fill of them does.
+ *
+ * **ST5 Planning.**  A stroke of a run is planned in this order, after the refusals
+ * every item can have: a font run's face unbound is `REFUSED`, `FACE_UNBOUND` (as
+ * the route's first step, whatever the hint mode, decided without the route); a font
+ * run needs `GLYPHS_FROM_FONT` (`GLYPH_SOURCE`); the sink must say `STROKE_RUNS`
+ * (`STROKE_CENTERLINE`); then the style (`STROKE_STYLE`, SK11).  A stroke that draws
+ * nothing (its notice) is refused for none of the first three.  So a stroke of a run
+ * is never drawn as nothing, and strict fails before the target is touched.
+ *
+ * **ST6 Paint.**  A solid or gradient paint is sampled in the item's local space,
+ * which for a run is the run's model space, the space of the path and of a fill of
+ * the same run: one gradient spans the run and does not restart for each glyph.
+ * SVG's `objectBoundingBox` of text is "relative to the entire `text` element in all
+ * cases" (11.2): a front end folds that box, without the stroke, into the gradient's
+ * map as it does for a fill, and gives every chunk's stroke of one element the same
+ * map.
+ *
+ * **ST7 Fill and stroke order.**  A text element's fill and stroke are two items on
+ * the **same run resource**, in the order the format gives (SVG's `paint-order`, CSS
+ * `-webkit-text-stroke`, Canvas's two calls): a chunk is painted all its fills then
+ * all its strokes, or the reverse, never glyph by glyph (SVG 2, 11.9).  A front end
+ * that needs the pair composited as one (an element's opacity) wraps both in a
+ * group (SK14).
  *
  * **SK8 Width 0 and hairlines.**  Width 0 has no special meaning: `R` is empty and
  * nothing is drawn, and the planning pass writes a `NOTICE`, reason

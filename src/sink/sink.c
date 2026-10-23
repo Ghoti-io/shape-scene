@@ -142,10 +142,22 @@ GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps, 
     d.reason = GSHSCENE_REASON_ITEM_KIND;
     return d;
   }
-  /* A stroke's paint and centerline are a fill's: the same refusals (SK4, SK7). */
+  /* A stroke's paint and centerline are a fill's: the same refusals (SK4, SK7).  A stroke that draws nothing (its notice,
+   * SK8, SK9) requires nothing of its centerline (ST5): none of the three refusals that follow is made for it. */
   int painted = item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE;
+  int stroked_run = item->kind == GSHSCENE_ITEM_STROKE && item->resource && item->resource->kind == GSHSCENE_RESOURCE_GLYPH_RUN;
+  int draws_nothing = stroked_run && gshscene_stroke_notice(item, instance_maps, instance_count, target_map);
+  /* ST5 (1), X6: a stroke of a run from an unbound face is refused here, before the target is touched, since no route is
+   * asked for a stroke (SK7) to refuse it. */
+  if (stroked_run && !draws_nothing && item->resource->u.glyphs.run.source == GSHSCENE_GLYPHS_FROM_FONT &&
+      !(item->resource->u.glyphs.run.face && item->resource->u.glyphs.run.face->u.face.bound)) {
+    d.entry_class = GSHSCENE_ENTRY_REFUSED;
+    d.reason = GSHSCENE_REASON_FACE_UNBOUND;
+    return d;
+  }
+  /* ST5 (2) */
   if ((painted || item->kind == GSHSCENE_ITEM_CLIP_PUSH) && !(caps->flags & GSHSCENE_CAP_GLYPHS_FROM_FONT) &&
-      glyphs_from_font(item->resource)) {
+      !draws_nothing && glyphs_from_font(item->resource)) {
     d.entry_class = GSHSCENE_ENTRY_REFUSED;
     d.reason = GSHSCENE_REASON_GLYPH_SOURCE;
     return d;
@@ -200,11 +212,8 @@ GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps, 
       return d;
     }
   }
-  /* S20, SK7: a stroke of a run is one region of all its glyphs (SG13), which only a sink that says so unites.  A
-   * stroke that draws nothing (its notice) is not refused for what it would have drawn. */
-  if (item->kind == GSHSCENE_ITEM_STROKE && !(caps->flags & GSHSCENE_CAP_STROKE_RUNS) && item->resource &&
-      item->resource->kind == GSHSCENE_RESOURCE_GLYPH_RUN &&
-      !gshscene_stroke_notice(item, instance_maps, instance_count, target_map)) {
+  /* S20, SK7, ST5 (3): a stroke of a run is one region of all its glyphs (SG13), which only a sink that says so unites. */
+  if (stroked_run && !(caps->flags & GSHSCENE_CAP_STROKE_RUNS) && !draws_nothing) {
     d.entry_class = GSHSCENE_ENTRY_REFUSED;
     d.reason = GSHSCENE_REASON_STROKE_CENTERLINE;
     return d;

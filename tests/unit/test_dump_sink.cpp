@@ -146,7 +146,7 @@ GSHSCENE_Sink * make_writer_like(const GSHSCENE_Allocator * alloc, const GSHSCEN
 GSHSCENE_Dump_Sink_Config config_toolpath_like() {
   GSHSCENE_Dump_Sink_Config c = config_default();
   for (GSHSCENE_Sink_Caps * caps : {&c.raster_caps, &c.stream_caps}) {
-    caps->flags &= ~GSHSCENE_CAP_STROKE_RUNS; // a pen follows one centerline: it does not unite a run's glyphs
+    // A pen follows a run's centerline (ST1's path): it claims STROKE_RUNS like every configuration here (ST10).
     caps->stroke_native = GSHSCENE_STROKE_NATIVE_JOIN_ROUND | GSHSCENE_STROKE_NATIVE_CAP_ROUND |
         GSHSCENE_STROKE_NATIVE_CAP_BUTT | GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL | GSHSCENE_STROKE_NATIVE_WIDTH_DEVICE |
         GSHSCENE_STROKE_NATIVE_DASH;
@@ -155,6 +155,15 @@ GSHSCENE_Dump_Sink_Config config_toolpath_like() {
 }
 GSHSCENE_Sink * make_toolpath_like(const GSHSCENE_Allocator * alloc, const GSHSCENE_Limits * limits) {
   return make_with(config_toolpath_like(), alloc, limits);
+}
+
+/** A sink that draws everything but a stroke of a run: it does not unite a run's glyphs (ST5). */
+GSHSCENE_Dump_Sink_Config config_no_run_strokes() {
+  GSHSCENE_Dump_Sink_Config c = config_default();
+  for (GSHSCENE_Sink_Caps * caps : {&c.raster_caps, &c.stream_caps}) {
+    caps->flags &= ~GSHSCENE_CAP_STROKE_RUNS;
+  }
+  return c;
 }
 
 void step(GSHSCENE_Sink * sink) {
@@ -847,46 +856,217 @@ TEST(DumpSink, TheOutlineFieldIsShapeGeometrysHashOfTheCanonicalExpansion) {
   }
 }
 
-TEST(DumpSink, AStrokeOfARunHasNoExpansionYetAndOneOfAHostilePathIsRefusedAsTheSinksLimit) {
-  // A run: drawn by a configuration that says STROKE_RUNS, with no expansion (`outline=-`) until strokes story S5; a
-  // configuration without it refuses the stroke in the plan, for its centerline.
-  {
-    Scene s;
-    GSHSCENE_Stroke_Style st;
-    gshscene_stroke_style_init(&st);
-    const GSHSCENE_Resource * style = nullptr;
-    ASSERT_EQ(gshscene_store_intern_stroke_style(s.store, &st, &style), GSHSCENE_OK);
-    s.held.push_back(style);
-    GSHSCENE_Paint red = solid(1, 0, 0);
-    GSHSCENE_List * l = s.open();
-    ASSERT_EQ(gshscene_list_stroke(l, s.glyphs(s.face(), {1, 2}, 8.0, GSHSCENE_HINT_NONE), style, nullptr, &red, 0, 0.0),
-        GSHSCENE_OK);
-    ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
-    SinkRef full(make_with(config_default(), nullptr, nullptr));
+namespace {
+
+/** The `outline=` field of the first stroke record of @p text, or empty. */
+std::string outline_field(const std::string & text) {
+  size_t at = text.find(" outline=");
+  if (at == std::string::npos) {
+    return "";
+  }
+  size_t end = text.find('\n', at);
+  return text.substr(at + 9, end - at - 9);
+}
+
+/** The hash of the expansion of the path @p p under @p style at the identity map in pixels, shape-geometry called directly. */
+uint64_t direct_path_outline(const GSHGEOM_Path * p, const GSHSCENE_Resource * style) {
+  GSHGEOM_Stroke g;
+  EXPECT_EQ(gshscene_resource_stroke_geometry(style, &g), GSHSCENE_OK);
+  GSHGEOM_Map id;
+  gshgeom_map_identity(2, &id);
+  GSHGEOM_Map canon;
+  int64_t sx = 0;
+  int64_t sy = 0;
+  EXPECT_EQ(gshgeom_stroke_canonical_map(&id, &canon, &sx, &sy), GSHGEOM_OK);
+  GSHGEOM_Stroke_Outline * o = nullptr;
+  EXPECT_EQ(gshgeom_stroke_expand(p, &g, &canon, nullptr, nullptr, &o), GSHGEOM_OK);
+  uint64_t h = gshgeom_stroke_outline_hash(o);
+  gshgeom_stroke_outline_destroy(o);
+  return h;
+}
+
+}  // namespace
+
+TEST(DumpSink, AStrokeOfARunRecordsTheHashOfTheExpansionOfItsCenterlineAndAnotherConfigurationMayNotStrokeRuns) {
+  // ST10: `outline=` is the hash of the expansion of ST1's path at the canonical map, exactly as for a path; a
+  // configuration that does not say STROKE_RUNS refuses the stroke in the plan, for its centerline (ST5).
+  Scene s;
+  GSHSCENE_Stroke_Style st;
+  gshscene_stroke_style_init(&st);
+  st.width = 1.5;
+  st.join = GSHSCENE_STROKE_JOIN_ROUND; // a pen follows it: round join and butt cap are native there
+  const GSHSCENE_Resource * style = nullptr;
+  ASSERT_EQ(gshscene_store_intern_stroke_style(s.store, &st, &style), GSHSCENE_OK);
+  s.held.push_back(style);
+  GSHSCENE_Paint red = solid(1, 0, 0);
+  const GSHSCENE_Resource * text = s.glyphs(s.face(), {1, 2}, 8.0, GSHSCENE_HINT_NONE);
+  GSHSCENE_List * l = s.open();
+  ASSERT_EQ(gshscene_list_stroke(l, text, style, nullptr, &red, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  // The centerline is ST1's path, interned as a path of its own: a stroke of it is the same stroke (ST11).
+  GSHGEOM_Path * centerline = nullptr;
+  ASSERT_EQ(gshscene_glyph_run_centerline(text, nullptr, nullptr, &centerline, nullptr), GSHSCENE_OK);
+  const GSHSCENE_Resource * as_path = nullptr;
+  ASSERT_EQ(gshscene_store_intern_path(s.store, centerline, &as_path), GSHSCENE_OK);
+  s.held.push_back(as_path);
+  GSHSCENE_List * lp = s.open();
+  ASSERT_EQ(gshscene_list_stroke(lp, as_path, style, nullptr, &red, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(lp), GSHSCENE_OK);
+  char want[40];
+  std::snprintf(want, sizeof want, "%016llx", (unsigned long long)direct_path_outline(centerline, style));
+  gshgeom_path_destroy(centerline);
+  for (const GSHSCENE_Dump_Sink_Config & config : {config_default(), config_writer_like(), config_toolpath_like()}) {
+    SinkRef sink(make_with(config, nullptr, nullptr));
     auto stream = make_stream(GSHSCENE_UNIT_PIXEL);
     ReportRef report;
-    ASSERT_EQ(render_job(full.sink, request_for(l, *stream, report.report)).result, GSHSCENE_OK);
+    ASSERT_EQ(render_job(sink.sink, request_for(l, *stream, report.report)).result, GSHSCENE_OK);
     EXPECT_NE(stream->bytes.find(" K res=glyph-run:"), std::string::npos) << stream->bytes;
-    EXPECT_NE(stream->bytes.find(" expand=0 outline=-\n"), std::string::npos) << stream->bytes;
-    SinkRef pen(make_with(config_toolpath_like(), nullptr, nullptr));
-    auto stream2 = make_stream(GSHSCENE_UNIT_PIXEL);
-    ReportRef report2;
-    ASSERT_EQ(render_job(pen.sink, request_for(l, *stream2, report2.report)).result, GSHSCENE_OK);
-    EXPECT_EQ(stream2->bytes.find(" K res="), std::string::npos) << "refused in the plan, never recorded";
-    GSHSCENE_Report_Summary sum2{};
-    ASSERT_EQ(gshscene_report_summary(report2.report, &sum2), GSHSCENE_OK);
-    ASSERT_EQ(sum2.by_class[GSHSCENE_ENTRY_REFUSED], 1u);
-    GSHSCENE_Report_Entry e;
-    ASSERT_EQ(gshscene_report_entry(report2.report, 0, &e), GSHSCENE_OK);
-    EXPECT_EQ(e.reason, GSHSCENE_REASON_STROKE_CENTERLINE);
+    EXPECT_EQ(outline_field(stream->bytes), want) << stream->bytes;
+    EXPECT_EQ(stream->bytes.find(" Y "), std::string::npos) << "a stroke takes no route: no glyph record (ST10)";
+    EXPECT_EQ(entries(report.report).size(), 0u);
+    auto stream_p = make_stream(GSHSCENE_UNIT_PIXEL);
+    ReportRef report_p;
+    ASSERT_EQ(render_job(sink.sink, request_for(lp, *stream_p, report_p.report)).result, GSHSCENE_OK);
+    EXPECT_EQ(outline_field(stream_p->bytes), want) << "the stroke of the run is the stroke of its path";
   }
-  // A zigzag of 4000 segments under a wide round-join stroke expands past the 64 KiB scratch: the sink's own limit.
+  SinkRef pen(make_with(config_no_run_strokes(), nullptr, nullptr));
+  auto stream2 = make_stream(GSHSCENE_UNIT_PIXEL);
+  ReportRef report2;
+  ASSERT_EQ(render_job(pen.sink, request_for(l, *stream2, report2.report)).result, GSHSCENE_OK);
+  EXPECT_EQ(stream2->bytes.find(" K res="), std::string::npos) << "refused in the plan, never recorded";
+  GSHSCENE_Report_Summary sum2{};
+  ASSERT_EQ(gshscene_report_summary(report2.report, &sum2), GSHSCENE_OK);
+  ASSERT_EQ(sum2.by_class[GSHSCENE_ENTRY_REFUSED], 1u);
+  GSHSCENE_Report_Entry e;
+  ASSERT_EQ(gshscene_report_entry(report2.report, 0, &e), GSHSCENE_OK);
+  EXPECT_EQ(e.reason, GSHSCENE_REASON_STROKE_CENTERLINE);
+  // A run from outlines is a centerline too.
+  GSHSCENE_Glyph oglyphs[2] = {{1, 0.0, 0.0, s.sq(0, 0, 4)}, {2, 7.0, 1.0, s.sq(0, 0, 3)}};
+  GSHSCENE_Glyph_Run orun{};
+  orun.source = GSHSCENE_GLYPHS_FROM_OUTLINES;
+  orun.glyph_count = 2;
+  orun.glyphs = oglyphs;
+  const GSHSCENE_Resource * otext = nullptr;
+  ASSERT_EQ(gshscene_store_intern_glyph_run(s.store, &orun, &otext), GSHSCENE_OK);
+  s.held.push_back(otext);
+  GSHSCENE_List * lo = s.open();
+  ASSERT_EQ(gshscene_list_stroke(lo, otext, style, nullptr, &red, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(lo), GSHSCENE_OK);
+  SinkRef full(make_with(config_default(), nullptr, nullptr));
+  auto stream3 = make_stream(GSHSCENE_UNIT_PIXEL);
+  ReportRef report3;
+  ASSERT_EQ(render_job(full.sink, request_for(lo, *stream3, report3.report)).result, GSHSCENE_OK);
+  EXPECT_EQ(outline_field(stream3->bytes).size(), 16u) << stream3->bytes;
+}
+
+TEST(DumpSink, AGlyphOfAStrokedRunTheProviderCannotGiveIsANoteAndAnUnboundFaceIsRefusedByThePlan) {
+  Scene s;
+  GSHSCENE_Stroke_Style st;
+  gshscene_stroke_style_init(&st);
+  st.width = 1.0;
+  const GSHSCENE_Resource * style = nullptr;
+  ASSERT_EQ(gshscene_store_intern_stroke_style(s.store, &st, &style), GSHSCENE_OK);
+  s.held.push_back(style);
+  GSHSCENE_Paint red = solid(1, 0, 0);
+  // Glyph 4 is corrupt: its note (second = 1) is reported; the others are stroked, as in the path of the two.
+  const GSHSCENE_Resource * face = s.face();
+  auto make_run = [&](const GSHSCENE_Resource * f, std::vector<GSHSCENE_Glyph> g, uint32_t mode) {
+    GSHSCENE_Glyph_Run run{};
+    run.source = GSHSCENE_GLYPHS_FROM_FONT;
+    run.face = f;
+    run.size = 8.0;
+    run.hint_mode = mode;
+    run.glyph_count = g.size();
+    run.glyphs = g.data();
+    const GSHSCENE_Resource * r = nullptr;
+    EXPECT_EQ(gshscene_store_intern_glyph_run(s.store, &run, &r), GSHSCENE_OK);
+    s.held.push_back(r);
+    return r;
+  };
+  const GSHSCENE_Resource * three =
+      make_run(face, {{1, 2.0, 40.0, nullptr}, {4, 13.0, 40.0, nullptr}, {2, 24.0, 40.0, nullptr}}, GSHSCENE_HINT_NONE);
+  const GSHSCENE_Resource * two =
+      make_run(face, {{1, 2.0, 40.0, nullptr}, {2, 24.0, 40.0, nullptr}}, GSHSCENE_HINT_NONE);
+  GSHSCENE_List * la = s.open();
+  ASSERT_EQ(gshscene_list_stroke(la, three, style, nullptr, &red, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(la), GSHSCENE_OK);
+  GSHSCENE_List * lb = s.open();
+  ASSERT_EQ(gshscene_list_stroke(lb, two, style, nullptr, &red, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(lb), GSHSCENE_OK);
+  SinkRef sink(make_with(config_default(), nullptr, nullptr));
+  auto sa = make_stream(GSHSCENE_UNIT_PIXEL);
+  ReportRef ra;
+  ASSERT_EQ(render_job(sink.sink, request_for(la, *sa, ra.report)).result, GSHSCENE_OK);
+  auto sb = make_stream(GSHSCENE_UNIT_PIXEL);
+  ReportRef rb;
+  ASSERT_EQ(render_job(sink.sink, request_for(lb, *sb, rb.report)).result, GSHSCENE_OK);
+  EXPECT_EQ(outline_field(sa->bytes), outline_field(sb->bytes)) << "the corrupt glyph adds nothing";
+  auto got = entries(ra.report);
+  ASSERT_EQ(got.size(), 1u);
+  EXPECT_EQ(got[0].entry_class, GSHSCENE_ENTRY_REFUSED);
+  EXPECT_EQ(got[0].reason, GSHSCENE_REASON_GLYPH_UNAVAILABLE);
+  EXPECT_EQ(got[0].second, 1u);
+  EXPECT_EQ(entries(rb.report).size(), 0u);
+  // Under strict a refused glyph stops the render at the item, before it is recorded.
+  auto ss = make_stream(GSHSCENE_UNIT_PIXEL);
+  ReportRef rs;
+  GSHSCENE_Render_Request req = request_for(la, *ss, rs.report);
+  req.flags = GSHSCENE_RENDER_STRICT;
+  EXPECT_EQ(render_job(sink.sink, req).result, GSHSCENE_ERR_REFUSED);
+  EXPECT_EQ(ss->bytes.find(" K res="), std::string::npos);
+  // An unbound face: the plan refuses (ST5), whatever the hint mode; strict fails before the sink is called.
+  const GSHSCENE_Resource * unbound = make_run(s.face(1, 0), {{1, 2.0, 40.0, nullptr}}, GSHSCENE_HINT_FONT_STRICT);
+  GSHSCENE_List * lu = s.open();
+  ASSERT_EQ(gshscene_list_stroke(lu, unbound, style, nullptr, &red, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(lu), GSHSCENE_OK);
+  auto su = make_stream(GSHSCENE_UNIT_PIXEL);
+  ReportRef ru;
+  EXPECT_EQ(render_job(sink.sink, request_for(lu, *su, ru.report)).result, GSHSCENE_OK);
+  auto gu = entries(ru.report);
+  ASSERT_EQ(gu.size(), 1u);
+  EXPECT_EQ(gu[0].entry_class, GSHSCENE_ENTRY_REFUSED);
+  EXPECT_EQ(gu[0].reason, GSHSCENE_REASON_FACE_UNBOUND);
+  EXPECT_EQ(su->bytes.find(" K res="), std::string::npos);
+  auto su2 = make_stream(GSHSCENE_UNIT_PIXEL);
+  ReportRef ru2;
+  GSHSCENE_Render_Request req2 = request_for(lu, *su2, ru2.report);
+  req2.flags = GSHSCENE_RENDER_STRICT;
+  EXPECT_EQ(render_job(sink.sink, req2).result, GSHSCENE_ERR_REFUSED);
+  EXPECT_EQ(su2->bytes.size(), 0u) << "strict failed before the target was touched";
+}
+
+TEST(DumpSink, AStrokeOfARunNeedsNoHintStatusAndMakesNoFastTierCall) {
+  // ST3: a strict-hinted run at a hinting size on a grid-aligned map is stroked on the general route alone.
+  Scene s;
+  GSHSCENE_Stroke_Style st;
+  gshscene_stroke_style_init(&st);
+  st.width = 1.0;
+  const GSHSCENE_Resource * style = nullptr;
+  ASSERT_EQ(gshscene_store_intern_stroke_style(s.store, &st, &style), GSHSCENE_OK);
+  s.held.push_back(style);
+  GSHSCENE_Paint red = solid(1, 0, 0);
+  const GSHSCENE_Resource * text = s.glyphs(s.face(), {1, 2}, 16.0, GSHSCENE_HINT_FONT_STRICT);
+  GSHSCENE_List * l = s.open();
+  ASSERT_EQ(gshscene_list_stroke(l, text, style, nullptr, &red, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  SinkRef sink(make_with(config_default(), nullptr, nullptr));
+  auto stream = make_stream(GSHSCENE_UNIT_PIXEL);
+  ReportRef report;
+  ASSERT_EQ(render_job(sink.sink, request_for(l, *stream, report.report)).result, GSHSCENE_OK);
+  EXPECT_EQ(entries(report.report).size(), 0u);
+  EXPECT_EQ(gcu_atomic_size_load(&s.provider.fast_calls), 0u);
+  EXPECT_GT(gcu_atomic_size_load(&s.provider.outline_calls), 0u);
+}
+
+TEST(DumpSink, AStrokeOfARunHasNoCenterlineForAHostilePathAndOneOfItIsRefusedAsTheSinksLimit) {
+  // A zigzag of 60000 segments under a wide round-join stroke expands past the one MiB of the stroke scratch: the sink's own
+  // limit.
   {
     Scene s;
     GSHGEOM_Path * p = nullptr;
     ASSERT_EQ(gshgeom_path_create(nullptr, nullptr, 2, &p), GSHGEOM_OK);
     gshgeom_path_move_to(p, GSHGEOM_Point{0, 0, 0});
-    for (int i = 1; i <= 4000; i++) {
+    for (int i = 1; i <= 60000; i++) {
       gshgeom_path_line_to(p, GSHGEOM_Point{(double)i * 0.01, (i % 2) ? 5.0 : 0.0, 0});
     }
     const GSHSCENE_Resource * path = nullptr;

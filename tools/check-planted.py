@@ -2233,10 +2233,10 @@ PLANTS += [
     ('s20-h-cap-stroke-runs', 'hdr', HS, '#define GSHSCENE_CAP_STROKE_RUNS (UINT32_C(1) << 13)', '#define GSHSCENE_CAP_STROKE_RUNS (UINT32_C(1) << 12)', ["testSink", "testStroke"]),
     ('s20-h-reason-centerline', 'hdr', HRP, '  GSHSCENE_REASON_STROKE_CENTERLINE = 30,', '  GSHSCENE_REASON_STROKE_CENTERLINE = 29,', ["testReport", "testStroke"]),
     ('s20-centerline-reason-name', 'src', RP, '      return "stroke-centerline";', '      return "stroke-centerlines";', ["testReport"]),
-    ('s20-centerline-no-refusal', 'src', SK, '  if (item->kind == GSHSCENE_ITEM_STROKE && !(caps->flags & GSHSCENE_CAP_STROKE_RUNS) && item->resource &&', '  if (0 && item->kind == GSHSCENE_ITEM_STROKE && !(caps->flags & GSHSCENE_CAP_STROKE_RUNS) && item->resource &&', K),
-    ('s20-centerline-flag-ignored', 'src', SK, '  if (item->kind == GSHSCENE_ITEM_STROKE && !(caps->flags & GSHSCENE_CAP_STROKE_RUNS) && item->resource &&', '  if (item->kind == GSHSCENE_ITEM_STROKE && item->resource &&', K),
-    ('s20-centerline-path-refused', 'src', SK, '      item->resource->kind == GSHSCENE_RESOURCE_GLYPH_RUN &&\n      !gshscene_stroke_notice(', '      item->resource->kind != GSHSCENE_RESOURCE_GLYPH_RUN &&\n      !gshscene_stroke_notice(', K),
-    ('s20-centerline-nothing-refused', 'src', SK, '      item->resource->kind == GSHSCENE_RESOURCE_GLYPH_RUN &&\n      !gshscene_stroke_notice(item, instance_maps, instance_count, target_map)) {', '      item->resource->kind == GSHSCENE_RESOURCE_GLYPH_RUN) {', K),
+    ('s20-centerline-no-refusal', 'src', SK, '  if (stroked_run && !(caps->flags & GSHSCENE_CAP_STROKE_RUNS) && !draws_nothing) {', '  if (0 && stroked_run && !(caps->flags & GSHSCENE_CAP_STROKE_RUNS) && !draws_nothing) {', K),
+    ('s20-centerline-flag-ignored', 'src', SK, '  if (stroked_run && !(caps->flags & GSHSCENE_CAP_STROKE_RUNS) && !draws_nothing) {', '  if (stroked_run && !draws_nothing) {', K),
+    ('s20-centerline-path-refused', 'src', SK, '  int stroked_run = item->kind == GSHSCENE_ITEM_STROKE && item->resource && item->resource->kind == GSHSCENE_RESOURCE_GLYPH_RUN;', '  int stroked_run = item->kind == GSHSCENE_ITEM_STROKE && item->resource && item->resource->kind != GSHSCENE_RESOURCE_GLYPH_RUN;', K),
+    ('s20-centerline-nothing-refused', 'src', SK, '  if (stroked_run && !(caps->flags & GSHSCENE_CAP_STROKE_RUNS) && !draws_nothing) {', '  if (stroked_run && !(caps->flags & GSHSCENE_CAP_STROKE_RUNS)) {', K),
     ('s20-centerline-reason', 'src', SK, '    d.reason = GSHSCENE_REASON_STROKE_CENTERLINE;', '    d.reason = GSHSCENE_REASON_STROKE_STYLE;', K),
     ('s20-centerline-class', 'src', SK, '    d.entry_class = GSHSCENE_ENTRY_REFUSED;\n    d.reason = GSHSCENE_REASON_STROKE_CENTERLINE;', '    d.entry_class = GSHSCENE_ENTRY_APPROXIMATED;\n    d.reason = GSHSCENE_REASON_STROKE_CENTERLINE;', K),
     ('ds-s20-default-stroke-runs', 'src', DS, '      GSHSCENE_CAP_STROKE_RUNS |', '      0 |', ["testDump_sink"]),
@@ -2260,12 +2260,48 @@ PLANTS += [
     ('sc2-check-dropped', 'src', SKC, '  if (gshgeom_stroke_check(&g) != GSHGEOM_OK) {', '  if (0) {', K),
     # strokes story S4 (SC10): the test sink's outline= field
     ('ds-s20-outline-pixel-scale', 'src', DS, '        gshgeom_map_scale(2, 1.0 / size, 1.0 / size, 1.0, &scale) != GSHGEOM_OK ||', '        gshgeom_map_scale(2, size, size, 1.0, &scale) != GSHGEOM_OK ||', ["testDump_sink"]),
-    ('ds-s20-outline-not-canonical', 'src', DS, '  if (gshgeom_stroke_expand(path, &params, &canon, &run->glyphs.self, NULL, &outline) != GSHGEOM_OK) {', '  if (gshgeom_stroke_expand(path, &params, &pixels, &run->glyphs.self, NULL, &outline) != GSHGEOM_OK) {', ["testDump_sink"]),
+    ('ds-s20-outline-not-canonical', 'src', DS, '  if (gshgeom_stroke_expand(path, &params, &canon, &run->strokes.self, NULL, &outline) != GSHGEOM_OK) {', '  if (gshgeom_stroke_expand(path, &params, &pixels, &run->strokes.self, NULL, &outline) != GSHGEOM_OK) {', ["testDump_sink"]),
     ('ds-s20-outline-unmapped', 'src', DS, '  GSHGEOM_Map pixels = *map;', '  GSHGEOM_Map pixels;\n  gshgeom_map_identity(2, &pixels);', ["testDump_sink"]),
-    ('ds-s20-outline-limit-ignored', 'src', DS, '  if (gshgeom_stroke_expand(path, &params, &canon, &run->glyphs.self, NULL, &outline) != GSHGEOM_OK) {\n    return GSHSCENE_ERR_LIMIT;', '  if (gshgeom_stroke_expand(path, &params, &canon, &run->glyphs.self, NULL, &outline) != GSHGEOM_OK) {\n    return GSHSCENE_ERR_INTERNAL;', ["testDump_sink"]),
+    ('ds-s20-outline-limit-ignored', 'src', DS, '  if (gshgeom_stroke_expand(path, &params, &canon, &run->strokes.self, NULL, &outline) != GSHGEOM_OK) {\n    gshgeom_path_destroy(centerline);\n    return GSHSCENE_ERR_LIMIT;', '  if (gshgeom_stroke_expand(path, &params, &canon, &run->strokes.self, NULL, &outline) != GSHGEOM_OK) {\n    gshgeom_path_destroy(centerline);\n    return GSHSCENE_ERR_INTERNAL;', ["testDump_sink"]),
     ('ds-s20-outline-run-spelled', 'src', DS, '    snprintf(outline_text, sizeof outline_text, "-");', '    snprintf(outline_text, sizeof outline_text, "0");', ["testDump_sink"]),
     ('ds-s20-outline-hash-not-written', 'src', DS, '    snprintf(outline_text, sizeof outline_text, "%016" PRIx64, outline_hash);', '    snprintf(outline_text, sizeof outline_text, "%016" PRIx64, (uint64_t)0);', ["testDump_sink"]),
     ('sc2-status-of-bad-style', 'src', SKC, '    return GSHSCENE_ERR_INTERNAL; /* SK2 equals SG2: a style the store holds passes */', '    return GSHSCENE_ERR_INVALID;', K),
+]
+
+# strokes story S5 (ST1 to ST5, ST10): the centerline of a run, the planning of a stroke of a run, and the test sink's expansion
+# of it.  Written with the story; the sweep is deferred to the consolidated pass (the strokes plan's deferred-verification).
+GLC = ["testGlyph", "testDump_sink"]
+PLANTS += [
+    ('st1-y-flip-skipped', 'src', GL, '      GSHSCENE_Result m = gshscene_glyph_map(run, &identity, i, &glyph_map);\n', '      GSHSCENE_Result m = gshscene_glyph_map(run, &identity, i, &glyph_map);\n      glyph_map.m[1][1] = -glyph_map.m[1][1];\n', GLC),
+    ('st1-weights-lost', 'src', GL, '      return gshgeom_path_rational_quadratic_to(path, p[1], p[2], mapped->w);', '      return gshgeom_path_rational_quadratic_to(path, p[1], p[2], (const double[3]){1.0, 1.0, 1.0});', GLC),
+    ('st1-cubic-weights-lost', 'src', GL, '      return gshgeom_path_rational_cubic_to(path, p[1], p[2], p[3], mapped->w);', '      return gshgeom_path_rational_cubic_to(path, p[1], p[2], p[3], (const double[4]){1.0, 1.0, 1.0, 1.0});', GLC),
+    ('st1-translate-swapped', 'src', GL, '      if (gshgeom_map_translate(2, glyph->x, glyph->y, 0.0, &glyph_map) != GSHGEOM_OK) {', '      if (gshgeom_map_translate(2, glyph->y, glyph->x, 0.0, &glyph_map) != GSHGEOM_OK) {', GLC),
+    ('st1-close-dropped', 'src', GL, '    case GSHGEOM_VERB_CLOSE:\n      return gshgeom_path_close(path);', '    case GSHGEOM_VERB_CLOSE:\n      return GSHGEOM_OK;', GLC),
+    ('st1-glyphs-reversed', 'src', GL, '  for (size_t i = 0; i < count && result == GSHSCENE_OK; i++) {\n    const GSHSCENE_Glyph * glyph = &run->u.glyphs.glyphs[i];', '  for (size_t j = 0; j < count && result == GSHSCENE_OK; j++) {\n    size_t i = count - 1 - j;\n    const GSHSCENE_Glyph * glyph = &run->u.glyphs.glyphs[i];', GLC),
+    ('st1-glyph-partial', 'src', GL, '    if (map_element(map, &e, &mapped) != GSHGEOM_OK) {\n      *refused = 1;\n      return GSHGEOM_OK;\n    }\n  }', '    (void)mapped;\n  }', GLC),
+    ('st1-note-dropped', 'src', GL, '    if (notes) {\n      notes[i] = note;\n    }', '    (void)note;', GLC),
+    ('st1-unbound-accepted', 'src', GL, '  if (from_font && !(run_face(run) && run_face(run)->u.face.bound)) {', '  if (0) {', GLC),
+    ('st1-3d-accepted', 'src', GL, '    if (outline && gshgeom_path_dimension(outline) != 2) {', '    if (0) {', GLC),
+    ('st1-limit-swallowed', 'src', GL, '        result = g == GSHGEOM_ERR_INTERNAL ? GSHSCENE_ERR_INTERNAL : from_geometry(g);', '        result = GSHSCENE_OK;', GLC),
+    ('st1-glyph-limit-no-note', 'src', GL, '      } else if (refused) {\n        note_set(&note, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_RESOURCE_LIMIT);\n      }', '      }', GLC),
+    ('st1-hinted-outline', 'src', GL, '        m = gshscene_glyph_outline(run, i, alloc, limits, &owned, &note);', '        m = gshscene_glyph_outline(run, i, alloc, limits, &owned, &note);\n        if (m == GSHSCENE_OK && run->u.glyphs.run.hint_mode != GSHSCENE_HINT_NONE) {\n          gshgeom_path_destroy(owned);\n          owned = NULL;\n          note_set(&note, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_HINT_STRICT_ROUTE);\n        }', GLC),
+    # ST5: the planning of a stroke of a run
+    ('st5-face-unchecked', 'src', SK, '  if (stroked_run && !draws_nothing && item->resource->u.glyphs.run.source == GSHSCENE_GLYPHS_FROM_FONT &&', '  if (0 && stroked_run && !draws_nothing && item->resource->u.glyphs.run.source == GSHSCENE_GLYPHS_FROM_FONT &&', KS),
+    ('st5-face-for-nothing', 'src', SK, '  if (stroked_run && !draws_nothing && item->resource->u.glyphs.run.source == GSHSCENE_GLYPHS_FROM_FONT &&', '  if (stroked_run && item->resource->u.glyphs.run.source == GSHSCENE_GLYPHS_FROM_FONT &&', KS),
+    ('st5-source-for-nothing', 'src', SK, '      !draws_nothing && glyphs_from_font(item->resource)) {', '      glyphs_from_font(item->resource)) {', KS),
+    ('st5-source-before-face', 'src', SK, '    d.reason = GSHSCENE_REASON_FACE_UNBOUND;\n    return d;\n  }\n  /* ST5 (2) */', '    d.reason = (caps->flags & GSHSCENE_CAP_GLYPHS_FROM_FONT) ? GSHSCENE_REASON_FACE_UNBOUND : GSHSCENE_REASON_GLYPH_SOURCE;\n    return d;\n  }\n  /* ST5 (2) */', KS),
+    ('st5-face-reason', 'src', SK, '    d.reason = GSHSCENE_REASON_FACE_UNBOUND;\n    return d;\n  }\n  /* ST5 (2) */', '    d.reason = GSHSCENE_REASON_GLYPH_UNAVAILABLE;\n    return d;\n  }\n  /* ST5 (2) */', KS),
+    ('st5-face-unbound-bound-confused', 'src', SK, '      !(item->resource->u.glyphs.run.face && item->resource->u.glyphs.run.face->u.face.bound)) {', '      (item->resource->u.glyphs.run.face && item->resource->u.glyphs.run.face->u.face.bound)) {', KS),
+    ('st5-runs-flag-after-style', 'src', SK, '  if (stroked_run && !(caps->flags & GSHSCENE_CAP_STROKE_RUNS) && !draws_nothing) {', '  if (stroked_run && !(caps->flags & GSHSCENE_CAP_STROKE_RUNS) && !draws_nothing &&\n      ((caps->flags & GSHSCENE_CAP_STROKE_EXPAND) || !(gshscene_stroke_required(item, instance_maps, instance_count, target_map) & ~caps->stroke_native))) {', KS),
+    ('st5-outlines-run-needs-face', 'src', SK, '  if (stroked_run && !draws_nothing && item->resource->u.glyphs.run.source == GSHSCENE_GLYPHS_FROM_FONT &&', '  if (stroked_run && !draws_nothing &&', KS),
+    # ST10: the test sink
+    ('ds-st10-outline-unhashed', 'src', DS, '  int is_run = !path && gshscene_resource_glyph_run(item->resource, &glyphs) == GSHSCENE_OK;', '  int is_run = 0;', ["testDump_sink"]),
+    ('ds-st10-notes-unreported', 'src', DS, '  for (size_t i = 0; notes && i < glyphs.glyph_count; i++) {', '  for (size_t i = 0; 0 && notes && i < glyphs.glyph_count; i++) {', ["testDump_sink", "testSink"]),
+    ('ds-st10-strict-continues', 'src', DS, '      *stopped = 1;\n      return GSHSCENE_OK;', '      *stopped = 0;\n      return GSHSCENE_OK;', ["testDump_sink", "testSink"]),
+    ('ds-st10-notes-wrong-glyph', 'src', DS, '        (GSHSCENE_Reason)notes[i].reason, chain, count, i);', '        (GSHSCENE_Reason)notes[i].reason, chain, count, 0);', ["testDump_sink", "testSink"]),
+    ('ds-st10-centerline-scratch-absent', 'src', DS, '  *centerline = of_run ? CENTERLINE_BYTES : 0;', '  *centerline = 0;', ["testDump_sink", "testSink"]),
+    ('ds-st10-stroke-scratch-absent', 'src', DS, '  *expansion = any ? STROKE_BYTES : 0;', '  *expansion = 0;', ["testDump_sink", "testSink"]),
+    ('ds-st10-unbound-undefended', 'src', DS, '      gshscene_face_info(glyphs.face, &info) != GSHSCENE_OK) {', '      0) {', ["testDump_sink"]),
 ]
 
 # color-paint story P4 (PL1 to PL10): the plane, the design-space rectangle clip and the group in a stated space.
