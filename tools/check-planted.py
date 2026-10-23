@@ -2443,6 +2443,10 @@ PLANTS += [
     ('ph7-emit-origin', 'src', EM, '    return placed == GSHSCENE_OK ? sink_origin(s, shape->id) : placed;', '    return placed;', PH),
     ('ph7-version-dump-letter', 'src', VS, "      if (put_common(out, 'P', node) < 0 || gshscene_placeholder_dump(out, &p->placeholder) < 0 ||", "      if (put_common(out, 'Q', node) < 0 || gshscene_placeholder_dump(out, &p->placeholder) < 0 ||", PH),
     ('ph7-damage-draws-nothing', 'src', DF, '  if (shape->p.kind == GSHSCENE_NODE_PLACEHOLDER) {\n    return GSHSCENE_OK; /* PH7', '  if (0) {\n    return GSHSCENE_OK; /* PH7', PH),
+    # the cross-target probe's placeholder section (tools/corpus-hash.c): a plan that forgets the entry, and one that drops
+    # the `second` of it, must fail the probe and not only the unit tests
+    ('ph9-probe-entry-forgotten', 'src', SK, '    if (d.entry_class) {\n      /* A stroke refused for its style', '    if (d.entry_class && d.reason != GSHSCENE_REASON_PLACEHOLDER) {\n      /* A stroke refused for its style', ["probe"]),
+    ('ph9-probe-second-dropped', 'src', SK, '    d.detail = ((uint64_t)item->placeholder.source << 16) | (uint64_t)item->placeholder.code; /* PH4 */', '    d.detail = 0;', ["probe"]),
 ]
 
 

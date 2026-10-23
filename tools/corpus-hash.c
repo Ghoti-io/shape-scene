@@ -60,6 +60,14 @@
  * `shape-scene.plane-count`), the plane's hash (one handle however often it is interned), lists of design-space
  * rectangle clips under design maps (their maps through the composer), fills of the plane with palette paints and
  * gradients, and groups in a stated blend space, and the renders of those lists by the test sinks.
+ * Since the strokes and color-paint pass a placeholder section folds, into a hash and count of their own
+ * (`shape-scene.placeholder-hash` and `shape-scene.placeholder-count`), lists of placeholders among fills and in a group
+ * (every u16 of the source and the code, both approximated values, boxes and none, maps and none, layers and depths, and
+ * the design-space call), the fields read back, the lists' hashes and ties, the renders of those lists by test sinks (a
+ * stream and a raster, best effort and strict, with and without damage) and a retained scene of placeholder nodes, a
+ * change of one and the diff's damage.  The section fails, and does not only print another hash, when a render's report
+ * does not hold exactly one placeholder entry for each placeholder of the list (a sink or a plan that forgets one), with
+ * the unit counts of the list.
  * It is built by `make check-corpus-hash` on the host and by
  * suite/tools/xarch/shape.sh and suite/tools/xwin/shape.sh for the others.
  *
@@ -96,6 +104,8 @@ static GSHGEOM_Hash stroke_total; /* strokes story S1: its own hash, so the one 
 static unsigned long stroke_count;
 static GSHGEOM_Hash plane_total; /* color-paint story P4: its own hash, so the two above are unchanged */
 static unsigned long plane_count;
+static GSHGEOM_Hash placeholder_total; /* the placeholder section: its own hash, so the three above are unchanged */
+static unsigned long placeholder_count;
 static GSHGEOM_Hash * acc = &total; /* where feed folds */
 static unsigned long * acc_count = &count;
 
@@ -1701,6 +1711,349 @@ static void plane_section(void) {
   gshscene_store_destroy(store);
 }
 
+/*
+ * Placeholders (color-paint story P5): lists of them among fills and in a group, and a retained scene of placeholder nodes,
+ * folded into a hash of their own.  What every target must agree on is the u16 source and code, the u32 flags, the box's
+ * doubles, the entry's `second` (`source << 16 | code`, a size_t) and the order of the report; and a render must report
+ * every placeholder, which the section checks and does not only hash.
+ */
+#define PH_PATHS 6
+#define PH_MAX 16
+
+/* The entries of a report that say PLACEHOLDER: counted, and folded in (class, second, chain). */
+static size_t feed_placeholder_entries(const GSHSCENE_Report * report) {
+  size_t found = 0;
+  size_t total = gshscene_report_count(report);
+  for (size_t i = 0; i < total; i++) {
+    GSHSCENE_Report_Entry e;
+    check(gshscene_report_entry(report, i, &e), "placeholder entry");
+    if (e.reason != GSHSCENE_REASON_PLACEHOLDER) {
+      continue;
+    }
+    found++;
+    feed((uint64_t)e.entry_class);
+    feed((uint64_t)e.second);
+    feed((uint64_t)e.chain_count);
+    for (size_t k = 0; k < e.chain_count; k++) {
+      feed((uint64_t)e.chain[k]);
+    }
+  }
+  return found;
+}
+
+/* One render of @p list by @p sink to @p target: the job's results are folded, the report must hold one placeholder entry
+ * for each of the @p expected placeholders, and the units are the list's. */
+static void feed_placeholder_job(GSHSCENE_Sink * sink, const GSHSCENE_List * list, const GSHSCENE_Target * target,
+    unsigned flags, size_t expected) {
+  GSHSCENE_Report * report = NULL;
+  check(gshscene_report_create(NULL, NULL, &report), "placeholder report");
+  GSHSCENE_Render_Request request;
+  memset(&request, 0, sizeof request);
+  request.list = list;
+  request.target = target;
+  request.report = report;
+  request.flags = flags;
+  feed_job(sink, &request);
+  size_t found = feed_placeholder_entries(report);
+  if (found != expected) {
+    fail("a render did not report every placeholder of its list exactly once (a sink or a plan forgot one)");
+  }
+  GSHSCENE_Report_Summary sum;
+  check(gshscene_report_summary(report, &sum), "placeholder summary");
+  if (sum.units_total != gshscene_list_expansion(list)) {
+    fail("a placeholder is not a unit of the render");
+  }
+  feed((uint64_t)sum.units_total);
+  feed((uint64_t)sum.by_class[GSHSCENE_ENTRY_REFUSED]);
+  feed((uint64_t)sum.by_class[GSHSCENE_ENTRY_APPROXIMATED]);
+  gshscene_report_destroy(report);
+}
+
+static void feed_placeholder_render(const GSHSCENE_List * list, size_t expected) {
+  GSHSCENE_Dump_Sink_Config full;
+  gshscene_dump_sink_config_default(&full);
+  GSHSCENE_Dump_Sink_Config narrow = full;
+  GSHSCENE_Sink_Caps * both[2] = {&narrow.raster_caps, &narrow.stream_caps};
+  for (int i = 0; i < 2; i++) {
+    both[i]->flags &= ~(GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_BLEND_SPACES | GSHSCENE_CAP_GLYPHS_FROM_FONT);
+    both[i]->composites &= ~((1u << GSHSCENE_COMPOSITE_XOR) | (1u << GSHSCENE_COMPOSITE_PLUS));
+  }
+  narrow.max_extent = 2000.0;
+  GSHSCENE_Dump_Sink_Config * configs[2] = {&full, &narrow};
+  for (int c = 0; c < 2; c++) {
+    GSHSCENE_Sink * sink = NULL;
+    check(gshscene_dump_sink_create(NULL, NULL, configs[c], &sink), "placeholder test sink");
+    uint64_t written = 0;
+    GSHSCENE_Writer writer = {count_write, &written};
+    GSHSCENE_Target stream;
+    memset(&stream, 0, sizeof stream);
+    stream.kind = GSHSCENE_TARGET_STREAM;
+    stream.surface = &writer;
+    stream.unit = GSHSCENE_UNIT_MILLIMETER;
+    if (gshgeom_map_scale(2, 0.25, 0.375, 1.0, &stream.map) != GSHGEOM_OK) {
+      fail("placeholder scale");
+    }
+    feed_placeholder_job(sink, list, &stream, 0, expected);
+    feed(written);
+    feed_placeholder_job(sink, list, &stream, GSHSCENE_RENDER_STRICT, expected); /* refused placeholders: ERR_REFUSED, still reported */
+    GIMG_Raster * raster = NULL;
+    if (gimg_raster_create(32, 32, &GIMG_PIXEL_RGBA8, GIMG_RASTER_OWNED, NULL, 0, &raster) != GIMG_OK) {
+      fail("placeholder raster");
+    }
+    GSHSCENE_Target pixels;
+    memset(&pixels, 0, sizeof pixels);
+    pixels.kind = GSHSCENE_TARGET_RASTER;
+    pixels.surface = raster;
+    GSHSCENE_Rect damage = {30, 30, 31, 31}; /* PH6: a placeholder outside the damage is reported as one inside it is */
+    pixels.damage = c ? &damage : NULL;
+    feed_placeholder_job(sink, list, &pixels, 0, expected);
+    GSHGEOM_Hash h;
+    gshgeom_hash_init(&h);
+    const unsigned char * px = gimg_raster_pixels_const(raster);
+    for (uint32_t y = 0; y < 32; y++) {
+      gshgeom_hash_bytes(&h, px + y * gimg_raster_stride_bytes(raster), 32u * 4u);
+    }
+    feed(gshgeom_hash_value(&h));
+    gimg_raster_destroy(raster);
+    check(gshscene_sink_destroy(sink), "placeholder sink destroy");
+  }
+}
+
+static void feed_placeholder(const GSHSCENE_Placeholder * p) {
+  feed((uint64_t)p->source);
+  feed((uint64_t)p->code);
+  feed((uint64_t)p->approximated);
+  feed((uint64_t)p->has_box);
+  for (int i = 0; i < 4; i++) {
+    feed(gshgeom_f64_bits(p->box[i]));
+  }
+}
+
+/* A box from integers over 1000 whose far corner is not before its near one. */
+static void random_box(double box[4]) {
+  box[0] = entry();
+  box[1] = entry();
+  double w = entry();
+  double h = entry();
+  box[2] = box[0] + (w < 0.0 ? -w : w);
+  box[3] = box[1] + (h < 0.0 ? -h : h);
+}
+
+static void placeholder_section(void) {
+  acc = &placeholder_total;
+  acc_count = &placeholder_count;
+  gshgeom_hash_init(&placeholder_total);
+  static const uint16_t sources[5] = {1u, 1u, 9u, 0x8001u, 0xFFFFu};
+  static const uint16_t codes[6] = {1u, 2u, 3u, 77u, 0x7FFFu, 0xFFFFu};
+  GSHSCENE_Store * store = NULL;
+  check(gshscene_store_create(NULL, NULL, &store), "placeholder store");
+  const GSHSCENE_Resource * paths[PH_PATHS];
+  for (size_t i = 0; i < PH_PATHS; i++) {
+    GSHGEOM_Path * path = random_path(2);
+    check(gshscene_store_intern_path(store, path, &paths[i]), "placeholder path");
+    gshgeom_path_destroy(path);
+  }
+  const GSHSCENE_Resource * face = test_face(store, 0, 0);
+  int32_t glyph_x = (int32_t)between(0, 4000) - 2000;
+  int32_t glyph_y = (int32_t)between(0, 4000) - 2000;
+  const GSHSCENE_Glyph_Fixed glyph = {3u, glyph_x, glyph_y};
+  const GSHSCENE_Resource * run = NULL;
+  check(gshscene_store_intern_glyph_run_fixed(store, face, 1337, 0, 0, 6u, 1, &glyph, &run), "placeholder run");
+
+  /* Lists of placeholders among fills, some inside a plain group; the design-space call under rotations and moves. */
+  for (unsigned l = 0; l < 10; l++) {
+    GSHSCENE_List * list = NULL;
+    check(gshscene_list_create(NULL, NULL, store, &list), "placeholder list");
+    size_t placeholders = 0;
+    int grouped = 0;
+    unsigned n = between(2, PH_MAX);
+    for (unsigned i = 0; i < n; i++) {
+      unsigned pick_source = between(0, 4);
+      unsigned pick_code = between(0, 5);
+      uint32_t approximated = between(0, 1);
+      int has_box = (next() & 1) != 0;
+      int use_map = (next() & 1) != 0;
+      int32_t layer = (int32_t)between(0, 6) - 3;
+      double depth = random_depth();
+      GSHGEOM_Map map = random_map();
+      double box[4];
+      random_box(box);
+      GSHSCENE_Paint paint = random_paint();
+      unsigned pick_path = between(0, PH_PATHS - 1);
+      switch (between(0, 5)) {
+        case 0:
+          check(gshscene_list_fill(list, paths[pick_path], use_map ? &map : NULL, GSHGEOM_FILL_NONZERO, &paint, layer,
+                    depth),
+              "placeholder fill");
+          break;
+        case 1:
+          if (!grouped) {
+            check(gshscene_list_group_push_fixed(list, 0u, layer), "placeholder group");
+            grouped = 1;
+          } else {
+            check(gshscene_list_group_pop(list), "placeholder group pop");
+            grouped = 0;
+          }
+          break;
+        case 2: {
+          GSHSCENE_Fixed_Op op[2];
+          memset(op, 0, sizeof op);
+          op[0].kind = GSHSCENE_FIXED_ROTATE;
+          op[0].bits = 15;
+          op[0].v[0] = (int32_t)between(0, 65535);
+          op[1].kind = GSHSCENE_FIXED_TRANSLATE;
+          op[1].v[0] = (int32_t)between(0, 400) - 200;
+          op[1].v[1] = (int32_t)between(0, 400) - 200;
+          int32_t design[4];
+          design[0] = (int32_t)between(0, 2000) - 1000;
+          design[1] = (int32_t)between(0, 2000) - 1000;
+          design[2] = design[0] + (int32_t)between(0, 4000);
+          design[3] = design[1] + (int32_t)between(0, 4000);
+          static const uint32_t bit_table[3] = {0u, 2u, 15u};
+          size_t ops = between(0, 2); /* one draw per statement: the order of a call's arguments is the target's */
+          uint32_t bits = bit_table[between(0, 2)];
+          check(gshscene_list_placeholder_fixed(list, run, op, ops, has_box ? design : NULL, bits, sources[pick_source],
+                    codes[pick_code], approximated, layer),
+              "placeholder fixed");
+          placeholders++;
+          break;
+        }
+        default:
+          check(gshscene_list_placeholder(list, sources[pick_source], codes[pick_code], approximated,
+                    has_box ? box : NULL, use_map ? &map : NULL, layer, depth),
+              "placeholder");
+          placeholders++;
+          break;
+      }
+    }
+    if (grouped) {
+      check(gshscene_list_group_pop(list), "placeholder final pop");
+    }
+    check(gshscene_list_close(list), "placeholder close");
+    feed(gshscene_list_hash(list));
+    feed((uint64_t)gshscene_list_count(list));
+    feed((uint64_t)gshscene_list_expansion(list));
+    feed_ties(list);
+    size_t seen = 0;
+    for (size_t i = 0; i < gshscene_list_count(list); i++) {
+      const GSHSCENE_Item * item = NULL;
+      check(gshscene_list_item(list, i, &item), "placeholder item");
+      feed((uint64_t)item->kind);
+      if (item->kind == GSHSCENE_ITEM_PLACEHOLDER) {
+        seen++;
+        feed_placeholder(&item->placeholder);
+        feed(gshgeom_map_hash(&item->map));
+        feed((uint64_t)(int64_t)item->layer);
+        feed(gshgeom_f64_bits(item->depth));
+      }
+    }
+    if (seen != placeholders) {
+      fail("a list does not hold the placeholders recorded into it");
+    }
+    feed_placeholder_render(list, placeholders);
+    gshscene_list_destroy(list);
+  }
+
+  /* A retained scene of placeholder nodes among shapes; a change of one, the version's list rendered, and the diff (PH7). */
+  GSHSCENE_Scene * scene = NULL;
+  check(gshscene_scene_create(NULL, NULL, NULL, &scene), "placeholder scene");
+  GSHSCENE_Store * sstore = gshscene_scene_store(scene);
+  const GSHSCENE_Resource * spath = NULL;
+  {
+    GSHGEOM_Path * path = random_path(2);
+    check(gshscene_store_intern_path(sstore, path, &spath), "placeholder scene path");
+    gshgeom_path_destroy(path);
+  }
+  GSHSCENE_Edit * edit = NULL;
+  check(gshscene_scene_open_edit(scene, NULL, &edit), "placeholder edit");
+  uint64_t ids[8];
+  for (size_t i = 0; i < 8; i++) {
+    GSHSCENE_Node node;
+    if (i % 4 == 3) {
+      gshscene_node_init(GSHSCENE_NODE_SHAPE, &node);
+      node.resource = spath;
+      node.map = random_map();
+    } else {
+      gshscene_node_init(GSHSCENE_NODE_PLACEHOLDER, &node);
+      node.placeholder.source = sources[between(0, 4)];
+      node.placeholder.code = codes[between(0, 5)];
+      node.placeholder.approximated = between(0, 1);
+      if (next() & 1) {
+        random_box(node.placeholder.box);
+        node.placeholder.has_box = 1;
+      }
+      node.map = random_map();
+    }
+    node.layer = (int32_t)between(0, 4) - 2;
+    node.depth = random_depth();
+    ids[i] = add_node(edit, GSHSCENE_ROOT_ID, &node, NULL);
+  }
+  const GSHSCENE_Version * v1 = NULL;
+  check(gshscene_scene_publish(scene, edit, NULL, &v1), "placeholder publish 1");
+  gshscene_edit_destroy(edit);
+  feed_version(v1);
+  check(gshscene_scene_open_edit(scene, v1, &edit), "placeholder edit 2");
+  for (size_t i = 0; i < 2; i++) {
+    GSHSCENE_Node_Info info;
+    uint64_t id = ids[i];
+    check(gshscene_edit_node(edit, id, &info), "placeholder node");
+    GSHSCENE_Node node = info.node;
+    node.placeholder.code = codes[between(0, 5)];
+    node.placeholder.approximated = node.placeholder.approximated ? 0u : 1u;
+    if (next() & 1) {
+      node.map = random_map();
+    }
+    check(gshscene_edit_set(edit, id, &node), "placeholder set");
+  }
+  const GSHSCENE_Version * v2 = NULL;
+  check(gshscene_scene_publish(scene, edit, NULL, &v2), "placeholder publish 2");
+  gshscene_edit_destroy(edit);
+  feed_version(v2);
+  const GSHSCENE_Version * versions[2] = {v1, v2};
+  for (int v = 0; v < 2; v++) {
+    const GSHSCENE_List * emitted = NULL;
+    check(gshscene_version_list(versions[v], &emitted), "placeholder emitted list");
+    size_t placeholders = 0;
+    for (size_t i = 0; i < gshscene_list_count(emitted); i++) {
+      const GSHSCENE_Item * item = NULL;
+      check(gshscene_list_item(emitted, i, &item), "placeholder emitted item");
+      if (item->kind == GSHSCENE_ITEM_PLACEHOLDER) {
+        placeholders++;
+        feed_placeholder(&item->placeholder);
+      }
+    }
+    if (placeholders != 6) {
+      fail("a version does not emit one placeholder item for each placeholder node");
+    }
+    feed_placeholder_render(emitted, placeholders);
+  }
+  GSHGEOM_Map device;
+  if (gshgeom_map_scale(2, 0.5, 0.75, 1.0, &device) != GSHGEOM_OK) {
+    fail("placeholder device map");
+  }
+  feed_diff(v1, v2, &device);
+  gshscene_version_release(v1);
+  gshscene_version_release(v2);
+  gshscene_resource_release(spath);
+  gshscene_scene_destroy(scene);
+
+  gshscene_resource_release(run);
+  gshscene_resource_release(face);
+  for (size_t i = 0; i < PH_PATHS; i++) {
+    gshscene_resource_release(paths[i]);
+  }
+  GSHSCENE_Store_Stats stats;
+  check(gshscene_store_stats(store, &stats), "placeholder stats");
+  feed(stats.live);
+  feed(stats.created);
+  if (stats.live != 0) {
+    fail("a placeholder resource is still live after every handle was released");
+  }
+  gshscene_store_destroy(store);
+  acc = &total;
+  acc_count = &count;
+}
+
 int main(void) {
   gshgeom_hash_init(&total);
   GSHSCENE_Store * store = NULL;
@@ -1881,5 +2234,8 @@ int main(void) {
   plane_section();
   printf("shape-scene.plane-hash %016" PRIx64 "\n", gshgeom_hash_value(&plane_total));
   printf("shape-scene.plane-count %lu\n", plane_count);
+  placeholder_section();
+  printf("shape-scene.placeholder-hash %016" PRIx64 "\n", gshgeom_hash_value(&placeholder_total));
+  printf("shape-scene.placeholder-count %lu\n", placeholder_count);
   return 0;
 }

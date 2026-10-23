@@ -9,7 +9,8 @@
 # HASH_FILE is tests/corpus/scene.hash, whose `hash` and `count` lines are
 # the committed values, and whose `stroke-hash` and `stroke-count` lines are
 # the stroke section's (strokes story S1), a hash of its own, and whose `plane-hash` and `plane-count` lines are the
-# plane section's (color-paint story P4), another.  No value may be empty, so a probe that crashed, or a
+# plane section's (color-paint story P4), another, and whose `placeholder-hash` and `placeholder-count` lines are the
+# placeholder section's, a fourth.  No value may be empty, so a probe that crashed, or a
 # hash file that was emptied, fails rather than comparing nothing with nothing.
 probe="${1:?usage: check-corpus-hash.sh PROBE HASH_FILE}"
 file="${2:?usage: check-corpus-hash.sh PROBE HASH_FILE}"
@@ -23,15 +24,21 @@ got_phash=$(printf '%s\n' "$got" | awk '$1=="shape-scene.plane-hash"{print $2}')
 got_pcount=$(printf '%s\n' "$got" | awk '$1=="shape-scene.plane-count"{print $2}')
 want_phash=$(awk '$1=="plane-hash"{print $2}' "$file" 2>/dev/null)
 want_pcount=$(awk '$1=="plane-count"{print $2}' "$file" 2>/dev/null)
+got_hhash=$(printf '%s\n' "$got" | awk '$1=="shape-scene.placeholder-hash"{print $2}')
+got_hcount=$(printf '%s\n' "$got" | awk '$1=="shape-scene.placeholder-count"{print $2}')
+want_hhash=$(awk '$1=="placeholder-hash"{print $2}' "$file" 2>/dev/null)
+want_hcount=$(awk '$1=="placeholder-count"{print $2}' "$file" 2>/dev/null)
 want_hash=$(awk '$1=="hash"{print $2}' "$file" 2>/dev/null)
 want_count=$(awk '$1=="count"{print $2}' "$file" 2>/dev/null)
 want_shash=$(awk '$1=="stroke-hash"{print $2}' "$file" 2>/dev/null)
 want_scount=$(awk '$1=="stroke-count"{print $2}' "$file" 2>/dev/null)
 if [ -z "$want_hash" ] || [ -z "$want_count" ] || [ -z "$got_hash" ] || [ -z "$got_count" ] ||
    [ -z "$want_shash" ] || [ -z "$want_scount" ] || [ -z "$got_shash" ] || [ -z "$got_scount" ] ||
-   [ -z "$want_phash" ] || [ -z "$want_pcount" ] || [ -z "$got_phash" ] || [ -z "$got_pcount" ]; then
-  printf 'check-corpus-hash: nothing to compare (probe %s/%s and strokes %s/%s, committed %s/%s and %s/%s in %s)\n' \
-    "$got_hash" "$got_count" "$got_shash" "$got_scount" "$want_hash" "$want_count" "$want_shash" "$want_scount" "$file" >&2
+   [ -z "$want_phash" ] || [ -z "$want_pcount" ] || [ -z "$got_phash" ] || [ -z "$got_pcount" ] ||
+   [ -z "$want_hhash" ] || [ -z "$want_hcount" ] || [ -z "$got_hhash" ] || [ -z "$got_hcount" ]; then
+  printf 'check-corpus-hash: nothing to compare (probe %s/%s, strokes %s/%s, planes %s/%s and placeholders %s/%s; committed %s/%s, %s/%s, %s/%s and %s/%s in %s)\n' \
+    "$got_hash" "$got_count" "$got_shash" "$got_scount" "$got_phash" "$got_pcount" "$got_hhash" "$got_hcount" \
+    "$want_hash" "$want_count" "$want_shash" "$want_scount" "$want_phash" "$want_pcount" "$want_hhash" "$want_hcount" "$file" >&2
   exit 1
 fi
 if [ "$got_hash" != "$want_hash" ] || [ "$got_count" != "$want_count" ]; then
@@ -49,4 +56,9 @@ if [ "$got_phash" != "$want_phash" ] || [ "$got_pcount" != "$want_pcount" ]; the
     "$got_phash" "$got_pcount" "$want_phash" "$want_pcount" >&2
   exit 1
 fi
-printf 'check-corpus-hash: ok, %s over %s results; strokes %s over %s; planes %s over %s\n' "$got_hash" "$got_count" "$got_shash" "$got_scount" "$got_phash" "$got_pcount"
+if [ "$got_hhash" != "$want_hhash" ] || [ "$got_hcount" != "$want_hcount" ]; then
+  printf 'check-corpus-hash: FAIL: placeholders %s over %s results, committed %s over %s\n' \
+    "$got_hhash" "$got_hcount" "$want_hhash" "$want_hcount" >&2
+  exit 1
+fi
+printf 'check-corpus-hash: ok, %s over %s results; strokes %s over %s; planes %s over %s; placeholders %s over %s\n' "$got_hash" "$got_count" "$got_shash" "$got_scount" "$got_phash" "$got_pcount" "$got_hhash" "$got_hcount"
