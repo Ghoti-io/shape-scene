@@ -18,8 +18,7 @@ The shape family waist: resources and lists, and the versioned scene above them.
 
 The dependency rules and the determinism gates that bind this library are in the Makefile's header
 comment and in `tools/`: `check-fp-contract`, `check-edges`, `check-libm` and `check-no-x87`, each shown
-to fail on a planted violation by `make check-gates`. The plan is in the workspace, not in this
-repository.
+to fail on a planted violation by `make check-gates`.
 
 ## Resources
 
@@ -916,7 +915,7 @@ inside the damage.
 **The store's total bytes** are bounded by `max_bytes`, accounted by a formula (`resource.h`) so the limit
 means the same on every target.
 
-Gaps that this design knows about and where they are recorded: the spine's Deferred table (a font as an
+Gaps that this design knows about (a font as an
 opaque key, fixed picture paints, intersection-only clips, per-glyph maps, affine and 2D maps, the linear
 cost of publish and diff, the granularity of a merge, single-rectangle damage, what is met at emission).
 
