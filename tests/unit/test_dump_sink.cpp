@@ -1094,8 +1094,7 @@ TEST(DumpSink, AStrokeOfARunNeedsNoHintStatusAndMakesNoFastTierCall) {
 }
 
 TEST(DumpSink, AStrokeOfARunHasNoCenterlineForAHostilePathAndOneOfItIsRefusedAsTheSinksLimit) {
-  // A zigzag of 60000 segments under a wide round-join stroke expands past the one MiB of the stroke scratch: the sink's own
-  // limit.
+  // A zigzag of 60000 segments under a wide round-join stroke expands past the sink's cap of points: the sink's own limit.
   {
     Scene s;
     GSHGEOM_Path * p = nullptr;
@@ -1136,6 +1135,41 @@ TEST(DumpSink, AStrokeOfARunHasNoCenterlineForAHostilePathAndOneOfItIsRefusedAsT
     strict.flags = GSHSCENE_RENDER_STRICT;
     EXPECT_EQ(render_job(sink.sink, strict).result, GSHSCENE_ERR_REFUSED);
   }
+}
+
+TEST(DumpSink, AZigzagStrokeWithinTheCapOfPointsIsDrawnAndOnePastItIsRefused) {
+  // The cap is a count of points, which is the same on every target; the bytes the expansion takes differ with the word size
+  // and decide nothing.  A zigzag of 200 segments under the same wide round-join stroke is drawn; the 60000 above is not.
+  Scene s;
+  GSHGEOM_Path * p = nullptr;
+  ASSERT_EQ(gshgeom_path_create(nullptr, nullptr, 2, &p), GSHGEOM_OK);
+  gshgeom_path_move_to(p, GSHGEOM_Point{0, 0, 0});
+  for (int i = 1; i <= 200; i++) {
+    gshgeom_path_line_to(p, GSHGEOM_Point{(double)i * 0.01, (i % 2) ? 5.0 : 0.0, 0});
+  }
+  const GSHSCENE_Resource * path = nullptr;
+  ASSERT_EQ(gshscene_store_intern_path(s.store, p, &path), GSHSCENE_OK);
+  gshgeom_path_destroy(p);
+  s.held.push_back(path);
+  GSHSCENE_Stroke_Style st;
+  gshscene_stroke_style_init(&st);
+  st.width = 3.0;
+  st.join = GSHSCENE_STROKE_JOIN_ROUND;
+  st.cap = GSHSCENE_STROKE_CAP_ROUND;
+  const GSHSCENE_Resource * style = nullptr;
+  ASSERT_EQ(gshscene_store_intern_stroke_style(s.store, &st, &style), GSHSCENE_OK);
+  s.held.push_back(style);
+  GSHSCENE_Paint red = solid(1, 0, 0);
+  GSHSCENE_List * l = s.open();
+  ASSERT_EQ(gshscene_list_stroke(l, path, style, nullptr, &red, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  SinkRef sink(make_with(config_default(), nullptr, nullptr));
+  auto stream = make_stream(GSHSCENE_UNIT_PIXEL);
+  ReportRef report;
+  ASSERT_EQ(render_job(sink.sink, request_for(l, *stream, report.report)).result, GSHSCENE_OK);
+  EXPECT_EQ(stream->bytes.find(" reason=" + std::to_string((int)GSHSCENE_REASON_RESOURCE_LIMIT)), std::string::npos)
+      << stream->bytes;
+  EXPECT_NE(stream->bytes.find(" K res="), std::string::npos) << stream->bytes;
 }
 
 TEST(DumpSink, AStrokePastTheExtentAndAStrokeOfAnUnboundFaceAreRefusedWhileDrawing) {

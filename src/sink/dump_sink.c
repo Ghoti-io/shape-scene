@@ -56,13 +56,19 @@
 #define GLYPH_BYTES ((size_t)65536)
 
 /**
- * The scratch of a stroke's expansion (strokes stories S4 and S5): one MiB, carved from the render's memory only when the
+ * The scratch of a stroke's expansion (strokes stories S4 and S5): 64 MiB, carved from the render's memory only when the
  * list holds a stroke (so no list without one has a workspace that moves).  The expansion of a line of text is far past the
  * 64 KiB of a glyph's paths (a flattened ring is some thousand points, and the allocator keeps every block it has handed out
- * until the stroke is done).  A stroke whose expansion does not fit is the sink's resource limit, in every mode alike, and a
- * stroke of a run and a stroke of the path the run defines are alike in this (ST11).
+ * until the stroke is done).  The scratch is not what decides whether a stroke is drawn: the bytes a stroke needs differ
+ * with the word size (shape-geometry's records hold sizes and pointers), so a cap in bytes would refuse a different set of
+ * strokes on a 32-bit target.  The cap is STROKE_MAX_POINTS, a count of points in each part of the outline, the same on
+ * every target; the scratch is room for any stroke within it.  The strokes of the tests need at most about 102 bytes a
+ * point on x86-64, and three parts of STROKE_MAX_POINTS points at four times that come to 48 MiB.  A stroke past the cap,
+ * or one that still does not fit, is the sink's resource limit, in every mode alike, and a stroke of a run and a stroke of
+ * the path the run defines are alike in this (ST11).
  */
-#define STROKE_BYTES ((size_t)1048576)
+#define STROKE_BYTES ((size_t)67108864)
+#define STROKE_MAX_POINTS ((size_t)131072)
 
 /**
  * The scratch in which a stroke of a run's centerline is made (ST1): the glyphs' outlines it is made from and the path, one
@@ -914,7 +920,10 @@ static GSHSCENE_Result stroke_outline_hash(Run * run, const GSHSCENE_Item * item
     path = centerline;
   }
   GSHGEOM_Stroke_Outline * outline = NULL;
-  if (gshgeom_stroke_expand(path, &params, &canon, &run->strokes.self, NULL, &outline) != GSHGEOM_OK) {
+  GSHGEOM_Limits stroke_limits;
+  gshgeom_limits_default(&stroke_limits);
+  stroke_limits.max_points = STROKE_MAX_POINTS;
+  if (gshgeom_stroke_expand(path, &params, &canon, &run->strokes.self, &stroke_limits, &outline) != GSHGEOM_OK) {
     gshgeom_path_destroy(centerline);
     return GSHSCENE_ERR_LIMIT;
   }
