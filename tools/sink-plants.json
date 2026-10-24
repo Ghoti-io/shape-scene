@@ -17702,27 +17702,6 @@
 ]
 ],
 [
-"ds-739-eq",
-"srcl",
-"src/sink/dump_sink.c",
-"739:(r == GS",
-"(r != GS",
-[
-"testDump_sink",
-"testSink",
-"testReport",
-"testGlyph",
-"testPalette",
-"testGradient",
-"testGroup_fields",
-"testStroke",
-"testPlane",
-"testPlaceholder",
-"fuzz-render",
-"probe"
-]
-],
-[
 "ds-1160-del",
 "srcl",
 "src/sink/dump_sink.c",
