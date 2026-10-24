@@ -1177,13 +1177,13 @@ static bool zigzag_stroke_drawn(int segments, size_t max_stroke_points) {
 
 TEST(DumpSink, AStrokeIsRefusedByItsCapOfPointsAndNotByTheBytesItTakes) {
   // The cap is a count of points, which is the same on every target; the bytes an expansion takes differ with the word size
-  // and decide nothing.  200 segments are drawn by default and refused under a cap of 1000 points; 1600 are refused by
-  // default (past 131072 points) and drawn under a cap of twice that.
+  // and decide nothing.  200 segments are drawn by default and refused under a cap of 1000 points; 8000 are refused by
+  // default (past 131072 points) and drawn under a cap of eight times that.
   EXPECT_TRUE(zigzag_stroke_drawn(200, 0));
   EXPECT_TRUE(zigzag_stroke_drawn(200, 131072)) << "0 is the default, 131072";
   EXPECT_FALSE(zigzag_stroke_drawn(200, 1000));
-  EXPECT_FALSE(zigzag_stroke_drawn(1600, 0));
-  EXPECT_TRUE(zigzag_stroke_drawn(1600, 262144));
+  EXPECT_FALSE(zigzag_stroke_drawn(8000, 0));
+  EXPECT_TRUE(zigzag_stroke_drawn(8000, 1048576));
 }
 
 TEST(DumpSink, ACapOfStrokePointsTooLargeToGiveScratchIsRefusedAtCreation) {

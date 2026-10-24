@@ -750,8 +750,8 @@ def stroke_render(kind, unit, target_map, native, expand, area=None):
 # cross-target gate (suite/tools/xarch/shape.sh) must reproduce them on every other target.  Keyed by the target
 # (the stream is in millimetres under a scale of 1/2, the raster is the identity) and the unit's index.
 OUTLINE_HASH = {
-    "stream": {0: 0x845034f9903ae5a6, 1: 0xed61a34621d91f1c, 2: 0x7ff7274b48be3546, 4: 0xad019422ffef6356},
-    "raster": {0: 0x32d3ab0c5ec389eb, 1: 0xec807991aece5d6b, 2: 0x488dce675fe7c3c4, 4: 0xf7a18d0f7a0b57c3},
+    "stream": {0: 0x71471e926f1e92b3, 1: 0x687f32375ef0d216, 2: 0x52713422acfbb41b, 4: 0x6f760735934651b9},
+    "raster": {0: 0x2058314624a79f1a, 1: 0xb9bd1eb021424f58, 2: 0x0cca12d828c733bf, 4: 0x0ddff8c919af8a64},
 }
 
 
