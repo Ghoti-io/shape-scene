@@ -172,6 +172,13 @@ typedef struct GSHSCENE_Dump_Sink_Config {
   size_t step_units;              ///< Deferred: units a step goes through per job; 0 is all of them.
   /** The resource limit: a fill or clip whose box is wider or taller than this, in target units, is refused while drawing.  0 is none. */
   double max_extent;
+  /**
+   * The resource limit on a stroke: the most points one part of its outline may hold, the same on every target; a stroke past it is
+   * refused while drawing.  0 is the default, 131072.  The sink gives the expansion 512 bytes for each point, so a render that
+   * holds a stroke needs that much workspace (64 MiB at the default); a count too large to size is refused at creation.  The
+   * pinned hashes of the test corpus are for the default: a dump made under another cap is not comparable with them.
+   */
+  size_t max_stroke_points;
   /** For a raster target, where the dump goes; NULL for nowhere (the output hash is still kept).  Not owned. */
   const GSHSCENE_Writer * log;
   uint8_t _reserved[16];          ///< Zero.

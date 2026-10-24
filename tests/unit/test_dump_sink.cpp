@@ -1137,18 +1137,18 @@ TEST(DumpSink, AStrokeOfARunHasNoCenterlineForAHostilePathAndOneOfItIsRefusedAsT
   }
 }
 
-TEST(DumpSink, AZigzagStrokeWithinTheCapOfPointsIsDrawnAndOnePastItIsRefused) {
-  // The cap is a count of points, which is the same on every target; the bytes the expansion takes differ with the word size
-  // and decide nothing.  A zigzag of 200 segments under the same wide round-join stroke is drawn; the 60000 above is not.
+// A zigzag of @p segments under a wide round-join stroke, rendered to a stream by a sink whose cap of stroke points is
+// @p max_stroke_points (0 is the default).  True when the stroke was drawn, false when it was refused as the sink's limit.
+static bool zigzag_stroke_drawn(int segments, size_t max_stroke_points) {
   Scene s;
   GSHGEOM_Path * p = nullptr;
-  ASSERT_EQ(gshgeom_path_create(nullptr, nullptr, 2, &p), GSHGEOM_OK);
+  EXPECT_EQ(gshgeom_path_create(nullptr, nullptr, 2, &p), GSHGEOM_OK);
   gshgeom_path_move_to(p, GSHGEOM_Point{0, 0, 0});
-  for (int i = 1; i <= 200; i++) {
+  for (int i = 1; i <= segments; i++) {
     gshgeom_path_line_to(p, GSHGEOM_Point{(double)i * 0.01, (i % 2) ? 5.0 : 0.0, 0});
   }
   const GSHSCENE_Resource * path = nullptr;
-  ASSERT_EQ(gshscene_store_intern_path(s.store, p, &path), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_store_intern_path(s.store, p, &path), GSHSCENE_OK);
   gshgeom_path_destroy(p);
   s.held.push_back(path);
   GSHSCENE_Stroke_Style st;
@@ -1157,19 +1157,41 @@ TEST(DumpSink, AZigzagStrokeWithinTheCapOfPointsIsDrawnAndOnePastItIsRefused) {
   st.join = GSHSCENE_STROKE_JOIN_ROUND;
   st.cap = GSHSCENE_STROKE_CAP_ROUND;
   const GSHSCENE_Resource * style = nullptr;
-  ASSERT_EQ(gshscene_store_intern_stroke_style(s.store, &st, &style), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_store_intern_stroke_style(s.store, &st, &style), GSHSCENE_OK);
   s.held.push_back(style);
   GSHSCENE_Paint red = solid(1, 0, 0);
   GSHSCENE_List * l = s.open();
-  ASSERT_EQ(gshscene_list_stroke(l, path, style, nullptr, &red, 0, 0.0), GSHSCENE_OK);
-  ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
-  SinkRef sink(make_with(config_default(), nullptr, nullptr));
+  EXPECT_EQ(gshscene_list_stroke(l, path, style, nullptr, &red, 0, 0.0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  GSHSCENE_Dump_Sink_Config c = config_default();
+  c.max_stroke_points = max_stroke_points;
+  SinkRef sink(make_with(c, nullptr, nullptr));
   auto stream = make_stream(GSHSCENE_UNIT_PIXEL);
   ReportRef report;
-  ASSERT_EQ(render_job(sink.sink, request_for(l, *stream, report.report)).result, GSHSCENE_OK);
-  EXPECT_EQ(stream->bytes.find(" reason=" + std::to_string((int)GSHSCENE_REASON_RESOURCE_LIMIT)), std::string::npos)
-      << stream->bytes;
-  EXPECT_NE(stream->bytes.find(" K res="), std::string::npos) << stream->bytes;
+  EXPECT_EQ(render_job(sink.sink, request_for(l, *stream, report.report)).result, GSHSCENE_OK);
+  bool refused = stream->bytes.find(" reason=" + std::to_string((int)GSHSCENE_REASON_RESOURCE_LIMIT)) != std::string::npos;
+  bool drawn = stream->bytes.find(" K res=") != std::string::npos;
+  EXPECT_NE(refused, drawn) << stream->bytes;
+  return drawn;
+}
+
+TEST(DumpSink, AStrokeIsRefusedByItsCapOfPointsAndNotByTheBytesItTakes) {
+  // The cap is a count of points, which is the same on every target; the bytes an expansion takes differ with the word size
+  // and decide nothing.  200 segments are drawn by default and refused under a cap of 1000 points; 1600 are refused by
+  // default (past 131072 points) and drawn under a cap of twice that.
+  EXPECT_TRUE(zigzag_stroke_drawn(200, 0));
+  EXPECT_TRUE(zigzag_stroke_drawn(200, 131072)) << "0 is the default, 131072";
+  EXPECT_FALSE(zigzag_stroke_drawn(200, 1000));
+  EXPECT_FALSE(zigzag_stroke_drawn(1600, 0));
+  EXPECT_TRUE(zigzag_stroke_drawn(1600, 262144));
+}
+
+TEST(DumpSink, ACapOfStrokePointsTooLargeToGiveScratchIsRefusedAtCreation) {
+  GSHSCENE_Dump_Sink_Config c = config_default();
+  c.max_stroke_points = SIZE_MAX / 256;
+  GSHSCENE_Sink * sink = nullptr;
+  EXPECT_EQ(gshscene_dump_sink_create(nullptr, nullptr, &c, &sink), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(sink, nullptr);
 }
 
 TEST(DumpSink, AStrokePastTheExtentAndAStrokeOfAnUnboundFaceAreRefusedWhileDrawing) {

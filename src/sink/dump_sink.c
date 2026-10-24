@@ -56,19 +56,20 @@
 #define GLYPH_BYTES ((size_t)65536)
 
 /**
- * The scratch of a stroke's expansion (strokes stories S4 and S5): 64 MiB, carved from the render's memory only when the
- * list holds a stroke (so no list without one has a workspace that moves).  The expansion of a line of text is far past the
- * 64 KiB of a glyph's paths (a flattened ring is some thousand points, and the allocator keeps every block it has handed out
- * until the stroke is done).  The scratch is not what decides whether a stroke is drawn: the bytes a stroke needs differ
- * with the word size (shape-geometry's records hold sizes and pointers), so a cap in bytes would refuse a different set of
- * strokes on a 32-bit target.  The cap is STROKE_MAX_POINTS, a count of points in each part of the outline, the same on
- * every target; the scratch is room for any stroke within it.  The strokes of the tests need at most about 102 bytes a
- * point on x86-64, and three parts of STROKE_MAX_POINTS points at four times that come to 48 MiB.  A stroke past the cap,
- * or one that still does not fit, is the sink's resource limit, in every mode alike, and a stroke of a run and a stroke of
- * the path the run defines are alike in this (ST11).
+ * The scratch of a stroke's expansion (strokes stories S4 and S5): STROKE_BYTES_PER_POINT bytes for each point of the cap
+ * (64 MiB at the default), carved from the render's memory only when the list holds a stroke (so no list without one has a
+ * workspace that moves).  The expansion of a line of text is far past the 64 KiB of a glyph's paths (a flattened ring is
+ * some thousand points, and the allocator keeps every block it has handed out until the stroke is done).  The scratch is
+ * not what decides whether a stroke is drawn: the bytes a stroke needs differ with the word size (shape-geometry's records
+ * hold sizes and pointers), so a cap in bytes would refuse a different set of strokes on a 32-bit target.  The cap is a
+ * count of points in each part of the outline, the same on every target (the configuration's `max_stroke_points`,
+ * STROKE_MAX_POINTS_DEFAULT when 0); the scratch is room for any stroke within it.  The strokes of the tests take at most
+ * about 102 bytes a point of the outline on x86-64, so three parts at the cap come to about 306 bytes for each point of the
+ * cap, against the 512 given.  A stroke past the cap, or one that still does not fit, is the sink's resource limit, in
+ * every mode alike, and a stroke of a run and a stroke of the path the run defines are alike in this (ST11).
  */
-#define STROKE_BYTES ((size_t)67108864)
-#define STROKE_MAX_POINTS ((size_t)131072)
+#define STROKE_BYTES_PER_POINT ((size_t)512)
+#define STROKE_MAX_POINTS_DEFAULT ((size_t)131072)
 
 /**
  * The scratch in which a stroke of a run's centerline is made (ST1): the glyphs' outlines it is made from and the path, one
@@ -300,12 +301,17 @@ static void stroke_kinds(const GSHSCENE_List * list, int * any, int * of_run) {
   }
 }
 
-/** The bytes of the two stroke scratches @p list needs (STROKE_BYTES and CENTERLINE_BYTES), 0 for one it does not. */
-static void stroke_scratch(const GSHSCENE_List * list, size_t * expansion, size_t * centerline) {
+/** The cap of points of a stroke under @p config: its `max_stroke_points`, or the default for 0. */
+static size_t stroke_points(const GSHSCENE_Dump_Sink_Config * config) {
+  return config->max_stroke_points ? config->max_stroke_points : STROKE_MAX_POINTS_DEFAULT;
+}
+
+/** The bytes of the two stroke scratches @p list needs (for @p points and CENTERLINE_BYTES), 0 for one it does not. */
+static void stroke_scratch(const GSHSCENE_List * list, size_t points, size_t * expansion, size_t * centerline) {
   int any = 0;
   int of_run = 0;
   stroke_kinds(list, &any, &of_run);
-  *expansion = any ? STROKE_BYTES : 0;
+  *expansion = any ? gshscene_sat_mul(points, STROKE_BYTES_PER_POINT) : 0;
   *centerline = of_run ? CENTERLINE_BYTES : 0;
 }
 
@@ -314,7 +320,7 @@ static size_t align_up(size_t n) {
 }
 
 /** The bytes a run of @p list needs, the slack for an unaligned workspace included. */
-static size_t run_bytes(const GSHSCENE_List * list, size_t * levels, size_t * blocks, size_t * fills, size_t * stops,
+static size_t run_bytes(const GSHSCENE_List * list, size_t points, size_t * levels, size_t * blocks, size_t * fills, size_t * stops,
     size_t * strokes) {
   *levels = gshscene_sat_add(gshscene_list_picture_depth(list), 1);
   *blocks = gshscene_sat_add(nesting(list), 1);
@@ -335,7 +341,7 @@ static size_t run_bytes(const GSHSCENE_List * list, size_t * levels, size_t * bl
   n = gshscene_sat_add(n, GLYPH_BYTES);
   size_t expansion;
   size_t centerline;
-  stroke_scratch(list, &expansion, &centerline);
+  stroke_scratch(list, points, &expansion, &centerline);
   n = gshscene_sat_add(n, align_up(expansion));
   n = gshscene_sat_add(n, align_up(centerline));
   return n;
@@ -404,13 +410,13 @@ static void arena_reset(Glyph_Arena * a) {
 }
 
 static GSHSCENE_Result op_workspace_bytes(void * impl, const GSHSCENE_Render_Request * request, size_t * out) {
-  (void)impl;
+  const Dump_Sink * ds = impl;
   size_t levels;
   size_t blocks;
   size_t fills;
   size_t stops;
   size_t strokes;
-  *out = run_bytes(request->list, &levels, &blocks, &fills, &stops, &strokes);
+  *out = run_bytes(request->list, stroke_points(&ds->config), &levels, &blocks, &fills, &stops, &strokes);
   return GSHSCENE_OK;
 }
 
@@ -922,7 +928,7 @@ static GSHSCENE_Result stroke_outline_hash(Run * run, const GSHSCENE_Item * item
   GSHGEOM_Stroke_Outline * outline = NULL;
   GSHGEOM_Limits stroke_limits;
   gshgeom_limits_default(&stroke_limits);
-  stroke_limits.max_points = STROKE_MAX_POINTS;
+  stroke_limits.max_points = stroke_points(&run->sink->config);
   if (gshgeom_stroke_expand(path, &params, &canon, &run->strokes.self, &stroke_limits, &outline) != GSHGEOM_OK) {
     gshgeom_path_destroy(centerline);
     return GSHSCENE_ERR_LIMIT;
@@ -1349,7 +1355,7 @@ static GSHSCENE_Result op_begin(void * impl, GSHSCENE_Job * job) {
   size_t fills;
   size_t stops;
   size_t strokes;
-  size_t need = run_bytes(request->list, &levels, &blocks, &fills, &stops, &strokes);
+  size_t need = run_bytes(request->list, stroke_points(&ds->config), &levels, &blocks, &fills, &stops, &strokes);
   unsigned char * memory = NULL;
   unsigned char * base;
   if (request->flags & GSHSCENE_RENDER_CALLER_MEMORY) {
@@ -1376,7 +1382,7 @@ static GSHSCENE_Result op_begin(void * impl, GSHSCENE_Job * job) {
   arena_init(&run->glyphs, carve(&cursor, GLYPH_BYTES), GLYPH_BYTES);
   size_t expansion_bytes;
   size_t centerline_bytes;
-  stroke_scratch(request->list, &expansion_bytes, &centerline_bytes);
+  stroke_scratch(request->list, stroke_points(&ds->config), &expansion_bytes, &centerline_bytes);
   arena_init(&run->strokes, carve(&cursor, expansion_bytes), expansion_bytes);
   arena_init(&run->centerlines, carve(&cursor, centerline_bytes), centerline_bytes);
   run->sink = ds;
@@ -1598,7 +1604,8 @@ GSHSCENE_Result gshscene_dump_sink_create(const GSHSCENE_Allocator * alloc, cons
       can_block != ((c.stream_caps.flags & GSHSCENE_CAP_CAN_BLOCK) != 0) ||
       (c.targets & ~((UINT32_C(1) << GSHSCENE_TARGET_RASTER) | (UINT32_C(1) << GSHSCENE_TARGET_STREAM))) ||
       c.completion >= GSHSCENE_DUMP_SINK_COMPLETION_COUNT || !(c.max_extent >= 0.0) || !gshscene_finite(c.max_extent) ||
-      (c.completion == GSHSCENE_DUMP_SINK_INLINE && !can_block) || (c.log && !c.log->write)) {
+      (c.completion == GSHSCENE_DUMP_SINK_INLINE && !can_block) || (c.log && !c.log->write) ||
+      gshscene_sat_mul(stroke_points(&c), STROKE_BYTES_PER_POINT) == SIZE_MAX) {
     return GSHSCENE_ERR_INVALID;
   }
   if (!alloc) {
