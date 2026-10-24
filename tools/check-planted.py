@@ -2326,7 +2326,7 @@ PLANTS += [
     ('ds-st10-strict-continues', 'src', DS, '      *stopped = 1;\n      return GSHSCENE_OK;', '      *stopped = 0;\n      return GSHSCENE_OK;', ["testDump_sink", "testSink"]),
     ('ds-st10-notes-wrong-glyph', 'src', DS, '        (GSHSCENE_Reason)notes[i].reason, chain, count, i);', '        (GSHSCENE_Reason)notes[i].reason, chain, count, 0);', ["testDump_sink", "testSink"]),
     ('ds-st10-centerline-scratch-absent', 'src', DS, '  *centerline = of_run ? CENTERLINE_BYTES : 0;', '  *centerline = 0;', ["testDump_sink", "testSink"]),
-    ('ds-st10-stroke-scratch-absent', 'src', DS, '  *expansion = any ? gshscene_sat_mul(points, STROKE_BYTES_PER_POINT) : 0;', '  *expansion = 0;', ["testDump_sink", "testSink"]),
+    ('ds-st10-stroke-scratch-absent', 'src', DS, '  *expansion = any ? gshscene_sat_mul(points, STROKE_BYTES_PER_POINT) : 0;', '  (void)points;\n  *expansion = 0;', ["testDump_sink", "testSink"]),
     # Removed, ds-st10-unbound-undefended: equivalent: the plan refuses a stroke of a run from an unbound face (sink.c, ST5 (1)) before the unit is reached, so the unit's own check is a defense for a caller that skipped the plan.
 ]
 
