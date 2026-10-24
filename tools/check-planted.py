@@ -1575,7 +1575,7 @@ PLANTS += [
     ('rule-S9-short-states-need', 'src', SK, '    if (request->workspace_bytes < need) {\n      return end_early(job, GSHSCENE_ERR_LIMIT,', '    request->report->summary.workspace_needed = need;\n    if (request->workspace_bytes < need) {\n      return end_early(job, GSHSCENE_ERR_LIMIT,', SINKT),
     ('rule-S9-query-takes-the-bound', 'src', SK, '    if (bytes <= r.workspace_bytes) {', '    if (1) {', SINKT),
     ('rule-S9-render-sizes-freely', 'src', SK, '    result = sink->ops.workspace_bytes(sink->impl, &job->request, &need);', '    GSHSCENE_Render_Request planted = job->request;\n    planted.flags &= ~GSHSCENE_RENDER_CALLER_MEMORY;\n    result = sink->ops.workspace_bytes(sink->impl, &planted, &need);', SINKT),
-    ('rule-S9-sizing-allocates', 'src', DS, '  (void)impl;\n  size_t levels;\n  size_t blocks;', '  Dump_Sink * planted = impl;\n  gshscene_free(&planted->alloc, gshscene_alloc(&planted->alloc, 8));\n  size_t levels;\n  size_t blocks;', SINKT),
+    ('rule-S9-sizing-allocates', 'src', DS, '  const Dump_Sink * ds = impl;\n  size_t levels;\n  size_t blocks;\n  size_t fills;\n  size_t stops;', '  Dump_Sink * planted = impl;\n  gshscene_free(&planted->alloc, gshscene_alloc(&planted->alloc, 8));\n  const Dump_Sink * ds = impl;\n  size_t levels;\n  size_t blocks;\n  size_t fills;\n  size_t stops;', SINKT),
     # S4: the test sink's one limit (max_extent) met over the area drawn rather than the item's box, as shape-cpu's
     # cell cap was before 2026-10-21.
     ('rule-S4-limit-in-damage', 'src', DS, '(box.x1 - box.x0 > limit || box.y1 - box.y0 > limit)', '(run->job->target.damage ? (box.x1 < (double)run->area.x1 ? box.x1 : (double)run->area.x1) - (box.x0 > (double)run->area.x0 ? box.x0 : (double)run->area.x0) > limit : (box.x1 - box.x0 > limit || box.y1 - box.y0 > limit))', ['testDump_sink']),
@@ -2286,9 +2286,9 @@ PLANTS += [
     # Removed, sc2-check-dropped: unreachable: a style the store holds always passes gshgeom_stroke_check (SK2 equals SG2), so the failing branch is a defense nothing reaches.
     # strokes story S4 (SC10): the test sink's outline= field
     ('ds-s20-outline-pixel-scale', 'src', DS, '    if (!(size > 0.0) || gshgeom_map_scale(2, 1.0 / size, 1.0 / size, 1.0, &scale) != GSHGEOM_OK ||', '    if (!(size > 0.0) || gshgeom_map_scale(2, size, size, 1.0, &scale) != GSHGEOM_OK ||', ["testDump_sink"]),
-    ('ds-s20-outline-not-canonical', 'src', DS, '  if (gshgeom_stroke_expand(path, &params, &canon, &run->strokes.self, NULL, &outline) != GSHGEOM_OK) {', '  if (gshgeom_stroke_expand(path, &params, &pixels, &run->strokes.self, NULL, &outline) != GSHGEOM_OK) {', ["testDump_sink"]),
+    ('ds-s20-outline-not-canonical', 'src', DS, '  if (gshgeom_stroke_expand(path, &params, &canon, &run->strokes.self, &stroke_limits, &outline) != GSHGEOM_OK) {', '  if (gshgeom_stroke_expand(path, &params, &pixels, &run->strokes.self, &stroke_limits, &outline) != GSHGEOM_OK) {', ["testDump_sink"]),
     ('ds-s20-outline-unmapped', 'src', DS, '  GSHGEOM_Map pixels = *map;', '  GSHGEOM_Map pixels;\n  gshgeom_map_identity(2, &pixels);', ["testDump_sink"]),
-    ('ds-s20-outline-limit-ignored', 'src', DS, '  if (gshgeom_stroke_expand(path, &params, &canon, &run->strokes.self, NULL, &outline) != GSHGEOM_OK) {\n    gshgeom_path_destroy(centerline);\n    return GSHSCENE_ERR_LIMIT;', '  if (gshgeom_stroke_expand(path, &params, &canon, &run->strokes.self, NULL, &outline) != GSHGEOM_OK) {\n    gshgeom_path_destroy(centerline);\n    return GSHSCENE_ERR_INTERNAL;', ["testDump_sink"]),
+    ('ds-s20-outline-limit-ignored', 'src', DS, '  if (gshgeom_stroke_expand(path, &params, &canon, &run->strokes.self, &stroke_limits, &outline) != GSHGEOM_OK) {\n    gshgeom_path_destroy(centerline);\n    return GSHSCENE_ERR_LIMIT;', '  if (gshgeom_stroke_expand(path, &params, &canon, &run->strokes.self, &stroke_limits, &outline) != GSHGEOM_OK) {\n    gshgeom_path_destroy(centerline);\n    return GSHSCENE_ERR_INTERNAL;', ["testDump_sink"]),
     # Removed, ds-s20-outline-run-spelled: unreachable: a stroke names a path or a glyph run (check_resource), so the outline hash is always made and the `-` spelling is never printed.
     ('ds-s20-outline-hash-not-written', 'src', DS, '    snprintf(outline_text, sizeof outline_text, "%016" PRIx64, outline_hash);', '    snprintf(outline_text, sizeof outline_text, "%016" PRIx64, (uint64_t)0);', ["testDump_sink"]),
     # Removed, sc2-status-of-bad-style: unreachable: the same branch, whose status could differ only for a style the store cannot hold.
@@ -2326,7 +2326,7 @@ PLANTS += [
     ('ds-st10-strict-continues', 'src', DS, '      *stopped = 1;\n      return GSHSCENE_OK;', '      *stopped = 0;\n      return GSHSCENE_OK;', ["testDump_sink", "testSink"]),
     ('ds-st10-notes-wrong-glyph', 'src', DS, '        (GSHSCENE_Reason)notes[i].reason, chain, count, i);', '        (GSHSCENE_Reason)notes[i].reason, chain, count, 0);', ["testDump_sink", "testSink"]),
     ('ds-st10-centerline-scratch-absent', 'src', DS, '  *centerline = of_run ? CENTERLINE_BYTES : 0;', '  *centerline = 0;', ["testDump_sink", "testSink"]),
-    ('ds-st10-stroke-scratch-absent', 'src', DS, '  *expansion = any ? STROKE_BYTES : 0;', '  *expansion = 0;', ["testDump_sink", "testSink"]),
+    ('ds-st10-stroke-scratch-absent', 'src', DS, '  *expansion = any ? gshscene_sat_mul(points, STROKE_BYTES_PER_POINT) : 0;', '  *expansion = 0;', ["testDump_sink", "testSink"]),
     # Removed, ds-st10-unbound-undefended: equivalent: the plan refuses a stroke of a run from an unbound face (sink.c, ST5 (1)) before the unit is reached, so the unit's own check is a defense for a caller that skipped the plan.
 ]
 
