@@ -60,6 +60,10 @@
  * whose descriptor, rows, accounted bytes and equality are read back; and an image named where a shape goes, which every
  * record call refuses.
  *
+ * Story I2 adds one: an image paint from the input over an image of the pool (or a path, or nothing), its window, map,
+ * edge modes, filters, filter space and tint chosen to be valid, invalid or past a bound, whose result class is predicted
+ * from IP1 and whose content is read back, filled into the list and put through the recognition and the filter choice.
+ *
  * The op numbers below are mirrored by tools/gen-fuzz-corpus.py; the replay
  * also fails if the corpus never reaches an outcome (a limit, a refusal, an
  * invalid publish), which is what keeps a corpus from measuring nothing.
@@ -93,7 +97,7 @@ enum {
   OP_FILL_EX, OP_CLIP_PUSH_EX, OP_GROUP_PUSH_EX, OP_LIST_FOREGROUND, OP_NODE_PROPS, OP_EDIT_FOREGROUND, OP_LIST_PALETTE,
   OP_FILL_FIXED, OP_TRUNCATE, OP_EDIT_PALETTE, OP_INTERN_GRADIENT, OP_FILL_GRADIENT, OP_SCENE_GRADIENT,
   OP_GRADIENT_NODE, OP_COLOR_BOUND, OP_GROUP_PDF, OP_NODE_PDF, OP_INTERN_STYLE, OP_STROKE, OP_STROKE_NODE, OP_PLACEHOLDER,
-  OP_PLACEHOLDER_NODE, OP_INTERN_IMAGE, OP_IMAGE_NOT_SHAPE, OP_COUNT
+  OP_PLACEHOLDER_NODE, OP_INTERN_IMAGE, OP_IMAGE_NOT_SHAPE, OP_IMAGE_PAINT, OP_COUNT
 };
 
 /* --- the outcomes the corpus must reach ------------------------------------------------------------ */
@@ -107,7 +111,8 @@ enum {
   OUT_STYLE_LIMIT, OUT_STYLE_DOUBLED, OUT_STYLE_SOLID, OUT_STYLE_UNSUPPORTED, OUT_STROKE_RECORDED,
   OUT_STROKE_UNSUPPORTED, OUT_STROKE_NODE, OUT_STROKE_EMITTED, OUT_PLACEHOLDER_RECORDED, OUT_PLACEHOLDER_INVALID,
   OUT_PLACEHOLDER_NODE, OUT_PLACEHOLDER_EMITTED, OUT_IMAGE_INTERNED, OUT_IMAGE_INVALID, OUT_IMAGE_UNSUPPORTED,
-  OUT_IMAGE_LIMIT, OUT_IMAGE_BAD_SAMPLE, OUT_IMAGE_HIT, OUT_IMAGE_TAKEN, OUT_IMAGE_NOT_SHAPE, OUT_COUNT
+  OUT_IMAGE_LIMIT, OUT_IMAGE_BAD_SAMPLE, OUT_IMAGE_HIT, OUT_IMAGE_TAKEN, OUT_IMAGE_NOT_SHAPE, OUT_IMAGE_PAINT,
+  OUT_IMAGE_PAINT_STENCIL, OUT_IMAGE_PAINT_INVALID, OUT_IMAGE_PAINT_LIMIT, OUT_IMAGE_PAINT_FILL, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limit", "edit limit", "publish limit",
@@ -123,7 +128,8 @@ static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limi
     "a stroke recorded", "a 3D stroke refused as unsupported", "a stroke node", "an emitted list with a stroke",
     "a placeholder recorded", "a placeholder refused as invalid", "a placeholder node", "an emitted list with a placeholder",
     "an image interned", "an image refused as invalid", "an image refused as unsupported", "an image past IM10's bounds refused",
-    "an image refused for a sample value", "an image found again", "an image taken", "an image refused where a shape goes"};
+    "an image refused for a sample value", "an image found again", "an image taken", "an image refused where a shape goes", "an image paint interned", "a tinted image paint interned",
+    "an image paint refused as invalid", "an image paint past IP1's bounds refused", "a fill with an image paint recorded"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -2478,6 +2484,147 @@ static void op(S * s, unsigned code) {
       CHECK(r == GSHSCENE_ERR_INVALID);
       list_after(s, b, GSHSCENE_ERR_INVALID, 0, 0);
       outcomes[OUT_IMAGE_NOT_SHAPE]++;
+      break;
+    }
+    case OP_IMAGE_PAINT: {
+      /* IP1: an image paint over an image of the pool, or over a path, or over nothing.  The result class is predicted
+       * from the rules: invalid before limit, and a bound last. */
+      unsigned pick_image = pick(s, 5);
+      unsigned wmode = pick(s, 5);
+      unsigned wa = arg(s), wb = arg(s), wc = arg(s), wd = arg(s);
+      unsigned mapsel = pick(s, 7);
+      unsigned ex = pick(s, 6), ey = pick(s, 6), mag = pick(s, 5), mini = pick(s, 5);
+      unsigned space_sel = pick(s, 2);
+      unsigned tsel = pick(s, 5);
+      unsigned where = pick(s, POOL);
+      const GSHSCENE_Resource * img = pick_image < 3 ? s->images[pick_image] : pick_image == 3 ? s->res[0] : NULL;
+      GSHSCENE_Image_Info info;
+      memset(&info, 0, sizeof info);
+      int is_image = img && gshscene_resource_kind(img) == GSHSCENE_RESOURCE_IMAGE &&
+          gshscene_resource_image(img, &info) == GSHSCENE_OK;
+      GSHSCENE_Image_Paint ip;
+      gshscene_image_paint_init(&ip);
+      ip.image = img;
+      int window_ok = 1;
+      if (wmode >= 2 && is_image) {
+        uint32_t x0 = wa % info.width, y0 = wb % info.height;
+        ip.window[0] = x0;
+        ip.window[1] = y0;
+        ip.window[2] = x0 + 1u + wc % (info.width - x0);
+        ip.window[3] = y0 + 1u + wd % (info.height - y0);
+        if (wmode == 3) {
+          ip.window[2] = x0; /* empty */
+          window_ok = 0;
+        } else if (wmode == 4) {
+          ip.window[3] = info.height + 1u; /* past the image */
+          window_ok = 0;
+        }
+      }
+      int map_invalid = 0;
+      int map_past = 0;
+      switch (mapsel) {
+        case 1: gshgeom_map_scale(2, 3.0, 3.0, 1.0, &ip.map); break;
+        case 2: gshgeom_map_scale(2, 0.25, 0.25, 1.0, &ip.map); break;
+        case 3: gshgeom_map_scale(2, 0.0, 1.0, 1.0, &ip.map); break; /* singular: legal, and a notice at render */
+        case 4: gshgeom_map_translate(2, 5.5, -2.0, 0.0, &ip.map); break;
+        case 5: gshgeom_map_scale(2, 0x1p70, 0x1p70, 1.0, &ip.map); map_past = 1; break;
+        case 6: ip.map.m[0][0] = (double)NAN; map_invalid = 1; break;
+        default: break;
+      }
+      ip.extend_x = ex;
+      ip.extend_y = ey;
+      ip.magnify = mag;
+      ip.minify = mini;
+      if (space_sel) {
+        ip.filter_space.primaries = GCOL_PRIMARIES_SRGB;
+        ip.filter_space.transfer = GCOL_TRANSFER_LINEAR;
+      }
+      GSHSCENE_Paint tint;
+      memset(&tint, 0, sizeof tint);
+      int has_tint = tsel != 0;
+      int tint_invalid = 0;
+      int tint_past = 0;
+      switch (tsel) {
+        case 1: tint.kind = GSHSCENE_PAINT_SOLID; tint.rgba[0] = 0.25; tint.rgba[1] = 0.5; tint.rgba[2] = 0.75; tint.rgba[3] = 1.0; break;
+        case 2: tint.kind = GSHSCENE_PAINT_FOREGROUND; tint.rgba[3] = 1.0; break;
+        case 3: tint.kind = GSHSCENE_PAINT_SOLID; tint.rgba[0] = 0x1p17; tint.rgba[3] = 1.0; tint_past = 1; break;
+        case 4: tint.kind = GSHSCENE_PAINT_GRADIENT; tint.rgba[3] = 1.0; tint_invalid = 1; break;
+        default: break;
+      }
+      ip.tint = has_tint ? &tint : NULL;
+      int stencil = is_image && info.alpha_only;
+      int invalid = !is_image || !window_ok || map_invalid || ex >= 4 || ey >= 4 || mag >= 4 || mini >= 4 ||
+          stencil != has_tint || tint_invalid;
+      int past = !invalid && (map_past || (tint_past && has_tint));
+      const GSHSCENE_Resource * made = NULL;
+      GSHSCENE_Store_Stats before, after;
+      CHECK(gshscene_store_stats(s->store, &before) == GSHSCENE_OK);
+      r = gshscene_store_intern_image_paint(s->store, &ip, &made);
+      CHECK(gshscene_store_stats(s->store, &after) == GSHSCENE_OK);
+      CHECK(r != GSHSCENE_ERR_INTERNAL && r != GSHSCENE_ERR_OOM && r != GSHSCENE_ERR_CORRUPT && r != GSHSCENE_ERR_IO);
+      if (invalid) {
+        CHECK(r == GSHSCENE_ERR_INVALID);
+        outcomes[OUT_IMAGE_PAINT_INVALID]++;
+      } else if (past) {
+        CHECK(r == GSHSCENE_ERR_LIMIT);
+        outcomes[OUT_IMAGE_PAINT_LIMIT]++;
+      } else if (r != GSHSCENE_OK) {
+        CHECK(r == GSHSCENE_ERR_LIMIT); /* only the store's own limits refuse what IP1 accepts */
+        CHECK(before.live >= lim->max_resources || before.bytes + GSHSCENE_BYTES_BASE > lim->max_bytes);
+        outcomes[OUT_IMAGE_PAINT_LIMIT]++;
+      }
+      if (r != GSHSCENE_OK) {
+        CHECK(made == NULL && before.live == after.live && before.bytes == after.bytes && before.created == after.created);
+        break;
+      }
+      outcomes[OUT_IMAGE_PAINT]++;
+      outcomes[OUT_IMAGE_PAINT_STENCIL] += stencil != 0;
+      CHECK(gshscene_resource_kind(made) == GSHSCENE_RESOURCE_IMAGE_PAINT);
+      GSHSCENE_Image_Paint back;
+      CHECK(gshscene_resource_image_paint(made, &back) == GSHSCENE_OK);
+      CHECK(back.image == img);
+      CHECK(back.window[0] < back.window[2] && back.window[2] <= info.width && back.window[1] < back.window[3] &&
+          back.window[3] <= info.height);
+      if (wmode < 2) {
+        CHECK(back.window[0] == 0 && back.window[1] == 0 && back.window[2] == info.width && back.window[3] == info.height);
+      } else {
+        CHECK(back.window[0] == ip.window[0] && back.window[1] == ip.window[1] && back.window[2] == ip.window[2] &&
+            back.window[3] == ip.window[3]);
+      }
+      CHECK(back.extend_x == ex && back.extend_y == ey && back.magnify == mag && back.minify == mini);
+      CHECK((back.tint != NULL) == stencil);
+      if (stencil) {
+        CHECK(back.filter_space.primaries == 0 && back.filter_space.transfer == 0);
+      }
+      CHECK(gshscene_resource_hash(made) != 0);
+      const GSHSCENE_Resource * again = NULL;
+      CHECK(gshscene_store_intern_image_paint(s->store, &ip, &again) == GSHSCENE_OK && again == made);
+      gshscene_resource_release(again);
+      if (s->list) {
+        ListSnap b = snap(s->list);
+        GSHSCENE_Paint paint;
+        memset(&paint, 0, sizeof paint);
+        paint.kind = GSHSCENE_PAINT_IMAGE;
+        paint.resource = made;
+        paint.rgba[3] = 1.0;
+        r = gshscene_list_fill(s->list, s->res[where], NULL, GSHGEOM_FILL_NONZERO, &paint, 0, 0);
+        list_after(s, b, r, 0, 0);
+        if (r == GSHSCENE_OK) {
+          const GSHSCENE_Item * item;
+          CHECK(gshscene_list_item(s->list, b.count, &item) == GSHSCENE_OK);
+          CHECK(item->paint.kind == GSHSCENE_PAINT_IMAGE && item->paint.resource == made);
+          CHECK(gshscene_image_required(item) != 0);
+          uint32_t filter = 99;
+          GSHSCENE_Result fr = gshscene_image_filter_of(item, NULL, 0, NULL, &filter);
+          CHECK((fr == GSHSCENE_OK && filter < (uint32_t)GSHSCENE_IMAGE_FILTER_COUNT) || fr == GSHSCENE_ERR_LIMIT);
+          double quad[8];
+          int drawn = gshscene_image_fill_is_draw(item, quad);
+          CHECK(drawn == 0 || drawn == 1);
+          (void)gshscene_paint_notice(item, NULL, 0, NULL);
+          outcomes[OUT_IMAGE_PAINT_FILL]++;
+        }
+      }
+      gshscene_resource_release(made);
       break;
     }
     default:

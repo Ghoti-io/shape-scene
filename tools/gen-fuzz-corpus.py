@@ -35,7 +35,7 @@ OPS = ["LIST_CREATE", "FILL", "CLIP_PUSH", "CLIP_POP", "GROUP_PUSH", "GROUP_POP"
        "PUBLISH", "MERGE", "HOLD", "RELEASE_VERSION", "DIFF", "EMIT", "VISIT", "DUMP", "SCENE_INTERN",
        "FILL_EX", "CLIP_PUSH_EX", "GROUP_PUSH_EX", "LIST_FOREGROUND", "NODE_PROPS", "EDIT_FOREGROUND", "LIST_PALETTE",
        "FILL_FIXED", "TRUNCATE", "EDIT_PALETTE", "INTERN_GRADIENT", "FILL_GRADIENT", "SCENE_GRADIENT", "GRADIENT_NODE",
-       "COLOR_BOUND", "GROUP_PDF", "NODE_PDF", "INTERN_STYLE", "STROKE", "STROKE_NODE", "PLACEHOLDER", "PLACEHOLDER_NODE", "INTERN_IMAGE", "IMAGE_NOT_SHAPE"]
+       "COLOR_BOUND", "GROUP_PDF", "NODE_PDF", "INTERN_STYLE", "STROKE", "STROKE_NODE", "PLACEHOLDER", "PLACEHOLDER_NODE", "INTERN_IMAGE", "IMAGE_NOT_SHAPE", "IMAGE_PAINT"]
 OP = {name: i for i, name in enumerate(OPS)}
 
 BIASED = {
@@ -46,7 +46,7 @@ BIASED = {
     "FILL_EX": 5, "CLIP_PUSH_EX": 2, "GROUP_PUSH_EX": 4, "LIST_FOREGROUND": 1, "NODE_PROPS": 5, "EDIT_FOREGROUND": 2,
     "LIST_PALETTE": 2, "FILL_FIXED": 4, "TRUNCATE": 2, "EDIT_PALETTE": 2, "INTERN_GRADIENT": 4, "FILL_GRADIENT": 4,
     "SCENE_GRADIENT": 4, "GRADIENT_NODE": 5, "INTERN_STYLE": 5, "STROKE": 4, "STROKE_NODE": 4,
-    "INTERN_IMAGE": 6, "IMAGE_NOT_SHAPE": 2,
+    "INTERN_IMAGE": 6, "IMAGE_NOT_SHAPE": 2, "IMAGE_PAINT": 6,
 }
 
 BIASED_FILES = 160
@@ -272,6 +272,35 @@ def scripted():
               + image(0, 1, 3, 1, 0, 0, 1, 0, 1, 0, 0, 0, 43, 0)        # 1 by 65537
               + image(0, 2, 3, 2, 0, 0, 1, 0, 1, 0, 0, 0, 45, 0)        # 40000 by 40000: past the texel bound
               + bytes([OP["IMAGE_NOT_SHAPE"], 0, OP["IMAGE_NOT_SHAPE"], 1]))
+    # Story I2.  IMAGE_PAINT reads: the image pick (0 to 2 the pool, 3 a path, 4 none), the window mode (0, 1 whole; 2 a
+    # sub-rectangle from the next four bytes; 3 empty; 4 past the image), those four bytes, the map (identity, scale 3, scale
+    # 1/4, singular, a translation, past the band, NaN), both edge modes and both filters (4 and over are out of range), the
+    # filter space, the tint (none, solid, foreground, past N1's bound, a gradient kind) and the item to fill (the last
+    # argument of the helper is ignored: the item is pool slot 0).
+    def paint(img, wmode, wa, wb, wc, wd, mapsel, ex, ey, mag, mini, space, tsel, where):
+        return bytes([OP["IMAGE_PAINT"], img, wmode, wa, wb, wc, wd, mapsel, ex, ey, mag, mini, space, tsel, 0])  # the item is always pool slot 0, the path
+    paints = (bytes([OP["LIST_CREATE"], OP["INTERN_PATH"], 0, 0])
+              + image(0, 2, 0, 5, 3, 3, 1, 0, 1, 0, 0, 1, 7, 0)         # slot 0: an RGBA8 image, padded, in sRGB
+              + image(0, 0, 0, 2, 1, 0, 0, 2, 1, 0, 0, 1, 13, 2)        # slot 2: an alpha-only gray8
+              + paint(0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0)         # the whole image, defaults: interned, filled
+              + paint(0, 2, 3, 2, 9, 9, 1, 1, 2, 0, 3, 1, 0, 1)         # a window, scaled, REPEAT/REFLECT, in linear sRGB
+              + paint(0, 0, 0, 0, 0, 0, 3, 3, 3, 2, 2, 0, 0, 0)         # a singular map: legal
+              + paint(0, 0, 0, 0, 0, 0, 4, 0, 0, 3, 3, 0, 0, 2)         # a translation, AREA both ways
+              + paint(2, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0)         # a stencil with a solid tint: interned, tinted
+              + paint(2, 1, 0, 0, 0, 0, 2, 0, 0, 1, 1, 1, 2, 3)         # a stencil with the foreground; its filter space dropped
+              + paint(2, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0)         # a stencil without a tint: invalid
+              + paint(0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0)         # a color image with a tint: invalid
+              + paint(2, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 3, 0)         # a tint past N1's bound: past the bound
+              + paint(2, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 4, 0)         # a gradient as the tint: invalid
+              + paint(0, 0, 0, 0, 0, 0, 5, 0, 0, 1, 1, 0, 0, 0)         # a map past the band: past the bound
+              + paint(0, 0, 0, 0, 0, 0, 6, 0, 0, 1, 1, 0, 0, 0)         # a NaN in the map: invalid
+              + paint(0, 3, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0)         # an empty window: invalid
+              + paint(0, 4, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0)         # a window past the image: invalid
+              + paint(0, 0, 0, 0, 0, 0, 0, 4, 0, 1, 1, 0, 0, 0)         # an edge mode out of range: invalid
+              + paint(0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 1, 0, 0, 0)         # a filter out of range: invalid
+              + paint(3, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0)         # a path where an image goes: invalid
+              + paint(4, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0))        # nothing: invalid
+    out["scripted-image-paints.bin"] = bytes(bytearray([0xFF, 0xFF]) + paints)
     out["scripted-images.bin"] = bytes(bytearray([0xFF, 0xFF]) + images)
     # The same under a store whose bytes are bounded (b1 = 0x40: max_bytes 1500): an image that does not fit is refused by
     # the store's limit, and one that does is interned.

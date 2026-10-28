@@ -30,6 +30,7 @@
 
 #include "../alloc_tracker.h"
 #include "../image_fixtures.h"
+#include "../scene_fixtures.h"
 #include "../image_vectors.h"
 #include "../known_answers.h"
 #include "../ref_image.h"
@@ -310,7 +311,8 @@ struct Fixture {
   Ref stencil;
   Ref other_color;  // another store's image
   StoreHolder other;
-  Fixture() {
+  Fixture() : Fixture(nullptr) {}
+  explicit Fixture(GSHSCENE_Index_Hash_Fn index_hash) : store(nullptr, nullptr, index_hash) {
     RasterHolder c(make_raster(70, 66, kRgba8));
     color = Ref(copy_in(store.store, c.get(), params()));
     RasterHolder g(make_raster(65, 65, kGray8));
@@ -558,8 +560,8 @@ TEST(ImagePaint, AStencilsFilterSpaceDoesNotApplyAndIsStoredAsZero) {
   EXPECT_EQ(intern_paint(f.store.store, with_space), GSHSCENE_ERR_INVALID);
 }
 
-TEST(ImagePaint, EqualContentIsOneHandleAndEveryFieldTellsPaintsApart) {
-  Fixture f;
+static void every_field_tells_paints_apart(GSHSCENE_Index_Hash_Fn index_hash) {
+  Fixture f(index_hash);
   GSHSCENE_Image_Paint base = paint_of(f.color.get());
   Ref a;
   ASSERT_EQ(intern_paint(f.store.store, base, &a), GSHSCENE_OK);
@@ -577,6 +579,13 @@ TEST(ImagePaint, EqualContentIsOneHandleAndEveryFieldTellsPaintsApart) {
   vary([](GSHSCENE_Image_Paint & p) { p.window[2] = 69; p.window[3] = 66; });
   vary([](GSHSCENE_Image_Paint & p) { p.window[2] = 70; p.window[3] = 65; });
   vary([](GSHSCENE_Image_Paint & p) { p.map = translate(0.5, 0.0); });
+  // Maps of one kind that differ in one entry only: the comparison must read every entry, not the kind.
+  vary([](GSHSCENE_Image_Paint & p) { p.map = translate(0.5, 0.25); });
+  vary([](GSHSCENE_Image_Paint & p) { p.map = translate(0.25, 0.5); });
+  vary([](GSHSCENE_Image_Paint & p) { p.map = matrix_map(2, 0, 0, 1); });
+  vary([](GSHSCENE_Image_Paint & p) { p.map = matrix_map(1, 0, 0, 2); });
+  vary([](GSHSCENE_Image_Paint & p) { p.map = matrix_map(1, 1, 0, 1); });
+  vary([](GSHSCENE_Image_Paint & p) { p.map = matrix_map(1, 0, 1, 1); });
   vary([](GSHSCENE_Image_Paint & p) { p.extend_x = GSHSCENE_IMAGE_EXTEND_REPEAT; });
   vary([](GSHSCENE_Image_Paint & p) { p.extend_y = GSHSCENE_IMAGE_EXTEND_REFLECT; });
   vary([](GSHSCENE_Image_Paint & p) { p.magnify = GSHSCENE_IMAGE_FILTER_NEAREST; });
@@ -594,7 +603,7 @@ TEST(ImagePaint, EqualContentIsOneHandleAndEveryFieldTellsPaintsApart) {
   // A tint's every field too.
   std::vector<GSHSCENE_Paint> tints = {solid_tint(), solid_tint(0.26, 0.5, 0.75, 1.0), solid_tint(0.25, 0.5, 0.75, 0.5),
       kind_tint(GSHSCENE_PAINT_FOREGROUND, 0, 1.0), kind_tint(GSHSCENE_PAINT_FOREGROUND, 0, 0.5),
-      kind_tint(GSHSCENE_PAINT_PALETTE, 1), kind_tint(GSHSCENE_PAINT_PALETTE, 2)};
+      kind_tint(GSHSCENE_PAINT_PALETTE, 1), kind_tint(GSHSCENE_PAINT_PALETTE, 2), kind_tint(GSHSCENE_PAINT_PALETTE, 0, 1.0)};
   GSHSCENE_Paint other_space = solid_tint();
   other_space.space = srgb_space();
   tints.push_back(other_space);
@@ -615,6 +624,15 @@ TEST(ImagePaint, EqualContentIsOneHandleAndEveryFieldTellsPaintsApart) {
   Ref c;
   ASSERT_EQ(intern_paint(f.store.store, on_other, &c), GSHSCENE_OK);
   EXPECT_NE(c.get(), a.get());
+}
+
+TEST(ImagePaint, EqualContentIsOneHandleAndEveryFieldTellsPaintsApart) {
+  every_field_tells_paints_apart(nullptr);
+}
+
+// The index finds a candidate; only the comparison tells paints apart once every index collides.
+TEST(ImagePaint, EqualContentIsOneHandleAndEveryFieldTellsPaintsApartWhenEveryIndexCollides) {
+  every_field_tells_paints_apart(all_zero);
 }
 
 TEST(ImagePaint, NegativeZeroIsStoredAsPositiveZeroInTheMapAndTheTint) {
@@ -1456,4 +1474,186 @@ TEST(ImagePaintCaps, APaletteTintNeedsTheEntryInThePaletteInForce) {
 int main(int argc, char ** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
+}
+
+// --- gaps the plants found ------------------------------------------------------------------------------------------
+
+TEST(ImageDecode, ATakenRasterIsReadAtItsOwnStride) {
+  StoreHolder store;
+  GIMG_Raster * raster = make_raster(9, 9, kRgb8, 7, 0x11); // rows padded: the stride is not the row's bytes
+  ASSERT_NE(raster, nullptr);
+  unsigned char * px = (unsigned char *)gimg_raster_pixels(raster);
+  size_t stride = gimg_raster_stride_bytes(raster);
+  ASSERT_GT(stride, (size_t)27);
+  px[stride * 4 + 2 * 3 + 0] = 255;
+  px[stride * 4 + 2 * 3 + 1] = 0;
+  px[stride * 4 + 2 * 3 + 2] = 51;
+  const GSHSCENE_Resource * r = nullptr;
+  GSHSCENE_Image_Params prm = params();
+  ASSERT_EQ(gshscene_store_intern_image_take(store.store, raster, &prm, &r), GSHSCENE_OK);
+  Ref image(r);
+  double out[4];
+  ASSERT_EQ(gshscene_image_decode(image.get(), 2, 4, out), GSHSCENE_OK);
+  EXPECT_EQ(out[0], 1.0);
+  EXPECT_EQ(out[1], 0.0);
+  EXPECT_EQ(out[2], 51.0 / 255.0);
+  EXPECT_EQ(out[3], 1.0);
+}
+
+TEST(ImagePaintDraw, OnlyOneClosedSubpathOfFourLinesInTwoDimensionsIsADrawnImage) {
+  Fixture f;
+  GSHSCENE_Image_Paint p = paint_of(f.color.get());
+  p.map = matrix_map(2, 0, 0, 3, 5, 7);
+  Ref paint;
+  ASSERT_EQ(intern_paint(f.store.store, p, &paint), GSHSCENE_OK);
+  Ref rect;
+  ASSERT_EQ(gshscene_image_paint_rect_path(f.store.store, paint.get(), &rect.resource), GSHSCENE_OK);
+  double q[8];
+  {
+    Unit u(f.store.store, rect.get(), nullptr, paint.get());
+    ASSERT_EQ(gshscene_image_fill_is_draw(u.item, q), 1);
+  }
+  for (int dim = 2; dim <= 3; dim++) {
+    for (int extra = 0; extra < 2; extra++) {
+      GSHGEOM_Path * path = nullptr;
+      ASSERT_EQ(gshgeom_path_create(nullptr, nullptr, dim, &path), GSHGEOM_OK);
+      ASSERT_EQ(gshgeom_path_move_to(path, GSHGEOM_Point{q[0], q[1], 0}), GSHGEOM_OK);
+      for (int i = 1; i < 4; i++) {
+        ASSERT_EQ(gshgeom_path_line_to(path, GSHGEOM_Point{q[2 * i], q[2 * i + 1], 0}), GSHGEOM_OK);
+      }
+      ASSERT_EQ(gshgeom_path_close(path), GSHGEOM_OK);
+      if (extra) {
+        ASSERT_EQ(gshgeom_path_move_to(path, GSHGEOM_Point{q[0], q[1], 0}), GSHGEOM_OK); // a sixth element
+      }
+      const GSHSCENE_Resource * r = nullptr;
+      GSHSCENE_Result made = gshscene_store_intern_path(f.store.store, path, &r);
+      gshgeom_path_destroy(path);
+      ASSERT_EQ(made, GSHSCENE_OK);
+      Ref res(r);
+      GSHSCENE_Paint pt = solid(0, 0, 0, 1);
+      pt.kind = GSHSCENE_PAINT_IMAGE;
+      pt.resource = paint.get();
+      ListHolder list(f.store.store);
+      GSHSCENE_Result filled = gshscene_list_fill(list.list, res.get(), nullptr, GSHGEOM_FILL_NONZERO, &pt, 0, 0.0);
+      if (filled != GSHSCENE_OK) {
+        continue; // the list refuses this path (a 3D one): there is no item to recognize
+      }
+      ASSERT_EQ(gshscene_list_close(list.list), GSHSCENE_OK);
+      const GSHSCENE_Item * item = nullptr;
+      ASSERT_EQ(gshscene_list_item(list.list, 0, &item), GSHSCENE_OK);
+      EXPECT_EQ(gshscene_image_fill_is_draw(item, nullptr), dim == 2 && !extra ? 1 : 0) << "dim " << dim << " extra " << extra;
+    }
+  }
+}
+
+TEST(ImagePaintCaps, AStrokeWithAnImagePaintNeedsWhatAFillOfItDoes) {
+  Fixture f;
+  Ref square(intern_square(f.store.store));
+  GSHSCENE_Image_Paint p = paint_of(f.color.get());
+  p.extend_x = GSHSCENE_IMAGE_EXTEND_REFLECT;
+  Ref paint;
+  ASSERT_EQ(intern_paint(f.store.store, p, &paint), GSHSCENE_OK);
+  Unit fill(f.store.store, square.get(), nullptr, paint.get());
+  Unit stroke(f.store.store, square.get(), nullptr, paint.get(), 1.0, true);
+  EXPECT_NE(gshscene_image_required(fill.item), 0u);
+  EXPECT_EQ(gshscene_image_required(stroke.item), gshscene_image_required(fill.item));
+}
+
+TEST(ImagePaintFilter, TheTargetIsComposedAfterTheChainAndNotBefore) {
+  Fixture f;
+  Ref square(intern_square(f.store.store));
+  GSHSCENE_Image_Paint p = paint_of(f.color.get());
+  p.magnify = GSHSCENE_IMAGE_FILTER_NEAREST;
+  p.minify = GSHSCENE_IMAGE_FILTER_LINEAR;
+  Ref paint;
+  ASSERT_EQ(intern_paint(f.store.store, p, &paint), GSHSCENE_OK);
+  GSHGEOM_Map item_map = matrix_map(10, 0, 0, 1.5);
+  Unit u(f.store.store, square.get(), &item_map, paint.get());
+  // A shear in the target: target after item stretches the short direction less than item after target would.
+  int discriminated = 0;
+  for (int upper = 0; upper < 2; upper++) {
+    GSHGEOM_Map shear = upper ? matrix_map(1, 3, 0, 1) : matrix_map(1, 0, 3, 1);
+    GSHGEOM_Map chain[2] = {item_map, p.map};
+    GSHGEOM_Map right, wrong;
+    ASSERT_EQ(gshgeom_map_compose_chain(chain, 2, &shear, &right), GSHGEOM_OK);
+    GSHGEOM_Map inner;
+    ASSERT_EQ(gshgeom_map_compose(&chain[0], &chain[1], &inner), GSHGEOM_OK);
+    ASSERT_EQ(gshgeom_map_compose(&inner, &shear, &wrong), GSHGEOM_OK);
+    int a = gshgeom_map_stretches_every_direction(&right);
+    int b = gshgeom_map_stretches_every_direction(&wrong);
+    uint32_t filter = 99;
+    ASSERT_EQ(gshscene_image_filter_of(u.item, nullptr, 0, &shear, &filter), GSHSCENE_OK);
+    EXPECT_EQ(filter, a ? (uint32_t)GSHSCENE_IMAGE_FILTER_NEAREST : (uint32_t)GSHSCENE_IMAGE_FILTER_LINEAR);
+    discriminated += a != b;
+  }
+  EXPECT_GT(discriminated, 0) << "the chosen maps must tell the two orders apart";
+}
+
+TEST(ImagePaintScene, ATintThatReadsTheForegroundOrThePaletteDamagesOnlyItsShapes) {
+  SceneHolder sc;
+  GSHSCENE_Store * store = sc.store();
+  Ref sq(intern_square(store, 0.0));
+  Ref sq2(intern_square(store, 40.0));
+  Ref sq3(intern_square(store, 80.0));
+  RasterHolder gray(make_raster(8, 8, kGray8));
+  RasterHolder rgba(make_raster(8, 8, kRgba8));
+  Ref stencil(copy_in(store, gray.get(), params(GSHSCENE_Color_Space{}, GSHSCENE_IMAGE_ALPHA_ONLY)));
+  Ref color(copy_in(store, rgba.get(), params()));
+  GSHSCENE_Paint fg_t = kind_tint(GSHSCENE_PAINT_FOREGROUND, 0, 1.0);
+  GSHSCENE_Paint pal_t = kind_tint(GSHSCENE_PAINT_PALETTE, 1, 1.0);
+  GSHSCENE_Image_Paint a = paint_of(stencil.get());
+  a.tint = &fg_t;
+  GSHSCENE_Image_Paint b = paint_of(stencil.get());
+  b.tint = &pal_t;
+  GSHSCENE_Image_Paint c = paint_of(color.get());
+  Ref pa, pb, pc;
+  ASSERT_EQ(intern_paint(store, a, &pa), GSHSCENE_OK);
+  ASSERT_EQ(intern_paint(store, b, &pb), GSHSCENE_OK);
+  ASSERT_EQ(intern_paint(store, c, &pc), GSHSCENE_OK);
+  VersionRef v1;
+  {
+    EditHolder e(sc);
+    const GSHSCENE_Resource * paints[3] = {pa.get(), pb.get(), pc.get()};
+    const GSHSCENE_Resource * shapes[3] = {sq.get(), sq2.get(), sq3.get()};
+    for (int i = 0; i < 3; i++) {
+      GSHSCENE_Node n = shape_node(shapes[i]);
+      n.paint = solid(0, 0, 0, 1);
+      n.paint.kind = GSHSCENE_PAINT_IMAGE;
+      n.paint.resource = paints[i];
+      add(e.edit, GSHSCENE_ROOT_ID, n);
+    }
+    publish(sc, e, &v1);
+  }
+  auto damage = [&](const GSHSCENE_Version * x, const GSHSCENE_Version * y) {
+    GSHSCENE_Diff * diff = nullptr;
+    GSHSCENE_Damage d{};
+    EXPECT_EQ(gshscene_diff(x, y, nullptr, nullptr, &diff), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_diff_damage(diff, &d), GSHSCENE_OK);
+    gshscene_diff_destroy(diff);
+    return d;
+  };
+  VersionRef v2;
+  {
+    EditHolder e(sc);
+    GSHSCENE_Color red = {{1, 0, 0, 1}, {}};
+    ASSERT_EQ(gshscene_edit_set_foreground(e.edit, &red), GSHSCENE_OK);
+    publish(sc, e, &v2);
+  }
+  GSHSCENE_Damage fg = damage(v1.get(), v2.get());
+  EXPECT_EQ(fg.empty, 0);
+  EXPECT_LT(fg.rect.x1, 40) << "only the shape whose tint is the foreground";
+  const GSHSCENE_Color entries[2] = {{{0, 0, 0, 1}, {}}, {{0, 1, 0, 1}, {}}};
+  const GSHSCENE_Resource * pal = nullptr;
+  ASSERT_EQ(gshscene_store_intern_palette(store, 2, entries, &pal), GSHSCENE_OK);
+  VersionRef v3;
+  {
+    EditHolder e(sc);
+    ASSERT_EQ(gshscene_edit_set_palette(e.edit, pal), GSHSCENE_OK);
+    publish(sc, e, &v3);
+  }
+  gshscene_resource_release(pal);
+  GSHSCENE_Damage pd = damage(v2.get(), v3.get());
+  EXPECT_EQ(pd.empty, 0);
+  EXPECT_GE(pd.rect.x0, 30) << "only the shape whose tint is a palette entry";
+  EXPECT_LT(pd.rect.x1, 80);
 }
