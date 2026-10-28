@@ -303,6 +303,148 @@ P id=3 parent=2 flags=0 key=- source=1 code=1 approx=0 box=0000000000000000 0000
 P id=4 parent=1 flags=0 key=5356470000000001:0000000000000009 source=1 code=3 approx=1 box=bff0000000000000 c000000000000000 4008000000000000 4010000000000000 map=ff01deda28fd860d layer=0 depth=0000000000000000
 P id=5 parent=1 flags=1 key=- source=1 code=2 approx=0 box=- map=1f5787abb2e02a06 layer=0 depth=0000000000000000
 )DUMP";
+struct ImageCase {
+  const char * name;
+  unsigned width, height, layout, type, bits, alpha, alpha_only;
+  unsigned primaries, transfer;
+  double gamma;
+  std::uint64_t hash;
+  unsigned tiles_x, tiles_y;
+  const std::uint64_t * tiles;
+  const char * dump;
+};
+
+static const std::uint64_t kImageTiles0[] = {UINT64_C(0x529a3613e4ff42d3)};
+static const std::uint64_t kImageTiles1[] = {UINT64_C(0x0dfc5f55f91e1a50), UINT64_C(0x3890aa22fead8d71), UINT64_C(0x73c778c22c3f5a21), UINT64_C(0x529a3613e4ff42d3)};
+static const std::uint64_t kImageTiles2[] = {UINT64_C(0x9b94128f426d4ad0)};
+static const std::uint64_t kImageTiles3[] = {UINT64_C(0x4d496d2d1c819a50), UINT64_C(0x6f95b771bca9fd31), UINT64_C(0x3aca1762a4f33e50), UINT64_C(0xfc8c74082d2bf231), UINT64_C(0xb1757dadef187121), UINT64_C(0x9bc12ecb61d965d4)};
+static const std::uint64_t kImageTiles4[] = {UINT64_C(0x19ff298a49a82aec)};
+static const std::uint64_t kImageTiles5[] = {UINT64_C(0x60d57ea70664c664), UINT64_C(0xd837f9f1e411bfa2), UINT64_C(0x69bb3c2a66cb37d7)};
+static const std::uint64_t kImageTiles6[] = {UINT64_C(0x8d47ddd13755df69), UINT64_C(0x98386fe8f65862d9), UINT64_C(0x17803c9a824a4df6), UINT64_C(0x449d8cf31089c47c)};
+static const std::uint64_t kImageTiles7[] = {UINT64_C(0x5734d192f118a1d1)};
+static const std::uint64_t kImageTiles8[] = {UINT64_C(0xb1760de7429582a1), UINT64_C(0x60ef203377915ba1), UINT64_C(0x5cd3face1f0b59aa)};
+static const std::uint64_t kImageTiles9[] = {UINT64_C(0xad4a9fbfc0cb03b7), UINT64_C(0x39f92053026d238a)};
+static const std::uint64_t kImageTiles10[] = {UINT64_C(0x10609a79e7d2e855), UINT64_C(0x92125bb0b98c63c1)};
+static const std::uint64_t kImageTiles11[] = {UINT64_C(0x9a3461ba69339980), UINT64_C(0x956eeab7f7ea25a2), UINT64_C(0xec7decd0a7cb1f3a), UINT64_C(0x05402ed77d889e4a)};
+static const std::uint64_t kImageTiles12[] = {UINT64_C(0xdaf4e5e86c5d61e9), UINT64_C(0xacb04a251c3ac311)};
+static const std::uint64_t kImageTiles13[] = {UINT64_C(0x398552cd72b8ab8e), UINT64_C(0x16d920b28890df5b)};
+static const std::uint64_t kImageTiles14[] = {UINT64_C(0xe981e8d5f3da6d70), UINT64_C(0x12589b8bc9c20c73)};
+static const std::uint64_t kImageTiles15[] = {UINT64_C(0xc324c03baf580bbc)};
+static const std::uint64_t kImageTiles16[] = {UINT64_C(0xa8f8aaed6b313670)};
+
+static const char * const kImageDump0 =
+R"DUMP(gshscene.resource 1 kind=image hash=5586f4c785cb6132
+image w=1 h=1 layout=gray type=unorm bits=8 alpha=none alphaonly=0 space=0:0:0000000000000000 tile=64 tiles=1x1
+t 0 529a3613e4ff42d3
+)DUMP";
+static const char * const kImageDump1 =
+R"DUMP(gshscene.resource 1 kind=image hash=f323f288ef95defd
+image w=65 h=65 layout=gray type=unorm bits=8 alpha=none alphaonly=1 space=0:0:0000000000000000 tile=64 tiles=2x2
+t 0 0dfc5f55f91e1a50 3890aa22fead8d71
+t 1 73c778c22c3f5a21 529a3613e4ff42d3
+)DUMP";
+static const char * const kImageDump2 =
+R"DUMP(gshscene.resource 1 kind=image hash=ab43abb69dda72ca
+image w=64 h=64 layout=rgb type=unorm bits=8 alpha=none alphaonly=0 space=0:0:0000000000000000 tile=64 tiles=1x1
+t 0 9b94128f426d4ad0
+)DUMP";
+static const char * const kImageDump3 =
+R"DUMP(gshscene.resource 1 kind=image hash=895a574b376a3bb6
+image w=65 h=129 layout=rgba type=unorm bits=8 alpha=straight alphaonly=0 space=0:0:0000000000000000 tile=64 tiles=2x3
+t 0 4d496d2d1c819a50 6f95b771bca9fd31
+t 1 3aca1762a4f33e50 fc8c74082d2bf231
+t 2 b1757dadef187121 9bc12ecb61d965d4
+)DUMP";
+static const char * const kImageDump4 =
+R"DUMP(gshscene.resource 1 kind=image hash=062bafdf6abaabe4
+image w=63 h=63 layout=rgba type=unorm bits=8 alpha=premultiplied alphaonly=0 space=0:0:0000000000000000 tile=64 tiles=1x1
+t 0 19ff298a49a82aec
+)DUMP";
+static const char * const kImageDump5 =
+R"DUMP(gshscene.resource 1 kind=image hash=36339e98c8bb76aa
+image w=130 h=3 layout=gray type=unorm bits=12 alpha=none alphaonly=0 space=0:0:0000000000000000 tile=64 tiles=3x1
+t 0 60d57ea70664c664 d837f9f1e411bfa2 69bb3c2a66cb37d7
+)DUMP";
+static const char * const kImageDump6 =
+R"DUMP(gshscene.resource 1 kind=image hash=f1ef3c26a6a5eafd
+image w=70 h=66 layout=rgb type=unorm bits=12 alpha=none alphaonly=0 space=0:0:0000000000000000 tile=64 tiles=2x2
+t 0 8d47ddd13755df69 98386fe8f65862d9
+t 1 17803c9a824a4df6 449d8cf31089c47c
+)DUMP";
+static const char * const kImageDump7 =
+R"DUMP(gshscene.resource 1 kind=image hash=fc322077c94c9636
+image w=5 h=5 layout=rgba type=unorm bits=12 alpha=straight alphaonly=0 space=0:0:0000000000000000 tile=64 tiles=1x1
+t 0 5734d192f118a1d1
+)DUMP";
+static const char * const kImageDump8 =
+R"DUMP(gshscene.resource 1 kind=image hash=8189c2b857937d5e
+image w=129 h=1 layout=gray type=unorm bits=16 alpha=none alphaonly=0 space=0:0:0000000000000000 tile=64 tiles=3x1
+t 0 b1760de7429582a1 60ef203377915ba1 5cd3face1f0b59aa
+)DUMP";
+static const char * const kImageDump9 =
+R"DUMP(gshscene.resource 1 kind=image hash=54fc43d77a97fb24
+image w=65 h=64 layout=rgb type=unorm bits=16 alpha=none alphaonly=0 space=0:0:0000000000000000 tile=64 tiles=2x1
+t 0 ad4a9fbfc0cb03b7 39f92053026d238a
+)DUMP";
+static const char * const kImageDump10 =
+R"DUMP(gshscene.resource 1 kind=image hash=8e30ce67f59a729b
+image w=3 h=70 layout=rgba type=unorm bits=16 alpha=premultiplied alphaonly=0 space=0:0:0000000000000000 tile=64 tiles=1x2
+t 0 10609a79e7d2e855
+t 1 92125bb0b98c63c1
+)DUMP";
+static const char * const kImageDump11 =
+R"DUMP(gshscene.resource 1 kind=image hash=734463a8fc8d92fe
+image w=65 h=65 layout=gray type=float bits=32 alpha=none alphaonly=0 space=0:0:0000000000000000 tile=64 tiles=2x2
+t 0 9a3461ba69339980 956eeab7f7ea25a2
+t 1 ec7decd0a7cb1f3a 05402ed77d889e4a
+)DUMP";
+static const char * const kImageDump12 =
+R"DUMP(gshscene.resource 1 kind=image hash=e1c7de8caf399ead
+image w=64 h=65 layout=rgb type=float bits=32 alpha=none alphaonly=0 space=0:0:0000000000000000 tile=64 tiles=1x2
+t 0 daf4e5e86c5d61e9
+t 1 acb04a251c3ac311
+)DUMP";
+static const char * const kImageDump13 =
+R"DUMP(gshscene.resource 1 kind=image hash=2deffc2d3917edce
+image w=66 h=2 layout=rgba type=float bits=32 alpha=straight alphaonly=0 space=0:0:0000000000000000 tile=64 tiles=2x1
+t 0 398552cd72b8ab8e 16d920b28890df5b
+)DUMP";
+static const char * const kImageDump14 =
+R"DUMP(gshscene.resource 1 kind=image hash=376697a27dd612ff
+image w=2 h=66 layout=rgba type=float bits=32 alpha=premultiplied alphaonly=0 space=0:0:0000000000000000 tile=64 tiles=1x2
+t 0 e981e8d5f3da6d70
+t 1 12589b8bc9c20c73
+)DUMP";
+static const char * const kImageDump15 =
+R"DUMP(gshscene.resource 1 kind=image hash=4038bf363e1025d7
+image w=3 h=3 layout=rgb type=unorm bits=8 alpha=none alphaonly=0 space=1:1:0000000000000000 tile=64 tiles=1x1
+t 0 c324c03baf580bbc
+)DUMP";
+static const char * const kImageDump16 =
+R"DUMP(gshscene.resource 1 kind=image hash=7c6c6914fb6baa1c
+image w=4 h=4 layout=rgba type=unorm bits=16 alpha=straight alphaonly=0 space=3:3:400199999999999a tile=64 tiles=1x1
+t 0 a8f8aaed6b313670
+)DUMP";
+
+static const ImageCase kImageCases[] = {
+    {"gray8-1x1", 1, 1, 1, 0, 8, 0, 0, 0, 0, 0.0, UINT64_C(0x5586f4c785cb6132), 1, 1, kImageTiles0, kImageDump0},
+    {"gray8-alpha-only-65x65", 65, 65, 1, 0, 8, 0, 1, 0, 0, 0.0, UINT64_C(0xf323f288ef95defd), 2, 2, kImageTiles1, kImageDump1},
+    {"rgb8-64x64", 64, 64, 3, 0, 8, 0, 0, 0, 0, 0.0, UINT64_C(0xab43abb69dda72ca), 1, 1, kImageTiles2, kImageDump2},
+    {"rgba8-straight-65x129", 65, 129, 4, 0, 8, 1, 0, 0, 0, 0.0, UINT64_C(0x895a574b376a3bb6), 2, 3, kImageTiles3, kImageDump3},
+    {"rgba8-premultiplied-63x63", 63, 63, 4, 0, 8, 2, 0, 0, 0, 0.0, UINT64_C(0x062bafdf6abaabe4), 1, 1, kImageTiles4, kImageDump4},
+    {"gray12-130x3", 130, 3, 1, 0, 12, 0, 0, 0, 0, 0.0, UINT64_C(0x36339e98c8bb76aa), 3, 1, kImageTiles5, kImageDump5},
+    {"rgb12-70x66", 70, 66, 3, 0, 12, 0, 0, 0, 0, 0.0, UINT64_C(0xf1ef3c26a6a5eafd), 2, 2, kImageTiles6, kImageDump6},
+    {"rgba12-straight-5x5", 5, 5, 4, 0, 12, 1, 0, 0, 0, 0.0, UINT64_C(0xfc322077c94c9636), 1, 1, kImageTiles7, kImageDump7},
+    {"gray16-129x1", 129, 1, 1, 0, 16, 0, 0, 0, 0, 0.0, UINT64_C(0x8189c2b857937d5e), 3, 1, kImageTiles8, kImageDump8},
+    {"rgb16-65x64", 65, 64, 3, 0, 16, 0, 0, 0, 0, 0.0, UINT64_C(0x54fc43d77a97fb24), 2, 1, kImageTiles9, kImageDump9},
+    {"rgba16-premultiplied-3x70", 3, 70, 4, 0, 16, 2, 0, 0, 0, 0.0, UINT64_C(0x8e30ce67f59a729b), 1, 2, kImageTiles10, kImageDump10},
+    {"grayf32-65x65", 65, 65, 1, 1, 32, 0, 0, 0, 0, 0.0, UINT64_C(0x734463a8fc8d92fe), 2, 2, kImageTiles11, kImageDump11},
+    {"rgbf32-64x65", 64, 65, 3, 1, 32, 0, 0, 0, 0, 0.0, UINT64_C(0xe1c7de8caf399ead), 1, 2, kImageTiles12, kImageDump12},
+    {"rgbaf32-straight-66x2", 66, 2, 4, 1, 32, 1, 0, 0, 0, 0.0, UINT64_C(0x2deffc2d3917edce), 2, 1, kImageTiles13, kImageDump13},
+    {"rgbaf32-premultiplied-2x66", 2, 66, 4, 1, 32, 2, 0, 0, 0, 0.0, UINT64_C(0x376697a27dd612ff), 1, 2, kImageTiles14, kImageDump14},
+    {"rgb8-srgb-linear-3x3", 3, 3, 3, 0, 8, 0, 0, 1, 1, 0.0, UINT64_C(0x4038bf363e1025d7), 1, 1, kImageTiles15, kImageDump15},
+    {"rgba16-p3-gamma-4x4", 4, 4, 4, 0, 16, 1, 0, 3, 3, 2.2, UINT64_C(0x7c6c6914fb6baa1c), 1, 1, kImageTiles16, kImageDump16},
+};
 
 }  // namespace known
 

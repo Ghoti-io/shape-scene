@@ -33,7 +33,8 @@
  * which a gradient paint names; paint.h, G1 to G13) or a stroke style (how a
  * centerline is stroked: its width, joins, caps, dashes; stroke.h) or the plane
  * (the shape of a fill that has no outline: every point the clips in force
- * allow); one further kind, an image, is named and reserved.  A
+ * allow) or an image (a raster's samples as imported, with the descriptor that says what they are;
+ * image.h).  A
  * **store** interns resources: asking it for content it already holds, while a
  * handle to that content is held, returns that handle, so equality of content
  * is equality of pointers within one store.  The store decides by the index
@@ -90,6 +91,9 @@
  *   offset, `u64` the dash count, `f64` each dash, `u64` the width profile's
  *   content hash (0 for none).
  * - **plane** (1): nothing after the format and the kind: there is one plane.
+ * - **image** (1): `u32` width, `u32` height, `u8` layout, `u8` sample type, `u8` bits, `u8` alpha form, `u8` alpha-only, the
+ *   space (`u8` primaries, `u8` transfer, `f64` gamma), `u32` the tile edge, `u64` the tile count, then `u64` the hash of
+ *   each tile in tile order; a tile's hash is of its dimensions and its samples as values (image.h, IM7).
  *
  * The hash is of the content, not of the reference to it: a glyph run hashes
  * its face's and its outlines' content hashes, so two stores that were given
@@ -114,7 +118,8 @@
  * paint=K <r> <g> <b> <a> space=<space> entry=E` per stop; a stroke style is a
  * line `stroke width=<hex> space=N join=N miter=<hex> cap=N degenerate=N align=N
  * rule=N scope=N offset=<hex> dashes=N profile=<hash>` and a line `d <hex>` per
- * dash; a plane is the line and no other.
+ * dash; a plane is the line and no other; an image is a line `image w=N h=N layout=L type=T bits=B alpha=A alphaonly=N
+ * space=<space> tile=N tiles=XxY` and a line `t <row> <hash> ...` per tile row, never the samples (image.h, IM12).
  *
  * ### The plane (color-paint story P4, C2; PL1 to PL10)
  *
@@ -156,7 +161,7 @@ typedef enum GSHSCENE_Resource_Kind {
   GSHSCENE_RESOURCE_GLYPH_RUN = 2, ///< Glyphs, by font and id or as outlines.
   GSHSCENE_RESOURCE_PICTURE = 3,   ///< A closed list, frozen: what an instance draws.
   GSHSCENE_RESOURCE_GRADIENT = 4,  ///< A gradient: a color line over a geometry, which a gradient paint names (paint.h, G1).
-  GSHSCENE_RESOURCE_IMAGE = 5,     ///< Reserved for the raster stories: no constructor yet.
+  GSHSCENE_RESOURCE_IMAGE = 5,     ///< An image: a raster's samples, interned by content (image.h, IM1 to IM14).
   GSHSCENE_RESOURCE_FACE = 6,      ///< A font's face and variation instance, bound to a glyph path provider (glyph_provider.h).
   GSHSCENE_RESOURCE_PALETTE = 7,   ///< A table of colors, which a palette paint's entry indexes (paint.h, N14).
   GSHSCENE_RESOURCE_STROKE_STYLE = 8, ///< How a centerline is stroked (stroke.h, SK1 to SK3).
@@ -223,8 +228,8 @@ typedef struct GSHSCENE_Glyph_Run {
  * for a glyph run the per-glyph figure for each glyph, and for a picture the
  * per-item figure for each item of its list, for a face the per-axis
  * figure for each coordinate, for a palette the per-color figure for each
- * entry, for a gradient the per-stop figure for each stop, and for a stroke style the per-dash figure for each dash
- * of its canonical array.  What a resource holds by handle (a run's face,
+ * entry, for a gradient the per-stop figure for each stop, for a stroke style the per-dash figure for each dash
+ * of its canonical array, and for an image its sample bytes and ::GSHSCENE_BYTES_PER_TILE for each tile (image.h).  What a resource holds by handle (a run's face,
  * a glyph's outline, an instanced picture) is a resource of its own and is
  * counted there.  An intern that would pass the limit is
  * ::GSHSCENE_ERR_LIMIT and builds and keeps nothing; a hit costs nothing; the

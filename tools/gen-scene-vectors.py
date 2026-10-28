@@ -929,6 +929,87 @@ def path_key(ids):
     return fnv(u64(len(ids)) + b"".join(u64(i) for i in ids))
 
 
+# --- images (image.h, IM1 to IM12; masks-images-patterns story I1) ----------------------------------------------
+# Every tile hash and image hash below is restated here from image.h's text with `struct` alone.  The samples come from
+# one formula, which tests/unit/test_image.cpp repeats: a sample at column x, row y, channel c is
+#   8 bits:   (7x + 13y + 29c + 1) mod 256
+#   12 bits:  (37x + 101y + 263c + 5) mod 4096
+#   16 bits:  (257x + 911y + 4099c + 0x1234) mod 65536   (its two bytes differ, so a byte order shows)
+#   float:    ((7x + 3y + 5c) mod 61) / 64 as an IEEE binary32 (a dyadic number: exact, and in [0, 1])
+KIND_IMAGE = 5
+IMAGE_TILE = 64
+IMAGE_TILE_MAGIC = 0x454C4954
+LAYOUT_GRAY, LAYOUT_GRAY_ALPHA, LAYOUT_RGB, LAYOUT_RGBA = 1, 2, 3, 4
+T_UNORM, T_FLOAT = 0, 1
+A_NONE, A_STRAIGHT, A_PREMULTIPLIED = 0, 1, 2
+
+
+def image_sample(bits, x, y, c):
+    """One sample as its value: an integer for UNORM, the binary32's bit pattern for float."""
+    if bits == 8:
+        return (7 * x + 13 * y + 29 * c + 1) % 256
+    if bits == 12:
+        return (37 * x + 101 * y + 263 * c + 5) % 4096
+    if bits == 16:
+        return (257 * x + 911 * y + 4099 * c + 0x1234) % 65536
+    assert bits == 32
+    return struct.unpack("<I", struct.pack("<f", ((7 * x + 3 * y + 5 * c) % 61) / 64.0))[0]
+
+
+def sample_bytes(bits, v):
+    return u8(v) if bits == 8 else u16(v) if bits < 32 else u32(v)
+
+
+def image_tile_hash(w, h, layout, bits, tx, ty):
+    x0, y0 = tx * IMAGE_TILE, ty * IMAGE_TILE
+    x1, y1 = min(x0 + IMAGE_TILE, w), min(y0 + IMAGE_TILE, h)
+    out = u32(1) + u32(IMAGE_TILE_MAGIC) + u32(x1 - x0) + u32(y1 - y0)
+    for y in range(y0, y1):
+        for x in range(x0, x1):
+            for c in range(layout):
+                out += sample_bytes(bits, image_sample(bits, x, y, c))
+    return fnv(out)
+
+
+def image_case(name, w, h, layout, kind, bits, alpha, alphaonly=0, space=TARGET):
+    tx_n, ty_n = (w + IMAGE_TILE - 1) // IMAGE_TILE, (h + IMAGE_TILE - 1) // IMAGE_TILE
+    tiles = [image_tile_hash(w, h, layout, bits, tx, ty) for ty in range(ty_n) for tx in range(tx_n)]
+    out = u32(1) + u32(KIND_IMAGE) + u32(w) + u32(h) + u8(layout) + u8(kind) + u8(bits) + u8(alpha) + u8(alphaonly)
+    out += space_bytes(space) + u32(IMAGE_TILE) + u64(len(tiles)) + b"".join(u64(t) for t in tiles)
+    digest = fnv(out)
+    lines = ["gshscene.resource 1 kind=image hash=%016x" % digest,
+             "image w=%d h=%d layout=%s type=%s bits=%d alpha=%s alphaonly=%d space=%s tile=%d tiles=%dx%d" % (
+                 w, h, {1: "gray", 2: "gray-alpha", 3: "rgb", 4: "rgba"}[layout], "float" if kind else "unorm", bits,
+                 {0: "none", 1: "straight", 2: "premultiplied"}[alpha], alphaonly, space_text(space), IMAGE_TILE,
+                 tx_n, ty_n)]
+    for ty in range(ty_n):
+        lines.append("t %d %s" % (ty, " ".join("%016x" % tiles[ty * tx_n + tx] for tx in range(tx_n))))
+    return dict(name=name, w=w, h=h, layout=layout, kind=kind, bits=bits, alpha=alpha, alphaonly=alphaonly, space=space,
+                hash=digest, tx=tx_n, ty=ty_n, tiles=tiles, dump="\n".join(lines) + "\n")
+
+
+# One case per layout x sample type x alpha form, with partial edge tiles on both axes, a multiple of 64 and a single texel.
+IMAGE_CASES = [
+    image_case("gray8-1x1", 1, 1, LAYOUT_GRAY, T_UNORM, 8, A_NONE),
+    image_case("gray8-alpha-only-65x65", 65, 65, LAYOUT_GRAY, T_UNORM, 8, A_NONE, alphaonly=1),
+    image_case("rgb8-64x64", 64, 64, LAYOUT_RGB, T_UNORM, 8, A_NONE),
+    image_case("rgba8-straight-65x129", 65, 129, LAYOUT_RGBA, T_UNORM, 8, A_STRAIGHT),
+    image_case("rgba8-premultiplied-63x63", 63, 63, LAYOUT_RGBA, T_UNORM, 8, A_PREMULTIPLIED),
+    image_case("gray12-130x3", 130, 3, LAYOUT_GRAY, T_UNORM, 12, A_NONE),
+    image_case("rgb12-70x66", 70, 66, LAYOUT_RGB, T_UNORM, 12, A_NONE),
+    image_case("rgba12-straight-5x5", 5, 5, LAYOUT_RGBA, T_UNORM, 12, A_STRAIGHT),
+    image_case("gray16-129x1", 129, 1, LAYOUT_GRAY, T_UNORM, 16, A_NONE),
+    image_case("rgb16-65x64", 65, 64, LAYOUT_RGB, T_UNORM, 16, A_NONE),
+    image_case("rgba16-premultiplied-3x70", 3, 70, LAYOUT_RGBA, T_UNORM, 16, A_PREMULTIPLIED),
+    image_case("grayf32-65x65", 65, 65, LAYOUT_GRAY, T_FLOAT, 32, A_NONE),
+    image_case("rgbf32-64x65", 64, 65, LAYOUT_RGB, T_FLOAT, 32, A_NONE),
+    image_case("rgbaf32-straight-66x2", 66, 2, LAYOUT_RGBA, T_FLOAT, 32, A_STRAIGHT),
+    image_case("rgbaf32-premultiplied-2x66", 2, 66, LAYOUT_RGBA, T_FLOAT, 32, A_PREMULTIPLIED),
+    image_case("rgb8-srgb-linear-3x3", 3, 3, LAYOUT_RGB, T_UNORM, 8, A_NONE, space=SRGB_LINEAR),
+    image_case("rgba16-p3-gamma-4x4", 4, 4, LAYOUT_RGBA, T_UNORM, 16, A_STRAIGHT, space=P3_GAMMA),
+]
+
+
 def cxx_string(name, text):
     return 'static const char * const %s =\nR"DUMP(%s)DUMP";\n' % (name, text)
 
@@ -991,6 +1072,20 @@ def render():
     o.append(cxx_string("kStrokeSceneDump", version_dump(STROKE_SCENE_NODES)))
     o.append(cxx_string("kPlaceholderListDump", list_dump(PLACEHOLDER_LIST_ITEMS)))
     o.append(cxx_string("kPlaceholderSceneDump", version_dump(PLACEHOLDER_SCENE_NODES)))
+    o.append("struct ImageCase {\n  const char * name;\n  unsigned width, height, layout, type, bits, alpha, alpha_only;\n"
+             "  unsigned primaries, transfer;\n  double gamma;\n  std::uint64_t hash;\n  unsigned tiles_x, tiles_y;\n"
+             "  const std::uint64_t * tiles;\n  const char * dump;\n};\n\n")
+    for i, c in enumerate(IMAGE_CASES):
+        o.append("static const std::uint64_t kImageTiles%d[] = {%s};\n" % (i, ", ".join("UINT64_C(0x%016x)" % t for t in c["tiles"])))
+    o.append("\n")
+    for i, c in enumerate(IMAGE_CASES):
+        o.append(cxx_string("kImageDump%d" % i, c["dump"]))
+    o.append("\nstatic const ImageCase kImageCases[] = {\n")
+    for i, c in enumerate(IMAGE_CASES):
+        o.append('    {"%s", %d, %d, %d, %d, %d, %d, %d, %d, %d, %r, UINT64_C(0x%016x), %d, %d, kImageTiles%d, kImageDump%d},\n' % (
+            c["name"], c["w"], c["h"], c["layout"], c["kind"], c["bits"], c["alpha"], c["alphaonly"], c["space"][0],
+            c["space"][1], c["space"][2], c["hash"], c["tx"], c["ty"], i, i))
+    o.append("};\n")
     o.append("\n}  // namespace known\n\n#endif\n")
     return "".join(o)
 

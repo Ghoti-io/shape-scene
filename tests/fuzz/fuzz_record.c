@@ -54,6 +54,12 @@
  * recorded, it is `ERR_LIMIT` only where nothing else is invalid, an invalid alpha or space is decided first, and a
  * failure changes nothing.
  *
+ * Masks-images-patterns story I1 adds two ops: an image of every layout, sample type and alpha form (and CMYK, planar and
+ * 10-bit rasters, which are refused), with strides, a space, flags, a take or a copy, hostile sizes over a small buffer and
+ * sample values at and past the format's range, whose result class is predicted from the rules (IM2, IM3, IM4, IM10) and
+ * whose descriptor, rows, accounted bytes and equality are read back; and an image named where a shape goes, which every
+ * record call refuses.
+ *
  * The op numbers below are mirrored by tools/gen-fuzz-corpus.py; the replay
  * also fails if the corpus never reaches an outcome (a limit, a refusal, an
  * invalid publish), which is what keeps a corpus from measuring nothing.
@@ -87,7 +93,7 @@ enum {
   OP_FILL_EX, OP_CLIP_PUSH_EX, OP_GROUP_PUSH_EX, OP_LIST_FOREGROUND, OP_NODE_PROPS, OP_EDIT_FOREGROUND, OP_LIST_PALETTE,
   OP_FILL_FIXED, OP_TRUNCATE, OP_EDIT_PALETTE, OP_INTERN_GRADIENT, OP_FILL_GRADIENT, OP_SCENE_GRADIENT,
   OP_GRADIENT_NODE, OP_COLOR_BOUND, OP_GROUP_PDF, OP_NODE_PDF, OP_INTERN_STYLE, OP_STROKE, OP_STROKE_NODE, OP_PLACEHOLDER,
-  OP_PLACEHOLDER_NODE, OP_COUNT
+  OP_PLACEHOLDER_NODE, OP_INTERN_IMAGE, OP_IMAGE_NOT_SHAPE, OP_COUNT
 };
 
 /* --- the outcomes the corpus must reach ------------------------------------------------------------ */
@@ -100,7 +106,8 @@ enum {
   OUT_BLEND_GROUP, OUT_PDF_GROUP, OUT_PDF_INVALID, OUT_PDF_EMITTED, OUT_STYLE_INTERNED, OUT_STYLE_INVALID,
   OUT_STYLE_LIMIT, OUT_STYLE_DOUBLED, OUT_STYLE_SOLID, OUT_STYLE_UNSUPPORTED, OUT_STROKE_RECORDED,
   OUT_STROKE_UNSUPPORTED, OUT_STROKE_NODE, OUT_STROKE_EMITTED, OUT_PLACEHOLDER_RECORDED, OUT_PLACEHOLDER_INVALID,
-  OUT_PLACEHOLDER_NODE, OUT_PLACEHOLDER_EMITTED, OUT_COUNT
+  OUT_PLACEHOLDER_NODE, OUT_PLACEHOLDER_EMITTED, OUT_IMAGE_INTERNED, OUT_IMAGE_INVALID, OUT_IMAGE_UNSUPPORTED,
+  OUT_IMAGE_LIMIT, OUT_IMAGE_BAD_SAMPLE, OUT_IMAGE_HIT, OUT_IMAGE_TAKEN, OUT_IMAGE_NOT_SHAPE, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limit", "edit limit", "publish limit",
@@ -114,7 +121,9 @@ static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limi
     "a stroke style interned", "a stroke style refused as invalid", "a stroke style past SK2's bounds refused",
     "an odd dash array doubled", "a dash array made solid", "a width profile refused (reserved)",
     "a stroke recorded", "a 3D stroke refused as unsupported", "a stroke node", "an emitted list with a stroke",
-    "a placeholder recorded", "a placeholder refused as invalid", "a placeholder node", "an emitted list with a placeholder"};
+    "a placeholder recorded", "a placeholder refused as invalid", "a placeholder node", "an emitted list with a placeholder",
+    "an image interned", "an image refused as invalid", "an image refused as unsupported", "an image past IM10's bounds refused",
+    "an image refused for a sample value", "an image found again", "an image taken", "an image refused where a shape goes"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -194,6 +203,7 @@ typedef struct S {
   const GSHSCENE_Resource * sgrads[2];     /* gradients, in the scene's store (story P2) */
   const GSHSCENE_Resource * styles[4];     /* stroke styles, in the standalone store (strokes story S1) */
   const GSHSCENE_Resource * sstyles[2];    /* stroke styles, in the scene's store */
+  const GSHSCENE_Resource * images[3];     /* images, in the standalone store (masks-images-patterns story I1) */
   GSHSCENE_Edit * edits[EDITS];
   unsigned edit_generation[EDITS];
   const GSHSCENE_Version * versions[VERSIONS];
@@ -725,6 +735,245 @@ static GSHSCENE_Result fuzz_gradient(S * s, GSHSCENE_Store * store, const GSHSCE
   }
   free(many);
   return r;
+}
+
+/* --- images (masks-images-patterns story I1) ------------------------------------------------------------------------- */
+
+/** One sample of an image from the input's base byte, as its value (the bit pattern for a float). */
+static uint32_t image_value(unsigned base, unsigned bits, int is_float, unsigned x, unsigned y, unsigned c) {
+  if (is_float) {
+    float f = (float)((base + 3u * x + y + 5u * c) % 61u) / 64.0f;
+    uint32_t v;
+    memcpy(&v, &f, sizeof v);
+    return v;
+  }
+  if (bits == 8) {
+    return (base * 13u + 7u * x + 13u * y + 29u * c) & 0xFFu;
+  }
+  if (bits == 12) {
+    return (base * 53u + 37u * x + 101u * y + 263u * c) % 4096u;
+  }
+  return (base * 4099u + 257u * x + 911u * y + 4099u * c) & 0xFFFFu;
+}
+
+static void image_put(unsigned char * at, unsigned bits, uint32_t v) {
+  if (bits <= 8) {
+    *at = (unsigned char)v;
+  } else if (bits <= 16) {
+    uint16_t w = (uint16_t)v;
+    memcpy(at, &w, sizeof w);
+  } else {
+    memcpy(at, &v, sizeof v);
+  }
+}
+
+static GSHSCENE_Result fuzz_image(S * s, int take) {
+  const GSHSCENE_Limits * lim = &s->limits;
+  unsigned model = pick(s, 4);   /* gray, RGB, RGBA, CMYK */
+  unsigned kind = pick(s, 6);    /* 8, 12, 16 bits, float, 10 bits, planar */
+  unsigned wsel = pick(s, 7);
+  unsigned hsel = pick(s, 5);
+  unsigned pad = pick(s, 5);
+  unsigned space_sel = pick(s, 10);
+  unsigned flag_sel = pick(s, 6);
+  unsigned reserved_sel = pick(s, 8);
+  unsigned premult = pick(s, 2);
+  unsigned bad_sel = pick(s, 10);
+  unsigned hostile = pick(s, 20);
+  unsigned base = arg(s);
+  unsigned slot = pick(s, 3);
+  static const unsigned widths[7] = {1, 2, 3, 63, 64, 65, 129};
+  static const unsigned heights[5] = {1, 2, 64, 65, 3};
+  static const unsigned hostile_w[4] = {65537, 1, 40000, 65536};
+  static const unsigned hostile_h[4] = {1, 65537, 40000, 65537};
+  unsigned w = widths[wsel];
+  unsigned h = heights[hsel];
+  if (hostile == 0) {
+    w = hostile_w[wsel % 4];
+    h = hostile_h[wsel % 4];
+  }
+  unsigned bits = kind == 0 || kind == 5 ? 8u : kind == 1 ? 12u : kind == 2 ? 16u : kind == 3 ? 32u : 10u;
+  int is_float = kind == 3;
+  if (kind == 5) {
+    model = 1; /* planar RGB */
+  }
+
+  GIMG_Pixel_Format format;
+  memset(&format, 0, sizeof format);
+  unsigned layout;
+  if (model == 3) {
+    format = GIMG_PIXEL_CMYK8;
+    layout = 4;
+    bits = 8;
+    is_float = 0;
+  } else {
+    layout = model == 0 ? 1u : model == 1 ? 3u : 4u;
+    format.channel_model = model == 0 ? GIMG_CHANNEL_GRAY : model == 1 ? GIMG_CHANNEL_RGB : GIMG_CHANNEL_RGBA;
+    format.channel_type = is_float ? GIMG_CHANNEL_FLOAT : GIMG_CHANNEL_UNORM;
+    format.layout = kind == 5 ? GIMG_LAYOUT_PLANAR : GIMG_LAYOUT_INTERLEAVED;
+    format.channel_count = (uint8_t)layout;
+    for (unsigned c = 0; c < layout; c++) {
+      format.bits_per_channel[c] = (uint8_t)bits;
+    }
+    format.alignment = 1;
+    format.alpha_form = (uint8_t)(model == 2 ? (premult ? GIMG_ALPHA_PREMULTIPLIED : GIMG_ALPHA_STRAIGHT) : GIMG_ALPHA_NONE);
+  }
+  size_t sample_bytes = bits <= 8 ? 1u : bits <= 16 ? 2u : 4u;
+  size_t row = (size_t)w * layout * sample_bytes;
+  size_t stride = row + pad;
+
+  GSHSCENE_Image_Params params;
+  memset(&params, 0, sizeof params);
+  params.space = pool_space(space_sel);
+  params.flags = flag_sel == 2 ? GSHSCENE_IMAGE_ALPHA_ONLY : flag_sel == 3 ? 2u : flag_sel == 4 ? 0x100u : flag_sel == 5 ? 3u : 0u;
+  params.reserved = reserved_sel == 0 ? 1u : 0u;
+
+  /* The result class, predicted from the rules as IM2, IM4, IM10 and IM3 give them. */
+  int alpha_only = params.flags & 1u;
+  int space_partial = space_sel % 10 == 7 || space_sel % 10 == 8;
+  int space_reserved = space_sel % 10 == 6;
+  int space_zero = space_sel % 10 == 0;
+  int borrowed = hostile == 0;
+  int invalid = params.reserved != 0 || (params.flags & ~1u) != 0 || space_partial ||
+      (alpha_only && (model != 0 || kind == 5 || !space_zero)) || (take && borrowed);
+  int unsupported = !invalid && (model == 3 || kind == 4 || kind == 5 || space_reserved);
+  uint64_t tiles = (uint64_t)((w + 63u) / 64u) * ((h + 63u) / 64u);
+  uint64_t accounted = 128u + (uint64_t)w * h * layout * sample_bytes + tiles * 16u;
+  int limit = !invalid && !unsupported &&
+      (w > 65536u || h > 65536u || (uint64_t)w * h > ((uint64_t)1 << 28) || accounted > (uint64_t)lim->max_bytes);
+  /* A sample value past its range, planted where the whole raster is read. */
+  int bad = 0;
+  if (!borrowed && model != 3 && kind <= 3) {
+    if (kind == 1 && bad_sel == 1) {
+      bad = 1;
+    } else if (kind == 3 && bad_sel >= 1 && bad_sel <= 3 && !(model != 2 && bad_sel == 3)) {
+      bad = 1;
+    }
+  }
+
+  GIMG_Raster * raster = NULL;
+  unsigned char hostile_buffer[64];
+  memset(hostile_buffer, 0xEE, sizeof hostile_buffer);
+  if (borrowed) {
+    if (gimg_raster_create(w, h, &format, GIMG_RASTER_BORROWED, hostile_buffer, row, &raster) != GIMG_OK) {
+      return GSHSCENE_ERR_INVALID;
+    }
+  } else {
+    if (gimg_raster_create(w, h, &format, GIMG_RASTER_OWNED, NULL, stride, &raster) != GIMG_OK) {
+      return GSHSCENE_ERR_INVALID;
+    }
+    unsigned char * pixels = (unsigned char *)gimg_raster_pixels(raster);
+    memset(pixels, 0x6C, stride * h);
+    for (unsigned y = 0; y < h; y++) {
+      for (unsigned x = 0; x < w; x++) {
+        for (unsigned c = 0; c < layout; c++) {
+          image_put(pixels + (size_t)y * stride + ((size_t)x * layout + c) * sample_bytes, bits,
+              image_value(base, bits, is_float, x, y, c));
+        }
+      }
+    }
+    if (bad) {
+      unsigned char * last = pixels + (size_t)(h - 1) * stride + ((size_t)(w - 1) * layout + (layout - 1)) * sample_bytes;
+      uint32_t v = kind == 1 ? 4096u : bad_sel == 1 ? 0x7FC00000u : bad_sel == 2 ? 0x7F800000u : 0x3FC00000u; /* 4096, NaN, +inf, 1.5 */
+      image_put(last, bits, v);
+    }
+  }
+
+  /* An equal raster for the second intern, made first: a take of content the store already holds destroys the raster. */
+  GIMG_Raster * twin = NULL;
+  if (!borrowed) {
+    CHECK(gimg_raster_copy(raster, &twin) == GIMG_OK);
+  }
+  GSHSCENE_Store_Stats before;
+  CHECK(gshscene_store_stats(s->store, &before) == GSHSCENE_OK);
+  const GSHSCENE_Resource * g = NULL;
+  GSHSCENE_Result r = take ? gshscene_store_intern_image_take(s->store, raster, &params, &g)
+                           : gshscene_store_intern_image(s->store, raster, &params, &g);
+  GSHSCENE_Store_Stats after;
+  CHECK(gshscene_store_stats(s->store, &after) == GSHSCENE_OK);
+  CHECK(r != GSHSCENE_ERR_INTERNAL && r != GSHSCENE_ERR_OOM && r != GSHSCENE_ERR_CORRUPT && r != GSHSCENE_ERR_IO);
+  if (invalid) {
+    CHECK(r == GSHSCENE_ERR_INVALID);
+    outcomes[OUT_IMAGE_INVALID]++;
+  } else if (unsupported) {
+    CHECK(r == GSHSCENE_ERR_UNSUPPORTED);
+    outcomes[OUT_IMAGE_UNSUPPORTED]++;
+  } else if (limit) {
+    CHECK(r == GSHSCENE_ERR_LIMIT);
+    outcomes[OUT_IMAGE_LIMIT]++;
+  } else if (bad) {
+    CHECK(r == GSHSCENE_ERR_INVALID);
+    outcomes[OUT_IMAGE_BAD_SAMPLE]++;
+  } else if (r != GSHSCENE_OK) {
+    /* Only the store's own limits refuse what the rules accept. */
+    CHECK(r == GSHSCENE_ERR_LIMIT);
+    CHECK(before.live >= lim->max_resources || accounted > (uint64_t)(lim->max_bytes - (size_t)before.bytes));
+    outcomes[OUT_IMAGE_LIMIT]++;
+  }
+  if (r != GSHSCENE_OK) {
+    /* A refusal changed nothing, and a refused take left the raster with its caller. */
+    CHECK(g == NULL);
+    CHECK(before.live == after.live && before.bytes == after.bytes && before.created == after.created);
+    CHECK(gimg_raster_width(raster) == w && gimg_raster_height(raster) == h);
+    gimg_raster_destroy(raster);
+    gimg_raster_destroy(twin);
+    return r;
+  }
+  outcomes[OUT_IMAGE_INTERNED]++;
+  CHECK(gshscene_resource_kind(g) == GSHSCENE_RESOURCE_IMAGE);
+  CHECK(gshscene_resource_bytes(g) == (size_t)accounted);
+  GSHSCENE_Image_Info info;
+  CHECK(gshscene_resource_image(g, &info) == GSHSCENE_OK);
+  CHECK(info.width == w && info.height == h && info.layout == layout && info.bits == bits);
+  CHECK(info.sample_type == (is_float ? 1u : 0u) && info.tile == 64u);
+  CHECK(info.tiles_x == (w + 63u) / 64u && info.tiles_y == (h + 63u) / 64u);
+  CHECK(info.alpha_only == (alpha_only ? 1u : 0u));
+  CHECK(info.alpha_form == (model == 2 ? (premult ? 2u : 1u) : 0u));
+  CHECK(info.space.primaries == (alpha_only ? GCOL_PRIMARIES_UNKNOWN : params.space.primaries));
+  CHECK(gshscene_image_stride(g) >= row);
+  for (unsigned y = 0; y < h; y++) {
+    const unsigned char * got = (const unsigned char *)gshscene_image_row(g, y);
+    CHECK(got != NULL);
+    for (unsigned x = 0; x < w; x++) {
+      for (unsigned c = 0; c < layout; c++) {
+        unsigned char want[4] = {0, 0, 0, 0};
+        image_put(want, bits, image_value(base, bits, is_float, x, y, c));
+        CHECK(memcmp(got + ((size_t)x * layout + c) * sample_bytes, want, sample_bytes) == 0);
+      }
+    }
+  }
+  CHECK(gshscene_image_row(g, h) == NULL);
+  CHECK(gshscene_image_tile_hash(g, info.tiles_x, 0) == 0 && gshscene_image_tile_hash(g, 0, info.tiles_y) == 0);
+  CHECK(gshscene_resource_dump(g, s->null) == GSHSCENE_OK);
+  int fresh = after.created == before.created + 1; /* a take of content already held hit, and destroyed the raster */
+
+  /* Found again: a copy of what was interned is the same handle, and a take of an equal raster too. */
+  GSHSCENE_Store_Stats mid;
+  CHECK(gshscene_store_stats(s->store, &mid) == GSHSCENE_OK);
+  CHECK(twin != NULL);
+  const GSHSCENE_Resource * hit = NULL;
+  r = take ? gshscene_store_intern_image_take(s->store, twin, &params, &hit)
+           : gshscene_store_intern_image(s->store, twin, &params, &hit);
+  CHECK(r == GSHSCENE_OK && hit == g);
+  GSHSCENE_Store_Stats again;
+  CHECK(gshscene_store_stats(s->store, &again) == GSHSCENE_OK);
+  CHECK(again.live == mid.live && again.bytes == mid.bytes && again.created == mid.created && again.hits == mid.hits + 1);
+  gshscene_resource_release(hit);
+  if (!take) {
+    gimg_raster_destroy(twin);
+  }
+  outcomes[OUT_IMAGE_HIT]++;
+  if (take) {
+    if (fresh) {
+      CHECK(gshscene_image_row(g, 0) == gimg_raster_pixels_const(raster)); /* a take reads the raster in place */
+    }
+    outcomes[OUT_IMAGE_TAKEN]++;
+  } else {
+    gimg_raster_destroy(raster);
+  }
+  gshscene_resource_release(s->images[slot]);
+  s->images[slot] = g;
+  return GSHSCENE_OK;
 }
 
 static void op(S * s, unsigned code) {
@@ -2209,6 +2458,28 @@ static void op(S * s, unsigned code) {
       }
       break;
     }
+    case OP_INTERN_IMAGE:
+      /* IM1 to IM10: an image from the input, by copy or by take; its result class predicted and its content read back. */
+      (void)fuzz_image(s, pick(s, 2));
+      break;
+    case OP_IMAGE_NOT_SHAPE: {
+      /* IM14: an image where a path, a run or a picture goes is refused by every record call, and nothing is recorded. */
+      const GSHSCENE_Resource * img = s->images[pick(s, 3)];
+      if (!s->list || !img) {
+        break;
+      }
+      ListSnap b = snap(s->list);
+      GSHSCENE_Paint paint = pool_paint(1);
+      r = gshscene_list_fill(s->list, img, NULL, GSHGEOM_FILL_NONZERO, &paint, 0, 0);
+      CHECK(r == GSHSCENE_ERR_INVALID);
+      r = gshscene_list_clip_push(s->list, img, NULL, GSHGEOM_FILL_NONZERO, 0, 0);
+      CHECK(r == GSHSCENE_ERR_INVALID);
+      r = gshscene_list_instance(s->list, img, NULL, 0, 0);
+      CHECK(r == GSHSCENE_ERR_INVALID);
+      list_after(s, b, GSHSCENE_ERR_INVALID, 0, 0);
+      outcomes[OUT_IMAGE_NOT_SHAPE]++;
+      break;
+    }
     default:
       break;
   }
@@ -2296,6 +2567,9 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
   }
   for (int i = 0; i < 4; i++) {
     gshscene_resource_release(s->styles[i]);
+  }
+  for (int i = 0; i < 3; i++) {
+    gshscene_resource_release(s->images[i]);
   }
   gshscene_scene_destroy(s->scene);
   GSHSCENE_Store_Stats stats;

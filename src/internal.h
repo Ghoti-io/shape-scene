@@ -114,6 +114,16 @@ struct GSHSCENE_Resource {
       GSHSCENE_Stroke_Style s; /* canonical (SK3); dashes points at the copy below */
       double * dashes;         /* dash_count of them, NULL for none */
     } stroke;
+    struct {
+      GSHSCENE_Image_Info info;   /* IM1 */
+      const unsigned char * rows; /* the first row: the copy below, or the taken raster's pixels */
+      size_t stride;              /* bytes between rows: a copy's is its row, a raster's is its own */
+      size_t row_bytes;           /* bytes of samples in a row */
+      unsigned char * copy;       /* a copy's samples, tightly packed; NULL for a take */
+      GIMG_Raster * raster;       /* a taken raster; NULL for a copy */
+      int owns_raster;            /* the raster is the store's to destroy (set once the intern has linked it) */
+      uint64_t * tiles;           /* tiles_x * tiles_y hashes in tile order */
+    } image;
   } u;
 };
 
@@ -278,6 +288,17 @@ int gshscene_stroke_dump(const GSHSCENE_Resource * resource, FILE * out);
  * bounds): the bound is unknown.
  */
 GSHSCENE_Result gshscene_centerline_box(const GSHSCENE_Resource * resource, GSHGEOM_Bounds * out);
+
+/* --- image.c ---------------------------------------------------------------- */
+
+/** Whether an image resource has the content @p source describes (an image.c Image_Source). */
+int gshscene_image_matches(const GSHSCENE_Resource * resource, const void * source);
+
+/** Free an image's tile hashes and copy, and destroy a taken raster the store owns. */
+void gshscene_image_free(GSHSCENE_Resource * resource);
+
+/** The payload of an image's dump (image.h, IM12); negative on failure. */
+int gshscene_image_dump(const GSHSCENE_Resource * resource, FILE * out);
 
 /* --- convert.c -------------------------------------------------------------- */
 

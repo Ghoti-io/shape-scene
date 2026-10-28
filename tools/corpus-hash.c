@@ -68,7 +68,12 @@
  * change of one and the diff's damage.  The section fails, and does not only print another hash, when a render's report
  * does not hold exactly one placeholder entry for each placeholder of the list (a sink or a plan that forgets one), with
  * the unit counts of the list.
- * It is built by `make check-corpus-hash` on the host and by
+ * Since masks-images-patterns story I1 an image section folds, into a hash and count of their own
+ * (`shape-scene.image-hash` and `shape-scene.image-count`), rasters of every layout, sample type and alpha form with
+ * random samples (a 16-bit sample whose two bytes differ, floats exact over 64) and padded strides, interned by copy,
+ * found again by a take of an equal raster, and told apart from a raster one sample away: each image's hash, accounted
+ * bytes and first and last tile hashes, and the store's counters.
+  * It is built by `make check-corpus-hash` on the host and by
  * suite/tools/xarch/shape.sh and suite/tools/xwin/shape.sh for the others.
  *
  * What it can see: byte order in a hash (the spelling is written from shifts), a
@@ -106,6 +111,8 @@ static GSHGEOM_Hash plane_total; /* color-paint story P4: its own hash, so the t
 static unsigned long plane_count;
 static GSHGEOM_Hash placeholder_total; /* the placeholder section: its own hash, so the three above are unchanged */
 static unsigned long placeholder_count;
+static GSHGEOM_Hash image_total; /* masks-images-patterns story I1: its own hash, so the four above are unchanged */
+static unsigned long image_count;
 static GSHGEOM_Hash * acc = &total; /* where feed folds */
 static unsigned long * acc_count = &count;
 
@@ -1839,6 +1846,134 @@ static void random_box(double box[4]) {
   box[3] = box[1] + (h < 0.0 ? -h : h);
 }
 
+/* --- images (masks-images-patterns story I1) ----------------------------------------------------------------------- */
+
+#define IM_IMAGES 24
+
+/** The samples of one image: every draw its own statement, in an order no compiler can change. */
+static void image_fill(unsigned char * base, size_t stride, uint32_t w, uint32_t h, unsigned layout, unsigned type,
+    unsigned bits) {
+  for (uint32_t y = 0; y < h; y++) {
+    for (uint32_t x = 0; x < w; x++) {
+      for (unsigned c = 0; c < layout; c++) {
+        unsigned char * at = base + (size_t)y * stride + ((size_t)x * layout + c) * (bits <= 8 ? 1u : bits <= 16 ? 2u : 4u);
+        if (type == 0 && bits == 8) {
+          *at = (unsigned char)(next() & 0xFFu);
+        } else if (type == 0) {
+          uint16_t v = (uint16_t)(bits == 12 ? next() % 4096u : next() & 0xFFFFu);
+          memcpy(at, &v, sizeof v);
+        } else {
+          uint64_t draw = next();
+          /* an exact float: k / 64 in [0, 1] for the alpha channel, and an integer up to 4095 for a color now and then */
+          float f = (c + 1 == layout && layout != 3 && layout != 1) || (draw & 7u) ? (float)(draw % 65u) / 64.0f
+                                                                                   : (float)(draw % 4096u);
+          memcpy(at, &f, sizeof f);
+        }
+      }
+    }
+  }
+}
+
+static void image_section(void) {
+  acc = &image_total;
+  acc_count = &image_count;
+  gshgeom_hash_init(&image_total);
+  static const GSHSCENE_Color_Space spaces[4] = {{GCOL_PRIMARIES_UNKNOWN, GCOL_TRANSFER_UNKNOWN, 0.0},
+      {GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_SRGB, 0.0}, {GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_LINEAR, 0.0},
+      {GCOL_PRIMARIES_DISPLAY_P3, GCOL_TRANSFER_GAMMA, 2.2}};
+  GSHSCENE_Store * store = NULL;
+  check(gshscene_store_create(NULL, NULL, &store), "image store");
+  const GSHSCENE_Resource * held[2 * IM_IMAGES];
+  size_t held_count = 0;
+  for (unsigned i = 0; i < IM_IMAGES; i++) {
+    unsigned model_pick = between(0, 2);
+    unsigned type_pick = between(0, 3);
+    uint32_t w = between(1, 150);
+    uint32_t h = between(1, 150);
+    size_t pad = between(0, 20);
+    unsigned space_pick = between(0, 3);
+    unsigned premultiplied = between(0, 1);
+    unsigned layout = model_pick == 0 ? 1u : model_pick == 1 ? 3u : 4u;
+    unsigned type = type_pick == 3 ? 1u : 0u;
+    unsigned bits = type_pick == 0 ? 8u : type_pick == 1 ? 12u : type_pick == 2 ? 16u : 32u;
+    GIMG_Pixel_Format format;
+    memset(&format, 0, sizeof format);
+    format.channel_model = model_pick == 0 ? GIMG_CHANNEL_GRAY : model_pick == 1 ? GIMG_CHANNEL_RGB : GIMG_CHANNEL_RGBA;
+    format.channel_type = type ? GIMG_CHANNEL_FLOAT : GIMG_CHANNEL_UNORM;
+    format.layout = GIMG_LAYOUT_INTERLEAVED;
+    format.channel_count = (uint8_t)layout;
+    for (unsigned c = 0; c < layout; c++) {
+      format.bits_per_channel[c] = (uint8_t)bits;
+    }
+    format.alignment = 1;
+    format.alpha_form = (uint8_t)(model_pick == 2 ? (premultiplied ? GIMG_ALPHA_PREMULTIPLIED : GIMG_ALPHA_STRAIGHT)
+                                                  : GIMG_ALPHA_NONE);
+    size_t row = (size_t)w * layout * (bits <= 8 ? 1u : bits <= 16 ? 2u : 4u);
+    GIMG_Raster * raster = NULL;
+    if (gimg_raster_create(w, h, &format, GIMG_RASTER_OWNED, NULL, row + pad, &raster) != GIMG_OK) {
+      fail("image raster");
+    }
+    unsigned char * base = (unsigned char *)gimg_raster_pixels(raster);
+    memset(base, 0x6B, (row + pad) * h);
+    image_fill(base, row + pad, w, h, layout, type, bits);
+
+    GSHSCENE_Image_Params params;
+    memset(&params, 0, sizeof params);
+    params.space = spaces[space_pick];
+    const GSHSCENE_Resource * image = NULL;
+    check(gshscene_store_intern_image(store, raster, &params, &image), "intern image");
+    feed(gshscene_resource_hash(image));
+    feed((uint64_t)gshscene_resource_bytes(image));
+    GSHSCENE_Image_Info info;
+    check(gshscene_resource_image(image, &info), "image info");
+    feed(gshscene_image_tile_hash(image, 0, 0));
+    feed(gshscene_image_tile_hash(image, info.tiles_x - 1, info.tiles_y - 1));
+    feed((uint64_t)info.tiles_x * info.tiles_y);
+
+    /* A take of an equal raster is a hit: the live handle comes back and the raster is the store's to destroy. */
+    GIMG_Raster * twin = NULL;
+    if (gimg_raster_copy(raster, &twin) != GIMG_OK) {
+      fail("image twin");
+    }
+    const GSHSCENE_Resource * hit = NULL;
+    check(gshscene_store_intern_image_take(store, twin, &params, &hit), "take twin");
+    if (hit != image) {
+      fail("a take of an equal raster is not the live image");
+    }
+    gshscene_resource_release(hit);
+
+    /* A raster one sample away is another image, kept so that the store's table has a population. */
+    GIMG_Raster * near = NULL;
+    if (gimg_raster_copy(raster, &near) != GIMG_OK) {
+      fail("image near");
+    }
+    *(unsigned char *)gimg_raster_pixels(near) ^= 1u;
+    const GSHSCENE_Resource * other = NULL;
+    check(gshscene_store_intern_image_take(store, near, &params, &other), "take near");
+    if (other == image) {
+      fail("a raster one sample away is the same image");
+    }
+    feed(gshscene_resource_hash(other));
+    held[held_count++] = image;
+    held[held_count++] = other;
+    gimg_raster_destroy(raster);
+  }
+  GSHSCENE_Store_Stats stats;
+  check(gshscene_store_stats(store, &stats), "image stats");
+  feed(stats.live);
+  feed(stats.bytes);
+  feed(stats.created);
+  feed(stats.hits);
+  for (size_t i = 0; i < held_count; i++) {
+    gshscene_resource_release(held[i]);
+  }
+  check(gshscene_store_stats(store, &stats), "image stats");
+  if (stats.live != 0 || stats.bytes != 0) {
+    fail("an image is still live after every handle was released");
+  }
+  gshscene_store_destroy(store);
+}
+
 static void placeholder_section(void) {
   acc = &placeholder_total;
   acc_count = &placeholder_count;
@@ -2237,5 +2372,8 @@ int main(void) {
   placeholder_section();
   printf("shape-scene.placeholder-hash %016" PRIx64 "\n", gshgeom_hash_value(&placeholder_total));
   printf("shape-scene.placeholder-count %lu\n", placeholder_count);
+  image_section();
+  printf("shape-scene.image-hash %016" PRIx64 "\n", gshgeom_hash_value(&image_total));
+  printf("shape-scene.image-count %lu\n", image_count);
   return 0;
 }

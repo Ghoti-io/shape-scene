@@ -60,6 +60,9 @@ cap, what a subpath of zero length draws, a dash array with its offset and scope
 reserved width profile, interned in a canonical form (an all-zero or negative dash array is solid, an odd one is
 doubled, a field that does not apply takes its default, `-0` is `+0`), so one drawing is one handle and one hash.
 
+An image (rules IM1 to IM14, `image.h`) is a resource too: a raster's samples as they were imported, with the
+descriptor that says what they are, interned by content. See "Images" below.
+
 ## Lists
 
 A list is an arena (chunks from the maker's allocator) with the items in segments of 16, 32, 64, ...
@@ -78,7 +81,9 @@ The spellings are in `resource.h` and `list.h`, field by field, in `shape-geomet
 S1: styles read back canonical, SK10's bounds under composed maps in every unit, the notices and features of strokes,
 their renders by sinks that draw, expand and refuse them, a retained scene's diff of stroke nodes) folds into a
 second hash and count, `stroke-hash` and `stroke-count` in `tests/corpus/scene.hash`, so that adding it left the
-first unchanged; both pairs are checked.
+first unchanged; both pairs are checked. The image section (store-level interns of images of every layout, sample
+type and alpha form, with partial edge tiles, padded strides, takes and collisions) is a third pair, `image-hash` and
+`image-count`, for the same reason.
 
 ## Recording without floats (fixed.h; story 14c)
 
@@ -178,14 +183,67 @@ it changes no pixel. **PH8** `tools/gen-scene-vectors.py` and `tools/gen-sink-ve
 the hashes a second time; the test sink writes `P class=N reason=N source=N code=N approx=N map=<hash> box=...` for each
 placeholder (`dump_sink.h`), the same in every configuration.
 
+## Images (normative; masks-images-patterns story I1)
+
+An image is raster content the scene holds by handle: the samples of a decoded picture, kept exactly as imported, so
+that a sink can sample them, a writer can embed them and a GPU sink can upload them by id. The rules are numbered
+IM1 to IM14 and live in `image.h`; this section says why they are what they are.
+
+**What is stored (IM1).** `{width, height, layout, sample type, bits, alpha form, alpha-only, space, samples}`. The
+layout is the number of samples per pixel (gray 1, gray-alpha 2, RGB 3, RGBA 4), interleaved. The sample type is
+`UNORM` at 8, 12 (right-justified in a `uint16_t`) or 16 bits, or `FLOAT` at 32. Gray-alpha is a pinned value that is
+refused until the image library has the model; a front end expands it to RGBA. Indexed, CMYK, YCbCr, Lab, planar,
+signed and unsigned integer and 1, 2, 4 and 10-bit images are `ERR_UNSUPPORTED`: the front end expands the sub-byte
+ones (`v * 255 / (2^n - 1)` is exact for 1, 2 and 4 bits), and the others wait for a color model at the waist.
+**Nothing is converted at intern:** premultiplying, widening 12 bits, normalizing or clamping a float would make two
+different facts one and lose what the front end said, and every conversion has a place that can do it later (the
+sink) and a definition (the paint that samples the image).
+
+**Equality (IM8).** Equal descriptors and equal samples as values, compared tile by tile after the hashes agree; a
+hash alone never decides. A sample one bit apart, a straight image beside its premultiplied twin, the alpha-only mark
+and the color space each make another image, and so do `-0` and `+0` in a float image (the bytes are kept). Padding
+and stride are not content.
+
+**Tiles (IM6) and the hash (IM7).** The grid is 64 by 64 texels, edge tiles partial. A tile's hash covers its
+dimensions and its samples as *values* (`u8`, `u16`, or the float's `u32` bit pattern, least significant byte first),
+never as the host stores them, so a big-endian host hashes the same image the same. The image's hash covers the
+descriptor, the tile edge and the tile hashes in order. A later copy-on-write edit rehashes only the tiles it touched;
+that editing API is not built, and the tile is logical: the samples are one row-major buffer, read by row (IM11).
+
+**Import (IM9).** A copy packs the samples tightly into the store's own allocation. A take keeps an owned raster and
+reads its rows in place, so the largest object a scene holds is not duplicated at the moment memory is scarcest; the
+raster is destroyed at the image's last release, after the release listeners have run. A take of content a live image
+already has returns the live handle and destroys the raster; a refused take leaves the raster with its caller.
+
+**Samples (IM3).** Every bit pattern of an 8- or 16-bit sample is a value. A 12-bit sample above 4095 and a
+non-finite float are refused, and so is the alpha of a float image (or an alpha-only image's one channel) outside
+`[0, 1]`. A float color has no magnitude bound: HDR content is routinely above the bound a recorded color keeps, and
+the decode saturates it when it is used. A premultiplied color above its alpha, and a color under zero alpha, are
+legal data.
+
+**Alpha-only (IM4) and the color description (IM5).** A gray image marked alpha-only has one channel read as alpha
+and takes its color from the paint that uses it; its space is the zero value. The space is given by the caller: the
+zero value (the target's space, which is what a PDF `DeviceRGB` image stands for) or a space the library carries.
+Nothing is guessed from the raster: `gshscene_image_space_from_raster` reads a raster's description when that is what
+a front end wants, and it refuses a description that does not state its gamut or transfer, and any ICC profile (a
+front end that identified a profile passes the space it identified).
+
+**Limits (IM10).** At most 2^16 texels along a side, at most 2^28 texels, and the accounted bytes (the base, the
+sample bytes and 16 for each tile) within the store's `max_bytes`. All three are decided in 64-bit arithmetic before
+a sample is read or anything is allocated; the checks run in the order invalid, unsupported, limit, sample values,
+out of memory, so a hostile size over a small buffer reads nothing.
+
+**What an image is not (IM14).** It is not a shape: a fill, a clip, a stroke centerline, an instance or a glyph
+run's outline that names one is `ERR_INVALID`. Nothing in a list can name an image yet; the paint that samples one,
+and the sinks that draw or embed it, are separate work.
+
 ## Reserved
 
-The image resource kind is named and has no constructor; its value is pinned because it is hashed. A story that gives
-it a meaning adds a constructor. (The palette paint, refused until story 14c, is N14 below; the gradient paint and
-resource, reserved until color-paint story P1, are G1 to G13.) Also refused with `ERR_UNSUPPORTED` are ProPhoto
-(D50: converting to it needs a chromatic adaptation), the parametric, BT.1886, PQ and HLG transfers and ICC
-profiles, and a stroke style's **width profile** (variable width, D8 of the strokes spec): the slot is a resource
-handle, hashed as `u64` 0 while it is empty, so that defining a profile fills a spelling that already exists.
+Refused with `ERR_UNSUPPORTED`: ProPhoto (D50: converting to it needs a chromatic adaptation), the parametric,
+BT.1886, PQ and HLG transfers and ICC profiles, gray-alpha images (a pinned layout value with no raster to carry it),
+and a stroke style's **width profile** (variable width, D8 of the strokes spec): the slot is a resource handle,
+hashed as `u64` 0 while it is empty, so that defining a profile fills a spelling that already exists. (The palette
+paint is N14 below; the gradient paint and resource are G1 to G13; the image resource is IM1 to IM14 above.)
 
 ## What a scene means: paint, color and composition (normative)
 

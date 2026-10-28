@@ -273,6 +273,8 @@ int gshscene_resource_matches(const GSHSCENE_Resource * resource, const GSHSCENE
       return gshscene_gradient_matches(resource, probe->source);
     case GSHSCENE_RESOURCE_STROKE_STYLE:
       return gshscene_stroke_matches(resource, probe->source);
+    case GSHSCENE_RESOURCE_IMAGE:
+      return gshscene_image_matches(resource, probe->source);
     case GSHSCENE_RESOURCE_PLANE:
       return 1; /* no content: any plane of the store is this one */
     default:
@@ -313,6 +315,9 @@ void gshscene_resource_free_content(GSHSCENE_Resource * resource) {
       break;
     case GSHSCENE_RESOURCE_STROKE_STYLE:
       gshscene_stroke_free(resource);
+      break;
+    case GSHSCENE_RESOURCE_IMAGE:
+      gshscene_image_free(resource);
       break;
     default:
       break;
@@ -885,6 +890,11 @@ GSHSCENE_Result gshscene_resource_dump(const GSHSCENE_Resource * resource, FILE 
       break;
     case GSHSCENE_RESOURCE_STROKE_STYLE:
       if (gshscene_stroke_dump(resource, out) < 0) {
+        return GSHSCENE_ERR_IO;
+      }
+      break;
+    case GSHSCENE_RESOURCE_IMAGE:
+      if (gshscene_image_dump(resource, out) < 0) {
         return GSHSCENE_ERR_IO;
       }
       break;

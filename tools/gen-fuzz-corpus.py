@@ -35,7 +35,7 @@ OPS = ["LIST_CREATE", "FILL", "CLIP_PUSH", "CLIP_POP", "GROUP_PUSH", "GROUP_POP"
        "PUBLISH", "MERGE", "HOLD", "RELEASE_VERSION", "DIFF", "EMIT", "VISIT", "DUMP", "SCENE_INTERN",
        "FILL_EX", "CLIP_PUSH_EX", "GROUP_PUSH_EX", "LIST_FOREGROUND", "NODE_PROPS", "EDIT_FOREGROUND", "LIST_PALETTE",
        "FILL_FIXED", "TRUNCATE", "EDIT_PALETTE", "INTERN_GRADIENT", "FILL_GRADIENT", "SCENE_GRADIENT", "GRADIENT_NODE",
-       "COLOR_BOUND", "GROUP_PDF", "NODE_PDF", "INTERN_STYLE", "STROKE", "STROKE_NODE", "PLACEHOLDER", "PLACEHOLDER_NODE"]
+       "COLOR_BOUND", "GROUP_PDF", "NODE_PDF", "INTERN_STYLE", "STROKE", "STROKE_NODE", "PLACEHOLDER", "PLACEHOLDER_NODE", "INTERN_IMAGE", "IMAGE_NOT_SHAPE"]
 OP = {name: i for i, name in enumerate(OPS)}
 
 BIASED = {
@@ -46,6 +46,7 @@ BIASED = {
     "FILL_EX": 5, "CLIP_PUSH_EX": 2, "GROUP_PUSH_EX": 4, "LIST_FOREGROUND": 1, "NODE_PROPS": 5, "EDIT_FOREGROUND": 2,
     "LIST_PALETTE": 2, "FILL_FIXED": 4, "TRUNCATE": 2, "EDIT_PALETTE": 2, "INTERN_GRADIENT": 4, "FILL_GRADIENT": 4,
     "SCENE_GRADIENT": 4, "GRADIENT_NODE": 5, "INTERN_STYLE": 5, "STROKE": 4, "STROKE_NODE": 4,
+    "INTERN_IMAGE": 6, "IMAGE_NOT_SHAPE": 2,
 }
 
 BIASED_FILES = 160
@@ -230,6 +231,51 @@ def scripted():
     node_bad = bytes([OP["PLACEHOLDER_NODE"], 0, 0, 2, 0, 0, 0, 1, 0])
     seq = bytearray([0xFF, 0xFF]) + records + open_edit() + node_ok + node_bad + publish() + bytes([OP["EMIT"], 0])
     out["scripted-placeholders.bin"] = bytes(seq)
+    # A palette fill, which random bytes reached by luck until the op table grew (masks-images-patterns story I1).
+    # LIST_PALETTE reads the entry count (pick of 5) and four bytes each, then the none pick (0: no palette).  FILL_FIXED
+    # reads: the target, the op count (0), the paint kind (2 + pick of 2), the alpha (pick of 20, minus 2), the fraction
+    # bits, the entry, the clip pick (0: a clip push) and the layer; every combination of kind and bits is tried, one
+    # of which draws with a palette entry.
+    fills = bytearray()
+    for kind in (0, 1):
+        for bits in (0, 1, 2, 3):
+            for alpha in (2, 3, 4, 6):
+                fills += bytes([OP["FILL_FIXED"], 0, 0, kind, alpha, bits, 1, 1, 0])
+    out["scripted-palette-fill.bin"] = bytes(bytearray([0xFF, 0xFF]) + bytes([OP["LIST_PALETTE"], 3, 255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 1]) + fills)
+    # Masks-images-patterns story I1.  INTERN_IMAGE reads: the take pick, the model (gray, RGB, RGBA, CMYK), the kind (8, 12
+    # and 16 bits, float, 10 bits, planar), the width and height picks, the row padding, the space pick (6 is reserved, 7
+    # and 8 partly given), the flag pick (2 is alpha-only, 3 and 4 and 5 are bad), the reserved pick (0: set), the
+    # premultiplied pick, the bad-sample pick (12-bit 4096 at 1; a float NaN, infinity and an alpha of 1.5 at 1, 2, 3), the
+    # hostile pick (0: a size past a bound over a small buffer), the base byte and the slot.  IMAGE_NOT_SHAPE reads the slot.
+    def image(take, model, kind, wsel, hsel, pad, space, flag, reserved, premult, bad, hostile, base, slot):
+        return bytes([OP["INTERN_IMAGE"], take, model, kind, wsel, hsel, pad, space, flag, reserved, premult, bad, hostile, base, slot])
+    images = (image(0, 2, 0, 5, 3, 3, 1, 0, 1, 0, 0, 1, 7, 0)           # a straight RGBA8 copy, padded, in sRGB
+              + image(1, 1, 2, 4, 2, 0, 0, 0, 1, 0, 0, 1, 9, 1)         # an RGB16 taken
+              + image(1, 0, 3, 2, 1, 2, 2, 0, 1, 0, 0, 1, 3, 2)         # a float gray taken
+              + image(0, 2, 3, 3, 2, 1, 3, 0, 1, 1, 0, 1, 5, 0)         # a premultiplied RGBA float copy in Display P3
+              + image(0, 0, 1, 6, 4, 0, 0, 0, 1, 0, 0, 1, 11, 1)        # a 12-bit gray
+              + image(0, 0, 0, 2, 1, 0, 0, 2, 1, 0, 0, 1, 13, 2)        # an alpha-only gray8
+              + image(0, 0, 1, 2, 1, 0, 0, 0, 1, 0, 1, 1, 15, 0)        # a 12-bit sample of 4096: refused
+              + image(0, 0, 3, 2, 1, 0, 0, 0, 1, 0, 1, 1, 17, 0)        # a float NaN: refused
+              + image(0, 0, 3, 2, 1, 0, 0, 0, 1, 0, 2, 1, 19, 0)        # a float infinity: refused
+              + image(0, 2, 3, 2, 1, 0, 0, 0, 1, 0, 3, 1, 21, 0)        # a float alpha of 1.5: refused
+              + image(0, 1, 0, 2, 1, 0, 0, 0, 0, 0, 0, 1, 23, 0)        # the reserved field set: invalid
+              + image(0, 1, 0, 2, 1, 0, 0, 3, 1, 0, 0, 1, 25, 0)        # an undefined flag: invalid
+              + image(0, 1, 0, 2, 1, 0, 7, 0, 1, 0, 0, 1, 27, 0)        # a partly given space: invalid
+              + image(0, 1, 0, 2, 1, 0, 0, 2, 1, 0, 0, 1, 29, 0)        # alpha-only on RGB: invalid
+              + image(1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 31, 0)        # a take of a borrowed raster: invalid
+              + image(0, 3, 0, 2, 1, 0, 0, 0, 1, 0, 0, 1, 33, 0)        # CMYK: unsupported
+              + image(0, 1, 4, 2, 1, 0, 0, 0, 1, 0, 0, 1, 35, 0)        # 10 bits: unsupported
+              + image(0, 1, 5, 2, 1, 0, 0, 0, 1, 0, 0, 1, 37, 0)        # planar: unsupported
+              + image(0, 1, 0, 2, 1, 0, 6, 0, 1, 0, 0, 1, 39, 0)        # ProPhoto: unsupported
+              + image(0, 2, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 41, 0)        # 65537 by 1: past the dimension bound
+              + image(0, 1, 3, 1, 0, 0, 1, 0, 1, 0, 0, 0, 43, 0)        # 1 by 65537
+              + image(0, 2, 3, 2, 0, 0, 1, 0, 1, 0, 0, 0, 45, 0)        # 40000 by 40000: past the texel bound
+              + bytes([OP["IMAGE_NOT_SHAPE"], 0, OP["IMAGE_NOT_SHAPE"], 1]))
+    out["scripted-images.bin"] = bytes(bytearray([0xFF, 0xFF]) + images)
+    # The same under a store whose bytes are bounded (b1 = 0x40: max_bytes 1500): an image that does not fit is refused by
+    # the store's limit, and one that does is interned.
+    out["scripted-images-small-store.bin"] = bytes(bytearray([0xFF, 0x40]) + images)
     # An instance of a picture: a closed empty list frozen into pool slot 0, a new list, and an instance of it under
     # the identity (INSTANCE reads the map and the picture's slot).  Random inputs reached it by luck until the op
     # table grew (strokes story S1).
