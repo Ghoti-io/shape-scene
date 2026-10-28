@@ -168,7 +168,7 @@ static GSHSCENE_Result canonical(const GSHSCENE_Store * store, const GSHSCENE_Gr
   int target = gshscene_color_space_is_target(&in->space);
   for (size_t i = 0; i < in->stop_count; i++) {
     const GSHSCENE_Gradient_Stop * s = &in->stops[i];
-    if (!gshscene_finite(s->offset) || s->color.kind == GSHSCENE_PAINT_GRADIENT) {
+    if (!gshscene_finite(s->offset) || s->color.kind == GSHSCENE_PAINT_GRADIENT || s->color.kind == GSHSCENE_PAINT_IMAGE) {
       return GSHSCENE_ERR_INVALID;
     }
     result = gshscene_list_canonical_paint_valid(store, &s->color, &stops[i].color);
@@ -549,20 +549,29 @@ int gshscene_gradient_degenerate(const GSHSCENE_Gradient * g) {
   return repeats && g->stop_count >= 2 && g->stops[0].offset == g->stops[g->stop_count - 1].offset;
 }
 
-GSHSCENE_Reason gshscene_gradient_notice(const GSHSCENE_Item * item, const GSHGEOM_Map * instance_maps,
+GSHSCENE_Reason gshscene_paint_notice(const GSHSCENE_Item * item, const GSHGEOM_Map * instance_maps,
     size_t instance_count, const GSHGEOM_Map * target_map) {
-  if (!item || item->kind != GSHSCENE_ITEM_FILL || item->paint.kind != GSHSCENE_PAINT_GRADIENT || !item->paint.resource ||
-      item->paint.resource->kind != GSHSCENE_RESOURCE_GRADIENT) {
+  if (!item || item->kind != GSHSCENE_ITEM_FILL || !item->paint.resource) {
     return (GSHSCENE_Reason)0;
   }
-  const GSHSCENE_Gradient * g = &item->paint.resource->u.gradient.g;
+  /* The paint's own map: a gradient's, or an image paint's (IP11). */
+  const GSHSCENE_Gradient * g = NULL;
+  const GSHGEOM_Map * paint_map;
+  if (item->paint.kind == GSHSCENE_PAINT_GRADIENT && item->paint.resource->kind == GSHSCENE_RESOURCE_GRADIENT) {
+    g = &item->paint.resource->u.gradient.g;
+    paint_map = &g->map;
+  } else if (item->paint.kind == GSHSCENE_PAINT_IMAGE && item->paint.resource->kind == GSHSCENE_RESOURCE_IMAGE_PAINT) {
+    paint_map = &item->paint.resource->u.imagepaint.p.map;
+  } else {
+    return (GSHSCENE_Reason)0;
+  }
   int not_invertible = (target_map && gshscene_map_singular(target_map)) || gshscene_map_singular(&item->map) ||
-      gshscene_map_singular(&g->map);
+      gshscene_map_singular(paint_map);
   for (size_t i = 0; i < instance_count && !not_invertible; i++) {
     not_invertible = gshscene_map_singular(&instance_maps[i]);
   }
   if (not_invertible) {
     return GSHSCENE_REASON_MAP_NOT_INVERTIBLE;
   }
-  return gshscene_gradient_degenerate(g) ? GSHSCENE_REASON_GRADIENT_DEGENERATE : (GSHSCENE_Reason)0;
+  return g && gshscene_gradient_degenerate(g) ? GSHSCENE_REASON_GRADIENT_DEGENERATE : (GSHSCENE_Reason)0;
 }

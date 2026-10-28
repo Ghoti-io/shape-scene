@@ -163,6 +163,9 @@ typedef enum GSHSCENE_Reason {
   GSHSCENE_REASON_STROKE_ZERO_WIDTH = 29, ///< Notice, per stroke: its width is 0, so it draws nothing (stroke.h, SK8).
   GSHSCENE_REASON_STROKE_CENTERLINE = 30, ///< Refused, per stroke: its centerline is a glyph run and the sink does not stroke runs (sink.h, S20).
   GSHSCENE_REASON_PLACEHOLDER = 31,   ///< Refused or approximated, per placeholder: a front end could not express a construct; `second` is `source << 16 | code` (sink.h, PH3, PH4).
+  GSHSCENE_REASON_IMAGE = 32,         ///< Refused, per fill: an image paint the sink cannot draw (an edge mode, a sample format, or none at all); `second` names the missing features (image_paint.h, S21, IP15).
+  GSHSCENE_REASON_IMAGE_FILTER = 33,  ///< Approximated, per fill: the filter the item's map calls for is not one the sink draws (IP15).
+  GSHSCENE_REASON_IMAGE_FILTER_SPACE = 34, ///< Approximated, per fill: the image paint's stated filter space is not the one the sink filters in (IP15).
   GSHSCENE_REASON_COUNT               ///< Closes the enum.
 } GSHSCENE_Reason;
 

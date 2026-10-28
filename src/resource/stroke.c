@@ -582,9 +582,11 @@ GSHSCENE_Reason gshscene_stroke_notice(const GSHSCENE_Item * item, const GSHGEOM
     return (GSHSCENE_Reason)0;
   }
   const GSHSCENE_Resource * gradient = paint_gradient(item);
+  const GSHSCENE_Resource * image_paint = item->paint.kind == GSHSCENE_PAINT_IMAGE && item->paint.resource &&
+          item->paint.resource->kind == GSHSCENE_RESOURCE_IMAGE_PAINT ? item->paint.resource : NULL;
   /* SK9: G11's condition on each map of the chain, for both width spaces ... */
   int not_invertible = (target_map && gshscene_map_singular(target_map)) || gshscene_map_singular(&item->map) ||
-      (gradient && gshscene_map_singular(&gradient->u.gradient.g.map));
+      (gradient && gshscene_map_singular(&gradient->u.gradient.g.map)) || gshscene_image_paint_singular(image_paint);
   for (size_t i = 0; i < instance_count && !not_invertible; i++) {
     not_invertible = gshscene_map_singular(&instance_maps[i]);
   }

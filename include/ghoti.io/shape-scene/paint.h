@@ -60,7 +60,8 @@
  * them is **saturated**, `sat(x) = min(max(x, -2^64), 2^64)`
  * (::GSHSCENE_COLOR_SATURATION), at exactly these points: each decode and each
  * encode within a conversion (N2), the matrix result (N3), every un-premultiply
- * `C / A` (N3, G4, a store to a straight target) and every `apply` (N5, list.h).
+ * `C / A` (N3, G4, a store to a straight target), every `apply` (N5, list.h) and the decode of a float
+ * texel of an image (image_paint.h, IP4).
  * Every sink, the oracles and ::gshscene_gradient_resolve apply it at the same
  * points.  Each step then takes values of magnitude at most `2^64` to a finite
  * one (the worst is a power: `(2^64)^10 = 2^640`), and the un-premultiply is
@@ -216,7 +217,7 @@
  * the target's is `APPROXIMATED`, reason `INTERPOLATION_SPACE`.  The planning
  * pass reports G11 and G10 as `NOTICE` entries (drawn as defined, never failing
  * strict), reasons `MAP_NOT_INVERTIBLE` and `GRADIENT_DEGENERATE`, through the
- * one predicate ::gshscene_gradient_notice.  A writer dedupes gradients by
+ * one predicate ::gshscene_paint_notice.  A writer dedupes gradients by
  * resource id; a GPU sink caches its upload by id and evicts on release (AD-27).
  *
  * **G14 Limits (color-paint story P2).**  Every double of the geometry of the
@@ -320,6 +321,11 @@ typedef enum GSHSCENE_Paint_Kind {
    * `rgba[0..2]` zero, `rgba[3]` its alpha multiplier, the space zero.  A COLR solid paint lowers to it (story 14c).
    */
   GSHSCENE_PAINT_PALETTE = 3,
+  /**
+   * An image paint resource of the list's store (image_paint.h, IP1 to IP18): `resource` names it, `rgba[0..2]` zero, `rgba[3]` its
+   * alpha multiplier, the space zero, the entry zero.
+   */
+  GSHSCENE_PAINT_IMAGE = 4,
   GSHSCENE_PAINT_KIND_COUNT    ///< Closes the enum.
 } GSHSCENE_Paint_Kind;
 
@@ -333,7 +339,10 @@ typedef struct GSHSCENE_Paint {
   double rgba[4];
   /** Solid: the color space of the components (zero is the target's).  Foreground: zero. */
   GSHSCENE_Color_Space space;
-  /** Gradient: the gradient resource (the list holds a reference).  NULL for a solid, foreground or palette paint (and required to be). */
+  /**
+   * Gradient: the gradient resource.  Image: the image-paint resource.  The list holds a reference.  NULL for a solid,
+   * foreground or palette paint (and required to be).
+   */
   const GSHSCENE_Resource * resource;
   /** Palette: the entry, in `[0, GSHSCENE_PALETTE_ENTRY_MAX]`.  Zero for every other kind (and required to be). */
   uint32_t entry;

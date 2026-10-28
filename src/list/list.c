@@ -406,12 +406,15 @@ static GSHSCENE_Result canonical_paint(const GSHSCENE_Store * store, const GSHSC
     return GSHSCENE_OK;
   }
   if (paint->kind != GSHSCENE_PAINT_SOLID && paint->kind != GSHSCENE_PAINT_FOREGROUND &&
-      paint->kind != GSHSCENE_PAINT_PALETTE && paint->kind != GSHSCENE_PAINT_GRADIENT) {
+      paint->kind != GSHSCENE_PAINT_PALETTE && paint->kind != GSHSCENE_PAINT_GRADIENT &&
+      paint->kind != GSHSCENE_PAINT_IMAGE) {
     return GSHSCENE_ERR_INVALID;
   }
-  /* One spelling: only a gradient paint names a resource, a gradient of the list's store (G1). */
-  if (paint->kind == GSHSCENE_PAINT_GRADIENT
-          ? (!paint->resource || paint->resource->store != store || paint->resource->kind != GSHSCENE_RESOURCE_GRADIENT)
+  /* One spelling: only a gradient or an image paint names a resource, of its kind and of the list's store (G1, IP1). */
+  if (paint->kind == GSHSCENE_PAINT_GRADIENT || paint->kind == GSHSCENE_PAINT_IMAGE
+          ? (!paint->resource || paint->resource->store != store ||
+                paint->resource->kind != (paint->kind == GSHSCENE_PAINT_GRADIENT ? GSHSCENE_RESOURCE_GRADIENT
+                                                                                  : GSHSCENE_RESOURCE_IMAGE_PAINT))
           : paint->resource != NULL) {
     return GSHSCENE_ERR_INVALID;
   }

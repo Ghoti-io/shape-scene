@@ -115,6 +115,13 @@ struct GSHSCENE_Resource {
       double * dashes;         /* dash_count of them, NULL for none */
     } stroke;
     struct {
+      GSHSCENE_Image_Paint p;     /* canonical (IP1); image and tint point at the copies below */
+      GSHSCENE_Paint tint;        /* the tint, when the image is alpha-only */
+      const GSHSCENE_Resource * image; /* retained */
+      int foreground;             /* the tint is a foreground paint */
+      uint32_t palette_need;      /* the tint's palette entry, plus one; 0 for none */
+    } imagepaint;
+    struct {
       GSHSCENE_Image_Info info;   /* IM1 */
       const unsigned char * rows; /* the first row: the copy below, or the taken raster's pixels */
       size_t stride;              /* bytes between rows: a copy's is its row, a raster's is its own */
@@ -288,6 +295,20 @@ int gshscene_stroke_dump(const GSHSCENE_Resource * resource, FILE * out);
  * bounds): the bound is unknown.
  */
 GSHSCENE_Result gshscene_centerline_box(const GSHSCENE_Resource * resource, GSHGEOM_Bounds * out);
+
+/* --- image_paint.c ---------------------------------------------------------- */
+
+/** Whether an image-paint resource has the canonical content @p source (a GSHSCENE_Image_Paint, window explicit). */
+int gshscene_image_paint_matches(const GSHSCENE_Resource * resource, const void * source);
+
+/** Release the image an image paint holds. */
+void gshscene_image_paint_free(GSHSCENE_Resource * resource);
+
+/** The payload of an image paint's dump (image_paint.h, IP13); negative on failure. */
+int gshscene_image_paint_dump(const GSHSCENE_Resource * resource, FILE * out);
+
+/** The distinct reasons a map of an image paint's chain makes the fill draw nothing: 1 when the paint's own map is singular. */
+int gshscene_image_paint_singular(const GSHSCENE_Resource * resource);
 
 /* --- image.c ---------------------------------------------------------------- */
 

@@ -237,6 +237,62 @@ out of memory, so a hostile size over a small buffer reads nothing.
 run's outline that names one is `ERR_INVALID`. Nothing in a list can name an image yet; the paint that samples one,
 and the sinks that draw or embed it, are separate work.
 
+## Image paints (normative; masks-images-patterns story I2)
+
+An image (above) holds samples; an **image paint** says how a fill takes its color from them, and a fill names it with a paint
+of kind `IMAGE` (4), exactly as it names a gradient. The rules are numbered IP1 to IP18, live in `image_paint.h`, and are
+checked by `tools/image-oracle.py`, which restates every sampling rule in exact rationals and shares no code with the
+library, against `tests/ref_image.h`, the library's own evaluator of them in `double`.
+
+**The resource (IP1).** `{image, window, map, extend x, extend y, magnify, minify, filter space, tint}`, interned by content
+as resource kind 10. The window is an integer rectangle of texels; the all-zero window means the whole image and the store
+keeps the explicit rectangle, so one drawing has one spelling. The map takes image space to the item's local space and is held
+to the same band as a gradient's (each entry zero or of magnitude in `[2^-64, 2^64]`, a limit decided after every validity
+check). The tint is present exactly when the image is alpha-only (a stencil without a color, or a color image with a tint,
+is invalid); a stencil's filter space does not apply and is stored as zero, so a stencil painted with and without a stated
+space is one paint. A zero filter space means the image's own space, whatever that is.
+
+**What a sample means (IP2 to IP7).** Texel `(i, j)` covers `[i, i + 1) x [j, j + 1)` with its centre at `(i + 1/2, j + 1/2)`,
+y down. A texel decodes to `v / (2^n - 1)` or a saturated float and is premultiplied in its own space (a premultiplied image
+is taken as stored, an additive pixel included). The filters act on premultiplied values in the filter space `F`, componentwise,
+and the result is taken to the layer's space as N3 takes a premultiplied value. The edge mode acts on **taps**, not on
+coordinates, so the same four modes serve all four filters and no texel outside the window is ever read. The cubic filter is
+Mitchell-Netravali with `B = C = 1/3`, clamped componentwise to the range of its sixteen taps: it never overshoots, and it is
+not interpolating (at a texel centre its weights are `1/18, 8/9, 1/18`), which is why a unit-scale draw is not magnified.
+
+**Which filter (IP8).** Per item and never per pixel, by `gshgeom_map_stretches_every_direction` on the composed map: the
+magnify filter when the smallest singular value exceeds 1, the minify filter otherwise, an exactly unit scale and a map that
+stretches one direction and shrinks another included. A determinant would call a 7 by 0.3 map a magnification.
+`gshscene_image_filter_of` gives it to a sink, composing the chain as `gshgeom_map_compose_chain` does.
+
+**What draws nothing (IP11).** A fill, or a stroke, whose chain has a map of exactly zero determinant is noticed by the one
+predicate `gshscene_paint_notice` (it was the gradient notice; it takes every paint that names a resource), and a sink skips by
+it. There is no other degenerate image paint: a zero alpha multiplier is a legal paint.
+
+**A drawn image (IP14).** `drawImage`, `<image>`, a CSS background and a PDF image operator lower to a fill of the destination
+rectangle with an image paint and `PAD` on both axes. A writer recognizes that shape with `gshscene_image_fill_is_draw`, which
+asks that the path be one closed subpath of four lines whose points are, as doubles, the window's corners mapped by the paint's
+map (in either winding, from either corner), and the front end builds that path with `gshscene_image_paint_rect_path`, so
+it can always satisfy the predicate. Nothing is compared within a tolerance: two writers cannot disagree about the same fill.
+
+**Sinks (IP15).** A sink states what it draws in three caps fields and one flag: `image_filters`, `image_extends`,
+`image_formats` (a sample type, a layout and the alpha-only mark are one bit each) and `CAP_IMAGE_FILTER_SPACES`. In the planning
+pass, after the gradient refusals: an image paint a sink cannot draw (an edge mode or a format it lacks, or no image
+capability at all) is **refused**, `IMAGE`, with the missing features in the entry's `second` (the extends in bits 0 to 3, the
+formats from bit 4); then among the approximations, the filter the item's map calls for, if the sink has not got it
+(`IMAGE_FILTER`), and a stated filter space the sink does not filter in (`IMAGE_FILTER_SPACE`). A sink without the caps
+never draws an image wrong: under strict the render fails before the target is touched, and `shape-cpu` refuses every
+image paint until it draws them. The test sink records an image once per render, `M <id> <hash> ...`, then each paint once,
+`J <id> <hash> image=<id> ...`, and a fill names its paint `img=<id>`.
+
+**Precision (IP12).** The sampling domain is the image-space points within `2^32` texels of the origin; a sink samples inside it
+or refuses the fill as its own resource limit. The oracle's vectors state a tolerance for each answer, the larger of `1e-12` and
+`2^-47` times the **condition sum** of the weighted sum (the sum of the weights times the largest magnitude each tap passes
+through), because a weighted sum of `n` terms in any order is only good to `n 2^-53` of that: a texel of magnitude `2^64` (a
+float saturated) costs the small components of its pixel about `2048` through a gamut matrix, in any double evaluation, and
+no sink can be asked to do better than the arithmetic allows. A `NEAREST` answer within `2^-16` of a texel boundary may take
+either neighbour.
+
 ## Reserved
 
 Refused with `ERR_UNSUPPORTED`: ProPhoto (D50: converting to it needs a chromatic adaptation), the parametric,
@@ -285,7 +341,7 @@ N2's decode and encode results within a conversion; N3's matrix result `M_B^-1 M
 implementation forms it); every **un-premultiply** `C / A` (N3's premultiplied conversion, G4's flag 1, B2's `Cs` and
 `Cb`, and a sink's store to a straight target); each component of a blend mode's mixing function `B(Cb, Cs)` before it
 is weighted (B9); and N5's result, so every fill, every group composite (`PLUS` and the blend modes included) at every
-depth.
+depth, and the decode of a float texel of an image (IP4), which is saturated as it is read.
 The saturation is part of the definition, not a sink's choice: the oracles, the scene's conversion (G3) and every sink
 apply it at the same points, so a value past `2^64` has one meaning on every sink. Content near `[0, 1]` does not reach
 it: one conversion of a component of magnitude at most 1 is at most `2.33^10 < 2^13` (a matrix, then a gamma-0.1
@@ -934,7 +990,7 @@ the list it emits, and the list's chain is what G11 reads.)
 `gradient_kinds` name the kinds a sink draws; another kind is refused (`GRADIENT`) by the planning pass, so a sink
 without gradients never draws one wrong. Without `GRADIENT_SPACES` a stated space other than the target's is
 approximated (`INTERPOLATION_SPACE`). The planning pass reports G11, then G10, as one `NOTICE` per fill
-(`MAP_NOT_INVERTIBLE`, `GRADIENT_DEGENERATE`) by the one predicate `gshscene_gradient_notice`, which a sink also skips
+(`MAP_NOT_INVERTIBLE`, `GRADIENT_DEGENERATE`) by the one predicate `gshscene_paint_notice`, which a sink also skips
 by; a notice never fails a render. N13 extends to gradients: a changed foreground damages the shapes whose gradient has
 a foreground stop, and a changed palette those with a palette stop.
 

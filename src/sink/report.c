@@ -125,6 +125,12 @@ const char * gshscene_reason_string(GSHSCENE_Reason reason) {
       return "stroke-centerline";
     case GSHSCENE_REASON_PLACEHOLDER:
       return "placeholder";
+    case GSHSCENE_REASON_IMAGE:
+      return "image";
+    case GSHSCENE_REASON_IMAGE_FILTER:
+      return "image-filter";
+    case GSHSCENE_REASON_IMAGE_FILTER_SPACE:
+      return "image-filter-space";
     case GSHSCENE_REASON_COUNT:
       break;
   }

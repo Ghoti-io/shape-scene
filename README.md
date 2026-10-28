@@ -18,7 +18,9 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
   rule, interned in a canonical form so one drawing is one handle), and a picture (a closed list,
   frozen, which an instance draws under a map), and an image (`image.h`: a decoded raster's samples,
   8, 12 or 16-bit integers or 32-bit floats as gray, RGB or RGBA, kept as imported and interned
-  by content in 64-by-64-texel tiles, copied in or taken from an owned raster). A stroke
+  by content in 64-by-64-texel tiles, copied in or taken from an owned raster), and an image paint
+  (`image_paint.h`: an image with an integer window, a map, an edge mode per axis, a magnify and a
+  minify filter, a filter space and a tint for a stencil). A stroke
   style's width profile is named and reserved.
 - **Recording without floats** (`fixed.h`). Integer-only calls, for a front end whose headers
   name no floating type: fills and clips of glyph runs under a design map of fixed-point ops,
@@ -91,7 +93,8 @@ The sink contract (`sink.h`, `report.h`, `cancel.h`; the normative text, S1 to S
 front-end and a driver; `examples/sink.c` renders a list through the sink contract with the test
 sink; `examples/gradient.c` interns, resolves and renders gradients; `examples/stroke.c` strokes an
 element after its fill and shows what a writer and a toolpath make of the strokes; `examples/image.c`
-imports rasters by copy and by take and shows what makes two images one.
+imports rasters by copy and by take and shows what makes two images one; `examples/image_paint.c` paints
+a rectangle with an image, recognizes a drawn image as a writer does and shows what a sink's capabilities make of it.
 
 ## Building
 

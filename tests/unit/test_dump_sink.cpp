@@ -132,6 +132,11 @@ GSHSCENE_Dump_Sink_Config config_writer_like() {
         GSHSCENE_STROKE_NATIVE_JOIN_BEVEL | GSHSCENE_STROKE_NATIVE_CAP_BUTT | GSHSCENE_STROKE_NATIVE_CAP_ROUND |
         GSHSCENE_STROKE_NATIVE_CAP_SQUARE | GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL |
         GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL_ANISOTROPIC | GSHSCENE_STROKE_NATIVE_DASH;
+    // An image (S21): kept by handle and emitted once; a nearest and a bilinear filter (SVG's image-rendering, PDF's /Interpolate),
+    // no cubic and no area average, no reflection, and no filtering in a stated space.
+    caps->image_filters = (1u << GSHSCENE_IMAGE_FILTER_NEAREST) | (1u << GSHSCENE_IMAGE_FILTER_LINEAR);
+    caps->image_extends = (1u << GSHSCENE_IMAGE_EXTEND_PAD) | (1u << GSHSCENE_IMAGE_EXTEND_REPEAT) | (1u << GSHSCENE_IMAGE_EXTEND_NONE);
+    caps->flags &= ~GSHSCENE_CAP_IMAGE_FILTER_SPACES;
   }
   return c;
 }
@@ -150,11 +155,30 @@ GSHSCENE_Dump_Sink_Config config_toolpath_like() {
     caps->stroke_native = GSHSCENE_STROKE_NATIVE_JOIN_ROUND | GSHSCENE_STROKE_NATIVE_CAP_ROUND |
         GSHSCENE_STROKE_NATIVE_CAP_BUTT | GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL | GSHSCENE_STROKE_NATIVE_WIDTH_DEVICE |
         GSHSCENE_STROKE_NATIVE_DASH;
+    // A pen draws no raster (S21): every image paint is refused, naming what it needs.
+    caps->image_filters = 0;
+    caps->image_extends = 0;
+    caps->image_formats = 0;
+    caps->flags &= ~GSHSCENE_CAP_IMAGE_FILTER_SPACES;
   }
   return c;
 }
 GSHSCENE_Sink * make_toolpath_like(const GSHSCENE_Allocator * alloc, const GSHSCENE_Limits * limits) {
   return make_with(config_toolpath_like(), alloc, limits);
+}
+
+/**
+ * A GPU's image caps (S21): every filter and edge mode through its samplers, no 12-bit and no float samples (no native
+ * texture format), and hardware filtering in linear light or the encoded space only, never a stated one.
+ */
+GSHSCENE_Sink * make_gpu_like(const GSHSCENE_Allocator * alloc, const GSHSCENE_Limits * limits) {
+  GSHSCENE_Dump_Sink_Config c = config_default();
+  for (GSHSCENE_Sink_Caps * caps : {&c.raster_caps, &c.stream_caps}) {
+    caps->image_formats &= ~(GSHSCENE_IMAGE_FORMAT_UNORM12 | GSHSCENE_IMAGE_FORMAT_FLOAT32);
+    caps->image_filters &= ~(1u << GSHSCENE_IMAGE_FILTER_AREA);
+    caps->flags &= ~GSHSCENE_CAP_IMAGE_FILTER_SPACES;
+  }
+  return make_with(c, alloc, limits);
 }
 
 /** A sink that draws everything but a stroke of a run: it does not unite a run's glyphs (ST5). */
@@ -180,12 +204,13 @@ const Fixture kBeforeSubmit{"before_submit", make_before_submit, {GSHSCENE_TARGE
 const Fixture kWriter{"writer", make_writer, {GSHSCENE_TARGET_STREAM}, nullptr};
 const Fixture kWriterLike{"writer_like", make_writer_like, {GSHSCENE_TARGET_RASTER, GSHSCENE_TARGET_STREAM}, nullptr};
 const Fixture kToolpathLike{"toolpath_like", make_toolpath_like, {GSHSCENE_TARGET_RASTER, GSHSCENE_TARGET_STREAM}, nullptr};
+const Fixture kGpuLike{"gpu_like", make_gpu_like, {GSHSCENE_TARGET_RASTER, GSHSCENE_TARGET_STREAM}, nullptr};
 
 } // namespace
 
 INSTANTIATE_TEST_SUITE_P(DumpSink, SinkConformance,
     ::testing::Values(&kFull, &kNarrow, &kNoXor, &kDeferred, &kAffine, &kAffineDeferred, &kBeforeSubmit, &kWriter,
-        &kWriterLike, &kToolpathLike),
+        &kWriterLike, &kToolpathLike, &kGpuLike),
     [](const ::testing::TestParamInfo<const Fixture *> & info) { return std::string(info.param->name); });
 
 /* --- the fixture of tools/gen-sink-vectors.py ----------------------------------------------------------- */
@@ -1661,13 +1686,16 @@ TEST(DumpSink, TheConfigurationIsValidated) {
     EXPECT_EQ(caps->cancel_work_bound, 1u);
     EXPECT_STREQ(caps->work_measure, "units");
     EXPECT_EQ(caps->gradient_kinds, 0xeu) << "linear, radial and sweep (S17)";
+    EXPECT_EQ(caps->image_filters, 0xfu) << "every image filter (S21)";
+    EXPECT_EQ(caps->image_extends, 0xfu) << "every edge mode";
+    EXPECT_EQ(caps->image_formats, 0xffu) << "every sample type, layout and the alpha-only mark";
     for (unsigned char b : caps->_reserved) {
       EXPECT_EQ(b, 0);
     }
   }
   uint32_t common = GSHSCENE_CAP_CAN_BLOCK | GSHSCENE_CAP_CALLER_MEMORY | GSHSCENE_CAP_GLYPHS_FROM_FONT |
       GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_BLEND_SPACES | GSHSCENE_CAP_GRADIENT_SPACES | GSHSCENE_CAP_PREPARE |
-      GSHSCENE_CAP_STROKE_RUNS;
+      GSHSCENE_CAP_STROKE_RUNS | GSHSCENE_CAP_IMAGE_FILTER_SPACES;
   EXPECT_EQ(d.raster_caps.flags, common | GSHSCENE_CAP_READBACK);
   EXPECT_EQ(d.stream_caps.flags, common);
   // Not a test sink, not a test sink's job.
@@ -2196,6 +2224,113 @@ TEST(DumpSink, PrepareHoldsOutlinesAndCreateCanFail) {
   huge.max_jobs = SIZE_MAX;
   GSHSCENE_Sink * sink = nullptr;
   EXPECT_EQ(gshscene_dump_sink_create(nullptr, &huge, nullptr, &sink), GSHSCENE_ERR_OOM);
+}
+
+// Masks-images-patterns story I2 (S21): the records of an image fill.  The image is written once, then its paint once,
+// each by id the first time a render meets it, and every fill names its paint with `img=`.
+TEST(DumpSink, AnImageAndItsPaintAreRecordedOnceAndEveryFillNamesItsPaint) {
+  Scene s;
+  GIMG_Raster * raster = nullptr;
+  ASSERT_EQ(gimg_raster_create(5, 4, &GIMG_PIXEL_RGBA8, GIMG_RASTER_OWNED, nullptr, 0, &raster), GIMG_OK);
+  GSHSCENE_Image_Params params{};
+  const GSHSCENE_Resource * image = nullptr;
+  ASSERT_EQ(gshscene_store_intern_image(s.store, raster, &params, &image), GSHSCENE_OK);
+  gimg_raster_destroy(raster);
+  s.held.push_back(image);
+  auto paint_resource = [&](uint32_t filter) {
+    GSHSCENE_Image_Paint ip;
+    gshscene_image_paint_init(&ip);
+    ip.image = image;
+    ip.magnify = ip.minify = filter;
+    const GSHSCENE_Resource * r = nullptr;
+    EXPECT_EQ(gshscene_store_intern_image_paint(s.store, &ip, &r), GSHSCENE_OK);
+    s.held.push_back(r);
+    return r;
+  };
+  const GSHSCENE_Resource * linear = paint_resource(GSHSCENE_IMAGE_FILTER_LINEAR);
+  const GSHSCENE_Resource * nearest = paint_resource(GSHSCENE_IMAGE_FILTER_NEAREST);
+  GSHSCENE_List * l = s.open();
+  for (const GSHSCENE_Resource * paint : {linear, nearest, linear, linear}) {
+    GSHSCENE_Paint p = solid(0, 0, 0, 1.0);
+    p.kind = GSHSCENE_PAINT_IMAGE;
+    p.resource = paint;
+    ASSERT_EQ(gshscene_list_fill(l, s.sq(2, 2, 8), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK);
+  }
+  ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  SinkRef sink(make_full(nullptr, nullptr));
+  auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+  ReportRef report;
+  Rendered r = render_job(sink.sink, request_for(l, *stream, report.report));
+  ASSERT_EQ(r.result, GSHSCENE_OK);
+  std::vector<std::string> lines;
+  for (size_t at = 0; at < stream->bytes.size();) {
+    size_t end = stream->bytes.find('\n', at);
+    lines.push_back(stream->bytes.substr(at, end - at));
+    at = end + 1;
+  }
+  size_t images = 0, paints = 0, fills = 0;
+  std::string image_id = std::to_string(gshscene_resource_id(image));
+  for (const std::string & line : lines) {
+    if (line.rfind("M ", 0) == 0) {
+      images++;
+      EXPECT_EQ(line.rfind("M " + image_id + " ", 0), 0u);
+      EXPECT_NE(line.find(" w=5 h=4 "), std::string::npos);
+    } else if (line.rfind("J ", 0) == 0) {
+      paints++;
+      EXPECT_NE(line.find(" image=" + image_id + " "), std::string::npos);
+      EXPECT_NE(line.find(" tint=-"), std::string::npos);
+    } else if (line.find(" img=") != std::string::npos) {
+      fills++;
+    }
+  }
+  EXPECT_EQ(images, 1u) << "the image once, however many paints and fills name it";
+  EXPECT_EQ(paints, 2u) << "each paint once";
+  EXPECT_EQ(fills, 4u);
+  EXPECT_NE(stream->bytes.find(" img=" + std::to_string(gshscene_resource_id(linear)) + " "), std::string::npos);
+  EXPECT_NE(stream->bytes.find(" img=" + std::to_string(gshscene_resource_id(nearest)) + " "), std::string::npos);
+}
+
+// The writer-like sink has no reflection: a REFLECT image fill is refused there and nothing of the image is written; the
+// toolpath-like sink has no image at all.
+TEST(DumpSink, ARefusedImageFillWritesNoRecordOfItsImage) {
+  for (int configuration = 0; configuration < 2; configuration++) {
+    Scene s;
+    GIMG_Raster * raster = nullptr;
+    ASSERT_EQ(gimg_raster_create(3, 3, &GIMG_PIXEL_RGBA8, GIMG_RASTER_OWNED, nullptr, 0, &raster), GIMG_OK);
+    GSHSCENE_Image_Params params{};
+    const GSHSCENE_Resource * image = nullptr;
+    ASSERT_EQ(gshscene_store_intern_image(s.store, raster, &params, &image), GSHSCENE_OK);
+    gimg_raster_destroy(raster);
+    s.held.push_back(image);
+    GSHSCENE_Image_Paint ip;
+    gshscene_image_paint_init(&ip);
+    ip.image = image;
+    ip.extend_x = GSHSCENE_IMAGE_EXTEND_REFLECT;
+    const GSHSCENE_Resource * paint = nullptr;
+    ASSERT_EQ(gshscene_store_intern_image_paint(s.store, &ip, &paint), GSHSCENE_OK);
+    s.held.push_back(paint);
+    GSHSCENE_Paint p = solid(0, 0, 0, 1.0);
+    p.kind = GSHSCENE_PAINT_IMAGE;
+    p.resource = paint;
+    GSHSCENE_List * l = s.open();
+    ASSERT_EQ(gshscene_list_fill(l, s.sq(2, 2, 8), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+    SinkRef sink(configuration ? make_toolpath_like(nullptr, nullptr) : make_writer_like(nullptr, nullptr));
+    auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+    ReportRef report;
+    Rendered r = render_job(sink.sink, request_for(l, *stream, report.report));
+    ASSERT_EQ(r.result, GSHSCENE_OK);
+    EXPECT_NE(stream->bytes.find(" X class=1 reason=32"), std::string::npos) << configuration;
+    EXPECT_EQ(stream->bytes.find("\nM "), std::string::npos) << "no image record for a refused fill";
+    EXPECT_EQ(stream->bytes.find("\nJ "), std::string::npos);
+    auto refused = sinkconf::entries(report.report);
+    ASSERT_EQ(refused.size(), 1u);
+    EXPECT_EQ(refused[0].reason, GSHSCENE_REASON_IMAGE);
+    size_t reflect = 1u << GSHSCENE_IMAGE_EXTEND_REFLECT;
+    size_t everything = reflect | (1u << GSHSCENE_IMAGE_EXTEND_PAD) |
+        ((size_t)(GSHSCENE_IMAGE_FORMAT_UNORM8 | GSHSCENE_IMAGE_FORMAT_RGBA) << GSHSCENE_IMAGE_REQUIRED_FORMAT_SHIFT);
+    EXPECT_EQ(refused[0].second, configuration ? everything : reflect) << "the writer lacks only reflection; the pen lacks all";
+  }
 }
 
 int main(int argc, char ** argv) {

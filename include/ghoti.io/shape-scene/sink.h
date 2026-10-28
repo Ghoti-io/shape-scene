@@ -196,7 +196,7 @@
  * (`INTERPOLATION_SPACE`).  A gradient with a palette stop the palette in force
  * lacks is refused (`PALETTE_ENTRY`).  The planning pass writes a `NOTICE`
  * (`MAP_NOT_INVERTIBLE` before `GRADIENT_DEGENERATE`, one entry a fill) for each
- * gradient fill ::gshscene_gradient_notice says draws nothing, and a sink skips
+ * gradient fill ::gshscene_paint_notice says draws nothing, and a sink skips
  * that fill's effect by the same predicate.  A sink converts the stops with
  * `gshscene_gradient_resolve`, against the request's list's foreground and
  * palette and the target's resolved space, **once per gradient per render** (by
@@ -385,7 +385,9 @@ typedef struct GSHSCENE_Target {
 #define GSHSCENE_CAP_STROKE_EXPAND (UINT32_C(1) << 12)
 /** A stroke whose centerline is a glyph run is drawn (S20, SK7); without it the planning pass refuses one, `STROKE_CENTERLINE`. */
 #define GSHSCENE_CAP_STROKE_RUNS (UINT32_C(1) << 13)
-#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 14) - 1) ///< Every flag defined.
+/** Image paints are filtered in their stated filter space (image_paint.h, IP5); without it a stated space is approximated, `IMAGE_FILTER_SPACE` (S21). */
+#define GSHSCENE_CAP_IMAGE_FILTER_SPACES (UINT32_C(1) << 14)
+#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 15) - 1) ///< Every flag defined.
 /** @} */
 
 /** @brief Where a sink checks its cancel token (S7).  The values are pinned. */
@@ -408,6 +410,12 @@ typedef struct GSHSCENE_Sink_Caps {
   uint32_t gradient_kinds;
   /** The `GSHSCENE_STROKE_NATIVE_*` features a sink emits as a stroke (S20, stroke.h SK11); 0, none. */
   uint32_t stroke_native;
+  /** Bit `1 << filter` for each ::GSHSCENE_Image_Filter drawn (S21, IP15); 0, none: a missing one is approximated, `IMAGE_FILTER`. */
+  uint32_t image_filters;
+  /** Bit `1 << extend` for each ::GSHSCENE_Image_Extend drawn; 0, a sink that draws no image paint (refused, `IMAGE`). */
+  uint32_t image_extends;
+  /** The `GSHSCENE_IMAGE_FORMAT_*` sample types, layouts and the alpha-only mark it reads; a missing one is refused, `IMAGE`. */
+  uint32_t image_formats;
   uint8_t _reserved[8];       ///< Zero.
 } GSHSCENE_Sink_Caps;
 
@@ -765,7 +773,7 @@ GSHSCENE_API GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_
  * @return 0 when the fill draws as G6 to G9 say; ::GSHSCENE_REASON_MAP_NOT_INVERTIBLE; or
  *   ::GSHSCENE_REASON_GRADIENT_DEGENERATE.
  */
-GSHSCENE_API GSHSCENE_Reason gshscene_gradient_notice(const GSHSCENE_Item * item, const GSHGEOM_Map * instance_maps,
+GSHSCENE_API GSHSCENE_Reason gshscene_paint_notice(const GSHSCENE_Item * item, const GSHGEOM_Map * instance_maps,
     size_t instance_count, const GSHGEOM_Map * target_map);
 
 /**

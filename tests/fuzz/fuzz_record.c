@@ -1472,7 +1472,7 @@ static void op(S * s, unsigned code) {
           if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
             /* A gradient node's fill (story P2): its paint names the node's gradient, and the notice predicate runs. */
             CHECK(info.node.paint.kind == GSHSCENE_PAINT_GRADIENT && item->paint.resource == info.node.paint.resource);
-            GSHSCENE_Reason why = gshscene_gradient_notice(item, NULL, 0, NULL);
+            GSHSCENE_Reason why = gshscene_paint_notice(item, NULL, 0, NULL);
             CHECK(why == 0 || why == GSHSCENE_REASON_GRADIENT_DEGENERATE || why == GSHSCENE_REASON_MAP_NOT_INVERTIBLE);
             outcomes[OUT_GRADIENT_EMITTED]++;
           }
@@ -1885,7 +1885,7 @@ static void op(S * s, unsigned code) {
       gshgeom_map_identity(2, &item.map);
       item.paint.kind = GSHSCENE_PAINT_GRADIENT;
       item.paint.resource = g;
-      GSHSCENE_Reason why = gshscene_gradient_notice(&item, NULL, 0, NULL);
+      GSHSCENE_Reason why = gshscene_paint_notice(&item, NULL, 0, NULL);
       CHECK(why == 0 || why == GSHSCENE_REASON_GRADIENT_DEGENERATE || why == GSHSCENE_REASON_MAP_NOT_INVERTIBLE);
       outcomes[OUT_GRADIENT_DEGENERATE] += why == GSHSCENE_REASON_GRADIENT_DEGENERATE;
       gshscene_resource_release(s->grads[slot]);

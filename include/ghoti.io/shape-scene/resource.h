@@ -91,6 +91,8 @@
  *   offset, `u64` the dash count, `f64` each dash, `u64` the width profile's
  *   content hash (0 for none).
  * - **plane** (1): nothing after the format and the kind: there is one plane.
+ * - **image paint** (1): `u64` the image's content hash, the window, the map's hash, the extends, the filters, the filter space and
+ *   the tint, as image_paint.h spells it (IP13).
  * - **image** (1): `u32` width, `u32` height, `u8` layout, `u8` sample type, `u8` bits, `u8` alpha form, `u8` alpha-only, the
  *   space (`u8` primaries, `u8` transfer, `f64` gamma), `u32` the tile edge, `u64` the tile count, then `u64` the hash of
  *   each tile in tile order; a tile's hash is of its dimensions and its samples as values (image.h, IM7).
@@ -166,6 +168,7 @@ typedef enum GSHSCENE_Resource_Kind {
   GSHSCENE_RESOURCE_PALETTE = 7,   ///< A table of colors, which a palette paint's entry indexes (paint.h, N14).
   GSHSCENE_RESOURCE_STROKE_STYLE = 8, ///< How a centerline is stroked (stroke.h, SK1 to SK3).
   GSHSCENE_RESOURCE_PLANE = 9,     ///< The plane: what a fill covers where no shape bounds it, every point the clips allow (PL1 to PL10).
+  GSHSCENE_RESOURCE_IMAGE_PAINT = 10, ///< How a fill samples an image: its window, map, edges, filters, space and tint (image_paint.h, IP1).
   GSHSCENE_RESOURCE_KIND_COUNT     ///< Closes the enum.
 } GSHSCENE_Resource_Kind;
 
@@ -174,7 +177,7 @@ typedef enum GSHSCENE_Resource_Kind {
  *
  * @param kind The kind, including a value outside the enum.
  * @return A static string, never NULL: "path", "glyph-run", "picture",
- *   "gradient", "image", "face", "palette", "stroke-style", "plane", or "unknown resource kind".
+ *   "gradient", "image", "face", "palette", "stroke-style", "plane", "image-paint", or "unknown resource kind".
  */
 GSHSCENE_API const char * gshscene_resource_kind_string(GSHSCENE_Resource_Kind kind);
 

@@ -3109,4 +3109,175 @@ TEST_P(SinkConformance, PH5_TheReportCapKeepsTheFirstPlaceholdersAndCountsTheRes
   }
 }
 
+// S21, IP15: an image fill is drawn, approximated or refused as the sink's own caps say, never drawn wrong.  The suite builds
+// fills that need each thing a sink may lack (an edge mode, a sample format, a filter, a filter space) and reads what the
+// caps of this sink say each must come to: a missing edge mode or format refuses, naming what is missing in `second`; a
+// missing filter (the one the map calls for) or a stated filter space the sink does not honor approximates.  Strict fails
+// before drawing exactly where there is a refusal.  A fill whose chain has a singular map is noticed where drawn, and refused
+// where the sink does not draw images.
+TEST_P(SinkConformance, S21_EachImageFillIsDrawnApproximatedOrRefusedAsTheCapsSay) {
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    auto make_image = [&](uint32_t layout, bool floating, bool stencil) {
+      GIMG_Pixel_Format format{};
+      format.channel_model = layout == 1 ? GIMG_CHANNEL_GRAY : layout == 3 ? GIMG_CHANNEL_RGB : GIMG_CHANNEL_RGBA;
+      format.channel_type = floating ? GIMG_CHANNEL_FLOAT : GIMG_CHANNEL_UNORM;
+      format.layout = GIMG_LAYOUT_INTERLEAVED;
+      format.channel_count = (uint8_t)layout;
+      for (uint32_t c = 0; c < layout; c++) {
+        format.bits_per_channel[c] = floating ? 32 : 8;
+      }
+      format.alignment = 1;
+      format.alpha_form = (uint8_t)(layout == 4 ? GIMG_ALPHA_STRAIGHT : GIMG_ALPHA_NONE);
+      GIMG_Raster * raster = nullptr;
+      EXPECT_EQ(gimg_raster_create(7, 7, &format, GIMG_RASTER_OWNED, nullptr, 0, &raster), GIMG_OK);
+      unsigned char * px = (unsigned char *)gimg_raster_pixels(raster);
+      size_t bytes = 7u * 7u * layout * (floating ? 4u : 1u);
+      for (size_t i = 0; i < bytes; i++) {
+        px[i] = floating ? (unsigned char)(i % 4 == 3 ? 0x3E : (i * 31u) & 0xFF) : (unsigned char)((i * 37u) & 0xFF);
+      }
+      if (floating) {
+        float * f32 = (float *)px;
+        for (size_t i = 0; i < bytes / 4; i++) {
+          f32[i] = (float)(i % 5) / 4.0f;
+        }
+      }
+      GSHSCENE_Image_Params params{};
+      params.flags = stencil ? GSHSCENE_IMAGE_ALPHA_ONLY : 0;
+      const GSHSCENE_Resource * image = nullptr;
+      EXPECT_EQ(gshscene_store_intern_image(s.store, raster, &params, &image), GSHSCENE_OK);
+      gimg_raster_destroy(raster);
+      s.held.push_back(image);
+      return image;
+    };
+    const GSHSCENE_Resource * color = make_image(4, false, false);
+    const GSHSCENE_Resource * rgb_float = make_image(3, true, false);
+    const GSHSCENE_Resource * stencil = make_image(1, false, true);
+    GSHSCENE_Color_Space linear{};
+    linear.primaries = GCOL_PRIMARIES_SRGB;
+    linear.transfer = GCOL_TRANSFER_LINEAR;
+    struct Case {
+      const char * name;
+      const GSHSCENE_Resource * image;
+      uint32_t ex, ey, magnify, minify;
+      GSHSCENE_Color_Space space;
+      double scale;
+    };
+    const Case cases[] = {
+        {"pad, linear", color, GSHSCENE_IMAGE_EXTEND_PAD, GSHSCENE_IMAGE_EXTEND_PAD, GSHSCENE_IMAGE_FILTER_LINEAR, GSHSCENE_IMAGE_FILTER_LINEAR, {}, 1.0},
+        {"reflect, nearest", color, GSHSCENE_IMAGE_EXTEND_REFLECT, GSHSCENE_IMAGE_EXTEND_PAD, GSHSCENE_IMAGE_FILTER_NEAREST, GSHSCENE_IMAGE_FILTER_NEAREST, {}, 1.0},
+        {"cubic magnified", color, GSHSCENE_IMAGE_EXTEND_PAD, GSHSCENE_IMAGE_EXTEND_PAD, GSHSCENE_IMAGE_FILTER_CUBIC, GSHSCENE_IMAGE_FILTER_AREA, {}, 3.0},
+        {"area minified", color, GSHSCENE_IMAGE_EXTEND_REPEAT, GSHSCENE_IMAGE_EXTEND_PAD, GSHSCENE_IMAGE_FILTER_CUBIC, GSHSCENE_IMAGE_FILTER_AREA, {}, 1.0},
+        {"a stated filter space", color, GSHSCENE_IMAGE_EXTEND_PAD, GSHSCENE_IMAGE_EXTEND_PAD, GSHSCENE_IMAGE_FILTER_LINEAR, GSHSCENE_IMAGE_FILTER_LINEAR, linear, 1.0},
+        {"float rgb, none", rgb_float, GSHSCENE_IMAGE_EXTEND_NONE, GSHSCENE_IMAGE_EXTEND_NONE, GSHSCENE_IMAGE_FILTER_LINEAR, GSHSCENE_IMAGE_FILTER_LINEAR, {}, 1.0},
+        {"a stencil", stencil, GSHSCENE_IMAGE_EXTEND_REPEAT, GSHSCENE_IMAGE_EXTEND_REFLECT, GSHSCENE_IMAGE_FILTER_NEAREST, GSHSCENE_IMAGE_FILTER_AREA, {}, 1.0},
+    };
+    GSHSCENE_Paint tint = solid(0, 0, 1);
+    GSHSCENE_List * list = s.open();
+    size_t count = 0;
+    for (const Case & c : cases) {
+      GSHSCENE_Image_Paint ip;
+      gshscene_image_paint_init(&ip);
+      ip.image = c.image;
+      ip.extend_x = c.ex;
+      ip.extend_y = c.ey;
+      ip.magnify = c.magnify;
+      ip.minify = c.minify;
+      ip.filter_space = c.space;
+      GSHGEOM_Map map;
+      gshgeom_map_scale(2, c.scale, c.scale, 1.0, &ip.map);
+      (void)map;
+      GSHSCENE_Image_Info info;
+      gshscene_resource_image(c.image, &info);
+      ip.tint = info.alpha_only ? &tint : nullptr;
+      const GSHSCENE_Resource * paint = nullptr;
+      ASSERT_EQ(gshscene_store_intern_image_paint(s.store, &ip, &paint), GSHSCENE_OK) << c.name;
+      s.held.push_back(paint);
+      GSHSCENE_Paint p = solid(0, 0, 0, 1);
+      p.kind = GSHSCENE_PAINT_IMAGE;
+      p.resource = paint;
+      ASSERT_EQ(gshscene_list_fill(list, s.sq(2.0 + 8.0 * (double)count, 4, 6), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0),
+          GSHSCENE_OK) << c.name;
+      count++;
+    }
+    ASSERT_EQ(gshscene_list_close(list), GSHSCENE_OK);
+    ReportRef report;
+    auto surface = make_surface(kind);
+    EXPECT_EQ(run(f(), sink.sink, request_for(list, *surface, report.report)).result, GSHSCENE_OK);
+    size_t refusals = 0;
+    std::vector<GSHSCENE_Report_Entry> seen = entries(report.report);
+    for (size_t i = 0; i < count; i++) {
+      const Case & c = cases[i];
+      const GSHSCENE_Item * item = nullptr;
+      ASSERT_EQ(gshscene_list_item(list, i, &item), GSHSCENE_OK);
+      uint32_t required = gshscene_image_required(item);
+      uint32_t have = (caps.image_extends & 0xFu) | (caps.image_formats << GSHSCENE_IMAGE_REQUIRED_FORMAT_SHIFT);
+      uint32_t missing = required & ~have;
+      uint32_t used = c.scale > 1.0 ? c.magnify : c.minify;
+      bool refused = missing != 0;
+      bool filter_missing = !refused && !(caps.image_filters & (1u << used));
+      bool space_missing = !refused && !filter_missing && c.space.primaries != 0 && !(caps.flags & GSHSCENE_CAP_IMAGE_FILTER_SPACES);
+      std::vector<GSHSCENE_Report_Entry> mine;
+      for (const GSHSCENE_Report_Entry & e : seen) {
+        ASSERT_GE(e.chain_count, 1u);
+        if (e.chain[0] == i) {
+          mine.push_back(e);
+        }
+      }
+      if (refused) {
+        refusals++;
+        ASSERT_EQ(mine.size(), 1u) << c.name;
+        EXPECT_EQ(mine[0].entry_class, GSHSCENE_ENTRY_REFUSED) << c.name;
+        EXPECT_EQ(mine[0].reason, GSHSCENE_REASON_IMAGE) << c.name;
+        EXPECT_EQ(mine[0].second, (size_t)missing) << c.name << ": the missing features are named";
+      } else if (filter_missing || space_missing) {
+        ASSERT_EQ(mine.size(), 1u) << c.name;
+        EXPECT_EQ(mine[0].entry_class, GSHSCENE_ENTRY_APPROXIMATED) << c.name;
+        EXPECT_EQ(mine[0].reason, filter_missing ? GSHSCENE_REASON_IMAGE_FILTER : GSHSCENE_REASON_IMAGE_FILTER_SPACE) << c.name;
+      } else {
+        EXPECT_TRUE(mine.empty()) << c.name << ": drawn as the paint says, with nothing to report";
+      }
+    }
+    // Strict fails before drawing exactly where there is a refusal, and an approximation never fails it.
+    auto strict_surface = make_surface(kind);
+    uint64_t before = strict_surface->snapshot();
+    ReportRef strict;
+    GSHSCENE_Render_Request req = request_for(list, *strict_surface, strict.report);
+    req.flags = GSHSCENE_RENDER_STRICT;
+    EXPECT_EQ(run(f(), sink.sink, req).result, refusals ? GSHSCENE_ERR_REFUSED : GSHSCENE_OK);
+    if (refusals) {
+      EXPECT_EQ(strict_surface->snapshot(), before) << "strict touched the target";
+    }
+    // What draws nothing: a fill whose paint's map is singular is noticed where images are drawn, refused where they are not.
+    GSHSCENE_Image_Paint flat;
+    gshscene_image_paint_init(&flat);
+    flat.image = color;
+    const double zero[4] = {1, 0, 0, 0};
+    const double t0[2] = {0, 0};
+    ASSERT_EQ(gshgeom_map_from_matrix(2, zero, t0, &flat.map), GSHGEOM_OK);
+    const GSHSCENE_Resource * flat_paint = nullptr;
+    ASSERT_EQ(gshscene_store_intern_image_paint(s.store, &flat, &flat_paint), GSHSCENE_OK);
+    s.held.push_back(flat_paint);
+    GSHSCENE_Paint fp = solid(0, 0, 0, 1);
+    fp.kind = GSHSCENE_PAINT_IMAGE;
+    fp.resource = flat_paint;
+    GSHSCENE_List * l = s.open();
+    ASSERT_EQ(gshscene_list_fill(l, s.sq(2, 2, 10), nullptr, GSHGEOM_FILL_NONZERO, &fp, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+    bool draws_images = (caps.image_extends & (1u << GSHSCENE_IMAGE_EXTEND_PAD)) &&
+        (caps.image_formats & GSHSCENE_IMAGE_FORMAT_UNORM8) && (caps.image_formats & GSHSCENE_IMAGE_FORMAT_RGBA);
+    auto out = make_surface(kind);
+    ReportRef r;
+    GSHSCENE_Render_Request rq = request_for(l, *out, r.report);
+    rq.flags = draws_images ? GSHSCENE_RENDER_STRICT : 0;
+    EXPECT_EQ(run(f(), sink.sink, rq).result, GSHSCENE_OK) << "a notice never fails strict";
+    auto said = of_class(r.report, draws_images ? GSHSCENE_ENTRY_NOTICE : GSHSCENE_ENTRY_REFUSED);
+    ASSERT_EQ(said.size(), 1u);
+    EXPECT_EQ(said[0].reason, draws_images ? GSHSCENE_REASON_MAP_NOT_INVERTIBLE : GSHSCENE_REASON_IMAGE);
+  }
+}
+
 #endif /* GHOTI_IO_GSHSCENE_TEST_SINK_CONFORMANCE_H */

@@ -115,7 +115,7 @@ std::string line_with(const std::string & text, const std::string & prefix) {
 
 TEST(Plane, IsOneResourceWithTheFormatAndKindForItsHash) {
   EXPECT_EQ((int)GSHSCENE_RESOURCE_PLANE, 9);
-  EXPECT_EQ((int)GSHSCENE_RESOURCE_KIND_COUNT, 10);
+  EXPECT_EQ((int)GSHSCENE_RESOURCE_KIND_COUNT, 11);
   EXPECT_STREQ(gshscene_resource_kind_string(GSHSCENE_RESOURCE_PLANE), "plane");
   StoreHolder a;
   StoreHolder b;

@@ -181,6 +181,11 @@ static void caps_full(GSHSCENE_Sink_Caps * caps, int readback) {
   for (uint32_t k = GSHSCENE_GRADIENT_LINEAR; k < GSHSCENE_GRADIENT_KIND_COUNT; k++) {
     caps->gradient_kinds |= UINT32_C(1) << k;
   }
+  /* Every image paint: it records each, by handle (S21). */
+  caps->image_filters = (UINT32_C(1) << GSHSCENE_IMAGE_FILTER_COUNT) - 1u;
+  caps->image_extends = (UINT32_C(1) << GSHSCENE_IMAGE_EXTEND_COUNT) - 1u;
+  caps->image_formats = GSHSCENE_IMAGE_FORMAT_ALL;
+  caps->flags |= GSHSCENE_CAP_IMAGE_FILTER_SPACES;
   caps->cancel_unit = GSHSCENE_CANCEL_BETWEEN_UNITS;
   caps->cancel_work_bound = 1;
   caps->work_measure = "units";
@@ -205,6 +210,9 @@ static int caps_valid(const GSHSCENE_Sink_Caps * caps) {
   }
   const uint32_t kinds = ((UINT32_C(1) << GSHSCENE_GRADIENT_KIND_COUNT) - 1u) & ~UINT32_C(1);
   return !(caps->flags & ~GSHSCENE_CAP_FLAGS_ALL) && !(caps->gradient_kinds & ~kinds) &&
+      !(caps->image_filters & ~((UINT32_C(1) << GSHSCENE_IMAGE_FILTER_COUNT) - 1u)) &&
+      !(caps->image_extends & ~((UINT32_C(1) << GSHSCENE_IMAGE_EXTEND_COUNT) - 1u)) &&
+      !(caps->image_formats & ~GSHSCENE_IMAGE_FORMAT_ALL) &&
       !(caps->stroke_native & ~GSHSCENE_STROKE_NATIVE_ALL) &&
       caps->cancel_unit >= GSHSCENE_CANCEL_BETWEEN_UNITS &&
       caps->cancel_unit < GSHSCENE_CANCEL_UNIT_COUNT && caps->work_measure != NULL;
@@ -278,6 +286,9 @@ static void gradient_need(const GSHSCENE_List * list, size_t * fills, size_t * s
       *fills = gshscene_sat_add(*fills, 1);
       size_t n = item->paint.resource->u.gradient.g.stop_count;
       *stops = n > *stops ? n : *stops;
+    } else if ((item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE) &&
+               item->paint.kind == GSHSCENE_PAINT_IMAGE) {
+      *fills = gshscene_sat_add(*fills, 2); /* its image paint and its image: each recorded once per render, by id */
     } else if (item->kind == GSHSCENE_ITEM_INSTANCE) {
       gradient_need(gshscene_resource_picture(item->resource), fills, stops, strokes);
     }
@@ -813,6 +824,62 @@ static GSHSCENE_Result gradient_record(Run * run, const GSHSCENE_Resource * grad
 }
 
 /**
+ * An image paint's records (dump_sink.h, S21), the first time a render meets each id: the image,
+ * `M <id> <hash> w=N h=N layout=L type=T bits=B alpha=A alphaonly=N space=<space>`, then the paint,
+ * `J <id> <hash> image=<id> window=x0 y0 x1 y1 map=<hash> extend=X,Y filter=MAG,MIN space=<space> tint=<-|kind r g b a space entry>`,
+ * as a writer emits an image once and names it by handle.  They share the table of ids with the gradients (an id is never
+ * issued twice by a store, whatever the kind).
+ */
+static GSHSCENE_Result image_paint_record(Run * run, const GSHSCENE_Resource * paint, GSHSCENE_Result * failed) {
+  GSHSCENE_Image_Paint p;
+  if (gshscene_resource_image_paint(paint, &p) != GSHSCENE_OK) {
+    return GSHSCENE_ERR_INTERNAL;
+  }
+  uint64_t paint_id = gshscene_resource_id(paint);
+  for (size_t i = 0; i < run->gradient_count; i++) {
+    if (run->gradients[i] == paint_id) {
+      return GSHSCENE_OK;
+    }
+  }
+  uint64_t image_id = gshscene_resource_id(p.image);
+  int image_known = 0;
+  for (size_t i = 0; i < run->gradient_count; i++) {
+    image_known = image_known || run->gradients[i] == image_id;
+  }
+  if (!image_known) {
+    GSHSCENE_Image_Info info;
+    if (gshscene_resource_image(p.image, &info) != GSHSCENE_OK) {
+      return GSHSCENE_ERR_INTERNAL;
+    }
+    run->gradients[run->gradient_count++] = image_id;
+    snprintf(run->line, LINE_BYTES,
+        "M %" PRIu64 " %016" PRIx64 " w=%u h=%u layout=%u type=%u bits=%u alpha=%u alphaonly=%u space=%u:%u:%016" PRIx64 "\n",
+        image_id, gshscene_resource_hash(p.image), info.width, info.height, info.layout, info.sample_type, info.bits,
+        info.alpha_form, info.alpha_only, (unsigned)info.space.primaries, (unsigned)info.space.transfer,
+        gshgeom_f64_bits(info.space.gamma));
+    emit_text(run, run->line, failed);
+  }
+  run->gradients[run->gradient_count++] = paint_id;
+  snprintf(run->line, LINE_BYTES,
+      "J %" PRIu64 " %016" PRIx64 " image=%" PRIu64 " window=%u %u %u %u map=%016" PRIx64
+      " extend=%u,%u filter=%u,%u space=%u:%u:%016" PRIx64 " tint=",
+      paint_id, gshscene_resource_hash(paint), image_id, p.window[0], p.window[1], p.window[2], p.window[3],
+      gshgeom_map_hash(&p.map), p.extend_x, p.extend_y, p.magnify, p.minify, (unsigned)p.filter_space.primaries,
+      (unsigned)p.filter_space.transfer, gshgeom_f64_bits(p.filter_space.gamma));
+  emit_text(run, run->line, failed);
+  if (!p.tint) {
+    emit_text(run, "-\n", failed);
+  } else {
+    snprintf(run->line, LINE_BYTES, "%u %016" PRIx64 " %016" PRIx64 " %016" PRIx64 " %016" PRIx64 " %u:%u:%016" PRIx64 " %u\n",
+        (unsigned)p.tint->kind, gshgeom_f64_bits(p.tint->rgba[0]), gshgeom_f64_bits(p.tint->rgba[1]),
+        gshgeom_f64_bits(p.tint->rgba[2]), gshgeom_f64_bits(p.tint->rgba[3]), (unsigned)p.tint->space.primaries,
+        (unsigned)p.tint->space.transfer, gshgeom_f64_bits(p.tint->space.gamma), p.tint->entry);
+    emit_text(run, run->line, failed);
+  }
+  return GSHSCENE_OK;
+}
+
+/**
  * The style's record (dump_sink.h), the first time a render meets its id (S20): `Q <id> <hash>` and its fields as
  * the style's dump spells them, then a `d` line per dash, as a writer emits a style once.
  */
@@ -1022,6 +1089,9 @@ static GSHSCENE_Result stroke_unit(Run * run, const GSHSCENE_Item * item, const 
   if (item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
     snprintf(run->line, LINE_BYTES, " grad=%" PRIu64, gshscene_resource_id(item->paint.resource));
     emit_text(run, run->line, &failed);
+  } else if (item->paint.kind == GSHSCENE_PAINT_IMAGE) {
+    snprintf(run->line, LINE_BYTES, " img=%" PRIu64, gshscene_resource_id(item->paint.resource));
+    emit_text(run, run->line, &failed);
   }
   if (b.empty) {
     snprintf(run->line, LINE_BYTES, " box=- expand=%u outline=%s\n", (unsigned)expand, outline_text);
@@ -1035,6 +1105,8 @@ static GSHSCENE_Result stroke_unit(Run * run, const GSHSCENE_Item * item, const 
   GSHSCENE_Result r = style_record(run, item->style, &failed);
   if (r == GSHSCENE_OK && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
     r = gradient_record(run, item->paint.resource, &failed);
+  } else if (r == GSHSCENE_OK && item->paint.kind == GSHSCENE_PAINT_IMAGE) {
+    r = image_paint_record(run, item->paint.resource, &failed);
   }
   if (r != GSHSCENE_OK) {
     return r;
@@ -1123,7 +1195,7 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
       Box box;
       int mapped = !unit_map(run, item, count, &map);
       /* S17: a gradient fill that draws nothing (the plan wrote its notice) is gone through and not drawn. */
-      GSHSCENE_Reason notice = gshscene_gradient_notice(item, run->maps, count - 1, &run->job->target.map);
+      GSHSCENE_Reason notice = gshscene_paint_notice(item, run->maps, count - 1, &run->job->target.map);
       if (notice) {
         snprintf(run->line, LINE_BYTES, " X class=%d reason=%d\n", (int)GSHSCENE_ENTRY_NOTICE, (int)notice);
         emit_text(run, run->line, &failed);
@@ -1176,6 +1248,9 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
       if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
         snprintf(run->line, LINE_BYTES, " grad=%" PRIu64, gshscene_resource_id(item->paint.resource));
         emit_text(run, run->line, &failed);
+      } else if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_IMAGE) {
+        snprintf(run->line, LINE_BYTES, " img=%" PRIu64, gshscene_resource_id(item->paint.resource));
+        emit_text(run, run->line, &failed);
       }
       emit_text(run, " box=", &failed);
       if (plane) {
@@ -1189,6 +1264,11 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
       }
       if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
         GSHSCENE_Result r = gradient_record(run, item->paint.resource, &failed);
+        if (r != GSHSCENE_OK) {
+          return r;
+        }
+      } else if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_IMAGE) {
+        GSHSCENE_Result r = image_paint_record(run, item->paint.resource, &failed);
         if (r != GSHSCENE_OK) {
           return r;
         }

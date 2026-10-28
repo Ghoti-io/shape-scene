@@ -73,6 +73,12 @@
  * random samples (a 16-bit sample whose two bytes differ, floats exact over 64) and padded strides, interned by copy,
  * found again by a take of an equal raster, and told apart from a raster one sample away: each image's hash, accounted
  * bytes and first and last tile hashes, and the store's counters.
+  * Since masks-images-patterns story I2 an image-paint section folds, into a hash and count of their own
+ * (`shape-scene.image-paint-hash` and `shape-scene.image-paint-count`), the decode of texels of every format (the divisions
+ * and the saturation of a float: every target must round alike), image paints of random windows, maps, edges, filters, filter
+ * spaces and tints, interned twice, lists of fills and strokes with them under random maps, and what each says: the notice
+ * under random instance and target maps, the features it requires, the filter its composed map calls for, whether it is a
+ * drawn image, its disposition under three sets of capabilities, and the test sink's render of the lists.
   * It is built by `make check-corpus-hash` on the host and by
  * suite/tools/xarch/shape.sh and suite/tools/xwin/shape.sh for the others.
  *
@@ -113,6 +119,8 @@ static GSHGEOM_Hash placeholder_total; /* the placeholder section: its own hash,
 static unsigned long placeholder_count;
 static GSHGEOM_Hash image_total; /* masks-images-patterns story I1: its own hash, so the four above are unchanged */
 static unsigned long image_count;
+static GSHGEOM_Hash image_paint_total; /* masks-images-patterns story I2: its own hash, so the five above are unchanged */
+static unsigned long image_paint_count;
 static GSHGEOM_Hash * acc = &total; /* where feed folds */
 static unsigned long * acc_count = &count;
 
@@ -1098,7 +1106,7 @@ static void gradient_section(void) {
     instances[0] = random_map();
     instances[1] = random_map();
     GSHGEOM_Map target = random_map();
-    feed((uint64_t)gshscene_gradient_notice(&item, instances, 2, &target));
+    feed((uint64_t)gshscene_paint_notice(&item, instances, 2, &target));
     double flat[4] = {0.0, 0.0, 0.0, 0.0}; /* rank one: its second column zero */
     flat[0] = entry();
     flat[2] = entry();
@@ -1106,7 +1114,7 @@ static void gradient_section(void) {
     if (gshgeom_map_from_matrix(2, flat, t0, &item.map) != GSHGEOM_OK) {
       fail("flat map");
     }
-    feed((uint64_t)gshscene_gradient_notice(&item, instances, 2, &target));
+    feed((uint64_t)gshscene_paint_notice(&item, instances, 2, &target));
   }
   /* The float-free constructor on a run of a 2048-unit face at a size that is not a power of two. */
   const GSHSCENE_Resource * face = test_face(store, 0, 0);
@@ -1974,6 +1982,223 @@ static void image_section(void) {
   gshscene_store_destroy(store);
 }
 
+/* --- image paints (masks-images-patterns story I2) ---------------------------------------------------------------- */
+
+#define IP_IMAGES 6
+#define IP_PAINTS 30
+
+/** One image of the probe: @p model 0 gray, 1 RGB, 2 RGBA; @p type 0 8 bits, 1 12, 2 16, 3 float; @p stencil an alpha-only gray. */
+static const GSHSCENE_Resource * probe_image(GSHSCENE_Store * store, unsigned model, unsigned type, uint32_t w, uint32_t h,
+    unsigned premultiplied, int stencil) {
+  unsigned layout = model == 0 ? 1u : model == 1 ? 3u : 4u;
+  unsigned bits = type == 0 ? 8u : type == 1 ? 12u : type == 2 ? 16u : 32u;
+  GIMG_Pixel_Format format;
+  memset(&format, 0, sizeof format);
+  format.channel_model = model == 0 ? GIMG_CHANNEL_GRAY : model == 1 ? GIMG_CHANNEL_RGB : GIMG_CHANNEL_RGBA;
+  format.channel_type = type == 3 ? GIMG_CHANNEL_FLOAT : GIMG_CHANNEL_UNORM;
+  format.layout = GIMG_LAYOUT_INTERLEAVED;
+  format.channel_count = (uint8_t)layout;
+  for (unsigned c = 0; c < layout; c++) {
+    format.bits_per_channel[c] = (uint8_t)bits;
+  }
+  format.alignment = 1;
+  format.alpha_form = (uint8_t)(model == 2 ? (premultiplied ? GIMG_ALPHA_PREMULTIPLIED : GIMG_ALPHA_STRAIGHT) : GIMG_ALPHA_NONE);
+  GIMG_Raster * raster = NULL;
+  if (gimg_raster_create(w, h, &format, GIMG_RASTER_OWNED, NULL, 0, &raster) != GIMG_OK) {
+    fail("image paint raster");
+  }
+  image_fill((unsigned char *)gimg_raster_pixels(raster), gimg_raster_stride_bytes(raster), w, h, layout, type == 3 ? 1u : 0u, bits);
+  GSHSCENE_Image_Params params;
+  memset(&params, 0, sizeof params);
+  params.flags = stencil ? GSHSCENE_IMAGE_ALPHA_ONLY : 0u;
+  const GSHSCENE_Resource * image = NULL;
+  check(gshscene_store_intern_image(store, raster, &params, &image), "image paint image");
+  gimg_raster_destroy(raster);
+  return image;
+}
+
+static void image_paint_section(void) {
+  acc = &image_paint_total;
+  acc_count = &image_paint_count;
+  gshgeom_hash_init(&image_paint_total);
+  GSHSCENE_Store * store = NULL;
+  check(gshscene_store_create(NULL, NULL, &store), "image paint store");
+  const GSHSCENE_Resource * images[IP_IMAGES];
+  uint32_t widths[IP_IMAGES] = {9, 12, 8, 6, 7, 5};
+  uint32_t heights[IP_IMAGES] = {7, 10, 8, 5, 7, 4};
+  images[0] = probe_image(store, 0, 0, widths[0], heights[0], 0, 1);
+  images[1] = probe_image(store, 1, 0, widths[1], heights[1], 0, 0);
+  images[2] = probe_image(store, 2, 0, widths[2], heights[2], 0, 0);
+  images[3] = probe_image(store, 2, 2, widths[3], heights[3], 1, 0);
+  images[4] = probe_image(store, 0, 1, widths[4], heights[4], 0, 0);
+  images[5] = probe_image(store, 1, 3, widths[5], heights[5], 0, 0);
+  /* IP4: the texels, decoded: the divisions by 255, 4095 and 65535 and a float's saturation. */
+  for (unsigned i = 0; i < IP_IMAGES; i++) {
+    for (unsigned t = 0; t < 6; t++) {
+      uint32_t x = between(0, widths[i] - 1);
+      uint32_t y = between(0, heights[i] - 1);
+      double v[4];
+      check(gshscene_image_decode(images[i], x, y, v), "decode");
+      for (int k = 0; k < 4; k++) {
+        feed(gshgeom_f64_bits(v[k]));
+      }
+    }
+  }
+  const GSHSCENE_Resource * paints[IP_PAINTS];
+  for (unsigned i = 0; i < IP_PAINTS; i++) {
+    unsigned pick = between(0, IP_IMAGES - 1);
+    GSHSCENE_Image_Info info;
+    check(gshscene_resource_image(images[pick], &info), "image info");
+    GSHSCENE_Image_Paint p;
+    gshscene_image_paint_init(&p);
+    p.image = images[pick];
+    if (between(0, 1)) {
+      p.window[0] = between(0, info.width - 1);
+      p.window[1] = between(0, info.height - 1);
+      p.window[2] = p.window[0] + 1u + between(0, info.width - p.window[0] - 1);
+      p.window[3] = p.window[1] + 1u + between(0, info.height - p.window[1] - 1);
+    }
+    p.map = random_map();
+    p.extend_x = between(0, 3);
+    p.extend_y = between(0, 3);
+    p.magnify = between(0, 3);
+    p.minify = between(0, 3);
+    p.filter_space = random_space();
+    GSHSCENE_Paint tint;
+    memset(&tint, 0, sizeof tint);
+    if (info.alpha_only) {
+      unsigned kind = between(0, 2);
+      tint = random_paint();
+      if (kind == 1) {
+        tint.kind = GSHSCENE_PAINT_FOREGROUND;
+        tint.rgba[0] = tint.rgba[1] = tint.rgba[2] = 0.0;
+        memset(&tint.space, 0, sizeof tint.space);
+      } else if (kind == 2) {
+        tint.kind = GSHSCENE_PAINT_PALETTE;
+        tint.rgba[0] = tint.rgba[1] = tint.rgba[2] = 0.0;
+        memset(&tint.space, 0, sizeof tint.space);
+        tint.entry = between(0, 3);
+      }
+      p.tint = &tint;
+    }
+    GSHSCENE_Result r = gshscene_store_intern_image_paint(store, &p, &paints[i]);
+    check(r, "intern image paint");
+    feed(gshscene_resource_hash(paints[i]));
+    const GSHSCENE_Resource * again = NULL;
+    check(gshscene_store_intern_image_paint(store, &p, &again), "intern image paint again");
+    if (again != paints[i]) {
+      fail("an image paint interned twice is two handles");
+    }
+    gshscene_resource_release(again);
+  }
+  /* Fills and strokes with them, under random item maps; a few are the drawn image of their paint. */
+  GSHGEOM_Path * square = NULL;
+  if (gshgeom_path_create(NULL, NULL, 2, &square) != GSHGEOM_OK) {
+    fail("path");
+  }
+  gshgeom_path_move_to(square, (GSHGEOM_Point){0, 0, 0});
+  gshgeom_path_line_to(square, (GSHGEOM_Point){8, 0, 0});
+  gshgeom_path_line_to(square, (GSHGEOM_Point){8, 8, 0});
+  gshgeom_path_line_to(square, (GSHGEOM_Point){0, 8, 0});
+  gshgeom_path_close(square);
+  const GSHSCENE_Resource * path = NULL;
+  check(gshscene_store_intern_path(store, square, &path), "square");
+  gshgeom_path_destroy(square);
+  GSHSCENE_Stroke_Style style;
+  gshscene_stroke_style_init(&style);
+  const GSHSCENE_Resource * style_resource = NULL;
+  check(gshscene_store_intern_stroke_style(store, &style, &style_resource), "style");
+  const GSHSCENE_Resource * rects[IP_PAINTS];
+  for (unsigned i = 0; i < IP_PAINTS; i++) {
+    check(gshscene_image_paint_rect_path(store, paints[i], &rects[i]), "rect path");
+  }
+  GSHSCENE_List * list = NULL;
+  check(gshscene_list_create(NULL, NULL, store, &list), "image paint list");
+  enum { UNITS = 40 };
+  for (unsigned i = 0; i < UNITS; i++) {
+    unsigned pick = between(0, IP_PAINTS - 1);
+    GSHGEOM_Map map = random_map();
+    int use_map = (next() & 3) != 0;
+    GSHSCENE_Paint paint;
+    memset(&paint, 0, sizeof paint);
+    paint.kind = GSHSCENE_PAINT_IMAGE;
+    paint.resource = paints[pick];
+    paint.rgba[3] = (double)between(0, 4) / 4.0;
+    int drawn = i % 5 == 0;
+    unsigned stroke = i % 7 == 3;
+    if (stroke) {
+      check(gshscene_list_stroke(list, path, style_resource, use_map ? &map : NULL, &paint, 0, 0.0), "image stroke");
+    } else {
+      check(gshscene_list_fill(list, drawn ? rects[pick] : path, use_map ? &map : NULL, GSHGEOM_FILL_NONZERO, &paint, 0, 0.0),
+          "image fill");
+    }
+  }
+  check(gshscene_list_close(list), "image paint list close");
+  feed(gshscene_list_hash(list));
+  GSHSCENE_Dump_Sink_Config config;
+  gshscene_dump_sink_config_default(&config);
+  GSHSCENE_Sink_Caps caps_full = config.raster_caps;
+  GSHSCENE_Sink_Caps caps_writer = caps_full;
+  caps_writer.image_filters = (1u << GSHSCENE_IMAGE_FILTER_NEAREST) | (1u << GSHSCENE_IMAGE_FILTER_LINEAR);
+  caps_writer.image_extends = (1u << GSHSCENE_IMAGE_EXTEND_PAD) | (1u << GSHSCENE_IMAGE_EXTEND_REPEAT) | (1u << GSHSCENE_IMAGE_EXTEND_NONE);
+  caps_writer.flags &= ~GSHSCENE_CAP_IMAGE_FILTER_SPACES;
+  GSHSCENE_Sink_Caps caps_none = caps_full;
+  caps_none.image_filters = caps_none.image_extends = caps_none.image_formats = 0;
+  caps_none.flags &= ~GSHSCENE_CAP_IMAGE_FILTER_SPACES;
+  const GSHSCENE_Sink_Caps * variants[3] = {&caps_full, &caps_writer, &caps_none};
+  for (size_t i = 0; i < gshscene_list_count(list); i++) {
+    const GSHSCENE_Item * item = NULL;
+    check(gshscene_list_item(list, i, &item), "image paint item");
+    GSHGEOM_Map instances[2];
+    instances[0] = random_map();
+    instances[1] = random_map();
+    GSHGEOM_Map target = random_map();
+    size_t count = between(0, 2);
+    feed((uint64_t)gshscene_paint_notice(item, instances, count, &target));
+    feed((uint64_t)gshscene_stroke_notice(item, instances, count, &target));
+    feed((uint64_t)gshscene_image_required(item));
+    uint32_t filter = 99;
+    GSHSCENE_Result fr = gshscene_image_filter_of(item, instances, count, &target, &filter);
+    feed((uint64_t)fr);
+    feed((uint64_t)filter);
+    double quad[8];
+    int is_draw = gshscene_image_fill_is_draw(item, quad);
+    feed((uint64_t)is_draw);
+    if (is_draw) {
+      for (int k = 0; k < 8; k++) {
+        feed(gshgeom_f64_bits(quad[k]));
+      }
+    }
+    for (int v = 0; v < 3; v++) {
+      GSHSCENE_Color_Space target_space;
+      memset(&target_space, 0, sizeof target_space);
+      GSHSCENE_Disposition d = gshscene_caps_disposition(variants[v], item, instances, count, &target, &target_space, NULL);
+      feed((uint64_t)d.entry_class);
+      feed((uint64_t)d.reason);
+      feed(d.detail);
+    }
+  }
+  feed_render(list);
+  gshscene_list_destroy(list);
+  for (unsigned i = 0; i < IP_PAINTS; i++) {
+    gshscene_resource_release(rects[i]);
+    gshscene_resource_release(paints[i]);
+  }
+  gshscene_resource_release(style_resource);
+  gshscene_resource_release(path);
+  for (unsigned i = 0; i < IP_IMAGES; i++) {
+    gshscene_resource_release(images[i]);
+  }
+  GSHSCENE_Store_Stats stats;
+  check(gshscene_store_stats(store, &stats), "image paint stats");
+  feed(stats.created);
+  feed(stats.hits);
+  if (stats.live != 0 || stats.bytes != 0) {
+    fail("an image paint resource is still live after every handle was released");
+  }
+  gshscene_store_destroy(store);
+}
+
 static void placeholder_section(void) {
   acc = &placeholder_total;
   acc_count = &placeholder_count;
@@ -2375,5 +2600,8 @@ int main(void) {
   image_section();
   printf("shape-scene.image-hash %016" PRIx64 "\n", gshgeom_hash_value(&image_total));
   printf("shape-scene.image-count %lu\n", image_count);
+  image_paint_section();
+  printf("shape-scene.image-paint-hash %016" PRIx64 "\n", gshgeom_hash_value(&image_paint_total));
+  printf("shape-scene.image-paint-count %lu\n", image_paint_count);
   return 0;
 }

@@ -1010,6 +1010,55 @@ IMAGE_CASES = [
 ]
 
 
+# --- image paints (image_paint.h, IP1 and IP13; masks-images-patterns story I2) ----------------------------------------
+KIND_IMAGE_PAINT = 10
+PAINT_IMAGE = 4
+EXT_PAD, EXT_REPEAT, EXT_REFLECT, EXT_NONE = 0, 1, 2, 3
+F_NEAREST, F_LINEAR, F_CUBIC, F_AREA = 0, 1, 2, 3
+
+
+def image_hash_of(name):
+    return [c for c in IMAGE_CASES if c["name"] == name][0]["hash"]
+
+
+def image_paint(image, window, mhash, ex, ey, mag, mn, fspace=TARGET, tint=None):
+    """A tint is (paint kind, rgba, space, entry).  The window is explicit (the store keeps the whole image spelled out)."""
+    out = u32(1) + u32(KIND_IMAGE_PAINT) + u64(image) + b"".join(u32(v) for v in window) + u64(mhash)
+    out += u8(ex) + u8(ey) + u8(mag) + u8(mn) + space_bytes(fspace)
+    if tint is None:
+        out += u8(0)
+        tint_text = "-"
+    else:
+        kind, rgba, space, entry = tint
+        out += u8(1) + u8(kind) + b"".join(f64(v) for v in rgba) + space_bytes(space) + u32(entry)
+        tint_text = "%d %s %s" % (kind, " ".join("%016x" % bits(v) for v in rgba), space_text(space)) + " %d" % entry
+    digest = fnv(out)
+    dump = "gshscene.resource 1 kind=image-paint hash=%016x\nimagepaint image=%016x window=%d %d %d %d map=%016x extend=%d,%d filter=%d,%d space=%s tint=%s\n" % (
+        digest, image, window[0], window[1], window[2], window[3], mhash, ex, ey, mag, mn, space_text(fspace), tint_text)
+    return dict(hash=digest, dump=dump)
+
+
+IMAGE_PAINTS = [
+    image_paint(image_hash_of("rgba8-straight-65x129"), (0, 0, 65, 129), IDENTITY, EXT_PAD, EXT_PAD, F_LINEAR, F_LINEAR),
+    image_paint(image_hash_of("gray8-alpha-only-65x65"), (1, 2, 40, 50), TRANSLATE, EXT_REPEAT, EXT_REFLECT, F_NEAREST, F_AREA,
+                tint=(PAINT_SOLID, (0.25, 0.5, 0.75, 1.0), SRGB_SRGB, 0)),
+    image_paint(image_hash_of("rgb12-70x66"), (4, 4, 66, 60), DESIGN, EXT_NONE, EXT_REFLECT, F_CUBIC, F_AREA, fspace=SRGB_LINEAR),
+    image_paint(image_hash_of("gray8-alpha-only-65x65"), (0, 0, 65, 65), IDENTITY, EXT_PAD, EXT_PAD, F_LINEAR, F_NEAREST,
+                tint=(PAINT_FOREGROUND, (0.0, 0.0, 0.0, 0.5), TARGET, 0)),
+    image_paint(image_hash_of("gray8-alpha-only-65x65"), (0, 0, 65, 65), IDENTITY, EXT_PAD, EXT_PAD, F_LINEAR, F_NEAREST,
+                tint=(PAINT_PALETTE, (0.0, 0.0, 0.0, 1.0), TARGET, 2)),
+    image_paint(image_hash_of("rgbaf32-premultiplied-2x66"), (0, 0, 2, 66), TRANSLATE, EXT_REFLECT, EXT_REPEAT, F_AREA, F_CUBIC,
+                fspace=P3_GAMMA),
+]
+IMAGE_PAINT_LIST_ITEMS = [
+    fill(KIND_PATH, SQ_RES, IDENTITY, 0, (0.0, 0.0, 0.0, 1.0), paint=PAINT_IMAGE, grad=IMAGE_PAINTS[0]["hash"]),
+    fill(KIND_PATH, P2_RES, TRANSLATE, 1, (0.0, 0.0, 0.0, 0.5), paint=PAINT_IMAGE, grad=IMAGE_PAINTS[1]["hash"], layer=2),
+    fill(KIND_PATH, SQ_RES, DESIGN, 0, (0.0, 0.0, 0.0, 0.25), paint=PAINT_IMAGE, grad=IMAGE_PAINTS[2]["hash"]),
+    fill(KIND_PATH, SQ_RES, IDENTITY, 0, (0.0, 0.0, 0.0, 0.0), paint=PAINT_IMAGE, grad=IMAGE_PAINTS[0]["hash"], depth=1.0),
+]
+IMAGE_PAINT_LIST_HASH = list_hash(IMAGE_PAINT_LIST_ITEMS)
+
+
 def cxx_string(name, text):
     return 'static const char * const %s =\nR"DUMP(%s)DUMP";\n' % (name, text)
 
@@ -1086,6 +1135,11 @@ def render():
             c["name"], c["w"], c["h"], c["layout"], c["kind"], c["bits"], c["alpha"], c["alphaonly"], c["space"][0],
             c["space"][1], c["space"][2], c["hash"], c["tx"], c["ty"], i, i))
     o.append("};\n")
+    o.append("static const std::uint64_t kImagePaintHashes[] = {%s};\n" % ", ".join("UINT64_C(0x%016x)" % p["hash"] for p in IMAGE_PAINTS))
+    o.append("static const std::uint64_t kImagePaintListHash = UINT64_C(0x%016x);\n\n" % IMAGE_PAINT_LIST_HASH)
+    for i, ip in enumerate(IMAGE_PAINTS):
+        o.append(cxx_string("kImagePaintDump%d" % i, ip["dump"]))
+    o.append(cxx_string("kImagePaintListDump", list_dump(IMAGE_PAINT_LIST_ITEMS)))
     o.append("\n}  // namespace known\n\n#endif\n")
     return "".join(o)
 

@@ -58,6 +58,8 @@ const char * gshscene_resource_kind_string(GSHSCENE_Resource_Kind kind) {
       return "stroke-style";
     case GSHSCENE_RESOURCE_PLANE:
       return "plane";
+    case GSHSCENE_RESOURCE_IMAGE_PAINT:
+      return "image-paint";
     case GSHSCENE_RESOURCE_KIND_COUNT:
       break;
   }
@@ -275,6 +277,8 @@ int gshscene_resource_matches(const GSHSCENE_Resource * resource, const GSHSCENE
       return gshscene_stroke_matches(resource, probe->source);
     case GSHSCENE_RESOURCE_IMAGE:
       return gshscene_image_matches(resource, probe->source);
+    case GSHSCENE_RESOURCE_IMAGE_PAINT:
+      return gshscene_image_paint_matches(resource, probe->source);
     case GSHSCENE_RESOURCE_PLANE:
       return 1; /* no content: any plane of the store is this one */
     default:
@@ -318,6 +322,9 @@ void gshscene_resource_free_content(GSHSCENE_Resource * resource) {
       break;
     case GSHSCENE_RESOURCE_IMAGE:
       gshscene_image_free(resource);
+      break;
+    case GSHSCENE_RESOURCE_IMAGE_PAINT:
+      gshscene_image_paint_free(resource);
       break;
     default:
       break;
@@ -895,6 +902,11 @@ GSHSCENE_Result gshscene_resource_dump(const GSHSCENE_Resource * resource, FILE 
       break;
     case GSHSCENE_RESOURCE_IMAGE:
       if (gshscene_image_dump(resource, out) < 0) {
+        return GSHSCENE_ERR_IO;
+      }
+      break;
+    case GSHSCENE_RESOURCE_IMAGE_PAINT:
+      if (gshscene_image_paint_dump(resource, out) < 0) {
         return GSHSCENE_ERR_IO;
       }
       break;

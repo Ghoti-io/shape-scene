@@ -1011,7 +1011,7 @@ TEST(GradientNotice, EachDegenerateCaseAndEachSingularMapIsNamed) {
                     const GSHGEOM_Map * target = nullptr) {
     Ref g(intern_g(s.store, d));
     GSHSCENE_Item item = fill_item(g.get(), item_map);
-    return gshscene_gradient_notice(&item, instances.empty() ? nullptr : instances.data(), instances.size(), target);
+    return gshscene_paint_notice(&item, instances.empty() ? nullptr : instances.data(), instances.size(), target);
   };
   const GSHSCENE_Reason NONE = (GSHSCENE_Reason)0;
   const GSHSCENE_Reason DEG = GSHSCENE_REASON_GRADIENT_DEGENERATE;
@@ -1084,16 +1084,16 @@ TEST(GradientNotice, EachDegenerateCaseAndEachSingularMapIsNamed) {
   Ref g(intern_g(s.store, linear(1, 1, 1, 1)));
   GSHSCENE_Item item = fill_item(g.get(), identity());
   item.kind = GSHSCENE_ITEM_CLIP_PUSH;
-  EXPECT_EQ(gshscene_gradient_notice(&item, nullptr, 0, nullptr), NONE);
+  EXPECT_EQ(gshscene_paint_notice(&item, nullptr, 0, nullptr), NONE);
   item = fill_item(g.get(), identity());
   item.paint = solid(0, 0, 0, 1);
-  EXPECT_EQ(gshscene_gradient_notice(&item, nullptr, 0, nullptr), NONE);
+  EXPECT_EQ(gshscene_paint_notice(&item, nullptr, 0, nullptr), NONE);
   item.paint.kind = GSHSCENE_PAINT_GRADIENT;
-  EXPECT_EQ(gshscene_gradient_notice(&item, nullptr, 0, nullptr), NONE) << "no gradient named";
+  EXPECT_EQ(gshscene_paint_notice(&item, nullptr, 0, nullptr), NONE) << "no gradient named";
   Ref sq(intern_square(s.store));
   item.paint.resource = sq.get();
-  EXPECT_EQ(gshscene_gradient_notice(&item, nullptr, 0, nullptr), NONE) << "not a gradient";
-  EXPECT_EQ(gshscene_gradient_notice(nullptr, nullptr, 0, nullptr), NONE);
+  EXPECT_EQ(gshscene_paint_notice(&item, nullptr, 0, nullptr), NONE) << "not a gradient";
+  EXPECT_EQ(gshscene_paint_notice(nullptr, nullptr, 0, nullptr), NONE);
 }
 
 // --- S17: the planning pass and the test sink ------------------------------------------------------------------------
@@ -1787,7 +1787,7 @@ TEST(GradientVectors, TheEvaluatorAgreesWithTheOracleAndTheLibraryResolvesItsSto
       const gradient_vectors::VMap & im = c.chain[c.chain_count - 2];
       GSHGEOM_Map target_map = matrix(tm.m[0], tm.m[1], tm.m[2], tm.m[3], tm.m[4], tm.m[5]);
       GSHSCENE_Item item = fill_item(g.get(), matrix(im.m[0], im.m[1], im.m[2], im.m[3], im.m[4], im.m[5]));
-      GSHSCENE_Reason n = gshscene_gradient_notice(&item, instances.data(), instances.size(), &target_map);
+      GSHSCENE_Reason n = gshscene_paint_notice(&item, instances.data(), instances.size(), &target_map);
       int want = c.reason == 3 ? GSHSCENE_REASON_MAP_NOT_INVERTIBLE : c.reason == 2 ? GSHSCENE_REASON_GRADIENT_DEGENERATE : 0;
       EXPECT_EQ((int)n, want) << c.name;
     }

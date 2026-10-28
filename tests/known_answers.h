@@ -445,6 +445,40 @@ static const ImageCase kImageCases[] = {
     {"rgb8-srgb-linear-3x3", 3, 3, 3, 0, 8, 0, 0, 1, 1, 0.0, UINT64_C(0x4038bf363e1025d7), 1, 1, kImageTiles15, kImageDump15},
     {"rgba16-p3-gamma-4x4", 4, 4, 4, 0, 16, 1, 0, 3, 3, 2.2, UINT64_C(0x7c6c6914fb6baa1c), 1, 1, kImageTiles16, kImageDump16},
 };
+static const std::uint64_t kImagePaintHashes[] = {UINT64_C(0x707b351ef43c09bb), UINT64_C(0xfc2b281e8599ec5a), UINT64_C(0x14c60e136a1394d0), UINT64_C(0x58d010fffc571954), UINT64_C(0xb1d4f7752682337d), UINT64_C(0x5c91c39b0a9b01d6)};
+static const std::uint64_t kImagePaintListHash = UINT64_C(0x46069277574f66eb);
+
+static const char * const kImagePaintDump0 =
+R"DUMP(gshscene.resource 1 kind=image-paint hash=707b351ef43c09bb
+imagepaint image=895a574b376a3bb6 window=0 0 65 129 map=1f5787abb2e02a06 extend=0,0 filter=1,1 space=0:0:0000000000000000 tint=-
+)DUMP";
+static const char * const kImagePaintDump1 =
+R"DUMP(gshscene.resource 1 kind=image-paint hash=fc2b281e8599ec5a
+imagepaint image=f323f288ef95defd window=1 2 40 50 map=d242bc481e41cf7c extend=1,2 filter=0,3 space=0:0:0000000000000000 tint=0 3fd0000000000000 3fe0000000000000 3fe8000000000000 3ff0000000000000 1:2:0000000000000000 0
+)DUMP";
+static const char * const kImagePaintDump2 =
+R"DUMP(gshscene.resource 1 kind=image-paint hash=14c60e136a1394d0
+imagepaint image=f1ef3c26a6a5eafd window=4 4 66 60 map=ff01deda28fd860d extend=3,2 filter=2,3 space=1:1:0000000000000000 tint=-
+)DUMP";
+static const char * const kImagePaintDump3 =
+R"DUMP(gshscene.resource 1 kind=image-paint hash=58d010fffc571954
+imagepaint image=f323f288ef95defd window=0 0 65 65 map=1f5787abb2e02a06 extend=0,0 filter=1,0 space=0:0:0000000000000000 tint=2 0000000000000000 0000000000000000 0000000000000000 3fe0000000000000 0:0:0000000000000000 0
+)DUMP";
+static const char * const kImagePaintDump4 =
+R"DUMP(gshscene.resource 1 kind=image-paint hash=b1d4f7752682337d
+imagepaint image=f323f288ef95defd window=0 0 65 65 map=1f5787abb2e02a06 extend=0,0 filter=1,0 space=0:0:0000000000000000 tint=3 0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 2
+)DUMP";
+static const char * const kImagePaintDump5 =
+R"DUMP(gshscene.resource 1 kind=image-paint hash=5c91c39b0a9b01d6
+imagepaint image=376697a27dd612ff window=0 0 2 66 map=d242bc481e41cf7c extend=2,1 filter=3,2 space=3:3:400199999999999a tint=-
+)DUMP";
+static const char * const kImagePaintListDump =
+R"DUMP(gshscene.list 1 items=4 ties=0 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=46069277574f66eb
+F res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=4 0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 space=0:0:0000000000000000 entry=0 resource=707b351ef43c09bb layer=0 depth=0000000000000000
+F res=path:0a107c56241f4b98 map=d242bc481e41cf7c rule=1 paint=4 0000000000000000 0000000000000000 0000000000000000 3fe0000000000000 space=0:0:0000000000000000 entry=0 resource=fc2b281e8599ec5a layer=2 depth=0000000000000000
+F res=path:b0a83b16e6cec382 map=ff01deda28fd860d rule=0 paint=4 0000000000000000 0000000000000000 0000000000000000 3fd0000000000000 space=0:0:0000000000000000 entry=0 resource=14c60e136a1394d0 layer=0 depth=0000000000000000
+F res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=4 0000000000000000 0000000000000000 0000000000000000 0000000000000000 space=0:0:0000000000000000 entry=0 resource=707b351ef43c09bb layer=0 depth=3ff0000000000000
+)DUMP";
 
 }  // namespace known
 

@@ -179,6 +179,29 @@ GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps, 
       return d;
     }
   }
+  const GSHSCENE_Resource * image_paint =
+      painted && item->paint.kind == GSHSCENE_PAINT_IMAGE && item->paint.resource &&
+          item->paint.resource->kind == GSHSCENE_RESOURCE_IMAGE_PAINT ? item->paint.resource : NULL;
+  if (image_paint) {
+    /* S21, IP15: an edge mode or a sample format the sink does not draw is refused, the missing ones named, and a sink with
+     * no image capability at all is refused for all of them; never drawn wrong. */
+    uint32_t have = (caps->image_extends & ((UINT32_C(1) << GSHSCENE_IMAGE_REQUIRED_FORMAT_SHIFT) - 1u)) |
+        (caps->image_formats << GSHSCENE_IMAGE_REQUIRED_FORMAT_SHIFT);
+    uint32_t missing = gshscene_image_required(item) & ~have;
+    if (missing) {
+      d.entry_class = GSHSCENE_ENTRY_REFUSED;
+      d.reason = GSHSCENE_REASON_IMAGE;
+      d.detail = missing;
+      return d;
+    }
+    /* N14: a palette tint whose entry the palette in force does not have refuses the fill. */
+    uint32_t need = image_paint->u.imagepaint.palette_need;
+    if (need && (!palette || palette->kind != GSHSCENE_RESOURCE_PALETTE || need > palette->u.palette.count)) {
+      d.entry_class = GSHSCENE_ENTRY_REFUSED;
+      d.reason = GSHSCENE_REASON_PALETTE_ENTRY;
+      return d;
+    }
+  }
   if (painted && item->paint.kind == GSHSCENE_PAINT_PALETTE) {
     /* N14: the one resolution decides; the foreground is not read for a palette paint. */
     GSHSCENE_Color unused;
@@ -248,6 +271,29 @@ GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps, 
     d.entry_class = GSHSCENE_ENTRY_APPROXIMATED;
     d.reason = GSHSCENE_REASON_INTERPOLATION_SPACE;
     return d;
+  }
+  if (image_paint) {
+    /* IP15: among the approximations, the filter the item's map calls for, then the stated filter space.  A chain that cannot be
+     * composed has no one filter: it is approximated when either is missing. */
+    uint32_t filter = 0;
+    uint32_t used;
+    if (gshscene_image_filter_of(item, instance_maps, instance_count, target_map, &filter) == GSHSCENE_OK) {
+      used = UINT32_C(1) << filter;
+    } else {
+      used = (UINT32_C(1) << image_paint->u.imagepaint.p.magnify) | (UINT32_C(1) << image_paint->u.imagepaint.p.minify);
+    }
+    if (used & ~caps->image_filters) {
+      d.entry_class = GSHSCENE_ENTRY_APPROXIMATED;
+      d.reason = GSHSCENE_REASON_IMAGE_FILTER;
+      return d;
+    }
+    const GSHSCENE_Color_Space * fs = &image_paint->u.imagepaint.p.filter_space;
+    if (!(caps->flags & GSHSCENE_CAP_IMAGE_FILTER_SPACES) && !gshscene_color_space_is_target(fs) &&
+        !(target_space && gshscene_space_equal(fs, target_space))) {
+      d.entry_class = GSHSCENE_ENTRY_APPROXIMATED;
+      d.reason = GSHSCENE_REASON_IMAGE_FILTER_SPACE;
+      return d;
+    }
   }
   return d;
 }
@@ -419,7 +465,10 @@ static GSHSCENE_Result caps_for(const GSHSCENE_Sink * sink, const GSHSCENE_Targe
   if (result != GSHSCENE_OK) {
     return result;
   }
-  if ((c.flags & ~GSHSCENE_CAP_FLAGS_ALL) || (c.stroke_native & ~GSHSCENE_STROKE_NATIVE_ALL) || c.cancel_unit == 0 ||
+  if ((c.flags & ~GSHSCENE_CAP_FLAGS_ALL) || (c.stroke_native & ~GSHSCENE_STROKE_NATIVE_ALL) ||
+      (c.image_filters & ~((UINT32_C(1) << GSHSCENE_IMAGE_FILTER_COUNT) - 1u)) ||
+      (c.image_extends & ~((UINT32_C(1) << GSHSCENE_IMAGE_EXTEND_COUNT) - 1u)) || (c.image_formats & ~GSHSCENE_IMAGE_FORMAT_ALL) ||
+      c.cancel_unit == 0 ||
       c.cancel_unit >= GSHSCENE_CANCEL_UNIT_COUNT ||
       !c.work_measure || !(c.flags & GSHSCENE_CAP_THREAD_AFFINE) != !sink->ops.thread_affine) {
     return GSHSCENE_ERR_INTERNAL;
@@ -765,7 +814,7 @@ static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
     /* S17, S20: a gradient fill or a stroke that draws nothing is drawn as defined, and the report says so. */
     GSHSCENE_Reason notice = item->kind == GSHSCENE_ITEM_STROKE
         ? gshscene_stroke_notice(item, maps, count - 1, &job->target.map)
-        : gshscene_gradient_notice(item, maps, count - 1, &job->target.map);
+        : gshscene_paint_notice(item, maps, count - 1, &job->target.map);
     if (notice) {
       result = gshscene_report_add(report, GSHSCENE_ENTRY_NOTICE, notice, chain, count, 0, 0.0);
       if (result != GSHSCENE_OK) {
