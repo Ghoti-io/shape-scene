@@ -162,7 +162,7 @@ GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps, 
     d.reason = GSHSCENE_REASON_GLYPH_SOURCE;
     return d;
   }
-  const GSHSCENE_Resource * gradient = painted && item->paint.kind == GSHSCENE_PAINT_GRADIENT ? item->paint.gradient : NULL;
+  const GSHSCENE_Resource * gradient = painted && item->paint.kind == GSHSCENE_PAINT_GRADIENT ? item->paint.resource : NULL;
   if (gradient) {
     /* S17: a kind the sink does not draw is refused, never drawn wrong. */
     uint32_t gk = gradient->u.gradient.g.kind;

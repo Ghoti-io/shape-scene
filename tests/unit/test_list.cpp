@@ -182,7 +182,7 @@ TEST(ListRecord, EveryKindReadsBackInOrderWithCanonicalFields) {
   EXPECT_EQ(fill->paint.rgba[2], 0.75);
   EXPECT_EQ(fill->paint.rgba[3], 1.0);
   EXPECT_TRUE(gshscene_color_space_is_target(&fill->paint.space));
-  EXPECT_EQ(fill->paint.gradient, nullptr);
+  EXPECT_EQ(fill->paint.resource, nullptr);
   EXPECT_EQ(fill->layer, -3);
   EXPECT_EQ(fill->group.opacity, 0.0) << "a group field that does not apply is zero";
 
@@ -410,7 +410,7 @@ TEST(ListRecord, EveryInvalidArgumentIsRefusedAndTheListIsAsItWas) {
     p.space = space_of(GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_PQ);
     EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &p), UNS) << "PQ is reserved";
     p = ok_paint;
-    p.gradient = sq.get();
+    p.resource = sq.get();
     EXPECT_EQ(fill(sq.get(), &good, GSHGEOM_FILL_NONZERO, &p), INV) << "a solid paint names no gradient";
   }
   // The same rules for a clip push and an instance.

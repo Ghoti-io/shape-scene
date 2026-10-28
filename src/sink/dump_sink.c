@@ -276,7 +276,7 @@ static void gradient_need(const GSHSCENE_List * list, size_t * fills, size_t * s
     if ((item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE) &&
         item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
       *fills = gshscene_sat_add(*fills, 1);
-      size_t n = item->paint.gradient->u.gradient.g.stop_count;
+      size_t n = item->paint.resource->u.gradient.g.stop_count;
       *stops = n > *stops ? n : *stops;
     } else if (item->kind == GSHSCENE_ITEM_INSTANCE) {
       gradient_need(gshscene_resource_picture(item->resource), fills, stops, strokes);
@@ -1020,7 +1020,7 @@ static GSHSCENE_Result stroke_unit(Run * run, const GSHSCENE_Item * item, const 
       gshscene_resource_id(item->style), gshgeom_map_hash(&map));
   emit_text(run, run->line, &failed);
   if (item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
-    snprintf(run->line, LINE_BYTES, " grad=%" PRIu64, gshscene_resource_id(item->paint.gradient));
+    snprintf(run->line, LINE_BYTES, " grad=%" PRIu64, gshscene_resource_id(item->paint.resource));
     emit_text(run, run->line, &failed);
   }
   if (b.empty) {
@@ -1034,7 +1034,7 @@ static GSHSCENE_Result stroke_unit(Run * run, const GSHSCENE_Item * item, const 
   emit_text(run, run->line, &failed);
   GSHSCENE_Result r = style_record(run, item->style, &failed);
   if (r == GSHSCENE_OK && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
-    r = gradient_record(run, item->paint.gradient, &failed);
+    r = gradient_record(run, item->paint.resource, &failed);
   }
   if (r != GSHSCENE_OK) {
     return r;
@@ -1174,7 +1174,7 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
           gshscene_resource_hash(item->resource), gshgeom_map_hash(&map), (int)item->fill_rule);
       emit_text(run, run->line, &failed);
       if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
-        snprintf(run->line, LINE_BYTES, " grad=%" PRIu64, gshscene_resource_id(item->paint.gradient));
+        snprintf(run->line, LINE_BYTES, " grad=%" PRIu64, gshscene_resource_id(item->paint.resource));
         emit_text(run, run->line, &failed);
       }
       emit_text(run, " box=", &failed);
@@ -1188,7 +1188,7 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
         emit_text(run, run->line, &failed);
       }
       if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
-        GSHSCENE_Result r = gradient_record(run, item->paint.gradient, &failed);
+        GSHSCENE_Result r = gradient_record(run, item->paint.resource, &failed);
         if (r != GSHSCENE_OK) {
           return r;
         }

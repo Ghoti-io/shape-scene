@@ -698,7 +698,7 @@ GSHSCENE_Paint paint_of(GSHSCENE_Paint_Kind kind, double alpha, uint32_t entry =
   p.kind = kind;
   p.rgba[3] = alpha;
   p.entry = entry;
-  p.gradient = g;
+  p.resource = g;
   return p;
 }
 

@@ -455,7 +455,7 @@ TEST(VersionDump, ParsesBackToTheFieldsTheHashIsOver) {
       }
       hash_space(&h, fld["space"]);
       gshgeom_hash_u32(&h, (uint32_t)std::stoul(fld["entry"]));
-      gshgeom_hash_u64(&h, hex(fld["gradient"]));
+      gshgeom_hash_u64(&h, hex(fld["resource"]));
       gshgeom_hash_i32(&h, (int32_t)std::stol(fld["layer"]));
       gshgeom_hash_f64(&h, dbl(fld["depth"]));
     } else {

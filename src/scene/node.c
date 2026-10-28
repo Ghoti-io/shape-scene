@@ -345,7 +345,7 @@ int gshscene_props_equal(const GSHSCENE_Node * a, const GSHSCENE_Node * b) {
     case GSHSCENE_NODE_SHAPE:
     case GSHSCENE_NODE_STROKE:
       if (a->resource != b->resource || a->style != b->style || a->fill_rule != b->fill_rule || a->paint.kind != b->paint.kind ||
-          !gshscene_space_equal(&a->paint.space, &b->paint.space) || a->paint.gradient != b->paint.gradient ||
+          !gshscene_space_equal(&a->paint.space, &b->paint.space) || a->paint.resource != b->paint.resource ||
           a->paint.entry != b->paint.entry) {
         return 0;
       }
@@ -389,7 +389,7 @@ int gshscene_node_equal(const GSHSCENE_Node_Rec * a, const GSHSCENE_Node_Rec * b
 static void props_retain(const GSHSCENE_Node * p) {
   gshscene_resource_retain(p->clip);
   gshscene_resource_retain(p->resource);
-  gshscene_resource_retain(p->paint.gradient);
+  gshscene_resource_retain(p->paint.resource);
   gshscene_resource_retain(p->soft_mask);
   gshscene_resource_retain(p->style);
 }
@@ -397,7 +397,7 @@ static void props_retain(const GSHSCENE_Node * p) {
 static void props_release(const GSHSCENE_Node * p) {
   gshscene_resource_release(p->clip);
   gshscene_resource_release(p->resource);
-  gshscene_resource_release(p->paint.gradient);
+  gshscene_resource_release(p->paint.resource);
   gshscene_resource_release(p->soft_mask);
   gshscene_resource_release(p->style);
 }

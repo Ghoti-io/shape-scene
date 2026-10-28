@@ -1471,7 +1471,7 @@ static void op(S * s, unsigned code) {
           }
           if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
             /* A gradient node's fill (story P2): its paint names the node's gradient, and the notice predicate runs. */
-            CHECK(info.node.paint.kind == GSHSCENE_PAINT_GRADIENT && item->paint.gradient == info.node.paint.gradient);
+            CHECK(info.node.paint.kind == GSHSCENE_PAINT_GRADIENT && item->paint.resource == info.node.paint.resource);
             GSHSCENE_Reason why = gshscene_gradient_notice(item, NULL, 0, NULL);
             CHECK(why == 0 || why == GSHSCENE_REASON_GRADIENT_DEGENERATE || why == GSHSCENE_REASON_MAP_NOT_INVERTIBLE);
             outcomes[OUT_GRADIENT_EMITTED]++;
@@ -1884,7 +1884,7 @@ static void op(S * s, unsigned code) {
       item.kind = GSHSCENE_ITEM_FILL;
       gshgeom_map_identity(2, &item.map);
       item.paint.kind = GSHSCENE_PAINT_GRADIENT;
-      item.paint.gradient = g;
+      item.paint.resource = g;
       GSHSCENE_Reason why = gshscene_gradient_notice(&item, NULL, 0, NULL);
       CHECK(why == 0 || why == GSHSCENE_REASON_GRADIENT_DEGENERATE || why == GSHSCENE_REASON_MAP_NOT_INVERTIBLE);
       outcomes[OUT_GRADIENT_DEGENERATE] += why == GSHSCENE_REASON_GRADIENT_DEGENERATE;
@@ -1902,7 +1902,7 @@ static void op(S * s, unsigned code) {
       memset(&paint, 0, sizeof paint);
       paint.kind = GSHSCENE_PAINT_GRADIENT;
       unsigned k = pick(s, 6);
-      paint.gradient = k < 4 ? s->grads[k] : k == 4 ? s->res[0] : NULL;
+      paint.resource = k < 4 ? s->grads[k] : k == 4 ? s->res[0] : NULL;
       paint.rgba[3] = (double)pick(s, 6) / 4.0; /* up to 1.25: invalid above 1 */
       int use;
       GSHGEOM_Map m = pool_map(arg(s), &use);
@@ -1911,8 +1911,8 @@ static void op(S * s, unsigned code) {
       if (r == GSHSCENE_OK) {
         const GSHSCENE_Item * item;
         CHECK(gshscene_list_item(s->list, b.count, &item) == GSHSCENE_OK);
-        CHECK(item->paint.kind == GSHSCENE_PAINT_GRADIENT && item->paint.gradient == paint.gradient);
-        CHECK(gshscene_resource_kind(item->paint.gradient) == GSHSCENE_RESOURCE_GRADIENT);
+        CHECK(item->paint.kind == GSHSCENE_PAINT_GRADIENT && item->paint.resource == paint.resource);
+        CHECK(gshscene_resource_kind(item->paint.resource) == GSHSCENE_RESOURCE_GRADIENT);
         outcomes[OUT_GRADIENT_FILL]++;
       }
       break;
@@ -1946,7 +1946,7 @@ static void op(S * s, unsigned code) {
       n.resource = s->sres[pick(s, POOL)];
       n.paint.kind = GSHSCENE_PAINT_GRADIENT;
       unsigned which = pick(s, 4);
-      n.paint.gradient = which < 2 ? s->sgrads[which] : which == 2 ? s->grads[0] : NULL;
+      n.paint.resource = which < 2 ? s->sgrads[which] : which == 2 ? s->grads[0] : NULL;
       n.paint.rgba[3] = (double)pick(s, 5) / 4.0;
       size_t before = gshscene_edit_node_count(e);
       uint64_t id = 0;
@@ -1958,7 +1958,7 @@ static void op(S * s, unsigned code) {
       CHECK(r != GSHSCENE_ERR_INTERNAL && r != GSHSCENE_ERR_OOM);
       if (r == GSHSCENE_OK) {
         remember(s, id);
-        CHECK(n.paint.gradient && gshscene_resource_kind(n.paint.gradient) == GSHSCENE_RESOURCE_GRADIENT);
+        CHECK(n.paint.resource && gshscene_resource_kind(n.paint.resource) == GSHSCENE_RESOURCE_GRADIENT);
         outcomes[OUT_GRADIENT_NODE]++;
       } else {
         CHECK(gshscene_edit_node_count(e) == before);

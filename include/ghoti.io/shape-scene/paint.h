@@ -334,7 +334,7 @@ typedef struct GSHSCENE_Paint {
   /** Solid: the color space of the components (zero is the target's).  Foreground: zero. */
   GSHSCENE_Color_Space space;
   /** Gradient: the gradient resource (the list holds a reference).  NULL for a solid, foreground or palette paint (and required to be). */
-  const GSHSCENE_Resource * gradient;
+  const GSHSCENE_Resource * resource;
   /** Palette: the entry, in `[0, GSHSCENE_PALETTE_ENTRY_MAX]`.  Zero for every other kind (and required to be). */
   uint32_t entry;
 } GSHSCENE_Paint;

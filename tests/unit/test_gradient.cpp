@@ -61,7 +61,7 @@ GSHSCENE_Paint spaced(double r, double g, double b, double a, GSHSCENE_Color_Spa
 GSHSCENE_Paint gradient_paint(const GSHSCENE_Resource * g, double alpha = 1.0) {
   GSHSCENE_Paint p{};
   p.kind = GSHSCENE_PAINT_GRADIENT;
-  p.gradient = g;
+  p.resource = g;
   p.rgba[3] = alpha;
   return p;
 }
@@ -509,7 +509,7 @@ TEST(GradientResource, EveryRuleIsCheckedAndAFailureKeepsNothing) {
       GSHSCENE_ERR_UNSUPPORTED, "a stop in ProPhoto");
   {
     Desc d = gen_linear();
-    d.stops[0].color.gradient = (const GSHSCENE_Resource *)&d;
+    d.stops[0].color.resource = (const GSHSCENE_Resource *)&d;
     EXPECT_EQ(try_intern(s.store, d), INV) << "a solid stop naming a resource";
   }
   // A target-space solid stop is fine in a target-space gradient (G3, Q8).
@@ -725,7 +725,7 @@ TEST(GradientPaint, AListHoldsItsGradientAndReleasesItOnEveryPath) {
     const GSHSCENE_Item * item = nullptr;
     ASSERT_EQ(gshscene_list_item(l.list, 0, &item), GSHSCENE_OK);
     EXPECT_EQ(item->paint.kind, GSHSCENE_PAINT_GRADIENT);
-    EXPECT_EQ(item->paint.gradient, g.get());
+    EXPECT_EQ(item->paint.resource, g.get());
     EXPECT_EQ(item->paint.rgba[3], 0.5);
     ASSERT_EQ(gshscene_list_truncate(l.list, 0), GSHSCENE_OK);
     EXPECT_EQ(gshscene_resource_refcount(g.get()), base) << "truncate releases it";
@@ -768,7 +768,7 @@ TEST(GradientPaint, ThePaintsRulesAreAFillsAndTheGradientMustBeOfTheStore) {
   EXPECT_EQ(fill(gradient_paint(g.get(), -0.5)), GSHSCENE_ERR_INVALID) << "alpha below 0";
   EXPECT_EQ(fill(gradient_paint(g.get(), kNaN)), GSHSCENE_ERR_INVALID) << "a NaN alpha";
   GSHSCENE_Paint solid_named = solid(0, 0, 0, 1);
-  solid_named.gradient = g.get();
+  solid_named.resource = g.get();
   EXPECT_EQ(fill(solid_named), GSHSCENE_ERR_INVALID) << "a solid paint names no gradient";
   EXPECT_EQ(gshscene_list_count(l.list), 1u);
 }
@@ -845,7 +845,7 @@ TEST(GradientScene, AShapeHoldsItsGradientAndAParameterChangeDamagesItsShapes) {
   ASSERT_EQ(gshscene_version_list(v1.get(), &list), GSHSCENE_OK);
   const GSHSCENE_Item * item = nullptr;
   ASSERT_EQ(gshscene_list_item(list, 0, &item), GSHSCENE_OK);
-  EXPECT_EQ(item->paint.gradient, gfg.get()) << "the version's list carries the gradient";
+  EXPECT_EQ(item->paint.resource, gfg.get()) << "the version's list carries the gradient";
   auto damage = [&](const GSHSCENE_Version * a, const GSHSCENE_Version * b) {
     GSHSCENE_Diff * diff = nullptr;
     GSHSCENE_Damage d{};
@@ -1091,7 +1091,7 @@ TEST(GradientNotice, EachDegenerateCaseAndEachSingularMapIsNamed) {
   item.paint.kind = GSHSCENE_PAINT_GRADIENT;
   EXPECT_EQ(gshscene_gradient_notice(&item, nullptr, 0, nullptr), NONE) << "no gradient named";
   Ref sq(intern_square(s.store));
-  item.paint.gradient = sq.get();
+  item.paint.resource = sq.get();
   EXPECT_EQ(gshscene_gradient_notice(&item, nullptr, 0, nullptr), NONE) << "not a gradient";
   EXPECT_EQ(gshscene_gradient_notice(nullptr, nullptr, 0, nullptr), NONE);
 }
@@ -1688,7 +1688,7 @@ TEST(GradientFixed, AFillOfAGradientRecordsItsAlphaAndMap) {
   const GSHSCENE_Item * item = nullptr;
   ASSERT_EQ(gshscene_list_item(l.list, 0, &item), GSHSCENE_OK);
   EXPECT_EQ(item->paint.kind, GSHSCENE_PAINT_GRADIENT);
-  EXPECT_EQ(item->paint.gradient, g.get());
+  EXPECT_EQ(item->paint.resource, g.get());
   EXPECT_EQ(item->paint.rgba[3], 0.75);
   EXPECT_EQ(item->layer, 5);
   EXPECT_EQ(item->fill_rule, GSHGEOM_FILL_EVEN_ODD);

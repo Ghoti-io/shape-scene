@@ -260,7 +260,7 @@ static GSHSCENE_Item * item_at(const GSHSCENE_List * list, size_t index) {
 
 static void item_release(const GSHSCENE_Item * item) {
   gshscene_resource_release(item->resource);
-  gshscene_resource_release(item->paint.gradient);
+  gshscene_resource_release(item->paint.resource);
   gshscene_resource_release(item->group.soft_mask);
   gshscene_resource_release(item->style);
 }
@@ -341,7 +341,7 @@ static GSHSCENE_Result list_append(GSHSCENE_List * list, const GSHSCENE_Item * i
   }
   *item_at(list, list->count) = *item;
   gshscene_resource_retain(item->resource);
-  gshscene_resource_retain(item->paint.gradient);
+  gshscene_resource_retain(item->paint.resource);
   gshscene_resource_retain(item->group.soft_mask);
   gshscene_resource_retain(item->style);
   note_item(list, item);
@@ -411,8 +411,8 @@ static GSHSCENE_Result canonical_paint(const GSHSCENE_Store * store, const GSHSC
   }
   /* One spelling: only a gradient paint names a resource, a gradient of the list's store (G1). */
   if (paint->kind == GSHSCENE_PAINT_GRADIENT
-          ? (!paint->gradient || paint->gradient->store != store || paint->gradient->kind != GSHSCENE_RESOURCE_GRADIENT)
-          : paint->gradient != NULL) {
+          ? (!paint->resource || paint->resource->store != store || paint->resource->kind != GSHSCENE_RESOURCE_GRADIENT)
+          : paint->resource != NULL) {
     return GSHSCENE_ERR_INVALID;
   }
   /* One spelling: only a palette paint has an entry, and 0xFFFF (a font's foreground) is never one (N14). */
@@ -437,7 +437,7 @@ static GSHSCENE_Result canonical_paint(const GSHSCENE_Store * store, const GSHSC
     out->kind = paint->kind;
     out->rgba[3] = paint->rgba[3];
     out->entry = paint->entry;
-    out->gradient = paint->gradient;
+    out->resource = paint->resource;
     return GSHSCENE_OK;
   }
   GSHSCENE_Result result = gshscene_color_space_check(&paint->space);
@@ -1399,7 +1399,7 @@ static int item_equal(const GSHSCENE_Item * a, const GSHSCENE_Item * b) {
     return 0;
   }
   if (a->paint.kind != b->paint.kind || !gshscene_space_equal(&a->paint.space, &b->paint.space) ||
-      a->paint.gradient != b->paint.gradient || a->paint.entry != b->paint.entry) {
+      a->paint.resource != b->paint.resource || a->paint.entry != b->paint.entry) {
     return 0;
   }
   for (int i = 0; i < 4; i++) {
@@ -1462,7 +1462,7 @@ void gshscene_paint_hash(GSHGEOM_Hash * h, const GSHSCENE_Paint * paint) {
   }
   gshscene_space_hash(h, &paint->space);
   gshgeom_hash_u32(h, paint->entry);
-  gshgeom_hash_u64(h, paint->gradient ? gshscene_resource_hash(paint->gradient) : 0);
+  gshgeom_hash_u64(h, paint->resource ? gshscene_resource_hash(paint->resource) : 0);
 }
 
 /* PH1: the content of a placeholder as a list and a version both spell it. */
@@ -1557,7 +1557,7 @@ int gshscene_space_dump(FILE * out, const GSHSCENE_Color_Space * space) {
       HEX(gshgeom_f64_bits(space->gamma)));
 }
 
-/* A paint as a fill's dump line spells it: ` paint=N <r> <g> <b> <a> space=<space> entry=E gradient=<hash>`. */
+/* A paint as a fill's dump line spells it: ` paint=N <r> <g> <b> <a> space=<space> entry=E resource=<hash>`. */
 static int dump_paint(FILE * out, const GSHSCENE_Paint * paint) {
   int written = fprintf(out, " paint=%u %016llx %016llx %016llx %016llx space=", (unsigned)paint->kind,
       HEX(gshgeom_f64_bits(paint->rgba[0])), HEX(gshgeom_f64_bits(paint->rgba[1])), HEX(gshgeom_f64_bits(paint->rgba[2])),
@@ -1566,8 +1566,8 @@ static int dump_paint(FILE * out, const GSHSCENE_Paint * paint) {
     written = gshscene_space_dump(out, &paint->space);
   }
   if (written >= 0) {
-    written = fprintf(out, " entry=%u gradient=%016llx", (unsigned)paint->entry,
-        HEX(paint->gradient ? gshscene_resource_hash(paint->gradient) : 0));
+    written = fprintf(out, " entry=%u resource=%016llx", (unsigned)paint->entry,
+        HEX(paint->resource ? gshscene_resource_hash(paint->resource) : 0));
   }
   return written;
 }

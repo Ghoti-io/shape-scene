@@ -333,7 +333,7 @@ inline const GSHSCENE_List * refusable(Scene & s, const GSHSCENE_Sink_Caps & cap
       s.held.push_back(r);
       GSHSCENE_Paint p{};
       p.kind = GSHSCENE_PAINT_GRADIENT;
-      p.gradient = r;
+      p.resource = r;
       p.rgba[3] = 1.0;
       gshscene_list_fill(l, s.sq(20, 20, 5), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0);
       *reason = GSHSCENE_REASON_GRADIENT;
@@ -2035,7 +2035,7 @@ TEST_P(SinkConformance, S17_GradientsAreDrawnByKindRefusedOtherwiseAndNoticedWhe
     auto paint_of = [](const GSHSCENE_Resource * g) {
       GSHSCENE_Paint p{};
       p.kind = GSHSCENE_PAINT_GRADIENT;
-      p.gradient = g;
+      p.resource = g;
       p.rgba[3] = 1.0;
       return p;
     };

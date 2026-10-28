@@ -81,7 +81,7 @@ TEST(NodeInit, EveryKindStartsAtTheDocumentedDefaults) {
     EXPECT_EQ(n.paint.rgba[2], 0.0);
     EXPECT_EQ(n.paint.rgba[3], 1.0) << "opaque black";
     EXPECT_TRUE(gshscene_color_space_is_target(&n.paint.space));
-    EXPECT_EQ(n.paint.gradient, nullptr);
+    EXPECT_EQ(n.paint.resource, nullptr);
   }
   gshscene_node_init(GSHSCENE_NODE_GROUP, nullptr);  // ignored
 }

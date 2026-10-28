@@ -295,7 +295,7 @@ std::string item_text(const GSHSCENE_Item * item) {
              " " + hex16(gshgeom_f64_bits(item->paint.rgba[1])) + " " + hex16(gshgeom_f64_bits(item->paint.rgba[2])) +
              " " + hex16(gshgeom_f64_bits(item->paint.rgba[3])) + " space=" + space_text(item->paint.space) +
              " entry=" + std::to_string(item->paint.entry) +
-             " gradient=" + hex16(item->paint.gradient ? gshscene_resource_hash(item->paint.gradient) : 0) +
+             " resource=" + hex16(item->paint.resource ? gshscene_resource_hash(item->paint.resource) : 0) +
              layer_depth_text(item);
     case GSHSCENE_ITEM_CLIP_PUSH:
       return "C" + res + map + " rule=" + std::to_string((int)item->fill_rule) + layer_depth_text(item);

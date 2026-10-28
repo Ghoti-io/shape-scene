@@ -152,12 +152,12 @@ int main(void) {
   GSHSCENE_Paint paint;
   memset(&paint, 0, sizeof paint);
   paint.kind = GSHSCENE_PAINT_GRADIENT;
-  paint.gradient = gradient;
+  paint.resource = gradient;
   paint.rgba[3] = 1.0;
   expect(gshscene_list_fill(list, a, NULL, GSHGEOM_FILL_NONZERO, &paint, 0, 0.0) == GSHSCENE_OK, "fill");
   paint.rgba[3] = 0.5;
   expect(gshscene_list_fill(list, b, NULL, GSHGEOM_FILL_NONZERO, &paint, 0, 0.0) == GSHSCENE_OK, "fill at half alpha");
-  paint.gradient = point;
+  paint.resource = point;
   expect(gshscene_list_fill(list, a, NULL, GSHGEOM_FILL_NONZERO, &paint, 0, 0.0) == GSHSCENE_OK, "fill, degenerate");
   gshscene_list_close(list);
 
@@ -183,7 +183,7 @@ int main(void) {
   expect(gshscene_store_intern_gradient(store, &radial, &disc) == GSHSCENE_OK, "intern a radial gradient");
   GSHSCENE_List * round = NULL;
   gshscene_list_create(NULL, NULL, store, &round);
-  paint.gradient = disc;
+  paint.resource = disc;
   paint.rgba[3] = 1.0;
   gshscene_list_fill(round, a, NULL, GSHGEOM_FILL_NONZERO, &paint, 0, 0.0);
   gshscene_list_close(round);

@@ -379,7 +379,7 @@ TEST(Paint, AForegroundPaintCarriesOnlyItsAlphaAndAZeroSpace) {
   q.rgba[3] = kNaN;
   EXPECT_EQ(fill(q), INV);
   q = p;
-  q.gradient = sq.get();
+  q.resource = sq.get();
   EXPECT_EQ(fill(q), INV);
   for (double a : {0.0, 1.0}) {
     q = p;

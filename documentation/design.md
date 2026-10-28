@@ -627,7 +627,7 @@ profile=<hash>` and a line `d <hex>` per dash. A style costs `GSHSCENE_BYTES_PER
 `tools/gen-scene-vectors.py` restates the canonical form, the hash and the dump from this text alone. The **list item**:
 `u8` 7, `u64` the centerline's content hash, `u64` the style's, `u64` the map's hash, the paint as a fill spells it,
 `i32` layer, `f64` depth; its dump line `K res=<kind>:<hash> style=<hash> map=<hash> paint=N <r> <g> <b> <a>
-space=<space> entry=E gradient=<hash> layer=N depth=<hex>`. The **version node** (kind 4) is spelled as a shape with
+space=<space> entry=E resource=<hash> layer=N depth=<hex>`. The **version node** (kind 4) is spelled as a shape with
 `u64` the style's hash after the resource's, and its dump line is a shape's with `K` for `S` and ` style=<hash>` after
 the resource.
 

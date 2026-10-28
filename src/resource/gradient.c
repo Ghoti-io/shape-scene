@@ -551,11 +551,11 @@ int gshscene_gradient_degenerate(const GSHSCENE_Gradient * g) {
 
 GSHSCENE_Reason gshscene_gradient_notice(const GSHSCENE_Item * item, const GSHGEOM_Map * instance_maps,
     size_t instance_count, const GSHGEOM_Map * target_map) {
-  if (!item || item->kind != GSHSCENE_ITEM_FILL || item->paint.kind != GSHSCENE_PAINT_GRADIENT || !item->paint.gradient ||
-      item->paint.gradient->kind != GSHSCENE_RESOURCE_GRADIENT) {
+  if (!item || item->kind != GSHSCENE_ITEM_FILL || item->paint.kind != GSHSCENE_PAINT_GRADIENT || !item->paint.resource ||
+      item->paint.resource->kind != GSHSCENE_RESOURCE_GRADIENT) {
     return (GSHSCENE_Reason)0;
   }
-  const GSHSCENE_Gradient * g = &item->paint.gradient->u.gradient.g;
+  const GSHSCENE_Gradient * g = &item->paint.resource->u.gradient.g;
   int not_invertible = (target_map && gshscene_map_singular(target_map)) || gshscene_map_singular(&item->map) ||
       gshscene_map_singular(&g->map);
   for (size_t i = 0; i < instance_count && !not_invertible; i++) {

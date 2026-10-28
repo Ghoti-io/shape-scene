@@ -159,12 +159,12 @@
  *
  * `gshscene.list 1 items=N ties=T fg=<r> <g> <b> <a> <space> palette=<hash> hash=<16 hex digits>`
  * (the palette's content hash, 0 for none) and one line per item:
- * `F res=<kind>:<hash> map=<hash> rule=N paint=N <r> <g> <b> <a> space=<space> entry=E gradient=<hash> layer=N depth=<hex>`,
+ * `F res=<kind>:<hash> map=<hash> rule=N paint=N <r> <g> <b> <a> space=<space> entry=E resource=<hash> layer=N depth=<hex>`,
  * `C res=<kind>:<hash> map=<hash> rule=N layer=N depth=<hex>`, `c`,
  * `G opacity=<hex> blend=<space> composite=N order=N layer=N depth=<hex>` (with ` isolation=N knockout=N
  * mask=<hash>` after `order=N` when one of them is not the default, T1), `g`,
  * `I res=<kind>:<hash> map=<hash> layer=N depth=<hex>`,
- * `K res=<kind>:<hash> style=<hash> map=<hash> paint=N <r> <g> <b> <a> space=<space> entry=E gradient=<hash> layer=N depth=<hex>`
+ * `K res=<kind>:<hash> style=<hash> map=<hash> paint=N <r> <g> <b> <a> space=<space> entry=E resource=<hash> layer=N depth=<hex>`
  * (a stroke), `P source=N code=N approx=N box=<x0> <y0> <x1> <y1>|- map=<hash> layer=N depth=<hex>` (a placeholder; the
  * box's four numbers as 16 hexadecimal digits each), then one line per tie,
  * `T first=I second=J depth=<hex> reason=N`, with every `double` as the 16

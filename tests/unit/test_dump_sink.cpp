@@ -513,7 +513,7 @@ TEST(DumpSink, TheGradientRecordsOnAStreamAreTheGenerators) {
   for (const F & f : {F{2, 2, 8, ga, 1.0}, F{10, 4, 6, ga, 0.5}, F{20, 20, 6, gb, 1.0}, F{30, 2, 4, gd, 1.0}}) {
     GSHSCENE_Paint p{};
     p.kind = GSHSCENE_PAINT_GRADIENT;
-    p.gradient = f.g;
+    p.resource = f.g;
     p.rgba[3] = f.alpha;
     ASSERT_EQ(gshscene_list_fill(l, s.sq(f.x, f.y, f.size), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK);
   }
@@ -1321,7 +1321,7 @@ TEST(DumpSink, AStyleIsRecordedOncePerRenderAndAnEmptyOrGradientStrokeIsSpelledA
   GSHSCENE_Paint red = solid(1, 0, 0);
   GSHSCENE_Paint shaded{};
   shaded.kind = GSHSCENE_PAINT_GRADIENT;
-  shaded.gradient = gradient;
+  shaded.resource = gradient;
   shaded.rgba[3] = 1.0;
   ASSERT_EQ(gshscene_list_stroke(l, s.sq(2, 2, 6), style, nullptr, &red, 0, 0.0), GSHSCENE_OK);
   ASSERT_EQ(gshscene_list_stroke(l, s.sq(12, 2, 6), style, nullptr, &shaded, 0, 0.0), GSHSCENE_OK);

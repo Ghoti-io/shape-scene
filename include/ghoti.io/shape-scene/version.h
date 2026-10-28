@@ -142,8 +142,8 @@
  *
  * - `G id=I parent=P flags=F key=K map=H opacity=X blend=<space> composite=N order=N layer=L depth=D clip=C children=LIST`
  *   (with ` isolation=N knockout=N mask=<hash>` after `order=N` when one of them is not the default)
- * - `S id=I parent=P flags=F key=K res=KIND:H map=H rule=R paint=PK r g b a space=<space> entry=E gradient=G layer=L depth=D`
- * - `K id=I parent=P flags=F key=K res=KIND:H style=H map=H rule=R paint=PK r g b a space=<space> entry=E gradient=G layer=L depth=D`
+ * - `S id=I parent=P flags=F key=K res=KIND:H map=H rule=R paint=PK r g b a space=<space> entry=E resource=G layer=L depth=D`
+ * - `K id=I parent=P flags=F key=K res=KIND:H style=H map=H rule=R paint=PK r g b a space=<space> entry=E resource=G layer=L depth=D`
  *   (a stroke)
  * - `I id=I parent=P flags=F key=K target=T map=H layer=L depth=D`
  * - `P id=I parent=P flags=F key=K source=N code=N approx=N box=<x0> <y0> <x1> <y1>|- map=H layer=L depth=D`

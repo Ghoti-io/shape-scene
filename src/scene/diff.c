@@ -481,13 +481,13 @@ static GSHSCENE_Result damage_group_leave(void * ctx, const GSHSCENE_Walk * walk
 /** N13: whether a paint reads the foreground: a foreground paint, or a gradient with a foreground stop (G3). */
 static int paints_with_foreground(const GSHSCENE_Paint * paint) {
   return paint->kind == GSHSCENE_PAINT_FOREGROUND ||
-      (paint->kind == GSHSCENE_PAINT_GRADIENT && paint->gradient->u.gradient.foreground);
+      (paint->kind == GSHSCENE_PAINT_GRADIENT && paint->resource->u.gradient.foreground);
 }
 
 /** N13: whether a paint reads the palette: a palette paint, or a gradient with a palette stop (G3). */
 static int paints_from_palette(const GSHSCENE_Paint * paint) {
   return paint->kind == GSHSCENE_PAINT_PALETTE ||
-      (paint->kind == GSHSCENE_PAINT_GRADIENT && paint->gradient->u.gradient.palette_need != 0);
+      (paint->kind == GSHSCENE_PAINT_GRADIENT && paint->resource->u.gradient.palette_need != 0);
 }
 
 static GSHSCENE_Result damage_shape(

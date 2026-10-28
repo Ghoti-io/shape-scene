@@ -660,7 +660,7 @@ static GSHSCENE_List * build(Scene * s, Input * in, int * ties) {
             /* S17: a gradient, a quarter of the time; under a map that is not invertible, an eighth of those. */
             paint.kind = GSHSCENE_PAINT_GRADIENT;
             paint.entry = 0;
-            paint.gradient = b >= 200 ? gradient_built(s, in) : gradient_from(s, b);
+            paint.resource = b >= 200 ? gradient_built(s, in) : gradient_from(s, b);
             singular = (c & 0xe0) == 0xe0;
           }
         }
@@ -678,7 +678,7 @@ static GSHSCENE_List * build(Scene * s, Input * in, int * ties) {
           at_bound = !past;
         }
         const GSHSCENE_Resource * r = square(s, a % SIDE, b % SIDE, 1 + c % 20);
-        if (r && (paint.kind != GSHSCENE_PAINT_GRADIENT || paint.gradient)) {
+        if (r && (paint.kind != GSHSCENE_PAINT_GRADIENT || paint.resource)) {
           GSHSCENE_Result fr = gshscene_list_fill(list, r, singular ? &flat : NULL, (GSHGEOM_Fill_Rule)(a & 1), &paint,
               layer, d);
           if (past || at_bound) {
@@ -807,9 +807,9 @@ static GSHSCENE_List * build(Scene * s, Input * in, int * ties) {
           memset(&paint, 0, sizeof paint); /* a gradient paint has an alpha and no color of its own (G1) */
           paint.kind = GSHSCENE_PAINT_GRADIENT;
           paint.rgba[3] = 0.75;
-          paint.gradient = gradient_from(s, b);
+          paint.resource = gradient_from(s, b);
         }
-        if (line && style && (paint.kind != GSHSCENE_PAINT_GRADIENT || paint.gradient)) {
+        if (line && style && (paint.kind != GSHSCENE_PAINT_GRADIENT || paint.resource)) {
           GSHSCENE_Result sr = gshscene_list_stroke(list, line, style, placed, &paint, layer, d);
           CHECK(sr == GSHSCENE_OK || sr == GSHSCENE_ERR_OOM);
         }

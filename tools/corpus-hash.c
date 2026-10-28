@@ -1093,7 +1093,7 @@ static void gradient_section(void) {
     item.kind = GSHSCENE_ITEM_FILL;
     item.map = random_map();
     item.paint.kind = GSHSCENE_PAINT_GRADIENT;
-    item.paint.gradient = gradients[i];
+    item.paint.resource = gradients[i];
     GSHGEOM_Map instances[2];
     instances[0] = random_map();
     instances[1] = random_map();
@@ -1185,7 +1185,7 @@ static void gradient_section(void) {
       GSHSCENE_Paint p;
       memset(&p, 0, sizeof p);
       p.kind = GSHSCENE_PAINT_GRADIENT;
-      p.gradient = gradients[between(0, 23)];
+      p.resource = gradients[between(0, 23)];
       p.rgba[3] = (entry() + 1.0) / 2.0;
       GSHGEOM_Map map = random_map();
       check(gshscene_list_fill(list, shape, &map, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), "gradient fill");

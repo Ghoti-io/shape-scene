@@ -563,7 +563,7 @@ GSHSCENE_Result gshscene_centerline_box(const GSHSCENE_Resource * resource, GSHG
 
 /** The gradient a stroke paints with, or NULL. */
 static const GSHSCENE_Resource * paint_gradient(const GSHSCENE_Item * item) {
-  const GSHSCENE_Resource * g = item->paint.kind == GSHSCENE_PAINT_GRADIENT ? item->paint.gradient : NULL;
+  const GSHSCENE_Resource * g = item->paint.kind == GSHSCENE_PAINT_GRADIENT ? item->paint.resource : NULL;
   return g && g->kind == GSHSCENE_RESOURCE_GRADIENT ? g : NULL;
 }
 

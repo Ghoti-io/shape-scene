@@ -297,7 +297,7 @@ GSHSCENE_Result gshscene_list_fill_gradient_fixed(GSHSCENE_List * list, const GS
   memset(&p, 0, sizeof p);
   p.kind = GSHSCENE_PAINT_GRADIENT;
   p.rgba[3] = fixed_value(alpha, bits);
-  p.gradient = gradient;
+  p.resource = gradient;
   GSHGEOM_Map map;
   GSHSCENE_Result r = design_map(resource, ops, op_count, &map);
   return r == GSHSCENE_OK ? gshscene_list_fill(list, resource, &map, rule, &p, layer, 0.0) : r;
@@ -335,7 +335,7 @@ GSHSCENE_Result gshscene_list_fill_plane_gradient_fixed(GSHSCENE_List * list, co
   memset(&p, 0, sizeof p);
   p.kind = GSHSCENE_PAINT_GRADIENT;
   p.rgba[3] = fixed_value(alpha, bits);
-  p.gradient = gradient;
+  p.resource = gradient;
   return fill_plane(list, plane, frame, ops, op_count, rule, &p, layer);
 }
 

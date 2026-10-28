@@ -309,7 +309,7 @@ TEST(PlaneSink, ARecordsGradientIsNamedAsOnAnyFill) {
   ListHolder l(s.store);
   GSHSCENE_Paint p{};
   p.kind = GSHSCENE_PAINT_GRADIENT;
-  p.gradient = gr;
+  p.resource = gr;
   p.rgba[3] = 1.0;
   ASSERT_EQ(gshscene_list_fill(l.list, plane.get(), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK);
   ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
@@ -427,7 +427,7 @@ TEST(PlaneFixed, TheGradientFillTakesTheGradientAndTheItemMap) {
   ASSERT_EQ(gshscene_list_item(l.list, 0, &item), GSHSCENE_OK);
   EXPECT_EQ(item->resource, plane.get());
   EXPECT_EQ(item->paint.kind, GSHSCENE_PAINT_GRADIENT);
-  EXPECT_EQ(item->paint.gradient, grad.get());
+  EXPECT_EQ(item->paint.resource, grad.get());
   EXPECT_EQ(item->paint.rgba[3], 0.5);
   EXPECT_EQ(gshscene_list_fill_plane_gradient_fixed(l.list, plane.get(), f.run.get(), &move, 1, GSHGEOM_FILL_NONZERO,
                 grad.get(), -1, 14, 2),

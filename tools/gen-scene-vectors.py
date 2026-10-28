@@ -507,7 +507,7 @@ def item_line(it):
     k = it["k"]
     ld = "layer=%d depth=%016x" % (it["layer"], bits(it["depth"])) if k != CLIP_POP and k != GROUP_POP else ""
     if k == FILL:
-        return "F res=%s:%016x map=%016x rule=%d paint=%d %s space=%s entry=%d gradient=%016x %s" % (
+        return "F res=%s:%016x map=%016x rule=%d paint=%d %s space=%s entry=%d resource=%016x %s" % (
             KIND_NAME[it["rkind"]], it["rhash"], it["mhash"], it["rule"], it["paint"],
             " ".join("%016x" % bits(c) for c in it["rgba"]), space_text(it["space"]), it["entry"], it["grad"], ld)
     if k == CLIP_PUSH:
@@ -521,7 +521,7 @@ def item_line(it):
     if k == GROUP_POP:
         return "g"
     if k == STROKE:
-        return "K res=%s:%016x style=%016x map=%016x paint=%d %s space=%s entry=%d gradient=%016x %s" % (
+        return "K res=%s:%016x style=%016x map=%016x paint=%d %s space=%s entry=%d resource=%016x %s" % (
             KIND_NAME[it["rkind"]], it["rhash"], it["shash"], it["mhash"], it["paint"],
             " ".join("%016x" % bits(c) for c in it["rgba"]), space_text(it["space"]), it["entry"], it["grad"], ld)
     if k == PLACEHOLDER:
@@ -760,7 +760,7 @@ def node_line(n):
             bits(n["depth"]), clip_text, children)
     if n["kind"] in (NODE_SHAPE, NODE_STROKE):
         style = " style=%016x" % n["style"] if n["kind"] == NODE_STROKE else ""
-        return "%s res=%s:%016x%s map=%016x rule=%d paint=%d %s space=%s entry=%d gradient=%016x layer=%d depth=%016x" % (
+        return "%s res=%s:%016x%s map=%016x rule=%d paint=%d %s space=%s entry=%d resource=%016x layer=%d depth=%016x" % (
             head, KIND_NAME[n["res"][0]], n["res"][1], style, n["map"], n["rule"], n["paint"],
             " ".join("%016x" % bits(c) for c in n["rgba"]), space_text(n["space"]), n["entry"], n["grad"], n["layer"],
             bits(n["depth"]))
