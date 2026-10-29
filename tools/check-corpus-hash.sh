@@ -12,7 +12,7 @@
 # plane section's (color-paint story P4), another, and whose `placeholder-hash` and `placeholder-count` lines are the
 # placeholder section's, a fourth, and whose `image-hash` and `image-count` lines are the image section's (masks-images-patterns
 # story I1), a fifth, and whose `image-paint-hash` and `image-paint-count` lines are the image-paint section's (story I2), a
-# sixth.  No value may be empty, so a probe that crashed, or a
+# sixth, and whose `mask-hash` and `mask-count` lines are the mask section's (story M1), a seventh.  No value may be empty, so a probe that crashed, or a
 # hash file that was emptied, fails rather than comparing nothing with nothing.
 probe="${1:?usage: check-corpus-hash.sh PROBE HASH_FILE}"
 file="${2:?usage: check-corpus-hash.sh PROBE HASH_FILE}"
@@ -38,6 +38,10 @@ got_mhash=$(printf '%s\n' "$got" | awk '$1=="shape-scene.image-paint-hash"{print
 got_mcount=$(printf '%s\n' "$got" | awk '$1=="shape-scene.image-paint-count"{print $2}')
 want_mhash=$(awk '$1=="image-paint-hash"{print $2}' "$file" 2>/dev/null)
 want_mcount=$(awk '$1=="image-paint-count"{print $2}' "$file" 2>/dev/null)
+got_khash=$(printf '%s\n' "$got" | awk '$1=="shape-scene.mask-hash"{print $2}')
+got_kcount=$(printf '%s\n' "$got" | awk '$1=="shape-scene.mask-count"{print $2}')
+want_khash=$(awk '$1=="mask-hash"{print $2}' "$file" 2>/dev/null)
+want_kcount=$(awk '$1=="mask-count"{print $2}' "$file" 2>/dev/null)
 want_hash=$(awk '$1=="hash"{print $2}' "$file" 2>/dev/null)
 want_count=$(awk '$1=="count"{print $2}' "$file" 2>/dev/null)
 want_shash=$(awk '$1=="stroke-hash"{print $2}' "$file" 2>/dev/null)
@@ -47,10 +51,11 @@ if [ -z "$want_hash" ] || [ -z "$want_count" ] || [ -z "$got_hash" ] || [ -z "$g
    [ -z "$want_phash" ] || [ -z "$want_pcount" ] || [ -z "$got_phash" ] || [ -z "$got_pcount" ] ||
    [ -z "$want_hhash" ] || [ -z "$want_hcount" ] || [ -z "$got_hhash" ] || [ -z "$got_hcount" ] ||
    [ -z "$want_ihash" ] || [ -z "$want_icount" ] || [ -z "$got_ihash" ] || [ -z "$got_icount" ] ||
-   [ -z "$want_mhash" ] || [ -z "$want_mcount" ] || [ -z "$got_mhash" ] || [ -z "$got_mcount" ]; then
-  printf 'check-corpus-hash: nothing to compare (probe %s/%s, strokes %s/%s, planes %s/%s, placeholders %s/%s, images %s/%s and image paints %s/%s; committed %s/%s, %s/%s, %s/%s, %s/%s, %s/%s and %s/%s in %s)\n' \
-    "$got_hash" "$got_count" "$got_shash" "$got_scount" "$got_phash" "$got_pcount" "$got_hhash" "$got_hcount" "$got_ihash" "$got_icount" "$got_mhash" "$got_mcount" \
-    "$want_hash" "$want_count" "$want_shash" "$want_scount" "$want_phash" "$want_pcount" "$want_hhash" "$want_hcount" "$want_ihash" "$want_icount" "$want_mhash" "$want_mcount" "$file" >&2
+   [ -z "$want_mhash" ] || [ -z "$want_mcount" ] || [ -z "$got_mhash" ] || [ -z "$got_mcount" ] ||
+   [ -z "$want_khash" ] || [ -z "$want_kcount" ] || [ -z "$got_khash" ] || [ -z "$got_kcount" ]; then
+  printf 'check-corpus-hash: nothing to compare (probe %s/%s, strokes %s/%s, planes %s/%s, placeholders %s/%s, images %s/%s, image paints %s/%s and masks %s/%s; committed %s/%s, %s/%s, %s/%s, %s/%s, %s/%s, %s/%s and %s/%s in %s)\n' \
+    "$got_hash" "$got_count" "$got_shash" "$got_scount" "$got_phash" "$got_pcount" "$got_hhash" "$got_hcount" "$got_ihash" "$got_icount" "$got_mhash" "$got_mcount" "$got_khash" "$got_kcount" \
+    "$want_hash" "$want_count" "$want_shash" "$want_scount" "$want_phash" "$want_pcount" "$want_hhash" "$want_hcount" "$want_ihash" "$want_icount" "$want_mhash" "$want_mcount" "$want_khash" "$want_kcount" "$file" >&2
   exit 1
 fi
 if [ "$got_hash" != "$want_hash" ] || [ "$got_count" != "$want_count" ]; then
@@ -83,4 +88,9 @@ if [ "$got_mhash" != "$want_mhash" ] || [ "$got_mcount" != "$want_mcount" ]; the
     "$got_mhash" "$got_mcount" "$want_mhash" "$want_mcount" >&2
   exit 1
 fi
-printf 'check-corpus-hash: ok, %s over %s results; strokes %s over %s; planes %s over %s; placeholders %s over %s; images %s over %s; image paints %s over %s\n' "$got_hash" "$got_count" "$got_shash" "$got_scount" "$got_phash" "$got_pcount" "$got_hhash" "$got_hcount" "$got_ihash" "$got_icount" "$got_mhash" "$got_mcount"
+if [ "$got_khash" != "$want_khash" ] || [ "$got_kcount" != "$want_kcount" ]; then
+  printf 'check-corpus-hash: FAIL: masks %s over %s results, committed %s over %s\n' \
+    "$got_khash" "$got_kcount" "$want_khash" "$want_kcount" >&2
+  exit 1
+fi
+printf 'check-corpus-hash: ok, %s over %s results; strokes %s over %s; planes %s over %s; placeholders %s over %s; images %s over %s; image paints %s over %s; masks %s over %s\n' "$got_hash" "$got_count" "$got_shash" "$got_scount" "$got_phash" "$got_pcount" "$got_hhash" "$got_hcount" "$got_ihash" "$got_icount" "$got_mhash" "$got_mcount" "$got_khash" "$got_kcount"

@@ -79,7 +79,15 @@
  * spaces and tints, interned twice, lists of fills and strokes with them under random maps, and what each says: the notice
  * under random instance and target maps, the features it requires, the filter its composed map calls for, whether it is a
  * drawn image, its disposition under three sets of capabilities, and the test sink's render of the lists.
-  * It is built by `make check-corpus-hash` on the host and by
+ * Since masks-images-patterns story M1 a mask section folds, into a hash and count of their own (`shape-scene.mask-hash` and
+ * `shape-scene.mask-count`), masks of random mode, coefficient set, spaces, backdrop, transfer (every kind, with exponents,
+ * samples and stitching bounds not exact in binary) and acting-on over pictures that include one that holds a masked group,
+ * interned twice and told apart from their nearest neighbors: each mask's hash, content as read back, the features it needs,
+ * the coefficients and spaces it resolves to under three enclosing spaces and its transfer at ten inputs, lists of masked
+ * groups under random placements with the dispositions under four sets of capabilities and the test sink's renders (whose
+ * reports name an item refused inside a mask's picture), and a retained scene of group nodes with masks, placements and maps
+ * of their own, its emitted list, a change of a mask and of a placement, and the diff's damage.
+ * It is built by `make check-corpus-hash` on the host and by
  * suite/tools/xarch/shape.sh and suite/tools/xwin/shape.sh for the others.
  *
  * What it can see: byte order in a hash (the spelling is written from shifts), a
@@ -121,6 +129,8 @@ static GSHGEOM_Hash image_total; /* masks-images-patterns story I1: its own hash
 static unsigned long image_count;
 static GSHGEOM_Hash image_paint_total; /* masks-images-patterns story I2: its own hash, so the five above are unchanged */
 static unsigned long image_paint_count;
+static GSHGEOM_Hash mask_total; /* masks-images-patterns story M1: its own hash, so the six above are unchanged */
+static unsigned long mask_count;
 static GSHGEOM_Hash * acc = &total; /* where feed folds */
 static unsigned long * acc_count = &count;
 
@@ -2439,6 +2449,372 @@ static void placeholder_section(void) {
   acc_count = &count;
 }
 
+/* --- masks (masks-images-patterns story M1): folded into a hash of their own ------------------------------------- */
+
+#define MK_MASKS 24
+#define MK_PICTURES 4
+
+static void feed_space(const GSHSCENE_Color_Space * s) {
+  feed((uint64_t)s->primaries);
+  feed((uint64_t)s->transfer);
+  feed(gshgeom_f64_bits(s->gamma));
+}
+
+/** A mask's content as read back (canonical), its hash and the features it needs. */
+static void feed_mask(const GSHSCENE_Resource * mask) {
+  GSHSCENE_Mask m;
+  check(gshscene_resource_mask(mask, &m), "mask read");
+  feed(gshscene_resource_hash(mask));
+  feed((uint64_t)m.mode);
+  feed((uint64_t)m.coefficients);
+  feed((uint64_t)m.acts_on);
+  feed_space(&m.space);
+  feed_space(&m.render_space);
+  feed_space(&m.backdrop_space);
+  for (int i = 0; i < 3; i++) {
+    feed(gshgeom_f64_bits(m.backdrop[i]));
+  }
+  feed((uint64_t)m.transfer.kind);
+  feed(gshgeom_f64_bits(m.transfer.c0));
+  feed(gshgeom_f64_bits(m.transfer.c1));
+  feed(gshgeom_f64_bits(m.transfer.n));
+  feed((uint64_t)m.transfer.sample_count);
+  for (size_t i = 0; i < m.transfer.sample_count; i++) {
+    feed(gshgeom_f64_bits(m.transfer.samples[i]));
+  }
+  feed((uint64_t)m.transfer.piece_count);
+  for (size_t i = 0; i < m.transfer.piece_count; i++) {
+    const GSHSCENE_Transfer_Piece * p = &m.transfer.pieces[i];
+    feed(gshgeom_f64_bits(p->lo));
+    feed(gshgeom_f64_bits(p->hi));
+    feed(gshgeom_f64_bits(p->e0));
+    feed(gshgeom_f64_bits(p->e1));
+    feed((uint64_t)p->leaf_kind);
+    feed(gshgeom_f64_bits(p->c0));
+    feed(gshgeom_f64_bits(p->c1));
+    feed(gshgeom_f64_bits(p->n));
+    feed((uint64_t)p->sample_count);
+    for (size_t k = 0; k < p->sample_count; k++) {
+      feed(gshgeom_f64_bits(p->samples[k]));
+    }
+  }
+  feed((uint64_t)gshscene_mask_required(mask));
+}
+
+/** The coefficients and spaces a mask resolves to under three enclosing spaces, and its transfer at ten inputs: every
+ * target must round alike (the Y row of a gamut's matrix, the exponent's power, the table's and the stitching's arithmetic). */
+static void feed_mask_numbers(const GSHSCENE_Resource * mask) {
+  GSHSCENE_Color_Space enclosing[3];
+  memset(enclosing, 0, sizeof enclosing);
+  enclosing[0].primaries = GCOL_PRIMARIES_SRGB;
+  enclosing[0].transfer = GCOL_TRANSFER_SRGB;
+  enclosing[1].primaries = GCOL_PRIMARIES_DISPLAY_P3;
+  enclosing[1].transfer = GCOL_TRANSFER_LINEAR;
+  enclosing[2].primaries = GCOL_PRIMARIES_ADOBE_RGB;
+  enclosing[2].transfer = GCOL_TRANSFER_GAMMA;
+  enclosing[2].gamma = 2.2;
+  for (int e = 0; e < 3; e++) {
+    GSHSCENE_Mask_Resolved r;
+    GSHSCENE_Result rr = gshscene_mask_resolve(mask, &enclosing[e], &r);
+    feed((uint64_t)rr);
+    if (rr == GSHSCENE_OK) {
+      for (int k = 0; k < 3; k++) {
+        feed(gshgeom_f64_bits(r.k[k]));
+      }
+      feed_space(&r.render_space);
+      feed_space(&r.luminance_space);
+      feed_space(&r.backdrop_space);
+    }
+  }
+  static const double xs[10] = {0.0, 1.0 / 64.0, 0.2, 1.0 / 3.0, 0.5, 0.75, 1.0 - 1.0 / 64.0, 1.0, -0.25, 1.5};
+  for (int i = 0; i < 10; i++) {
+    feed(gshgeom_f64_bits(gshscene_mask_transfer(mask, xs[i])));
+  }
+}
+
+/** A random valid mask content over @p picture; the transfer's arrays are in the caller's storage. */
+static void random_mask(const GSHSCENE_Resource * picture, GSHSCENE_Mask * m, double samples[8], GSHSCENE_Transfer_Piece pieces[4],
+    double piece_samples[4][4]) {
+  memset(m, 0, sizeof *m);
+  m->picture = picture;
+  m->mode = between(1, 2);
+  m->acts_on = between(0, 1);
+  if (between(0, 2) == 0) {
+    m->render_space = random_space();
+  }
+  if (m->mode == GSHSCENE_MASK_LUMINANCE) {
+    m->coefficients = between(0, 3);
+    m->space = random_space();
+    if (between(0, 1)) {
+      for (int i = 0; i < 3; i++) {
+        m->backdrop[i] = thousandths(-500, 1500);
+      }
+      m->backdrop_space = random_space();
+    }
+  }
+  unsigned kind = between(0, 3);
+  m->transfer.kind = kind;
+  if (kind == GSHSCENE_TRANSFER_EXPONENTIAL) {
+    m->transfer.c0 = thousandths(0, 400);
+    m->transfer.c1 = thousandths(500, 1000);
+    m->transfer.n = thousandths(0, 4000);
+  } else if (kind == GSHSCENE_TRANSFER_TABLE) {
+    m->transfer.sample_count = between(2, 8);
+    for (size_t i = 0; i < m->transfer.sample_count; i++) {
+      samples[i] = thousandths(0, 1000);
+    }
+    m->transfer.samples = samples;
+  } else if (kind == GSHSCENE_TRANSFER_STITCHING) {
+    unsigned k = between(1, 4);
+    m->transfer.piece_count = k;
+    m->transfer.pieces = pieces;
+    for (unsigned i = 0; i < k; i++) {
+      memset(&pieces[i], 0, sizeof pieces[i]);
+      pieces[i].lo = i == 0 ? 0.0 : (double)i / (double)k; /* a division: not exact in binary */
+      pieces[i].hi = i + 1 == k ? 1.0 : (double)(i + 1) / (double)k;
+      pieces[i].e0 = thousandths(0, 1000);
+      pieces[i].e1 = thousandths(0, 1000);
+      pieces[i].leaf_kind = between(0, 2);
+      if (pieces[i].leaf_kind == GSHSCENE_TRANSFER_EXPONENTIAL) {
+        pieces[i].c0 = thousandths(0, 400);
+        pieces[i].c1 = thousandths(500, 1000);
+        pieces[i].n = thousandths(0, 4000);
+      } else if (pieces[i].leaf_kind == GSHSCENE_TRANSFER_TABLE) {
+        pieces[i].sample_count = between(2, 4);
+        for (size_t s = 0; s < pieces[i].sample_count; s++) {
+          piece_samples[i][s] = thousandths(0, 1000);
+        }
+        pieces[i].samples = piece_samples[i];
+      }
+    }
+  }
+}
+
+static void mask_section(void) {
+  acc = &mask_total;
+  acc_count = &mask_count;
+  gshgeom_hash_init(&mask_total);
+  GSHSCENE_Store * store = NULL;
+  check(gshscene_store_create(NULL, NULL, &store), "mask store");
+  const GSHSCENE_Resource * paths[6];
+  for (unsigned i = 0; i < 6; i++) {
+    GSHGEOM_Path * path = random_path(2);
+    check(gshscene_store_intern_path(store, path, &paths[i]), "mask path");
+    gshgeom_path_destroy(path);
+  }
+  /* Pictures: some fills under random maps; a fill and a placeholder no sink draws (the plan reports it inside the mask); one
+   * fill in a half-transparent group; and, below, one that holds a masked group (a mask of a mask). */
+  const GSHSCENE_Resource * pictures[MK_PICTURES] = {NULL, NULL, NULL, NULL};
+  for (unsigned p = 0; p < 3; p++) {
+    GSHSCENE_List * list = NULL;
+    check(gshscene_list_create(NULL, NULL, store, &list), "mask picture list");
+    if (p == 2) {
+      GSHSCENE_Group g = random_group_props();
+      g.opacity = 0.5;
+      check(gshscene_list_group_push(list, &g, 0, 0.0), "mask picture group");
+    }
+    unsigned fills = p == 1 ? 1 : 3;
+    for (unsigned f = 0; f < fills; f++) {
+      GSHGEOM_Map map = random_map();
+      GSHSCENE_Paint paint = random_paint();
+      check(gshscene_list_fill(list, paths[between(0, 5)], &map, GSHGEOM_FILL_NONZERO, &paint, (int32_t)f, 0.0), "mask picture fill");
+    }
+    if (p == 1) {
+      const double box[4] = {1.0, 2.0, 9.0, 8.0};
+      check(gshscene_list_placeholder(list, GSHSCENE_PLACEHOLDER_SOURCE_COLR, GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED, 0, box, NULL, 0, 0.0),
+          "mask picture placeholder");
+    }
+    if (p == 2) {
+      check(gshscene_list_group_pop(list), "mask picture pop");
+    }
+    check(gshscene_list_close(list), "mask picture close");
+    check(gshscene_store_intern_picture(store, list, &pictures[p]), "mask picture");
+    gshscene_list_destroy(list);
+    feed(gshscene_resource_hash(pictures[p]));
+  }
+  const GSHSCENE_Resource * masks[MK_MASKS];
+  for (unsigned i = 0; i < MK_MASKS; i++) {
+    if (i == 12) {
+      /* The picture that holds a masked group: a mask whose picture names another mask. */
+      GSHSCENE_List * list = NULL;
+      check(gshscene_list_create(NULL, NULL, store, &list), "nested list");
+      GSHSCENE_Group g = random_group_props();
+      g.soft_mask = masks[0];
+      g.soft_mask_map = random_map();
+      check(gshscene_list_group_push(list, &g, 0, 0.0), "nested group");
+      GSHSCENE_Paint paint = random_paint();
+      check(gshscene_list_fill(list, paths[0], NULL, GSHGEOM_FILL_NONZERO, &paint, 0, 0.0), "nested fill");
+      check(gshscene_list_group_pop(list), "nested pop");
+      check(gshscene_list_close(list), "nested close");
+      check(gshscene_store_intern_picture(store, list, &pictures[3]), "nested picture");
+      gshscene_list_destroy(list);
+      feed(gshscene_resource_hash(pictures[3]));
+    }
+    GSHSCENE_Mask m;
+    double samples[8];
+    GSHSCENE_Transfer_Piece pieces[4];
+    double piece_samples[4][4];
+    random_mask(pictures[between(0, i < 12 ? 2u : 3u)], &m, samples, pieces, piece_samples);
+    check(gshscene_store_intern_mask(store, &m, &masks[i]), "mask");
+    const GSHSCENE_Resource * again = NULL;
+    check(gshscene_store_intern_mask(store, &m, &again), "mask again");
+    if (again != masks[i]) {
+      fail("a mask interned twice is two handles");
+    }
+    gshscene_resource_release(again);
+    feed_mask(masks[i]);
+    feed_mask_numbers(masks[i]);
+    /* Its nearest neighbor (the acting-on) is another handle with another hash. */
+    GSHSCENE_Mask near_m = m;
+    near_m.acts_on = m.acts_on ^ 1u;
+    const GSHSCENE_Resource * other = NULL;
+    check(gshscene_store_intern_mask(store, &near_m, &other), "near mask");
+    if (other == masks[i] || gshscene_resource_hash(other) == gshscene_resource_hash(masks[i])) {
+      fail("two masks one field apart are one");
+    }
+    feed(gshscene_resource_hash(other));
+    gshscene_resource_release(other);
+  }
+  GSHSCENE_Store_Stats stats;
+  check(gshscene_store_stats(store, &stats), "mask stats");
+  feed(stats.created);
+  feed(stats.hits);
+  feed(stats.bytes);
+  /* Lists of masked groups: random masks and placements, the group's other fields, and the dispositions under four caps. */
+  GSHSCENE_Dump_Sink_Config config;
+  gshscene_dump_sink_config_default(&config);
+  GSHSCENE_Sink_Caps caps_full = config.raster_caps;
+  GSHSCENE_Sink_Caps caps_writer = caps_full;
+  caps_writer.mask_native = GSHSCENE_MASK_NATIVE_ALPHA | GSHSCENE_MASK_NATIVE_LUMINANCE | GSHSCENE_MASK_NATIVE_COEFF_W3C |
+      GSHSCENE_MASK_NATIVE_COEFF_REC709 | GSHSCENE_MASK_NATIVE_SPACES;
+  GSHSCENE_Sink_Caps caps_plain = caps_full;
+  caps_plain.mask_native &= ~(GSHSCENE_MASK_NATIVE_TRANSFER_TABLE | GSHSCENE_MASK_NATIVE_TRANSFER_STITCHING |
+      GSHSCENE_MASK_NATIVE_ACTS_ON_SHAPE | GSHSCENE_MASK_NATIVE_BACKDROP);
+  GSHSCENE_Sink_Caps caps_none = caps_full;
+  caps_none.flags &= ~GSHSCENE_CAP_GROUP_SOFT_MASK;
+  caps_none.mask_native = 0;
+  const GSHSCENE_Sink_Caps * variants[4] = {&caps_full, &caps_writer, &caps_plain, &caps_none};
+  for (unsigned l = 0; l < 10; l++) {
+    GSHSCENE_List * list = NULL;
+    check(gshscene_list_create(NULL, NULL, store, &list), "mask list");
+    GSHSCENE_Paint back = random_paint();
+    check(gshscene_list_fill(list, paths[between(0, 5)], NULL, GSHGEOM_FILL_NONZERO, &back, 0, 0.0), "mask backdrop");
+    for (unsigned g = 0; g < 4; g++) {
+      GSHSCENE_Group group = random_group_props();
+      if (between(0, 3) != 0) {
+        group.soft_mask = masks[between(0, MK_MASKS - 1)];
+        unsigned place = between(0, 3);
+        if (place == 1) {
+          double tx = thousandths(-3000, 3000);
+          double ty = thousandths(-3000, 3000);
+          gshgeom_map_translate(2, tx, ty, 0.0, &group.soft_mask_map);
+        } else if (place == 2) {
+          group.soft_mask_map = random_map();
+        } else if (place == 3) {
+          const double flat[4] = {thousandths(500, 1500), 0.0, 0.0, 0.0}; /* rank one: singular */
+          const double zero[2] = {0.0, 0.0};
+          if (gshgeom_map_from_matrix(2, flat, zero, &group.soft_mask_map) != GSHGEOM_OK) {
+            fail("singular placement");
+          }
+        }
+      }
+      if (between(0, 3) == 0) {
+        group.isolation = between(0, 1);
+        group.knockout = between(0, 1);
+      }
+      check(gshscene_list_group_push(list, &group, (int32_t)g, 0.0), "mask group");
+      GSHSCENE_Paint paint = random_paint();
+      check(gshscene_list_fill(list, paths[between(0, 5)], NULL, GSHGEOM_FILL_NONZERO, &paint, 0, 0.0), "mask fill");
+      check(gshscene_list_group_pop(list), "mask pop");
+    }
+    check(gshscene_list_close(list), "mask close");
+    feed(gshscene_list_hash(list));
+    feed((uint64_t)gshscene_list_count(list));
+    feed((uint64_t)gshscene_list_expansion(list));
+    feed_ties(list);
+    GSHGEOM_Map target = random_map();
+    for (size_t i = 0; i < gshscene_list_count(list); i++) {
+      const GSHSCENE_Item * item = NULL;
+      check(gshscene_list_item(list, i, &item), "mask item");
+      if (item->kind != GSHSCENE_ITEM_GROUP_PUSH) {
+        continue;
+      }
+      feed(gshgeom_map_hash(&item->group.soft_mask_map));
+      for (int v = 0; v < 4; v++) {
+        GSHSCENE_Color_Space target_space;
+        memset(&target_space, 0, sizeof target_space);
+        GSHSCENE_Disposition d = gshscene_caps_disposition(variants[v], item, NULL, 0, &target, &target_space, NULL);
+        feed((uint64_t)d.entry_class);
+        feed((uint64_t)d.reason);
+        feed(d.detail);
+      }
+    }
+    feed_render(list);
+    gshscene_list_destroy(list);
+  }
+  /* A retained scene: group nodes with masks, a placement and a map of their own, emitted (the placement composed with the
+   * node's map), then one mask and one placement changed, diffed. */
+  GSHSCENE_Scene * scene = NULL;
+  check(gshscene_scene_create(NULL, NULL, store, &scene), "mask scene");
+  GSHSCENE_Edit * edit = NULL;
+  check(gshscene_scene_open_edit(scene, NULL, &edit), "mask edit");
+  uint64_t groups[4];
+  for (unsigned i = 0; i < 4; i++) {
+    GSHSCENE_Node n;
+    gshscene_node_init(GSHSCENE_NODE_GROUP, &n);
+    n.map = random_map();
+    n.soft_mask = masks[between(0, MK_MASKS - 1)];
+    n.soft_mask_map = random_map();
+    n.isolation = between(0, 1);
+    groups[i] = add_node(edit, GSHSCENE_ROOT_ID, &n, NULL);
+    GSHSCENE_Node shape;
+    gshscene_node_init(GSHSCENE_NODE_SHAPE, &shape);
+    shape.resource = paths[i];
+    shape.paint = random_paint();
+    add_node(edit, groups[i], &shape, NULL);
+  }
+  const GSHSCENE_Version * v1 = NULL;
+  check(gshscene_scene_publish(scene, edit, NULL, &v1), "mask publish");
+  gshscene_edit_destroy(edit);
+  feed_version(v1);
+  const GSHSCENE_List * emitted = NULL;
+  check(gshscene_version_list(v1, &emitted), "mask emit");
+  feed_render(emitted);
+  check(gshscene_scene_open_edit(scene, v1, &edit), "mask second edit");
+  GSHSCENE_Node changed;
+  gshscene_node_init(GSHSCENE_NODE_GROUP, &changed);
+  changed.map = random_map();
+  changed.soft_mask = masks[between(0, MK_MASKS - 1)];
+  changed.soft_mask_map = random_map();
+  check(gshscene_edit_set(edit, groups[between(0, 3)], &changed), "mask node set");
+  const GSHSCENE_Version * v2 = NULL;
+  check(gshscene_scene_publish(scene, edit, NULL, &v2), "mask second publish");
+  gshscene_edit_destroy(edit);
+  feed_version(v2);
+  feed_diff(v1, v2, NULL);
+  GSHGEOM_Map view = random_map();
+  feed_diff(v1, v2, &view);
+  gshscene_version_release(v1);
+  gshscene_version_release(v2);
+  gshscene_scene_destroy(scene);
+  for (unsigned i = 0; i < MK_MASKS; i++) {
+    gshscene_resource_release(masks[i]);
+  }
+  for (unsigned i = 0; i < MK_PICTURES; i++) {
+    gshscene_resource_release(pictures[i]);
+  }
+  for (unsigned i = 0; i < 6; i++) {
+    gshscene_resource_release(paths[i]);
+  }
+  check(gshscene_store_stats(store, &stats), "mask final stats");
+  feed(stats.created);
+  feed(stats.hits);
+  if (stats.live != 0 || stats.bytes != 0) {
+    fail("a mask resource is still live after every handle was released");
+  }
+  gshscene_store_destroy(store);
+}
+
 int main(void) {
   gshgeom_hash_init(&total);
   GSHSCENE_Store * store = NULL;
@@ -2628,5 +3004,8 @@ int main(void) {
   image_paint_section();
   printf("shape-scene.image-paint-hash %016" PRIx64 "\n", gshgeom_hash_value(&image_paint_total));
   printf("shape-scene.image-paint-count %lu\n", image_paint_count);
+  mask_section();
+  printf("shape-scene.mask-hash %016" PRIx64 "\n", gshgeom_hash_value(&mask_total));
+  printf("shape-scene.mask-count %lu\n", mask_count);
   return 0;
 }
