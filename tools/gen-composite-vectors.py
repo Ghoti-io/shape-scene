@@ -42,7 +42,16 @@ combination's vectors bit for bit.
 
     python3 tools/gen-composite-vectors.py > tests/composite_vectors.h
     python3 tools/gen-composite-vectors.py --groups > tests/group_vectors.h
+    python3 tools/gen-composite-vectors.py --masks > tests/mask_vectors.h
     python3 tools/gen-composite-vectors.py --check
+    python3 tools/gen-composite-vectors.py --masks --check [--plant NAME]
+
+tests/mask_vectors.h (--masks) holds the soft mask (MK1 to MK7): the mask's value from its picture through every mode,
+coefficient set, backdrop and transfer (probe scenes whose answer is the value itself), the outside value, the transfer
+edges, a masked group under all four isolated and knockout parents and the operators of every family with the value
+acting on opacity and on shape, the order of clip, mask, opacity and blend, a mask of a mask; and two tables of known
+answers for ``gshscene_mask_transfer`` and ``gshscene_mask_resolve``.  A `--plant` breaks one rule of the oracle's
+mask on purpose (``composite-oracle.py --selftest --plant`` lists them) and the check must then fail.
 """
 import importlib.util
 import os
@@ -878,9 +887,515 @@ def render_groups():
     return "".join(out)
 
 
+
+# --- MK1 to MK7: the soft mask (tests/mask_vectors.h) ---------------------------------------------------------------
+ALPHA, LUMINANCE = oracle.MASK_ALPHA, oracle.MASK_LUMINANCE
+OPACITY, SHAPE = oracle.ACTS_OPACITY, oracle.ACTS_SHAPE
+IDENT = oracle.IDENTITY
+W3C, REC709, LUMC, SPACE_Y = 0, 1, 2, 3
+
+
+def mask(pic, mode=ALPHA, coeff=0, space=TARGET, rspace=TARGET, backdrop=(0.0, 0.0, 0.0), bspace=TARGET, tr=IDENT, acts=OPACITY):
+    return dict(pic=pic, mode=mode, coeff=coeff, space=space, rspace=rspace, backdrop=backdrop, bspace=bspace, tr=tr, acts=acts)
+
+
+def mgroup(m, isolation=0, knockout=0, opacity=1.0, op="src-over", blend=TARGET):
+    g = tgroup(isolation, knockout, opacity, op, blend)
+    g["mask"] = m
+    return g
+
+
+WHITE = fill((1.0, 1.0, 1.0, 1.0))
+PIC_A = [fill((1.0, 0.5, 0.25, 0.75))]                                            # alpha 3/4
+PIC_B = [fill((0.0, 0.5, 1.0, 1.0), 0.5), fill((1.0, 0.25, 0.0, 0.5), 0.25)]       # two partial fills, overlapping
+PIC_E = []                                                                        # draws nothing
+PIC_H = [fill((1.0, 0.5, 0.25, 0.75), 0.0)]                                       # a fill of coverage 0
+PIC_N = [group(0.5), fill((0.25, 0.75, 0.5, 1.0)), fill((1.0, 0.0, 0.0, 0.5), 0.5), pop()]   # a group inside the picture
+PIC_C = [clip(0.5), fill((0.5, 0.5, 1.0, 1.0)), unclip()]                          # clipped to half
+PIC_D = [fill((0.25, 0.75, 0.5, 0.6), 0.7)]                                       # a non-dyadic alpha
+PIC_T = [fill((0.0, 0.5, 1.0, 0.5))]                                              # translucent
+PIC_O = [fill((1.5, -0.5, 0.25, 1.0))]                                            # out of range
+PIC_G = [fill((0.5, 0.5, 0.5, 1.0))]                                              # opaque gray
+PIC_R, PIC_GR, PIC_BL = [fill((1.0, 0.0, 0.0, 1.0))], [fill((0.0, 1.0, 0.0, 1.0))], [fill((0.0, 0.0, 1.0, 1.0))]
+PICTURES = [("alpha 3/4", PIC_A), ("two partial fills", PIC_B), ("white", [WHITE]), ("empty", PIC_E), ("a fill of coverage 0", PIC_H),
+            ("a group inside", PIC_N), ("a clip inside", PIC_C), ("a non-dyadic alpha", PIC_D)]
+
+TRANSFERS = [
+    ("identity", IDENT),
+    ("exponential n=2", ("exp", 0.0, 1.0, 2.0)),
+    ("exponential n=0.5", ("exp", 0.0, 1.0, 0.5)),
+    ("exponential c0=1/4 c1=3/4 n=1", ("exp", 0.25, 0.75, 1.0)),
+    ("exponential past [0,1]", ("exp", -0.5, 1.5, 1.0)),
+    ("exponential n=0", ("exp", 0.25, 0.75, 0.0)),
+    ("exponential reversed", ("exp", 1.0, 0.0, 1.0)),
+    ("exponential n=3", ("exp", 0.0, 1.0, 3.0)),
+    ("table [0,1]", ("table", [0.0, 1.0])),
+    ("table of four", ("table", [0.0, 0.5, 0.5, 1.0])),
+    ("table of three, a bump", ("table", [0.0, 1.0, 0.0])),
+    ("table past [0,1]", ("table", [-0.5, 1.5, 0.25])),
+    ("stitching of one piece", ("stitch", [(0.0, 1.0, 0.0, 1.0, ("exp", 0.0, 1.0, 2.0))])),
+    ("stitching of two pieces", ("stitch", [(0.0, 0.5, 0.0, 1.0, IDENT), (0.5, 1.0, 0.25, 0.75, IDENT)])),
+    ("stitching of three, mixed leaves", ("stitch", [(0.0, 0.25, 0.0, 1.0, ("exp", 0.5, 1.0, 1.0)), (0.25, 0.75, 1.0, 0.0, ("table", [0.0, 0.25, 1.0])),
+                                                     (0.75, 1.0, 0.0, 1.0, ("exp", 0.0, 1.0, 2.0))])),
+]
+TR_BY_NAME = dict(TRANSFERS)
+
+SPACE_CASES = []   # (name, space L, space R) for the luminance sweeps
+MASK_CASES = []
+
+
+def mcase(name, items, target=SRGB, backdrop=BACKDROP):
+    MASK_CASES.append(dict(name=name, items=items, target=target, backdrop=backdrop, fg=FG, palette=None))
+
+
+def probe(name, m, target=SRGB):
+    """A scene whose answer is the mask's value: an opaque white fill through a masked group over an empty target gives
+    (v, v, v, v)."""
+    mcase(name, [mgroup(m), WHITE, pop()], target=target, backdrop=(0.0, 0.0, 0.0, 0.0))
+
+
+# 1. The alpha mask: each picture through the identity, and the picture of alpha 3/4 through every transfer.
+for pname, pic in PICTURES:
+    probe("alpha mask of %s, identity" % pname, mask(pic))
+    if pname not in ("alpha 3/4", "two partial fills"):   # those two go through every transfer below
+        probe("alpha mask of %s, exponential n=2" % pname, mask(pic, tr=TR_BY_NAME["exponential n=2"]))
+for tname, tr in TRANSFERS[1:]:
+    probe("alpha mask of alpha 3/4, %s" % tname, mask(PIC_A, tr=tr))
+    probe("alpha mask of two partial fills, %s" % tname, mask(PIC_B, tr=tr))
+
+# 2. The luminance mask: every coefficient set over colored pictures, in R = L and R != L.
+LUM_COLORS = [("orange at 3/4", PIC_A), ("opaque blue", PIC_BL), ("opaque red", PIC_R), ("opaque green", PIC_GR),
+              ("translucent azure", PIC_T), ("two partial fills", PIC_B), ("out of range", PIC_O), ("a non-dyadic alpha", PIC_D),
+              ("opaque gray", PIC_G), ("a group inside", PIC_N)]
+for coeff, cname in ((W3C, "W3C"), (REC709, "REC709"), (LUMC, "LUM"), (SPACE_Y, "SPACE_Y")):
+    for pname, pic in LUM_COLORS:
+        probe("luminance %s of %s, black backdrop" % (cname, pname), mask(pic, LUMINANCE, coeff))
+    for lname, l_, r_ in (("L = linear sRGB, R = sRGB", LIN, SRGB), ("L = P3, R = sRGB", P3, SRGB), ("L = sRGB, R = linear P3", SRGB, LINP3),
+                          ("L = Adobe gamma, R = BT.2020 linear", ADOBE, BT2020L)):
+        for pname, pic in (("orange at 3/4", PIC_A), ("translucent azure", PIC_T)):
+            probe("luminance %s of %s, %s" % (cname, pname, lname), mask(pic, LUMINANCE, coeff, space=l_, rspace=r_))
+# gray invariance, written as vectors: gray is gray under every set
+for coeff, cname in ((W3C, "W3C"), (REC709, "REC709"), (LUMC, "LUM"), (SPACE_Y, "SPACE_Y")):
+    for sp, sname in ((SRGB, "sRGB"), (LIN, "linear sRGB"), (P3, "P3")):
+        probe("luminance %s of opaque gray in %s is gray" % (cname, sname), mask(PIC_G, LUMINANCE, coeff, space=sp, rspace=sp))
+
+# 3. The backdrop: black, white, a color in L, a color in another space, out of range; a picture that covers little and nothing.
+BACKDROPS = [("white", (1.0, 1.0, 1.0), TARGET), ("a color", (0.5, 0.25, 0.75), TARGET), ("a color given in P3", (0.5, 0.25, 0.75), P3),
+             ("out of range", (2.0, -1.0, 0.5), TARGET), ("red", (1.0, 0.0, 0.0), TARGET)]
+for bname, bk, bsp in BACKDROPS:
+    for pname, pic in (("orange at 3/4", PIC_A), ("translucent azure", PIC_T), ("empty", PIC_E), ("two partial fills", PIC_B)):
+        probe("luminance W3C of %s over a %s backdrop" % (pname, bname), mask(pic, LUMINANCE, W3C, backdrop=bk, bspace=bsp))
+        probe("luminance LUM of %s over a %s backdrop, L = linear sRGB, R = sRGB" % (pname, bname),
+              mask(pic, LUMINANCE, LUMC, space=LIN, rspace=SRGB, backdrop=bk, bspace=bsp))
+
+# 4. A luminance mask through each transfer; the outside value (MK5) for every mode, transfer and backdrop.
+for tname, tr in TRANSFERS[1:]:
+    probe("luminance W3C of orange at 3/4, %s" % tname, mask(PIC_A, LUMINANCE, W3C, tr=tr))
+for tname, tr in TRANSFERS:
+    for pname, pic in (("empty", PIC_E), ("a fill of coverage 0", PIC_H)):
+        probe("outside value, alpha mask of %s, %s" % (pname, tname), mask(pic, tr=tr))
+    probe("outside value, luminance REC709 over a color backdrop, %s" % tname,
+          mask(PIC_E, LUMINANCE, REC709, backdrop=(0.5, 0.25, 0.75), tr=tr))
+    probe("outside value, luminance LUM over a color backdrop in P3, R != L, %s" % tname,
+          mask(PIC_H, LUMINANCE, LUMC, space=LIN, rspace=SRGB, backdrop=(0.5, 0.25, 0.75), bspace=P3, tr=tr))
+
+# 5. The transfer's edges: the picture's alpha at a stitching bound, at 0 and 1, on a table's knots, exponent extremes.
+for x in (0.0, 0.25, 0.5, 0.75, 1.0, 0.3, 0.9999999999999999):
+    for tname in ("stitching of two pieces", "stitching of three, mixed leaves", "table of four", "table of three, a bump"):
+        probe("transfer edge: alpha %s through %s" % (x, tname), mask([fill((1.0, 1.0, 1.0, x))], tr=TR_BY_NAME[tname]))
+for n in (0.0, 1.0, 0.5, 2.0, 65536.0):
+    for x in (0.0, 0.5, 1.0):
+        probe("transfer edge: alpha %s through the exponent %s" % (x, n), mask([fill((1.0, 1.0, 1.0, x))], tr=("exp", 0.0, 1.0, n)))
+
+# 6. MK7: a masked group under all four parents, with the value acting on opacity and on shape, for the operators of every
+# family: source-over, blend modes, bounded Porter-Duff operators, unbounded ones.
+ACT_OPS = ["src-over", "multiply", "screen", "hue", "plus", "dest-over", "src-atop", "xor", "dest-out", "dest-in", "src", "src-in",
+           "src-out", "clear"]
+PARENTS = ((0, 0), (1, 0), (0, 1), (1, 1))
+M_ALPHA = mask(PIC_A)                                                        # v = 3/4
+M_LUM = mask(PIC_B, LUMINANCE, LUMC, tr=TR_BY_NAME["exponential n=2"])        # a luminance mask through a transfer
+
+
+def pname_(i, k):
+    return "%s, %s parent" % ("isolated" if i == 0 else "non-isolated", "knockout" if k else "not knockout")
+
+
+def acts_items(i, k, op, m, acts, inner=(0, 0), opacity=0.75):
+    return [tgroup(i, k), fill((0.0, 1.0, 0.0, 0.5), 0.5),
+            mgroup(dict(m, acts=acts), inner[0], inner[1], opacity, op), fill((1.0, 0.0, 0.0, 0.5)),
+            fill((0.0, 0.0, 1.0, 0.75), 0.5), pop(), pop()]
+
+
+ACT_RESULTS = {}
+for mname, m in (("alpha 3/4", M_ALPHA), ("luminance of two partial fills", M_LUM)):
+    for op in ACT_OPS:
+        if mname != "alpha 3/4" and op not in ("src-over", "multiply", "dest-in", "src"):
+            continue
+        for i, k in PARENTS:
+            for acts, an in ((OPACITY, "OPACITY"), (SHAPE, "SHAPE")):
+                mcase("%s mask acting on %s, %s group, %s" % (mname, an, op, pname_(i, k)), acts_items(i, k, op, m, acts))
+                ACT_RESULTS[(mname, op, i, k, an)] = len(MASK_CASES) - 1
+
+# 7. The masked group is itself non-isolated or knockout (T4, T5 compute its content first; the mask then acts on it).
+for op in ("src-over", "multiply", "dest-in"):
+    for ii, ik in PARENTS:
+        for acts, an in ((OPACITY, "OPACITY"), (SHAPE, "SHAPE")):
+            mcase("masked group %s, %s on %s" % (pname_(ii, ik), op, an), acts_items(0, 0, op, M_ALPHA, acts, inner=(ii, ik)))
+
+# 8. The order: clip, mask, opacity, then the blend and the composite (a product, then T5).
+for i, k in PARENTS:
+    for acts, an in ((OPACITY, "OPACITY"), (SHAPE, "SHAPE")):
+        mcase("clip 1/2, mask %s, opacity 3/4, multiply: %s" % (an, pname_(i, k)),
+              [tgroup(i, k), fill((0.0, 1.0, 0.0, 0.5), 0.5), clip(0.5), mgroup(dict(M_ALPHA, acts=acts), 0, 0, 0.75, "multiply"),
+               fill((1.0, 0.0, 0.0, 0.5)), fill((0.0, 0.0, 1.0, 0.75), 0.5), pop(), unclip(), pop()])
+
+# 9. R is the enclosing layer's space when it is zero: a masked group inside a group blended in linear light.
+for coeff, cname in ((W3C, "W3C"), (LUMC, "LUM")):
+    for acts, an in ((OPACITY, "OPACITY"), (SHAPE, "SHAPE")):
+        mcase("mask with R = the enclosing blend space (linear sRGB), %s, %s" % (cname, an),
+              [tgroup(0, 0, 1.0, "src-over", LIN), fill((0.5, 0.25, 0.75, 0.75), 0.5, SRGB),
+               mgroup(mask(PIC_B, LUMINANCE, coeff, acts=acts), 0, 0, 0.75, "src-over"), fill((1.0, 0.5, 0.0, 1.0), 0.75, SRGB), pop(), pop()])
+        mcase("mask with R = sRGB inside a group blended in linear light, %s, %s" % (cname, an),
+              [tgroup(0, 0, 1.0, "src-over", LIN), fill((0.5, 0.25, 0.75, 0.75), 0.5, SRGB),
+               mgroup(mask(PIC_B, LUMINANCE, coeff, rspace=SRGB, acts=acts), 0, 0, 0.75, "src-over"), fill((1.0, 0.5, 0.0, 1.0), 0.75, SRGB),
+               pop(), pop()])
+# ... and the picture is composited in R: translucent sRGB colors overlapping in linear light are not the same as in sRGB.
+PIC_X = [fill((0.8, 0.2, 0.4, 0.5), 1.0, SRGB), fill((0.1, 0.9, 0.3, 0.5), 1.0, SRGB), fill((0.9, 0.9, 0.1, 0.25), 0.5, SRGB)]
+for coeff, cname in ((W3C, "W3C"), (SPACE_Y, "SPACE_Y")):
+    probe("luminance %s of overlapping sRGB colors drawn in R = linear sRGB (enclosing sRGB)" % cname, mask(PIC_X, LUMINANCE, coeff, rspace=LIN))
+    probe("luminance %s of overlapping sRGB colors drawn in R = sRGB, L = linear sRGB" % cname, mask(PIC_X, LUMINANCE, coeff, space=LIN, rspace=SRGB))
+    mcase("luminance %s of overlapping sRGB colors with R the enclosing linear blend space" % cname,
+          [tgroup(0, 0, 1.0, "src-over", LIN), mgroup(mask(PIC_X, LUMINANCE, coeff), 0, 0, 1.0, "src-over"), WHITE, pop(), pop()],
+          backdrop=(0.0, 0.0, 0.0, 0.0))
+probe("alpha of overlapping sRGB colors, R = linear sRGB, through the identity", mask(PIC_X, rspace=LIN))
+mcase("a masked group in linear light over an sRGB target", [mgroup(mask(PIC_A, LUMINANCE, LUMC), 0, 0, 1.0, "src-over", LIN),
+                                                            fill((1.0, 0.5, 0.25, 0.75), 0.75, SRGB), pop()])
+
+# 10. A mask of a mask: the picture holds a masked group (the inner mask's R is the picture's, MK2), to depth two.
+INNER = mask([fill((1.0, 1.0, 1.0, 0.5))], tr=TR_BY_NAME["exponential n=2"])
+INNER_L = mask(PIC_B, LUMINANCE, LUMC, space=LIN)
+for acts, an in ((OPACITY, "OPACITY"), (SHAPE, "SHAPE")):
+    pic2 = [mgroup(dict(INNER, acts=acts), 0, 0, 1.0), fill((1.0, 0.5, 0.25, 0.75)), pop()]
+    mcase("mask of a mask: an alpha mask whose picture holds an alpha-masked group (%s)" % an,
+          [mgroup(mask(pic2)), WHITE, pop()], backdrop=(0.0, 0.0, 0.0, 0.0))
+    pic3 = [mgroup(dict(INNER_L, acts=acts), 0, 0, 1.0), fill((0.25, 0.75, 0.5, 1.0)), pop()]
+    mcase("mask of a mask: a luminance mask whose picture holds a luminance-masked group (%s)" % an,
+          [mgroup(mask(pic3, LUMINANCE, W3C, backdrop=(0.5, 0.5, 0.5))), WHITE, pop()], backdrop=(0.0, 0.0, 0.0, 0.0))
+pic4 = [mgroup(INNER, 0, 0, 1.0), fill((1.0, 0.5, 0.25, 0.75)), pop()]
+pic5 = [mgroup(mask(pic4), 0, 0, 1.0), fill((0.5, 0.75, 1.0, 1.0)), pop()]
+mcase("mask of a mask of a mask (depth three)", [mgroup(mask(pic5, LUMINANCE, REC709)), WHITE, pop()], backdrop=(0.0, 0.0, 0.0, 0.0))
+
+# 11. A target that is not sRGB, and a root that is not empty.
+mcase("a masked group over a half-transparent linear target", [mgroup(mask(PIC_T, LUMINANCE, LUMC), 0, 0, 1.0, "multiply"),
+                                                               fill((1.0, 0.5, 0.25, 1.0), 0.75), pop()], target=LIN, backdrop=(0.125, 0.0625, 0.25, 0.5))
+mcase("a masked group of opacity 0", [mgroup(M_ALPHA, 0, 0, 0.0, "src-over"), fill((1.0, 0.5, 0.25, 1.0)), pop()])
+mcase("a masked group of opacity 0 with an unbounded operator, acting on SHAPE",
+      [mgroup(dict(M_ALPHA, acts=SHAPE), 0, 0, 0.0, "src"), fill((1.0, 0.5, 0.25, 1.0)), pop()])
+mcase("an empty masked group, unbounded, on SHAPE", [mgroup(dict(M_ALPHA, acts=SHAPE), 0, 0, 1.0, "dest-in"), pop()])
+mcase("an empty masked group, unbounded, on OPACITY", [mgroup(M_ALPHA, 0, 0, 1.0, "dest-in"), pop()])
+
+
+# --- the table of masks, and the generator's own checks ---------------------------------------------------------------
+def canon(x):
+    if isinstance(x, dict):
+        return tuple(sorted((k, canon(v)) for k, v in x.items()))
+    if isinstance(x, (list, tuple)):
+        return tuple(canon(v) for v in x)
+    return x
+
+
+class MaskTable:
+    """Every mask a case or a table mentions, once, children before the masks that hold them."""
+
+    def __init__(self):
+        self.index = {}
+        self.masks = []
+
+    def add(self, m):
+        for it in m["pic"]:
+            if it.get("mask") is not None:
+                self.add(it["mask"])
+        key = canon(m)
+        if key not in self.index:
+            self.index[key] = len(self.masks)
+            self.masks.append(m)
+        return self.index[key]
+
+    def of(self, m):
+        return self.index[canon(m)]
+
+
+def walk_masks(items):
+    for it in items:
+        if it.get("mask") is not None:
+            yield it["mask"]
+
+
+def evaluate_mask_case(c):
+    items = [dict(it) for it in c["items"]]
+    return oracle.evaluate_general(items, [it["cov"] for it in items], c["fg"], c["target"], c["backdrop"], c["palette"])
+
+
+def mask_tree(m):
+    yield m
+    for child in walk_masks(m["pic"]):
+        yield from mask_tree(child)
+
+
+def transfer_exact(tr):
+    """Whether a double evaluation of the transfer is exact on dyadic inputs: the identity, a table, a stitching whose pieces
+    are of a power-of-two width over such leaves.  (A power is evaluated by gmath_pow and is never marked exact.)"""
+    if tr[0] in ("identity", "table"):
+        return True
+    if tr[0] == "stitch":
+        return all(F(hi - lo).numerator == 1 and (F(hi - lo).denominator & (F(hi - lo).denominator - 1)) == 0 and leaf[0] != "exp"
+                   for lo, hi, e0, e1, leaf in tr[1])
+    return False
+
+
+def mask_case_exact(c, got, inexact):
+    for it in c["items"]:
+        for top in walk_masks([it]):
+            for m in mask_tree(top):
+                if m["mode"] != ALPHA or not transfer_exact(m["tr"]):
+                    return False
+                if any(sp != TARGET for sp in (m["space"], m["bspace"])):
+                    return False
+                if any(p.get("k") == FILL and not oracle.is_target(p.get("space", TARGET)) for p in m["pic"]):
+                    return False
+                if any(p.get("k") == GROUP_PUSH and not oracle.is_target(p["blend"]) for p in m["pic"]):
+                    return False
+    blends = any(it["k"] == GROUP_PUSH and it["composite"] >= 13 for it in c["items"])
+    return (not inexact) and not converts(c) and not blends and all(is_dyadic_double(v) for v in got) and not any(
+        m["rspace"] != TARGET for top in walk_masks(c["items"]) for m in mask_tree(top))
+
+
+def check_distinguished():
+    """The vectors distinguish OPACITY from SHAPE where MK7 says they differ, and only there: under a knockout parent for
+    source-over and the blend modes, and under every parent for an unbounded operator; a bounded Porter-Duff operator
+    is affine in the source, so it agrees under a parent that is not knockout."""
+    pdf_ops = oracle.PDF_OPS
+    differs = 0
+    for (mname, op, i, k, an), n in ACT_RESULTS.items():
+        if an != "OPACITY":
+            continue
+        a, _ = evaluate_mask_case(MASK_CASES[n])
+        b, _ = evaluate_mask_case(MASK_CASES[ACT_RESULTS[(mname, op, i, k, "SHAPE")]])
+        expect = k == 1 or oracle.is_unbounded(op)
+        if (a != b) != expect:
+            sys.exit("gen-composite-vectors: OPACITY and SHAPE %s for %s under (%d, %d), %s" % (
+                "agree where they should differ" if expect else "differ where they should agree", op, i, k, mname))
+        differs += expect
+    if differs < 20:
+        sys.exit("gen-composite-vectors: too few vectors tell OPACITY from SHAPE (%d)" % differs)
+
+
+def check_mask_probes():
+    """Every probe's answer is (v, v, v, v) with v in [0, 1], and the family sweeps are not all one number."""
+    values = set()
+    for c in MASK_CASES:
+        if len(c["items"]) >= 3 and c["items"][0].get("mask") is not None and c["items"][1] is WHITE and c["backdrop"] == (0.0, 0.0, 0.0, 0.0):
+            got, _ = evaluate_mask_case(c)
+            if not (got[0] == got[1] == got[2] == got[3] and 0 <= got[0] <= 1):
+                sys.exit("gen-composite-vectors: the probe %r is not a value in [0, 1]: %s" % (c["name"], got))
+            values.add(got[0])
+    if len(values) < 60:
+        sys.exit("gen-composite-vectors: the probes take only %d distinct values" % len(values))
+
+
+SAMPLE_XS = [-0.25, 0.0, 0.0625, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1.0, 1.25, 0.3, 0.7, 0.3333333333333333, 0.9999999999999999]
+RESOLVE_ENCLOSING = [SRGB, LIN, P3, ADOBE]
+
+
+def transfer_rows(table):
+    rows = []
+    for tname, tr in TRANSFERS:
+        m = mask(PIC_E, tr=tr)
+        n = table.add(m)
+        for x in SAMPLE_XS:
+            ex = oracle.Exactness()
+            want = oracle.clamp01(oracle.transfer_raw(tr, oracle.clamp01(F(x)), ex))
+            exact = transfer_exact(tr) and not ex.inexact and is_dyadic_double(want) and F(x) == F(float(x)) and F(x).denominator <= 2 ** 20
+            rows.append((n, x, want, exact))
+    return rows
+
+
+def resolve_rows(table):
+    rows = []
+    masks = [("W3C", mask(PIC_E, LUMINANCE, W3C)), ("REC709", mask(PIC_E, LUMINANCE, REC709)), ("LUM", mask(PIC_E, LUMINANCE, LUMC))]
+    for sp in (SRGB, LIN, P3, LINP3, ADOBE, BT2020L):
+        masks.append(("SPACE_Y", mask(PIC_E, LUMINANCE, SPACE_Y, space=sp)))
+    masks.append(("SPACE_Y, R zero", mask(PIC_E, LUMINANCE, SPACE_Y)))
+    masks.append(("R explicit", mask(PIC_E, LUMINANCE, W3C, rspace=P3, bspace=ADOBE)))
+    masks.append(("L explicit, B", mask(PIC_E, LUMINANCE, REC709, space=LIN, rspace=SRGB, bspace=P3)))
+    for label, m in masks:
+        n = table.add(m)
+        for enc in RESOLVE_ENCLOSING:
+            r = enc if oracle.is_target(m["rspace"]) else m["rspace"]
+            l_ = r if oracle.is_target(m["space"]) else m["space"]
+            b = l_ if oracle.is_target(m["bspace"]) else m["bspace"]
+            k = oracle.coefficients(m["coeff"], l_)
+            rows.append((n, enc, [float(v) for v in k], r, l_, b, m["coeff"] != SPACE_Y))
+    return rows
+
+
+def render_masks():
+    for c in MASK_CASES:
+        if c["name"] in ("",):
+            sys.exit("unnamed case")
+    names = [c["name"] for c in MASK_CASES]
+    if len(set(names)) != len(names):
+        dup = sorted(n for n in set(names) if names.count(n) > 1)
+        sys.exit("gen-composite-vectors: duplicate mask case names: %s" % dup[:3])
+    check_distinguished()
+    check_mask_probes()
+    table = MaskTable()
+    for c in MASK_CASES:
+        for m in walk_masks(c["items"]):
+            table.add(m)
+    answers = transfer_rows(table)
+    resolves = resolve_rows(table)
+    out = []
+    out.append("// Generated by tools/gen-composite-vectors.py --masks from tools/composite-oracle.py (exact rationals).\n")
+    out.append("// Do not edit; run the generator.  Independent of the library's code.\n")
+    out.append("// The soft mask (MK1 to MK7 of shape-scene's documentation/design.md): a masked group's mask value from its picture's\n")
+    out.append("// rendered layer (alpha or luminance, the coefficient sets, the backdrop, the transfer, the outside value), and the value\n")
+    out.append("// substituted into the opacity or the shape of the group's composite, under the four isolated and knockout parents and\n")
+    out.append("// the operators of every family.  Plus the known answers of gshscene_mask_transfer and gshscene_mask_resolve.\n")
+    out.append("#ifndef GHOTI_IO_GSHSCENE_TEST_MASK_VECTORS_H\n#define GHOTI_IO_GSHSCENE_TEST_MASK_VECTORS_H\n\n")
+    out.append("namespace mask_vectors {\n\n")
+    out.append("struct VSpace {\n  int primaries;\n  int transfer;\n  double gamma;\n};\n\n")
+    out.append("// kind: 1 fill, 2 clip push, 3 clip pop, 4 group push, 5 group pop; a fill is solid.  isolation: 0 isolated, 1 not;\n")
+    out.append("// knockout: 0 or 1 (group push only).  mask: an index into kMasks, or -1 (group push only).  coverage: the shape the\n")
+    out.append("// test gives the fill or the clip push.\n")
+    out.append("struct VItem {\n  int kind;\n  double rgba[4];\n  VSpace space;\n  double opacity;\n  VSpace blend;\n  int composite;\n"
+               "  int isolation;\n  int knockout;\n  double coverage;\n  int mask;\n};\n\n")
+    out.append("// MK4: kind 0 identity, 1 exponential (c0, c1, n), 2 table (samples), 3 stitching (pieces; a piece's leaf is\n")
+    out.append("// 0, 1 or 2 with the leaf's own fields).\n")
+    out.append("struct VPiece {\n  double lo;\n  double hi;\n  double e0;\n  double e1;\n  int leaf_kind;\n  double c0;\n  double c1;\n  double n;\n"
+               "  int sample_count;\n  const double * samples;\n};\n\n")
+    out.append("struct VTransfer {\n  int kind;\n  double c0;\n  double c1;\n  double n;\n  int sample_count;\n  const double * samples;\n"
+               "  int piece_count;\n  const VPiece * pieces;\n};\n\n")
+    out.append("// MK1: mode 1 alpha, 2 luminance; coefficients 0 W3C, 1 REC709, 2 LUM, 3 SPACE_Y; acts_on 0 opacity, 1 shape.  The picture\n")
+    out.append("// is the items (each with its coverage); a masked group inside it names a mask of a lower index.\n")
+    out.append("struct VMask {\n  int mode;\n  int coefficients;\n  VSpace space;\n  VSpace render_space;\n  double backdrop[3];\n  VSpace backdrop_space;\n"
+               "  int acts_on;\n  VTransfer transfer;\n  int item_count;\n  const VItem * items;\n};\n\n")
+
+    def item_line(it):
+        rgba = it.get("rgba", (0.0, 0.0, 0.0, 0.0))
+        mi = table.of(it["mask"]) if it.get("mask") is not None else -1
+        return "    {%d, {%s, %s, %s, %s}, %s, %s, %s, %d, %d, %d, %s, %d},\n" % (
+            it["k"], hexf(F(rgba[0])), hexf(F(rgba[1])), hexf(F(rgba[2])), hexf(F(rgba[3])),
+            space_cxx(it.get("space", TARGET)), hexf(F(it.get("opacity", 1.0))), space_cxx(it.get("blend", TARGET)),
+            it.get("composite", 0), it.get("isolation", 0), it.get("knockout", 0), hexf(F(it["cov"])), mi)
+
+    def samples_decl(name, samples):
+        for v in samples:
+            if F(float(v)) != F(v):
+                sys.exit("gen-composite-vectors: transfer sample %r is not a double" % (v,))
+        return "static const double %s[] = {%s};\n" % (name, ", ".join(hexf(F(v)) for v in samples))
+
+    def transfer_init(n, tr):
+        """Declarations and the VTransfer initializer text of mask @p n's transfer."""
+        decl = ""
+        kind = tr[0]
+        if kind == "identity":
+            return decl, "{0, 0x0.0p+0, 0x0.0p+0, 0x0.0p+0, 0, nullptr, 0, nullptr}"
+        if kind == "exp":
+            return decl, "{1, %s, %s, %s, 0, nullptr, 0, nullptr}" % tuple(hexf(F(v)) for v in tr[1:4])
+        if kind == "table":
+            decl += samples_decl("kSamples%d" % n, tr[1])
+            return decl, "{2, 0x0.0p+0, 0x0.0p+0, 0x0.0p+0, %d, kSamples%d, 0, nullptr}" % (len(tr[1]), n)
+        pieces = []
+        for j, (lo, hi, e0, e1, leaf) in enumerate(tr[1]):
+            lk = {"identity": 0, "exp": 1, "table": 2}[leaf[0]]
+            c0 = c1 = nn = "0x0.0p+0"
+            cnt, ref = 0, "nullptr"
+            if leaf[0] == "exp":
+                c0, c1, nn = (hexf(F(v)) for v in leaf[1:4])
+            elif leaf[0] == "table":
+                decl += samples_decl("kSamples%d_%d" % (n, j), leaf[1])
+                cnt, ref = len(leaf[1]), "kSamples%d_%d" % (n, j)
+            pieces.append("    {%s, %s, %s, %s, %d, %s, %s, %s, %d, %s},\n" % (
+                hexf(F(lo)), hexf(F(hi)), hexf(F(e0)), hexf(F(e1)), lk, c0, c1, nn, cnt, ref))
+        decl += "static const VPiece kPieces%d[] = {\n%s};\n" % (n, "".join(pieces))
+        return decl, "{3, 0x0.0p+0, 0x0.0p+0, 0x0.0p+0, 0, nullptr, %d, kPieces%d}" % (len(tr[1]), n)
+
+    for n, m in enumerate(table.masks):
+        out.append("static const VItem kMaskItems%d[] = {\n" % n)
+        if not m["pic"]:
+            out.append("    {0, {0x0.0p+0, 0x0.0p+0, 0x0.0p+0, 0x0.0p+0}, {0, 0, 0x0.0p+0}, 0x0.0p+0, {0, 0, 0x0.0p+0}, 0, 0, 0, 0x0.0p+0, -1},\n")
+        for it in m["pic"]:
+            out.append(item_line(it))
+        out.append("};\n")
+        decl, init = transfer_init(n, m["tr"])
+        out.append(decl)
+        out.append("static const VMask kMask%d = {%d, %d, %s, %s, {%s}, %s, %d, %s, %d, kMaskItems%d};\n" % (
+            n, m["mode"], m["coeff"], space_cxx(m["space"]), space_cxx(m["rspace"]), ", ".join(hexf(F(v)) for v in m["backdrop"]),
+            space_cxx(m["bspace"]), m["acts"], init, len(m["pic"]), n))
+    out.append("\nstatic const VMask * const kMasks[] = {%s};\nstatic const int kMaskCount = %d;\n\n" % (
+        ", ".join("&kMask%d" % n for n in range(len(table.masks))), len(table.masks)))
+
+    out.append("// exact: dyadic values, no conversion, no blend mode, alpha masks through the identity, a table or a stitching of\n")
+    out.append("// power-of-two pieces: a double evaluator matches want bit for bit.\n")
+    out.append("struct VCase {\n  const char * name;\n  bool exact;\n  VSpace target;\n  double backdrop[4];\n  int item_count;\n"
+               "  const VItem * items;\n  double want[4];\n};\n\n")
+    rows = []
+    exact_count = 0
+    for n, c in enumerate(MASK_CASES):
+        got, inexact = evaluate_mask_case(c)
+        exact = mask_case_exact(c, got, inexact)
+        exact_count += exact
+        out.append("static const VItem kItems%d[] = {\n" % n)
+        for it in c["items"]:
+            out.append(item_line(it))
+        out.append("};\n")
+        rows.append("    {\"%s\", %s, %s, {%s}, %d, kItems%d, {%s}},\n" % (
+            c["name"], "true" if exact else "false", space_cxx(c["target"]), ", ".join(hexf(F(v)) for v in c["backdrop"]),
+            len(c["items"]), n, ", ".join(hexf(v) for v in got)))
+    out.append("\nstatic const VCase kCases[] = {\n")
+    out += rows
+    out.append("};\n\nstatic const int kCaseCount = %d;\nstatic const int kExactCaseCount = %d;\n\n" % (len(MASK_CASES), exact_count))
+
+    out.append("// gshscene_mask_transfer of kMasks[mask] at x (MK4, M1-D5): the input clamped, the transfer, the output clamped.\n")
+    out.append("struct VTransferAnswer {\n  int mask;\n  double x;\n  double want;\n  bool exact;\n};\n\nstatic const VTransferAnswer kTransferAnswers[] = {\n")
+    exact_t = 0
+    for n, x, want, exact in answers:
+        out.append("    {%d, %s, %s, %s},\n" % (n, hexf(F(x)), hexf(want), "true" if exact else "false"))
+        exact_t += exact
+    out.append("};\n\nstatic const int kTransferAnswerCount = %d;\nstatic const int kExactTransferAnswerCount = %d;\n\n" % (len(answers), exact_t))
+    out.append("// gshscene_mask_resolve of kMasks[mask] for a layer of space enclosing (MK3): the coefficients as doubles (the nearest\n")
+    out.append("// double of each exact rational; exact: for SPACE_Y within GSHSCENE_RESOLVE_TOLERANCE), and the three spaces.\n")
+    out.append("struct VResolve {\n  int mask;\n  VSpace enclosing;\n  double k[3];\n  bool exact;\n  VSpace render_space;\n  VSpace luminance_space;\n"
+               "  VSpace backdrop_space;\n};\n\nstatic const VResolve kResolves[] = {\n")
+    for n, enc, k, r, l_, b, exact in resolves:
+        out.append("    {%d, %s, {%s}, %s, %s, %s, %s},\n" % (n, space_cxx(enc), ", ".join(hexf(F(v)) for v in k),
+                   "true" if exact else "false", space_cxx(r), space_cxx(l_), space_cxx(b)))
+    out.append("};\n\nstatic const int kResolveCount = %d;\n\n" % len(resolves))
+    out.append("}  // namespace mask_vectors\n\n#endif\n")
+    return "".join(out)
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
-    if "--check" in args:
+    while "--plant" in args:
+        k = args.index("--plant")
+        name = args[k + 1] if k + 1 < len(args) else ""
+        if name not in oracle.PLANT_NAMES:
+            sys.exit("gen-composite-vectors: --plant takes one of: " + ", ".join(oracle.PLANT_NAMES))
+        oracle.PLANTS.add(name)
+        del args[k:k + 2]
+    if "--masks" in args:
+        text = render_masks()
+        if "--check" in args:
+            path = os.path.join(HERE, "..", "tests", "mask_vectors.h")
+            with open(path) as f:
+                if f.read() != text:
+                    sys.exit("gen-composite-vectors: tests/mask_vectors.h is not what the generator writes")
+            print("gen-composite-vectors: tests/mask_vectors.h is current")
+        else:
+            sys.stdout.write(text)
+    elif "--check" in args:
         for name, text in (("composite_vectors.h", render()), ("group_vectors.h", render_groups())):
             path = os.path.join(HERE, "..", "tests", name)
             with open(path) as f:

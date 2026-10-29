@@ -8,6 +8,11 @@
  * definition makes of it, to be compared with the exact answers of
  * tools/composite-oracle.py (tests/composite_vectors.h).
  *
+ * The soft mask (MK2 to MK7) is evaluated here as well: the mask's value from its picture's rendered layer, its
+ * luminance and its transfer, substituted into T5.  The transfer and the coefficients are the library's own
+ * (`gshscene_mask_transfer`, `gshscene_mask_resolve`, M1-D5: the waist's one evaluation), which the known answers of
+ * tests/mask_vectors.h check against the oracle; the rest of the mask is stated here.
+ *
  * Nothing here is part of the library: the scene never evaluates a color.
  *
  * Copyright 2026 by Corey Pennycuff
@@ -25,6 +30,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstring>
+#include <map>
 #include <utility>
 #include <vector>
 
@@ -557,9 +563,72 @@ inline void element(GFrame & frame, double f, int composite, const Px & a) {
   frame.shape_g = frame.shape_g + f - frame.shape_g * f;
 }
 
-/** T1 to T7 over a closed list of solid fills, clips and groups (each group push's isolation and knockout read). */
+/**
+ * The coverage of a mask picture's items by item index, keyed by the picture: a picture is a closed list, and the coverage a
+ * test gives its fills and clips is not part of it (a test builds pictures whose content tells the coverages apart).
+ */
+typedef std::map<const GSHSCENE_Resource *, std::vector<double>> PictureCoverage;
+
+inline double clamp01(double x) {
+  return x > 0.0 ? (x > 1.0 ? 1.0 : x) : 0.0; /* a NaN is 0 */
+}
+
 inline Px evaluate_general(const GSHSCENE_List * list, const std::vector<double> & coverage, const Space & target,
-    const Px & backdrop) {
+    const Px & backdrop, const PictureCoverage * pictures = nullptr);
+
+/**
+ * MK2, MK5: the value of a mask at a point, for a masked group that composites into a layer whose blend space is
+ * @p enclosing.  The picture is drawn as its own isolated, non-knockout group in the mask's render space; where it draws
+ * nothing the layer is `(0, 0, 0, 0)` and the same expression gives the transfer of the backdrop's value.
+ */
+inline double mask_value(const GSHSCENE_Resource * mask, const Space & enclosing, const PictureCoverage * pictures) {
+  GSHSCENE_Mask m;
+  gshscene_resource_mask(mask, &m);
+  GSHSCENE_Color_Space bp;
+  std::memset(&bp, 0, sizeof bp);
+  bp.primaries = (GCOL_Primaries)enclosing.primaries;
+  bp.transfer = (GCOL_Transfer)enclosing.transfer;
+  bp.gamma = enclosing.gamma;
+  GSHSCENE_Mask_Resolved res;
+  gshscene_mask_resolve(mask, &bp, &res);
+  Space r_space = from(res.render_space), l_space = from(res.luminance_space), b_space = from(res.backdrop_space);
+  const GSHSCENE_List * picture = gshscene_resource_picture(m.picture);
+  Px g = evaluate_general(picture, pictures->at(m.picture), r_space, Px{{0, 0, 0, 0}}, pictures);
+  double a = g.v[3];
+  if (m.mode == GSHSCENE_MASK_ALPHA) {
+    return clamp01(gshscene_mask_transfer(mask, clamp01(a)));
+  }
+  Px c = convert_premultiplied(g, r_space, l_space);
+  double backdrop[3] = {m.backdrop[0], m.backdrop[1], m.backdrop[2]}, b[3];
+  convert(backdrop, b_space, l_space, b);
+  double over[3];
+  for (int k = 0; k < 3; k++) {
+    over[k] = sat(c.v[k] + (1.0 - a) * b[k]);
+  }
+  double y = sat(res.k[0] * over[0] + res.k[1] * over[1] + res.k[2] * over[2]);
+  return clamp01(gshscene_mask_transfer(mask, clamp01(y)));
+}
+
+/**
+ * MK7: T5's element of a group's pop, with the mask's value substituted into the opacity (`o v`) or the shape (`m v`) and
+ * nothing else; a group with no mask has v = 1.
+ */
+inline void group_element(GFrame & parent, const GFrame & done, const Px & moved, double v, bool shape) {
+  int composite = (int)done.group.composite;
+  double o = done.group.opacity;
+  if (pdf_operator(composite)) {
+    double k = done.outer * o * v;
+    double f = done.outer * (shape ? v : 1.0) * done.shape_g;
+    element(parent, f, composite, Px{{k * moved.v[0], k * moved.v[1], k * moved.v[2], k * moved.v[3]}});
+  } else {
+    double ov = o * (shape ? 1.0 : v);
+    element(parent, done.outer * (shape ? v : 1.0), composite, Px{{ov * moved.v[0], ov * moved.v[1], ov * moved.v[2], ov * moved.v[3]}});
+  }
+}
+
+/** T1 to T7 and MK2 to MK7 over a closed list of solid fills, clips and groups (each group push's isolation, knockout and mask read). */
+inline Px evaluate_general(const GSHSCENE_List * list, const std::vector<double> & coverage, const Space & target,
+    const Px & backdrop, const PictureCoverage * pictures) {
   std::vector<GFrame> stack(1);
   stack[0].layer = backdrop;
   stack[0].initial = backdrop;
@@ -612,13 +681,13 @@ inline Px evaluate_general(const GSHSCENE_List * list, const std::vector<double>
         }
         own.v[3] = done.alpha_g;
         Px moved = convert_premultiplied(own, done.space, parent.space);
-        int composite = (int)done.group.composite;
-        double o = done.group.opacity;
-        if (pdf_operator(composite)) {
-          double k = done.outer * o;
-          element(parent, done.outer * done.shape_g, composite, Px{{k * moved.v[0], k * moved.v[1], k * moved.v[2], k * moved.v[3]}});
+        if (done.group.soft_mask) {
+          GSHSCENE_Mask m;
+          gshscene_resource_mask(done.group.soft_mask, &m);
+          double v = mask_value(done.group.soft_mask, parent.space, pictures);
+          group_element(parent, done, moved, v, m.acts_on == GSHSCENE_MASK_ACTS_ON_SHAPE);
         } else {
-          element(parent, done.outer, composite, Px{{o * moved.v[0], o * moved.v[1], o * moved.v[2], o * moved.v[3]}});
+          group_element(parent, done, moved, 1.0, false);
         }
         break;
       }

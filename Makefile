@@ -418,7 +418,7 @@ $(APP_DIR)/examples/%$(EXE_EXTENSION): examples/%.c $(APP_DIR)/$(STATIC_TARGET) 
 .PHONY: clean cloc docs docs-pdf examples coverage check-symbols check-stamps check-aliasing
 .PHONY: run-examples
 .PHONY: check-fp-contract check-edges check-libm check-no-x87 check-gates libver-gen
-.PHONY: check-vectors check-sink-vectors check-composite check-gradient check-image check-corpus-hash check-planted check-publish-types check-fuzz-corpus fuzz-replay
+.PHONY: check-vectors check-sink-vectors check-composite check-gradient check-image check-corpus-hash check-planted check-mask-plants check-publish-types check-fuzz-corpus fuzz-replay
 .PHONY: all install test test-quiet test-asan test-valgrind test-valgrind-quiet test-watch uninstall watch
 .PHONY: all-debug install-debug test-debug test-valgrind-debug test-watch-debug uninstall-debug watch-debug
 .PHONY: fuzz fuzz-clean
@@ -527,9 +527,19 @@ check-vectors: ## Fail if tests/known_answers.h is not what the independent gene
 check-sink-vectors: ## Fail if tests/sink_answers.h is not what the independent generator writes (story 13a)
 	@python3 tools/gen-sink-vectors.py --check
 
-check-composite: ## Fail if the exact reference does not agree with itself, or tests/composite_vectors.h is not what it writes
+check-composite: ## Fail if the exact reference does not agree with itself, or tests/composite_vectors.h, group_vectors.h or mask_vectors.h is not what it writes
 	@python3 tools/composite-oracle.py --selftest
 	@python3 tools/gen-composite-vectors.py --check
+	@python3 tools/gen-composite-vectors.py --masks --check
+	@for plant in luminance-of-straight-color mask-after-blend tr0-as-zero-outside shape-merged-into-opacity wrong-coefficient-set \
+		backdrop-before-conversion dropped-clamp stitching-side-swapped exponent-inverted table-last-interval acts-on-ignored; do \
+		if python3 tools/composite-oracle.py --selftest --plant $$plant > /dev/null 2>&1; then \
+			echo "check-composite: the planted defect $$plant was not caught by the selftest"; exit 1; \
+		fi; \
+		if python3 tools/gen-composite-vectors.py --masks --check --plant $$plant > /dev/null 2>&1; then \
+			echo "check-composite: the planted defect $$plant was not caught by the mask vectors"; exit 1; \
+		fi; \
+	done; echo "check-composite: the eleven planted defects of the mask are each caught by the selftest and by the vectors"
 
 check-gradient: ## Fail if the gradient oracle does not agree with itself, or tests/gradient_vectors.h is not what it writes
 	@python3 tools/gradient-oracle.py --selftest
@@ -587,6 +597,15 @@ check-planted: $(HASH_PROBE) $(LIBOBJECTS) $(TEST_EXECUTABLES) ## Fail unless ea
 	 PLANT_TESTS='$(TEST_NAMES)' PLANT_APP_DIR='$(APP_DIR)' PLANT_OBJ_DIR='$(OBJ_DIR)' \
 	 PLANT_LD_PATH='$(TEST_LD_PATH)' PLANT_WORK='$(BUILD_DIR)/planted' PLANT_JOBS='$(PLANT_JOBS)' \
 	 python3 tools/check-planted.py
+
+check-mask-plants: $(LIBOBJECTS) $(OBJ_DIR)/tests/test_composite.o ## Fail unless each planted defect of the mask's evaluator and transfer fails a known answer
+	@PLANT_CC='$(CC)' PLANT_CFLAGS='$(LIB_CFLAGS) $(INCLUDE)' \
+	 PLANT_PROBE_CFLAGS='$(CFLAGS) $(INCLUDE)' PLANT_PROBE_LIBS='$(LDFLAGS) $(DEP_LIBS)' \
+	 PLANT_CXX='$(CXX) $(CXXFLAGS)' PLANT_CXX_INCLUDE='$(INCLUDE) -Itests' \
+	 PLANT_LDFLAGS='$(LDFLAGS) $(DEP_LIBS) $(TESTFLAGS)' \
+	 PLANT_TESTS='testComposite' PLANT_APP_DIR='$(APP_DIR)' PLANT_OBJ_DIR='$(OBJ_DIR)' \
+	 PLANT_LD_PATH='$(TEST_LD_PATH)' PLANT_WORK='$(BUILD_DIR)/planted-masks' PLANT_JOBS='1' \
+	 python3 tools/check-mask-plants.py
 
 check-gates: ## Prove each gate fails on its planted violation and passes its control
 	@CC='$(CC)' GATE_PROJECT='$(PROJECT)' GATE_ALLOWED='$(EDGES_ALLOWED)' GATE_LIBM_EXEMPT='$(LIBM_EXEMPT)' tools/check-gates.sh
@@ -855,7 +874,7 @@ PKGCONFIG_INSTALL_PATH ?= $(PC_INSTALL_PATH)
 # this library's own tests run. They are C++ (GoogleTest), but for the glyph
 # provider, which is C so that a probe can use it, and only a test or a probe
 # includes them.
-TESTING_HEADERS := tests/sink_conformance.h tests/alloc_tracker.h tests/composite_vectors.h tests/group_vectors.h tests/glyph_test_provider.h \
+TESTING_HEADERS := tests/sink_conformance.h tests/alloc_tracker.h tests/composite_vectors.h tests/group_vectors.h tests/mask_vectors.h tests/glyph_test_provider.h \
 	tests/gradient_vectors.h tests/image_vectors.h
 
 install: all ## Install the library

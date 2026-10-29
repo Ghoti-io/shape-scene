@@ -35,14 +35,18 @@
 
 #include "../composite_vectors.h"
 #include "../group_vectors.h"
+#include "../mask_vectors.h"
 #include "../known_answers.h"
 #include "ref_composite.h"
 
 #include <cmath>
+#include <map>
 #include <random>
+#include <string>
 
 using namespace scene;
 namespace cv = composite_vectors;
+namespace mv = mask_vectors;
 
 namespace {
 
@@ -477,6 +481,306 @@ TEST(Groups, TheDefaultCombinationIsTheCompositeVectors) {
       EXPECT_NEAR(a.v[k], b.v[k], 1e-13 * std::max(1.0, std::fabs(a.v[k]))) << c.name;
       if (c.exact) {
         EXPECT_EQ(a.v[k], b.v[k]) << c.name << " (exact)";
+      }
+    }
+  }
+}
+
+namespace {
+
+GSHSCENE_Color_Space mspace(const mv::VSpace & v) {
+  GSHSCENE_Color_Space out;
+  std::memset(&out, 0, sizeof out);
+  out.primaries = (GCOL_Primaries)v.primaries;
+  out.transfer = (GCOL_Transfer)v.transfer;
+  out.gamma = v.gamma;
+  return out;
+}
+
+/** The masks of tests/mask_vectors.h in one store: each built once, with the coverage of its picture's items. */
+struct MaskWorld {
+  GSHSCENE_Store * store;
+  Ref sq;
+  std::map<int, Ref> masks;
+  std::vector<Ref> pictures;
+  refc::PictureCoverage coverage;
+
+  explicit MaskWorld(GSHSCENE_Store * s) : store(s), sq(intern_square(s)) {}
+
+  /** Record @p items into @p list; @p encode puts each item's coverage into its map, so that pictures that differ in coverage differ. */
+  void record(GSHSCENE_List * list, const mv::VItem * items, int count, bool encode, std::vector<double> * cov) {
+    for (int i = 0; i < count; i++) {
+      const mv::VItem & it = items[i];
+      cov->push_back(it.coverage);
+      GSHGEOM_Map tr = translate(it.coverage, 0.0);
+      switch (it.kind) {
+        case 1: {
+          GSHSCENE_Paint p = solid(it.rgba[0], it.rgba[1], it.rgba[2], it.rgba[3]);
+          p.space = mspace(it.space);
+          EXPECT_EQ(gshscene_list_fill(list, sq.get(), encode ? &tr : nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK);
+          break;
+        }
+        case 2:
+          EXPECT_EQ(gshscene_list_clip_push(list, sq.get(), encode ? &tr : nullptr, GSHGEOM_FILL_NONZERO, 0, 0.0), GSHSCENE_OK);
+          break;
+        case 3:
+          EXPECT_EQ(gshscene_list_clip_pop(list), GSHSCENE_OK);
+          break;
+        case 4: {
+          GSHSCENE_Group g = make_group(it.opacity, GSHSCENE_ORDER_FLAT, (uint32_t)it.composite);
+          g.blend_space = mspace(it.blend);
+          g.isolation = (uint32_t)it.isolation;
+          g.knockout = (uint32_t)it.knockout;
+          g.soft_mask = it.mask >= 0 ? mask(it.mask) : nullptr;
+          EXPECT_EQ(gshscene_list_group_push(list, &g, 0, 0.0), GSHSCENE_OK);
+          break;
+        }
+        default:
+          EXPECT_EQ(gshscene_list_group_pop(list), GSHSCENE_OK);
+          break;
+      }
+    }
+  }
+
+  /** The mask resource of kMasks[index] (owned by the world). */
+  const GSHSCENE_Resource * mask(int index) {
+    auto found = masks.find(index);
+    if (found != masks.end()) {
+      return found->second.get();
+    }
+    const mv::VMask & m = *mv::kMasks[index];
+    ListHolder l(store);
+    std::vector<double> cov;
+    int real = m.item_count;
+    if (real == 1 && m.items[0].kind == 0) {
+      real = 0; /* the placeholder row of an empty picture */
+    }
+    record(l.list, m.items, real, true, &cov);
+    EXPECT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
+    const GSHSCENE_Resource * pic = nullptr;
+    EXPECT_EQ(gshscene_store_intern_picture(store, l.list, &pic), GSHSCENE_OK);
+    pictures.emplace_back(pic);
+    coverage[pic] = cov;
+    GSHSCENE_Mask gm;
+    std::memset(&gm, 0, sizeof gm);
+    gm.picture = pic;
+    gm.mode = (uint32_t)m.mode;
+    gm.coefficients = (uint32_t)m.coefficients;
+    gm.space = mspace(m.space);
+    gm.render_space = mspace(m.render_space);
+    for (int k = 0; k < 3; k++) {
+      gm.backdrop[k] = m.backdrop[k];
+    }
+    gm.backdrop_space = mspace(m.backdrop_space);
+    gm.acts_on = (uint32_t)m.acts_on;
+    std::vector<GSHSCENE_Transfer_Piece> pieces;
+    gm.transfer.kind = (uint32_t)m.transfer.kind;
+    gm.transfer.c0 = m.transfer.c0;
+    gm.transfer.c1 = m.transfer.c1;
+    gm.transfer.n = m.transfer.n;
+    gm.transfer.sample_count = (size_t)m.transfer.sample_count;
+    gm.transfer.samples = m.transfer.samples;
+    for (int j = 0; j < m.transfer.piece_count; j++) {
+      const mv::VPiece & vp = m.transfer.pieces[j];
+      GSHSCENE_Transfer_Piece p;
+      std::memset(&p, 0, sizeof p);
+      p.lo = vp.lo;
+      p.hi = vp.hi;
+      p.e0 = vp.e0;
+      p.e1 = vp.e1;
+      p.leaf_kind = (uint32_t)vp.leaf_kind;
+      p.c0 = vp.c0;
+      p.c1 = vp.c1;
+      p.n = vp.n;
+      p.sample_count = (size_t)vp.sample_count;
+      p.samples = vp.samples;
+      pieces.push_back(p);
+    }
+    gm.transfer.piece_count = pieces.size();
+    gm.transfer.pieces = pieces.empty() ? nullptr : pieces.data();
+    const GSHSCENE_Resource * r = nullptr;
+    EXPECT_EQ(gshscene_store_intern_mask(store, &gm, &r), GSHSCENE_OK) << index;
+    masks[index] = Ref(r);
+    return r;
+  }
+};
+
+bool near_enough(double got, double want) {
+  return std::fabs(got - want) <= 1e-12 * std::max(1.0, std::fabs(want));
+}
+
+}  // namespace
+
+TEST(Masks, EveryVectorIsTheOraclesAnswer) {
+  // MK1 to MK7: each case is built through the API (a group push naming a mask resource whose picture holds the items the
+  // oracle drew), closed, and evaluated by the test evaluator; the answer is the oracle's exact one, bit for bit where the
+  // generator marks it exact and within 1e-12 max(1, |v|) (STOP-2) otherwise.
+  StoreHolder s;
+  MaskWorld world(s.store);
+  int exact = 0, masked = 0;
+  double worst = 0.0;
+  for (int n = 0; n < mv::kCaseCount; n++) {
+    const mv::VCase & c = mv::kCases[n];
+    ListHolder l(s.store);
+    std::vector<double> coverage;
+    world.record(l.list, c.items, c.item_count, false, &coverage);
+    ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK) << c.name;
+    refc::Px backdrop = {{c.backdrop[0], c.backdrop[1], c.backdrop[2], c.backdrop[3]}};
+    refc::Space target{c.target.primaries, c.target.transfer, c.target.gamma};
+    refc::Px got = refc::evaluate_general(l.list, coverage, target, backdrop, &world.coverage);
+    for (int i = 0; i < c.item_count; i++) {
+      masked += c.items[i].kind == 4 && c.items[i].mask >= 0;
+    }
+    for (int k = 0; k < 4; k++) {
+      ASSERT_TRUE(std::isfinite(got.v[k])) << c.name;
+      if (c.exact) {
+        EXPECT_EQ(got.v[k], c.want[k]) << c.name << " channel " << k << " (exact)";
+      } else {
+        double e = std::fabs(got.v[k] - c.want[k]) / std::max(1.0, std::fabs(c.want[k]));
+        worst = std::max(worst, e);
+        EXPECT_LE(e, 1e-12) << c.name << " channel " << k;
+      }
+    }
+    exact += c.exact ? 1 : 0;
+  }
+  EXPECT_EQ(exact, mv::kExactCaseCount);
+  EXPECT_GE(masked, 400);
+  std::printf("mask_vectors: %d cases, %d exact; worst relative error %.3g\n", mv::kCaseCount, exact, worst);
+}
+
+TEST(Masks, TheTransferIsTheOraclesAnswerAtEveryPoint) {
+  // MK4, M1-D5: gshscene_mask_transfer of each transfer at each sample, the input clamped to [0, 1] first and the output after.
+  StoreHolder s;
+  MaskWorld world(s.store);
+  int exact = 0;
+  for (int n = 0; n < mv::kTransferAnswerCount; n++) {
+    const mv::VTransferAnswer & a = mv::kTransferAnswers[n];
+    const GSHSCENE_Resource * mask = world.mask(a.mask);
+    ASSERT_NE(mask, nullptr);
+    double got = gshscene_mask_transfer(mask, a.x);
+    if (a.exact) {
+      EXPECT_EQ(got, a.want) << "mask " << a.mask << " at " << a.x << " (exact)";
+      exact++;
+    } else {
+      EXPECT_TRUE(near_enough(got, a.want)) << "mask " << a.mask << " at " << a.x << ": " << got << " against " << a.want;
+    }
+  }
+  EXPECT_EQ(exact, mv::kExactTransferAnswerCount);
+}
+
+TEST(Masks, TheResolvedCoefficientsAndSpacesAreTheOraclesAnswer) {
+  // MK3: the fixed sets are the nearest double of each rational, bit for bit; SPACE_Y is within the resolve tolerance of N3's row.
+  StoreHolder s;
+  MaskWorld world(s.store);
+  for (int n = 0; n < mv::kResolveCount; n++) {
+    const mv::VResolve & r = mv::kResolves[n];
+    const GSHSCENE_Resource * mask = world.mask(r.mask);
+    ASSERT_NE(mask, nullptr);
+    GSHSCENE_Color_Space enclosing = mspace(r.enclosing);
+    GSHSCENE_Mask_Resolved got;
+    ASSERT_EQ(gshscene_mask_resolve(mask, &enclosing, &got), GSHSCENE_OK) << n;
+    for (int k = 0; k < 3; k++) {
+      if (r.exact) {
+        EXPECT_EQ(got.k[k], r.k[k]) << n << " channel " << k;
+      } else {
+        EXPECT_LE(std::fabs(got.k[k] - r.k[k]), GSHSCENE_RESOLVE_TOLERANCE * std::max(1.0, std::fabs(r.k[k]))) << n << " channel " << k;
+      }
+    }
+    auto same_space = [](const GSHSCENE_Color_Space & a, const mv::VSpace & b) {
+      return (int)a.primaries == b.primaries && (int)a.transfer == b.transfer && a.gamma == b.gamma;
+    };
+    EXPECT_TRUE(same_space(got.render_space, r.render_space)) << n;
+    EXPECT_TRUE(same_space(got.luminance_space, r.luminance_space)) << n;
+    EXPECT_TRUE(same_space(got.backdrop_space, r.backdrop_space)) << n;
+  }
+}
+
+TEST(Masks, OpacityAndShapeDifferWhereMK7SaysAndOnlyThere) {
+  // MK7: a mask acting on opacity multiplies the opacity, one acting on shape multiplies the shape; the two give the same answer
+  // for source-over, the blend modes and a bounded Porter-Duff operator under a parent that is not a knockout group, and
+  // different answers under a knockout parent and for an unbounded operator under every parent.  The evaluator's answers
+  // (not the table's) are compared, so the evaluator is the one tested.
+  StoreHolder s;
+  MaskWorld world(s.store);
+  const std::string on_opacity = " mask acting on OPACITY, ", on_shape = " mask acting on SHAPE, ";
+  std::map<std::string, refc::Px> got;
+  for (int n = 0; n < mv::kCaseCount; n++) {
+    const mv::VCase & c = mv::kCases[n];
+    std::string name = c.name;
+    if (name.find(" mask acting on ") == std::string::npos) {
+      continue;
+    }
+    ListHolder l(s.store);
+    std::vector<double> coverage;
+    world.record(l.list, c.items, c.item_count, false, &coverage);
+    ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
+    refc::Px backdrop = {{c.backdrop[0], c.backdrop[1], c.backdrop[2], c.backdrop[3]}};
+    got[name] = refc::evaluate_general(l.list, coverage, refc::Space{c.target.primaries, c.target.transfer, c.target.gamma}, backdrop,
+        &world.coverage);
+  }
+  int differ = 0, agree = 0;
+  const char * unbounded[] = {"dest-in", "src", "src-in", "src-out", "clear"};
+  for (auto & e : got) {
+    size_t at = e.first.find(on_opacity);
+    if (at == std::string::npos) {
+      continue;
+    }
+    std::string shape_name = e.first;
+    shape_name.replace(at, on_opacity.size(), on_shape);
+    ASSERT_TRUE(got.count(shape_name)) << shape_name;
+    const refc::Px & a = e.second;
+    const refc::Px & b = got[shape_name];
+    bool differs = false;
+    for (int k = 0; k < 4; k++) {
+      differs = differs || std::fabs(a.v[k] - b.v[k]) > 1e-9;
+    }
+    bool knockout_parent = e.first.find("not knockout parent") == std::string::npos;
+    size_t op_at = at + on_opacity.size(), op_end = e.first.find(" group,", op_at);
+    std::string op = e.first.substr(op_at, op_end - op_at);
+    bool is_unbounded = false;
+    for (const char * u : unbounded) {
+      is_unbounded = is_unbounded || op == u;
+    }
+    EXPECT_EQ(differs, knockout_parent || is_unbounded) << e.first;
+    differ += differs;
+    agree += !differs;
+  }
+  EXPECT_GE(differ, 20);
+  EXPECT_GE(agree, 20);
+}
+
+TEST(Masks, AGrayPictureIsAGrayValueUnderEverySetInEverySpace) {
+  // MK3: every set sums to 1, so a gray r = g = b = x has the luminance x.  This is checked without the oracle, through the
+  // evaluator's own statement of MK2 and the library's resolved coefficients.
+  StoreHolder s;
+  Ref sq(intern_square(s.store));
+  const GSHSCENE_Color_Space spaces[] = {srgb_space(), linear_srgb_space(),
+      space_of(GCOL_PRIMARIES_DISPLAY_P3, GCOL_TRANSFER_SRGB), space_of(GCOL_PRIMARIES_ADOBE_RGB, GCOL_TRANSFER_GAMMA, 2.19921875),
+      space_of(GCOL_PRIMARIES_BT2020, GCOL_TRANSFER_LINEAR)};
+  for (uint32_t coeff = 0; coeff < GSHSCENE_MASK_COEFF_COUNT; coeff++) {
+    for (const GSHSCENE_Color_Space & sp : spaces) {
+      for (double x : {0.0, 0.125, 0.3, 0.5, 0.75, 1.0}) {
+        ListHolder l(s.store);
+        GSHSCENE_Paint p = solid(x, x, x, 1.0);
+        ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK);
+        ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
+        const GSHSCENE_Resource * pic = nullptr;
+        ASSERT_EQ(gshscene_store_intern_picture(s.store, l.list, &pic), GSHSCENE_OK);
+        Ref picture(pic);
+        GSHSCENE_Mask m;
+        std::memset(&m, 0, sizeof m);
+        m.picture = pic;
+        m.mode = GSHSCENE_MASK_LUMINANCE;
+        m.coefficients = coeff;
+        m.space = sp;
+        m.render_space = sp;
+        const GSHSCENE_Resource * r = nullptr;
+        ASSERT_EQ(gshscene_store_intern_mask(s.store, &m, &r), GSHSCENE_OK);
+        Ref mask(r);
+        refc::PictureCoverage cov;
+        cov[pic] = {1.0};
+        double v = refc::mask_value(mask.get(), refc::from(srgb_space()), &cov);
+        EXPECT_NEAR(v, x, 1e-15 * std::max(1.0, x)) << "set " << coeff << " x " << x;
       }
     }
   }

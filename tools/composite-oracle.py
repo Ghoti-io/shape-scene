@@ -18,7 +18,8 @@ its alpha scaled; a missing entry is refused, so its fill draws nothing), the bl
 (B1 to B12: W3C Compositing and Blending Level 1's mixing functions applied literally to
 every real input, then source-over) and the general group of PDF's transparency model (T1
 to T7: isolated or not, knockout or not, shape and opacity kept apart), of which N5 to N9 are
-the isolated, non-knockout case.  It shares no code with the library or with the other
+the isolated, non-knockout case, and the soft mask (MK2 to MK7: the mask's value from its
+picture's rendered layer, through a luminance and a transfer, substituted into T5).  It shares no code with the library or with the other
 generators.  Arithmetic is `fractions.Fraction` throughout; the inexact steps are the power
 function of a transfer and soft-light's square root of a value that is not the square of a
 rational, each evaluated with `decimal` at 80 digits and turned back into the exact rational
@@ -27,11 +28,12 @@ inexact.  Everything else is exact: a case whose values are dyadic rationals and
 are all the same has an exact answer (whether a double evaluator meets it bit for bit is the
 generator's question, tools/gen-composite-vectors.py).
 
-    python3 tools/composite-oracle.py --selftest
+    python3 tools/composite-oracle.py --selftest [--plant NAME]
 
 runs the oracle against itself: the Porter-Duff identities, the published matrices,
 the transfer round trips, the primitive's limits, and the order of a sequence
-against tools/gen-scene-vectors.py's own statement of it.  tools/gen-composite-vectors.py
+against tools/gen-scene-vectors.py's own statement of it.  A `--plant` breaks one rule of the
+mask on purpose (PLANT_NAMES), and the selftest must then fail.  tools/gen-composite-vectors.py
 imports this file for the answers it commits.
 
 A case is evaluated by `evaluate(items, cov, fg, target, backdrop, palette)`: `items` are
@@ -609,7 +611,9 @@ def evaluate_general(items, cov, fg, target, backdrop, palette=None):
             moved = convert_premultiplied(own, done.space, parent.space, ex)
             opacity = F(done.group["opacity"])
             op = OPS[int(done.group["composite"])]
-            if op in PDF_OPS:
+            if done.group.get("mask") is not None:
+                masked_pop(parent, done, moved, opacity, op, done.group["mask"], ex)
+            elif op in PDF_OPS:
                 f = done.outer * done.shape_g
                 element(parent, f, op, [done.outer * opacity * v for v in moved], ex)
             else:
@@ -649,6 +653,166 @@ def pdf_literal(elements, isolated, knockout, backdrop):
     if not isolated and ag != 0:
         c = [c[i] + (c[i] - c0[i]) * (a0 / ag - a0) for i in range(3)]
     return c, ag, fg
+
+
+# --- MK2 to MK7: the soft mask ---------------------------------------------------------------------------------
+# A group push may carry `mask`, a dictionary (see gen-composite-vectors.py's mask()): `pic` (the picture's items, each with
+# its `cov`), `mode` (MASK_ALPHA or MASK_LUMINANCE), `coeff` (0 W3C, 1 REC709, 2 LUM, 3 SPACE_Y), `space` (L; TARGET: R),
+# `rspace` (R; TARGET: the layer the masked group composites into), `backdrop` (three components), `bspace` (TARGET: L),
+# `tr` (a transfer: ("identity",), ("exp", c0, c1, n), ("table", samples), ("stitch", pieces) with a piece
+# (lo, hi, e0, e1, leaf)) and `acts` (ACTS_OPACITY or ACTS_SHAPE).
+MASK_ALPHA, MASK_LUMINANCE = 1, 2
+ACTS_OPACITY, ACTS_SHAPE = 0, 1
+COEFFICIENTS = {
+    0: (F(2125, 10000), F(7154, 10000), F(721, 10000)),   # W3C: CSS Masking's and SVG's luminanceToAlpha
+    1: (F(2126, 10000), F(7152, 10000), F(722, 10000)),   # REC709
+    2: (F(30, 100), F(59, 100), F(11, 100)),              # LUM: B8's, and PDF's DeviceRGB
+}
+IDENTITY = ("identity",)
+
+# The planted defects of the mask (a `--plant NAME` of the selftest, the generator's --masks --check): each breaks one
+# rule on purpose and must be seen to fail.
+PLANTS = set()
+PLANT_NAMES = ("luminance-of-straight-color", "mask-after-blend", "tr0-as-zero-outside", "shape-merged-into-opacity",
+               "wrong-coefficient-set", "backdrop-before-conversion", "dropped-clamp", "stitching-side-swapped",
+               "exponent-inverted", "table-last-interval", "acts-on-ignored")
+
+
+def clamp01(x):
+    return ZERO if x < 0 else ONE if x > 1 else x
+
+
+def coefficients(coeff, space):
+    """MK3: the luminance coefficients of a set, exact; SPACE_Y is the Y row of N3's RGB-to-XYZ matrix of the space."""
+    if coeff == 3:
+        return tuple(MATRIX[space[0]][1])
+    if "wrong-coefficient-set" in PLANTS and coeff == 2:
+        coeff = 1
+    return COEFFICIENTS[coeff]
+
+
+def power01(x, n, ex):
+    """x^n for x in [0, 1] and a Fraction n >= 0: 0^0 = 1; exact for an integer n, else 80 digits (flagged inexact)."""
+    if "exponent-inverted" in PLANTS and n != 0:
+        n = ONE / n
+    if n == 0:
+        return ONE
+    if x == 0:
+        return ZERO
+    if x == 1:
+        return ONE
+    if n.denominator == 1:
+        return x ** n.numerator
+    ex.inexact = True
+    return F(to_dec(x) ** to_dec(n))
+
+
+def transfer_raw(tr, x, ex):
+    """MK4: the transfer of x in [0, 1], before the output clamp."""
+    kind = tr[0]
+    if kind == "identity":
+        return x
+    if kind == "exp":
+        c0, c1, n = (F(v) for v in tr[1:4])
+        return c0 + power01(x, n, ex) * (c1 - c0)
+    if kind == "table":
+        s = [F(v) for v in tr[1]]
+        m = len(s)
+        u = x * (m - 1)
+        cap = m - 3 if "table-last-interval" in PLANTS and m >= 3 else m - 2
+        i = min(int(u // 1), cap)
+        return s[i] + (u - i) * (s[i + 1] - s[i])
+    if kind == "stitch":
+        pieces = tr[1]
+        chosen = None
+        for j, (lo, hi, e0, e1, leaf) in enumerate(pieces):
+            lo, hi = F(lo), F(hi)
+            if "stitching-side-swapped" in PLANTS:
+                inside = lo < x <= hi or (j == 0 and x == 0)
+            else:
+                inside = lo <= x < hi or (j == len(pieces) - 1 and x == 1)
+            if inside:
+                chosen = pieces[j]
+                break
+        lo, hi, e0, e1, leaf = chosen
+        lo, hi, e0, e1 = F(lo), F(hi), F(e0), F(e1)
+        return transfer_raw(leaf, e0 + (x - lo) * (e1 - e0) / (hi - lo), ex)
+    raise ValueError(kind)
+
+
+def transfer(tr, x, ex):
+    """MK4 as a function of any x: the input clamped to [0, 1], the transfer, the output clamped."""
+    return clamp01(transfer_raw(tr, clamp01(x), ex))
+
+
+def mask_value(mask, bp, ex):
+    """MK2, MK5: the mask's value at a point, for a masked group that composites into a layer whose blend space is bp."""
+    r = bp if is_target(mask["rspace"]) else mask["rspace"]
+    items = [dict(it) for it in mask["pic"]]
+    g, inexact = evaluate_general(items, [it["cov"] for it in items], (None, TARGET), r, (0, 0, 0, 0))
+    ex.inexact = ex.inexact or inexact
+    a = g[3]
+    out = (lambda v: v) if "dropped-clamp" in PLANTS else clamp01
+    if mask["mode"] == MASK_ALPHA:
+        if "tr0-as-zero-outside" in PLANTS and g == [ZERO] * 4:
+            return ZERO
+        return out(transfer_raw(mask["tr"], clamp01(a), ex))
+    lspace = r if is_target(mask["space"]) else mask["space"]
+    bspace = lspace if is_target(mask["bspace"]) else mask["bspace"]
+    k = coefficients(mask["coeff"], lspace)
+    if "tr0-as-zero-outside" in PLANTS and g == [ZERO] * 4:
+        return ZERO
+    if "backdrop-before-conversion" in PLANTS:
+        b_r = convert([F(v) for v in mask["backdrop"]], bspace, r, ex)
+        over = [g[i] + (ONE - a) * b_r[i] for i in range(3)]       # composited in R, then converted
+        res = convert([sat(v) for v in over], r, lspace, ex)
+    else:
+        c_l = convert_premultiplied(g, r, lspace, ex)
+        b_l = convert([F(v) for v in mask["backdrop"]], bspace, lspace, ex)
+        if "luminance-of-straight-color" in PLANTS:
+            s_c = straight(c_l) if a != 0 else [ZERO] * 3
+            res = [sat(s_c[i] + (ONE - a) * b_l[i]) if a != 0 else b_l[i] for i in range(3)]
+        else:
+            res = [sat(c_l[i] + (ONE - a) * b_l[i]) for i in range(3)]   # source-over onto the opaque backdrop, in L
+    y = sat(k[0] * res[0] + k[1] * res[1] + k[2] * res[2])
+    return out(transfer_raw(mask["tr"], clamp01(y), ex))
+
+
+def outside_value(mask, bp, ex):
+    """MK5, stated on its own: the value where the picture draws nothing, TR of the backdrop's value."""
+    r = bp if is_target(mask["rspace"]) else mask["rspace"]
+    if mask["mode"] == MASK_ALPHA:
+        return clamp01(transfer_raw(mask["tr"], ZERO, ex))
+    lspace = r if is_target(mask["space"]) else mask["space"]
+    bspace = lspace if is_target(mask["bspace"]) else mask["bspace"]
+    b_l = convert([F(v) for v in mask["backdrop"]], bspace, lspace, ex)
+    k = coefficients(mask["coeff"], lspace)
+    return clamp01(transfer_raw(mask["tr"], clamp01(sat(k[0] * b_l[0] + k[1] * b_l[1] + k[2] * b_l[2])), ex))
+
+
+def masked_pop(parent, done, moved, opacity, op, mask, ex):
+    """MK7: T5's element with the mask value v substituted into o (OPACITY) or m (SHAPE) and nothing else."""
+    v = mask_value(mask, parent.space, ex)
+    acts = mask["acts"]
+    if "acts-on-ignored" in PLANTS:
+        acts = ACTS_SHAPE
+    if "shape-merged-into-opacity" in PLANTS:
+        acts = ACTS_OPACITY
+    shape = acts == ACTS_SHAPE
+    before = (list(parent.layer), parent.alpha_g, parent.shape_g)
+    if "mask-after-blend" in PLANTS:
+        shape, vv = False, ONE
+    else:
+        vv = v
+    if op in PDF_OPS:
+        f = done.outer * (vv if shape else ONE) * done.shape_g
+        element(parent, f, op, [done.outer * opacity * vv * x for x in moved], ex)
+    else:
+        element(parent, done.outer * (vv if shape else ONE), op, [opacity * (ONE if shape else vv) * x for x in moved], ex)
+    if "mask-after-blend" in PLANTS:
+        parent.layer = [(ONE - v) * before[0][i] + v * parent.layer[i] for i in range(4)]
+        parent.alpha_g = (ONE - v) * before[1] + v * parent.alpha_g
+        parent.shape_g = (ONE - v) * before[2] + v * parent.shape_g
 
 
 # --- N11: the order of a sequence ------------------------------------------------------------------------------
@@ -711,6 +875,215 @@ def paint_order(items):
 
 
 # --- the oracle against itself ---------------------------------------------------------------------------------
+def selftest_masks(check):
+    """MK2 to MK7 against hand-computed values, identities of the rules and the group's own machinery."""
+    import itertools
+    import random
+
+    def fill_(rgba, cov=1.0):
+        return dict(k=FILL, paint=PAINT_SOLID, rgba=rgba, space=TARGET, cov=cov)
+
+    def mk(pic, mode=MASK_ALPHA, coeff=0, space=TARGET, rspace=TARGET, backdrop=(0, 0, 0), bspace=TARGET, tr=IDENTITY,
+           acts=ACTS_OPACITY):
+        return dict(pic=pic, mode=mode, coeff=coeff, space=space, rspace=rspace, backdrop=backdrop, bspace=bspace, tr=tr,
+                    acts=acts)
+
+    def val(m, bp=SPACE_SRGB):
+        return mask_value(m, bp, Exactness())
+
+    LUMI = MASK_LUMINANCE
+    spaces = [SPACE_SRGB, SPACE_LINEAR_SRGB, SPACE_P3, SPACE_LINEAR_P3, SPACE_ADOBE_GAMMA, SPACE_LINEAR_BT2020]
+
+    # MK3: the sets as integers, each summing to 1; SPACE_Y is the Y row, summing to 1 in the reals for every gamut.
+    check(COEFFICIENTS[0] == (F(2125, 10000), F(7154, 10000), F(721, 10000)), "MK3: W3C")
+    check(COEFFICIENTS[1] == (F(2126, 10000), F(7152, 10000), F(722, 10000)), "MK3: REC709")
+    check(COEFFICIENTS[2] == (F(30, 100), F(59, 100), F(11, 100)), "MK3: LUM")
+    check(coefficients(2, SPACE_SRGB) == LUM, "MK3: LUM is B8's Lum")
+    for c in range(3):
+        check(sum(COEFFICIENTS[c]) == 1, "MK3: set %d sums to 1" % c)
+    for p in GAMUTS:
+        check(sum(coefficients(3, (p, LINEAR, 0.0))) == 1, "MK3: SPACE_Y of gamut %d sums to exactly 1" % p)
+    for r_, pub in zip(coefficients(3, SPACE_SRGB), (0.2126, 0.7152, 0.0722)):
+        check(abs(float(r_) - pub) < 6e-4, "MK3: SPACE_Y of sRGB is the published row")
+
+    # MK2, hand-computed: a pure primary, opaque, over black, is the set's own coefficient.
+    literal = {0: (F(2125, 10000), F(7154, 10000), F(721, 10000)), 1: (F(2126, 10000), F(7152, 10000), F(722, 10000)),
+               2: (F(3, 10), F(59, 100), F(11, 100))}
+    for coeff, row in literal.items():
+        for ch in range(3):
+            rgba = [0, 0, 0, 1]
+            rgba[ch] = 1
+            check(val(mk([fill_(tuple(rgba))], LUMI, coeff)) == row[ch], "MK2: primary %d of set %d" % (ch, coeff))
+        # half-transparent blue over a white backdrop: r = (1/2, 1/2, 1), y = (k_r + k_g) / 2 + k_b
+        got = val(mk([fill_((0, 0, 1, F(1, 2)))], LUMI, coeff, backdrop=(1, 1, 1)))
+        check(got == (row[0] + row[1]) / 2 + row[2], "MK2: premultiplied over the backdrop, set %d" % coeff)
+        # half-transparent blue over black: the straight color's luminance times the alpha
+        check(val(mk([fill_((0, 0, 1, F(1, 2)))], LUMI, coeff)) == row[2] / 2, "MK2: a times the straight color's luminance")
+    # SPACE_Y: the Y row of the gamut of L.
+    for p in GAMUTS:
+        sp = (p, LINEAR, 0.0)
+        for ch in range(3):
+            rgba = [0, 0, 0, 1]
+            rgba[ch] = 1
+            check(val(mk([fill_(tuple(rgba))], LUMI, 3, space=sp, rspace=sp)) == MATRIX[p][1][ch], "MK3: SPACE_Y %d %d" % (p, ch))
+
+    # MK2: gray invariance for every set, in every space (R = L), and with R != L; translucent gray over its own backdrop.
+    for coeff in range(4):
+        for sp in spaces:
+            for x in (F(0), F(1, 8), F(1, 2), F(3, 4), F(1)):
+                gray = (x, x, x, 1)
+                got = val(mk([fill_(gray)], LUMI, coeff, space=sp, rspace=sp))
+                check(got == x, "MK2: gray %s is gray in set %d (R = L = %s)" % (x, coeff, sp))
+                got = val(mk([fill_((x, x, x, F(1, 2)))], LUMI, coeff, space=sp, rspace=sp, backdrop=(x, x, x), bspace=sp))
+                check(got == x, "MK2: translucent gray over its own backdrop")
+        for r_, l_ in ((SPACE_SRGB, SPACE_P3), (SPACE_SRGB, SPACE_LINEAR_SRGB), (SPACE_LINEAR_P3, SPACE_SRGB)):
+            x = F(3, 8)
+            want = convert([x, x, x], r_, l_, Exactness())[0]
+            got = val(mk([fill_((x, x, x, 1))], LUMI, coeff, space=l_, rspace=r_))
+            check(abs(got - clamp01(want)) < F(1, 10 ** 60), "MK2: gray converts to gray, set %d R %s L %s" % (coeff, r_, l_))
+
+    # MK2: the luminance of the picture composited over the backdrop in L, written from the straight color.
+    rng = random.Random(1021)
+    for t in range(80):
+        r_, l_, b_ = rng.choice(spaces), rng.choice(spaces), rng.choice(spaces)
+        coeff = rng.randrange(4)
+        rgb = tuple(F(rng.randint(-4, 12), 8) for _ in range(3))
+        a = F(rng.choice([1, 2, 4, 7, 8]), 8)
+        bk = tuple(F(rng.randint(0, 8), 8) for _ in range(3))
+        got = val(mk([fill_(rgb + (a,))], LUMI, coeff, space=l_, rspace=r_, backdrop=bk, bspace=b_))
+        ex_ = Exactness()
+        cl = convert(list(rgb), r_, l_, ex_)
+        bl = convert(list(bk), b_, l_, ex_)
+        k = coefficients(coeff, l_)
+        res = [sat(a * cl[i] + (ONE - a) * bl[i]) for i in range(3)]
+        want = clamp01(sat(k[0] * res[0] + k[1] * res[1] + k[2] * res[2]))
+        check(abs(got - want) < F(1, 10 ** 55), "MK2: the straight-color statement of the luminance (case %d)" % t)
+
+    # MK2, MK4: alpha through the identity is alpha; the clamps hold at both ends.
+    for a in (F(0), F(1, 4), F(1, 2), F(3, 4), F(1), F(0.6)):
+        check(val(mk([fill_((1, 0.5, 0.25, a))])) == a, "MK2: alpha %s" % a)
+    check(val(mk([fill_((1, 1, 1, 1))], tr=("exp", -0.5, 1.5, 1.0))) == 1, "MK2: the output clamps at 1")
+    check(val(mk([], tr=("exp", -0.5, 1.5, 1.0))) == 0, "MK2: the output clamps at 0")
+    check(val(mk([fill_((1, 1, 1, 1))], LUMI, tr=("exp", -0.5, 1.5, 1.0))) == 1, "MK2: the luminance's output clamps at 1")
+    check(val(mk([fill_((1, 1, 1, 1))], LUMI, backdrop=(2, 2, 2))) == 1, "MK2: the luminance saturates into [0, 1]")
+    check(val(mk([fill_((-1, -1, -1, 1))], LUMI)) == 0, "MK2: a negative luminance clamps to 0")
+
+    # MK4, hand-computed.
+    check(transfer(("exp", 0, 1, 2), F(1, 2), Exactness()) == F(1, 4), "MK4: exponential n = 2")
+    check(transfer(("exp", 0, 1, 3), F(1, 2), Exactness()) == F(1, 8), "MK4: exponential n = 3")
+    check(transfer(("exp", F(1, 4), F(3, 4), 1), F(1, 2), Exactness()) == F(1, 2), "MK4: exponential c0, c1")
+    check(transfer(("exp", 0, 1, 0), ZERO, Exactness()) == 1 and transfer(("exp", 0, 1, 0), F(1, 2), Exactness()) == 1,
+          "MK4: 0^0 = 1 and x^0 = 1")
+    check(transfer(("exp", 0, 1, 2), ZERO, Exactness()) == 0 and transfer(("exp", 0, 1, 2), ONE, Exactness()) == 1, "MK4: ends")
+    ex_ = Exactness()
+    check(abs(transfer(("exp", 0, 1, 0.5), F(1, 4), ex_) - F(1, 2)) < F(1, 10 ** 70) and ex_.inexact,
+          "MK4: a non-integer exponent is evaluated to 80 digits and flagged")
+    ex_ = Exactness()
+    transfer(("exp", 0, 1, 2), F(1, 3), ex_)
+    check(not ex_.inexact, "MK4: an integer exponent is exact")
+    check(transfer(("exp", 0, 1, 65536), F(1, 2), Exactness()) == F(1, 2 ** 65536), "MK4: n = 2^16 is exact")
+    table = ("table", [0, F(1, 2), F(1, 2), 1])
+    for x, want in ((ZERO, ZERO), (F(1, 3), F(1, 2)), (F(1, 2), F(1, 2)), (F(5, 6), F(3, 4)), (ONE, ONE), (F(2, 3), F(1, 2))):
+        check(transfer(table, x, Exactness()) == want, "MK4: table at %s" % x)
+    bump = ("table", [0, 1, 0])
+    check(transfer(bump, F(1, 4), Exactness()) == F(1, 2) and transfer(bump, ONE, Exactness()) == 0, "MK4: a table's last interval")
+    check(transfer(("table", [F(1, 4), F(3, 4)]), F(1, 2), Exactness()) == F(1, 2), "MK4: a two-sample table")
+    stitch = ("stitch", [(0, F(1, 2), 0, 1, IDENTITY), (F(1, 2), 1, F(1, 4), F(3, 4), IDENTITY)])
+    for x, want in ((ZERO, ZERO), (F(1, 4), F(1, 2)), (F(1, 2), F(1, 4)), (F(3, 4), F(1, 2)), (ONE, F(3, 4))):
+        check(transfer(stitch, x, Exactness()) == want, "MK4: stitching at %s (the upper piece at a bound, the last takes 1)" % x)
+    check(transfer(stitch, F(-1), Exactness()) == 0 and transfer(stitch, F(2), Exactness()) == F(3, 4), "MK4: the input clamps")
+    check(transfer(("stitch", [(0, 1, 1, 0, IDENTITY)]), F(1, 4), Exactness()) == F(3, 4), "MK4: a reversed encode")
+
+    # MK4, the identities: one piece is its leaf; exp(1, 0, 1) and the table [0, 1] are the identity.
+    leaves = [IDENTITY, ("exp", F(1, 4), F(3, 4), 2), ("table", [0, F(1, 2), F(1, 4), 1])]
+    for x in (F(n, 16) for n in range(-2, 19)):
+        check(transfer(("exp", 0, 1, 1), x, Exactness()) == clamp01(x), "MK4: n = 1, c0 = 0, c1 = 1 is the identity")
+        check(transfer(("table", [0, 1]), x, Exactness()) == clamp01(x), "MK4: the table [0, 1] is the identity")
+        for leaf in leaves:
+            check(transfer(("stitch", [(0, 1, 0, 1, leaf)]), x, Exactness()) == transfer(leaf, x, Exactness()),
+                  "MK4: a one-piece stitching is its leaf")
+
+    # MK5: the outside value is the transfer of the backdrop's value, and an empty picture, a picture that drew nothing and
+    # the stated value agree.
+    trs = [IDENTITY, ("exp", F(1, 4), F(3, 4), 1), ("exp", 0, 1, 2), ("table", [F(1, 2), 1, 0]),
+           ("stitch", [(0, F(1, 2), F(1, 2), 1, IDENTITY), (F(1, 2), 1, 0, 1, IDENTITY)])]
+    for tr, mode, bk, (r_, l_) in itertools.product(trs, (MASK_ALPHA, LUMI), ((0, 0, 0), (1, 1, 1), (F(1, 2), F(1, 4), F(3, 4))),
+                                                    ((SPACE_SRGB, SPACE_SRGB), (SPACE_SRGB, SPACE_LINEAR_P3))):
+        kw = dict(mode=mode, tr=tr)
+        if mode == LUMI:
+            kw.update(coeff=1, space=l_, rspace=r_, backdrop=bk, bspace=SPACE_P3)
+        want = outside_value(mk([], **kw), SPACE_SRGB, Exactness())
+        for pic in ([], [fill_((1, 0.5, 0.25, 0.75), 0.0)], [dict(k=GROUP_PUSH, opacity=1.0, blend=TARGET, composite=0, cov=0.0),
+                                                              fill_((1, 0, 0, 1), 0.0), dict(k=GROUP_POP, cov=0.0)]):
+            check(abs(val(mk(pic, **kw)) - want) < F(1, 10 ** 60), "MK5: the picture that draws nothing has the outside value")
+    check(val(mk([], tr=("exp", F(1, 4), F(3, 4), 1))) == F(1, 4), "MK5: TR(0), not 0")
+    check(val(mk([], LUMI, backdrop=(1, 0, 0))) == F(2125, 10000), "MK5: the luminance of the backdrop")
+    check(val(mk([], LUMI, backdrop=(1, 1, 1), tr=("exp", 0, 1, 2))) == 1, "MK5: the transfer of the backdrop's luminance")
+    check(val(mk([], LUMI, coeff=2, backdrop=(0, 1, 0), tr=("exp", 0, 1, 2))) == F(59, 100) ** 2, "MK5: TR of the luminance")
+
+    # MK6/MK2: the picture is rendered in R; the layer's own space is Bp when R is zero.
+    half_blue = fill_((0, 0, 1, F(1, 2)))
+    a_ = mask_value(mk([half_blue], LUMI, 1), SPACE_LINEAR_SRGB, Exactness())
+    b_ = mask_value(mk([half_blue], LUMI, 1, rspace=SPACE_LINEAR_SRGB), SPACE_SRGB, Exactness())
+    check(a_ == b_ == F(722, 20000), "MK2: R is the enclosing space when zero")
+
+    # MK7 (1): a group of one constant picture, an opaque white identity alpha mask, is the group; a half-alpha one is half opacity.
+    white = fill_((1, 1, 1, 1))
+    content = [fill_((1, 0, 0, F(3, 4)), F(1, 2)), fill_((0, 0, 1, F(1, 2)), F(3, 4))]
+
+    def scene(parent_i, parent_k, op, opacity, group_extra, content_items, pre=None, clip_v=None):
+        pre = [fill_((0, 1, 0, F(1, 2)), F(1, 2))] if pre is None else pre
+        items = [dict(k=GROUP_PUSH, opacity=1.0, blend=TARGET, composite=0, isolation=parent_i, knockout=parent_k, cov=0.0)] + pre
+        if clip_v is not None:
+            items.append(dict(k=CLIP_PUSH, cov=clip_v))
+        items.append(dict(k=GROUP_PUSH, opacity=opacity, blend=TARGET, composite=OP_INDEX[op], cov=0.0, **group_extra))
+        items += content_items
+        items.append(dict(k=GROUP_POP, cov=0.0))
+        if clip_v is not None:
+            items.append(dict(k=CLIP_POP, cov=0.0))
+        items.append(dict(k=GROUP_POP, cov=0.0))
+        return evaluate_general(items, [it["cov"] for it in items], (None, TARGET), SPACE_SRGB, (F(1, 4), F(1, 8), F(1, 2), F(1, 2)))[0]
+
+    for op in ("src-over", "multiply", "dest-in", "src", "xor"):
+        for pi, pk in ((0, 0), (1, 0), (0, 1), (1, 1)):
+            plain = scene(pi, pk, op, F(3, 4), {}, content)
+            check(scene(pi, pk, op, F(3, 4), dict(mask=mk([white])), content) == plain,
+                  "MK7: an opaque white identity mask is no mask (%s, %d, %d)" % (op, pi, pk))
+            half = mk([fill_((1, 1, 1, F(1, 2)))])
+            check(scene(pi, pk, op, F(3, 4), dict(mask=half), content) == scene(pi, pk, op, F(3, 8), {}, content),
+                  "MK7: a half-alpha mask is half the opacity (%s, %d, %d)" % (op, pi, pk))
+
+    # MK7 (2): OPACITY multiplies the opacity by v; SHAPE is a clip of coverage v around the group (both are the
+    # substitution into T5, and nothing else), across the four parents and operators of every family.
+    for t in range(240):
+        pi, pk = rng.randrange(2), rng.randrange(2)
+        op = rng.choice(OPS)
+        opacity = F(rng.choice([1, 3, 4]), 4)
+        pic_alpha = F(rng.choice([0, 1, 2, 3, 4, 5, 8]), 8)
+        tr = rng.choice(trs)
+        m = mk([fill_((F(rng.randint(0, 8), 8), F(rng.randint(0, 8), 8), F(rng.randint(0, 8), 8), pic_alpha))], rng.choice((MASK_ALPHA, LUMI)),
+               coeff=rng.randrange(3), backdrop=(F(1, 2), F(1, 4), 1), tr=tr)
+        v = val(m)
+        body = [fill_((1, 0, 0, F(3, 4)), F(1, 2)), fill_((0, 0, 1, F(1, 2)), F(3, 4))]
+        want_op = scene(pi, pk, op, opacity * v, {}, body)
+        check(scene(pi, pk, op, opacity, dict(mask=dict(m, acts=ACTS_OPACITY)), body) == want_op,
+              "MK7: OPACITY is the opacity times v (%s, %d, %d)" % (op, pi, pk))
+        want_sh = scene(pi, pk, op, opacity, {}, body, clip_v=v)
+        check(scene(pi, pk, op, opacity, dict(mask=dict(m, acts=ACTS_SHAPE)), body) == want_sh,
+              "MK7: SHAPE is a clip of coverage v around the group (%s, %d, %d)" % (op, pi, pk))
+    # ... and the two differ where T3 makes them: under a knockout parent for every operator, and under any parent for an
+    # unbounded one (a bounded operator is affine in S with op(0, D) = D, so v op(S, D) + (1 - v) D is the same either way).
+    m = mk([fill_((1, 1, 1, F(3, 4)))])
+    for op in ("src-over", "multiply", "hue", "dest-in", "src", "src-in", "xor", "dest-over", "src-atop", "clear"):
+        for pi, pk in ((0, 0), (1, 0), (0, 1), (1, 1)):
+            o_ = scene(pi, pk, op, F(3, 4), dict(mask=dict(m, acts=ACTS_OPACITY)), content)
+            s_ = scene(pi, pk, op, F(3, 4), dict(mask=dict(m, acts=ACTS_SHAPE)), content)
+            expected_differ = pk == 1 or is_unbounded(op)   # a bounded operator is affine in S: v op(S, D) + (1 - v) D
+            check((o_ != s_) == expected_differ, "MK7: OPACITY and SHAPE %s for %s, parent (%d, %d)" % (
+                "differ" if expected_differ else "agree", op, pi, pk))
+
+
+
 def selftest():
     import importlib.util
     import itertools
@@ -1031,6 +1404,8 @@ def selftest():
     c_, _ = evaluate_general(mul, [0, 1, 0], (None, TARGET), SPACE_SRGB, (0.0, 0.0, 0.5, 0.5))
     check(b_ == c_, "a non-isolated group of normal opacity 1 blends its content as if it were not there")
 
+    selftest_masks(check)
+
     # N11 against tools/gen-scene-vectors.py's own statement of the order.
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gen-scene-vectors.py")
     spec = importlib.util.spec_from_file_location("genvec", path)
@@ -1057,7 +1432,20 @@ def selftest():
     return 0
 
 
-if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "--selftest":
-        sys.exit(selftest())
+def main(argv):
+    args = list(argv)
+    while "--plant" in args:
+        k = args.index("--plant")
+        name = args[k + 1] if k + 1 < len(args) else ""
+        if name not in PLANT_NAMES:
+            sys.exit("composite-oracle: --plant takes one of: " + ", ".join(PLANT_NAMES))
+        PLANTS.add(name)
+        del args[k:k + 2]
+    if args == ["--selftest"]:
+        return selftest()
     print(__doc__)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
