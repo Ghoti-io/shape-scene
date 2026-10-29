@@ -462,7 +462,8 @@ GSHSCENE_Result gshscene_list_canonical_depth(double depth, double * out) {
   return GSHSCENE_OK;
 }
 
-static int map_bits_equal(const GSHGEOM_Map * a, const GSHGEOM_Map * b) {
+/* Two maps are equal when their dimension, kind and every entry are the same bits (-0 is not 0). */
+static int map_equal(const GSHGEOM_Map * a, const GSHGEOM_Map * b) {
   if (a->dim != b->dim || a->kind != b->kind) {
     return 0;
   }
@@ -525,7 +526,7 @@ static GSHSCENE_Result canonical_group(const GSHSCENE_Store * store, const GSHSC
   }
   GSHGEOM_Map identity;
   gshgeom_map_identity(2, &identity);
-  if (!group->soft_mask && placed && !map_bits_equal(&placement, &identity)) {
+  if (!group->soft_mask && placed && !map_equal(&placement, &identity)) {
     return GSHSCENE_ERR_INVALID;
   }
   GSHSCENE_Result result = gshscene_color_space_check(&group->blend_space);
@@ -1422,23 +1423,6 @@ GSHSCENE_Result gshscene_list_copy(
 
 /* --- equality ------------------------------------------------------------------- */
 
-static int map_equal(const GSHGEOM_Map * a, const GSHGEOM_Map * b) {
-  if (a->dim != b->dim || a->kind != b->kind) {
-    return 0;
-  }
-  for (int i = 0; i < a->dim; i++) {
-    for (int j = 0; j < a->dim; j++) {
-      if (gshgeom_f64_bits(a->m[i][j]) != gshgeom_f64_bits(b->m[i][j])) {
-        return 0;
-      }
-    }
-    if (gshgeom_f64_bits(a->t[i]) != gshgeom_f64_bits(b->t[i])) {
-      return 0;
-    }
-  }
-  return 1;
-}
-
 int gshscene_space_equal(const GSHSCENE_Color_Space * a, const GSHSCENE_Color_Space * b) {
   return a->primaries == b->primaries && a->transfer == b->transfer &&
          gshgeom_f64_bits(a->gamma) == gshgeom_f64_bits(b->gamma);
@@ -1481,7 +1465,7 @@ static int item_equal(const GSHSCENE_Item * a, const GSHSCENE_Item * b) {
          gshscene_space_equal(&a->group.blend_space, &b->group.blend_space) &&
          a->group.composite == b->group.composite && a->group.ordering == b->group.ordering &&
          a->group.isolation == b->group.isolation && a->group.knockout == b->group.knockout &&
-         a->group.soft_mask == b->group.soft_mask && map_bits_equal(&a->group.soft_mask_map, &b->group.soft_mask_map);
+         a->group.soft_mask == b->group.soft_mask && map_equal(&a->group.soft_mask_map, &b->group.soft_mask_map);
 }
 
 int gshscene_list_equal(const GSHSCENE_List * a, const GSHSCENE_List * b) {
