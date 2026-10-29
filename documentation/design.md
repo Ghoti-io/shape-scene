@@ -299,7 +299,9 @@ Refused with `ERR_UNSUPPORTED`: ProPhoto (D50: converting to it needs a chromati
 BT.1886, PQ and HLG transfers and ICC profiles, gray-alpha images (a pinned layout value with no raster to carry it),
 and a stroke style's **width profile** (variable width, D8 of the strokes spec): the slot is a resource handle,
 hashed as `u64` 0 while it is empty, so that defining a profile fills a spelling that already exists. (The palette
-paint is N14 below; the gradient paint and resource are G1 to G13; the image resource is IM1 to IM14 above.)
+paint is N14 below; the gradient paint and resource are G1 to G13; the image resource is IM1 to IM14 above; the mask
+resource is MK1 to MK14 below.) A mask's transfer is PDF's function types 0, 2 and 3 on one level, and its coefficients are
+MK3's four sets; any other function or weights are sampled or named by the front end and reported as approximated.
 
 ## What a scene means: paint, color and composition (normative)
 
@@ -480,7 +482,8 @@ each be a color the author did not state). The one resolution is `gshscene_paint
 (`gshscene_caps_disposition`) takes the palette, so a writer, a GPU sink and shape-cpu refuse the same fills. A
 palette change is a new parameter, never a re-lowering (AD-23): a theme picks another handle.
 
-**Not decided here.** The other color spaces, the depth predicate for 3D maps, and the merge of adds to one parent.
+**Not decided here.** The other color spaces, the depth predicate for 3D maps, and the merge of adds to one parent. Masks (MK1 to MK14) are defined here but no sink composites one yet: how a sink evaluates a mask per pixel, its cost, and the
+rounding of a GPU's evaluation against the reference are the sinks' to state; the mask-border property of CSS is refused.
 
 ## Strokes (normative; strokes story S1)
 
@@ -849,28 +852,28 @@ past 12.
 PDF's transparency model (ISO 32000-1, section 11) has two kinds of group the N-rules do not: a **non-isolated** group,
 whose content composites with what was painted before the group, and a **knockout** group, each of whose elements
 composites with the group's initial backdrop rather than with the elements before it; and a group may have a **soft
-mask**. They are defined here in full so that a later sink composites them without a change to the waist. Every sink
-refuses them until it does (S19). In real arithmetic, as N1 to N14. `tools/composite-oracle.py` states T1 to T7 a second
+mask**. They are defined here in full so that a later sink composites them without a change to the waist. A sink
+refuses them until it claims them (S19). In real arithmetic, as N1 to N14. `tools/composite-oracle.py` states T1 to T7 a second
 time in exact rationals and checks them against itself and against ISO 32000's own straight-color formulas (written there
 independently, `pdf_literal`), and `tools/gen-composite-vectors.py --groups` commits known answers for the four
 combinations of isolated and knockout, in range and with blend modes, as `tests/group_vectors.h` (installed for sinks);
 `tests/ref_composite.h`'s `evaluate_general` agrees with them.
 
 **T1 The fields.** A group (`GSHSCENE_Group`, a group node) has `isolation` (`ISOLATED` 0, the default, or
-`NON_ISOLATED` 1), `knockout` (0, the default, or 1) and `soft_mask` (NULL, the default, or a picture of the list's
-store, which the list or node holds; a reserved slot, T7). The defaults are every group that existed before the fields,
+`NON_ISOLATED` 1), `knockout` (0, the default, or 1) and `soft_mask` (NULL, the default, or a mask resource of the list's
+store, which the list or node holds: T7, MK1) and a `soft_mask_map` (MK6). The defaults are every group that existed before the fields,
 so formats stay 1: a default group's hash and dump are spelled exactly as before, and a group with a field that is not
 the default sets bit 7 of its `u8` composite and writes `u8` flags (1 non-isolated, 2 knockout) and `u64` the mask's
-content hash after it, and ` isolation=N knockout=N mask=<hash>` in its dump line (list.h, version.h). Equality compares
-them, the mask by handle. A mask's picture counts toward the picture nesting as an instance's does; the walk of a list's
-expansion does not enter it.
+content hash after it (MK13 adds the placement), and ` isolation=N knockout=N mask=<hash> maskmap=<hash>` in its dump line (list.h,
+version.h). Equality compares them, the mask by handle. A mask's picture counts toward the picture nesting as an
+instance's does (MK12); the walk of a list's expansion does not enter it, and the planning pass does (MK9).
 
 **T2 Shape and opacity are kept separate.** Each element painted into a layer has a **shape** `f` in `[0, 1]`, how much
-of the pixel it covers: a fill's geometric coverage `k` times the clips in force (N7, N9) (and later a soft mask of
-PDF's alpha-is-shape kind); and an **opacity source** `S`, premultiplied, whose alpha `q` is in `[0, 1]`: the paint's
-alpha (N7, N10, N14, G12), a group's opacity (and later an opacity soft mask). The two are multiplied only where a formula
+of the pixel it covers: a fill's geometric coverage `k` times the clips in force (N7, N9) (and a soft mask of
+PDF's alpha-is-shape kind, MK7); and an **opacity source** `S`, premultiplied, whose alpha `q` is in `[0, 1]`: the paint's
+alpha (N7, N10, N14, G12), a group's opacity (and an opacity soft mask, MK7). The two are multiplied only where a formula
 below multiplies them (`f q`). **The waist never merges them**: no item, field, record call or sink interface folds a
-shape into an opacity or the reverse, because a knockout group needs the shape alone, and a later shape or opacity mask
+shape into an opacity or the reverse, because a knockout group needs the shape alone, and a shape or opacity mask
 must reach the right one.
 
 **T3 The element step.** In a layer with value `L` and initial backdrop `L0` (T4), an element of shape `f`, operator
@@ -906,14 +909,186 @@ clips in force at the push and `o` the opacity.
 others it is N8 word for word. A fill is N7. So N5 to N9 are T1 to T7 at the defaults exactly, and the generator requires
 the general model to give every committed case of `composite_vectors.h` in exact rationals.
 
-**T7 The soft mask (reserved).** The slot names a picture. What a mask means beyond that (PDF's alpha or luminosity soft
-mask computed from a transparency group, its backdrop color, its transfer function, and whether it acts as shape or as
-opacity, PDF's alpha-is-shape) is decided with the sink work that applies it; in T3 it will multiply the group's opacity
-source (or its shape) at the group's pop. Until then no sink claims it.
+**T7 The soft mask.** The slot names a mask resource (MK1, in the section "Masks" below), a picture read as alpha or luminance through a
+transfer; MK2 to MK7 define the value and its place in T3 to T5: at the group's pop it multiplies the group's opacity
+source or its shape.
 
-**S19 Sinks.** A sink claims `GSHSCENE_CAP_GROUP_NON_ISOLATED`, `_KNOCKOUT` and `_SOFT_MASK` for what it composites;
-without them the planning pass refuses the group (`GROUP_ISOLATION`, `GROUP_KNOCKOUT`, `SOFT_MASK`, in that order, after
-`COMPOSITE`), so it is never drawn as a default group. shape-cpu and the test sink claim none of the three.
+**S19 Sinks.** A sink claims `GSHSCENE_CAP_GROUP_NON_ISOLATED`, `_KNOCKOUT` and `_SOFT_MASK` for what it composites, and
+`mask_native` for the mask features (MK9) it has; without them the planning pass refuses the group (`GROUP_ISOLATION`,
+`GROUP_KNOCKOUT`, `SOFT_MASK`, `MASK_FEATURE`, in that order, after `COMPOSITE`), so it is never drawn as a default
+group or a different mask. shape-cpu claims none of them yet; the test sink's configurations claim them as MK14 says.
+
+## Masks (normative)
+
+A mask is a resource (`mask.h`) that a group's soft-mask slot names. It turns a rendered picture into a number `v` in
+`[0, 1]` at every pixel, and that number multiplies the group's opacity or its shape at the group's pop (MK7). It is
+defined here in full, in real arithmetic as N1 to N14, so that every sink (a CPU reference, a GPU sink, a writer whose
+format has soft masks) gives one answer and no sink decides a meaning later. `tools/composite-oracle.py` states MK2 to
+MK7 a second time in exact rationals and checks them against themselves; `tools/gen-composite-vectors.py --masks`
+commits known answers as `tests/mask_vectors.h` (installed for sinks, beside `group_vectors.h`) for every mode, transfer
+kind, backdrop and acts-on, under all four isolated and knockout parents and under operators other than the default;
+`tests/ref_composite.h` agrees with them. `sat` is N1's saturation and `clamp01(x) = min(max(x, 0), 1)`.
+
+A mask is **raster-only**: its value is a function of the rendered mask picture at the sink's pixel grid, so a sink
+with no pixels (a toolpath) refuses it, and a writer keeps it by handle for a format that has masks. The picture inside
+it is ordinary content, vector until a sink renders it. A mask has no extent of its own and is not a clip (MK5, MK8).
+
+**MK1 The resource.** Kind `GSHSCENE_RESOURCE_MASK`. `GSHSCENE_Mask` is plain data validated by
+`gshscene_store_intern_mask`: `picture` (a picture resource of the same store, required, retained); `mode` (`ALPHA` 1 or
+`LUMINANCE` 2; zero is `ERR_INVALID`, so a front end must say); `coefficients` (`W3C` 0, `REC709` 1, `LUM` 2, `SPACE_Y` 3:
+MK3); `space` (an N1 space, the luminance space `L`; zero means `L = R`); `render_space` (an N1 space, `R`, the space the
+picture is blended in; zero means the blend space of the layer the masked group composites into, `Bp`, as a group's
+zero does); `backdrop` (three finite components, each of magnitude at most `2^16`, and `backdrop_space`, an N1 space,
+zero meaning `L`: the opaque color the picture is composited over, MK2; zero is black); `transfer` (MK4); `acts_on`
+(`OPACITY` 0 or `SHAPE` 1). **One spelling:** in `ALPHA` mode `coefficients`, `space`, `backdrop` and `backdrop_space`
+are zero (`ERR_INVALID` otherwise), because alpha has no color and a field that cannot matter must not split a
+handle. A space outside N1 is `ERR_UNSUPPORTED`, a component or exponent past its bound `ERR_LIMIT`, decided after every
+`ERR_INVALID`, as colors are. Equal content is one handle; a hash never decides equality. The dump is a header and the
+picture's hash, never its items.
+
+**MK2 The mask's value.** Let the masked group be pushed over a layer whose blend space is `Bp`, `R` the mask's
+resolved render space (`render_space`, or `Bp` if zero) and `L` its resolved luminance space (`space`, or `R` if zero).
+Let `G_m(p) = (c, a)` be the premultiplied layer, in `R`, that the mask's picture leaves when it is drawn **as its own
+isolated, non-knockout group** (N6 to N9, with `R` as the group's blend space) in the frame of MK6, at the point `p` of
+the sink's pixel grid; `(0, 0, 0, 0)` where it drew nothing. Then the value `v(p)` in `[0, 1]` is:
+- `ALPHA`: `v = clamp01(TR(clamp01(a)))`.
+- `LUMINANCE`: `(c_L, a) = convert(G_m, R -> L)` (N3 on the premultiplied value: un-premultiply, convert the straight
+  color, premultiply); `B_L` the backdrop converted (N3) into `L`; `r = sat(c_L + (1 - a) B_L)` (the picture composited
+  source-over onto the opaque backdrop, **in `L`**); `y = sat(k_r r_r + k_g r_g + k_b r_b)` with `k` MK3's coefficients;
+  `v = clamp01(TR(clamp01(y)))`.
+
+`TR` is MK4's. The luminance is of the **premultiplied** result over the backdrop, so "luminance times alpha" (SVG, CSS)
+and "composite over the backdrop, then take the luminosity" (PDF) are one rule: with a black backdrop `r = c_L`, which is
+`a` times the luminance of the straight color. The value is a function of the pixel's rendered layer, **not** the
+area average of a per-subpixel mask: the transfer is applied after the pixel is rendered, as every renderer does. The
+clamps are part of the definition: T2 requires shape and opacity in `[0, 1]`, and a luminance of a wide-gamut or
+out-of-range color (N1 allows components to `2^16`) is not.
+
+**MK3 The coefficient sets.** Exact rationals: `W3C` `(2125, 7154, 721) / 10000` (CSS Masking's and SVG's
+`luminanceToAlpha`; the default); `REC709` `(2126, 7152, 722) / 10000`; `LUM` `(30, 59, 11) / 100` (the non-separable blend
+modes' `Lum`, and the weights PDF's informative text gives `DeviceRGB`); `SPACE_Y` the Y row of the RGB-to-XYZ matrix of
+N3 for the luminance space (exact in the reals, from the primaries and white). **Every set sums to exactly 1**, so a gray
+`r = g = b = x` has luminance `x` (`SPACE_Y` because the white's `Y` is 1). They apply to the components of `L` **as
+they are**, encoded or linear as the space is; the front end names `L`, the scene never converts for it.
+`gshscene_mask_resolve` returns the set as doubles (the nearest double of each rational; `SPACE_Y` within
+`GSHSCENE_RESOLVE_TOLERANCE` of the exact row) together with the resolved `R`, `L` and backdrop spaces, so every sink uses
+the same numbers. Which set a format uses is the front end's choice, not the scene's; a wrong choice is silent, so a
+front end states it.
+
+**MK4 The transfer.** A transfer is one of: `IDENTITY`; `EXPONENTIAL {c0, c1, n}` (PDF function type 2):
+`c0 + x^n (c1 - c0)`, `n` finite in `[0, 2^16]`, `0^0 = 1`, the power through `gmath_pow`; `TABLE {s_0 .. s_{m-1}}`
+(PDF type 0 of order 1 on an equally spaced grid over `[0, 1]`, `m >= 2` finite samples): `u = x (m - 1)`,
+`i = min(floor(u), m - 2)`, `t = u - i`, `s_i + t (s_{i+1} - s_i)`; `STITCHING` (PDF type 3), `k >= 1` pieces
+`{lo, hi, e0, e1, leaf}` with `lo_0 = 0`, `hi_{k-1} = 1`, `hi_i = lo_{i+1}`, `lo < hi`, `e0, e1` in `[0, 1]` and `leaf` an
+`IDENTITY`, `EXPONENTIAL` or `TABLE`: the piece with `lo <= x < hi` (the last also takes `x = 1`; at a boundary it is
+the upper piece), `x' = e0 + (x - lo)(e1 - e0)/(hi - lo)`, the value `leaf(x')`. Nested stitchings are flattened by the
+front end, exactly (composing the affine encodes), so the resource is one level and bounded. The input is clamped to
+`[0, 1]` first and the output is clamped (MK2); a NaN is 0. A function a front end cannot spell (a calculator function,
+a sampled function of higher order) is sampled into a `TABLE` and reported `APPROXIMATED`. Limits: at most 256 pieces
+(`GSHSCENE_MASK_MAX_PIECES`) and 4096 samples in all (`GSHSCENE_MASK_MAX_SAMPLES`), past them `ERR_LIMIT` at intern.
+`gshscene_mask_transfer` is the one evaluation; a GPU sink bakes a table from it or evaluates its own within its stated
+tolerance.
+
+**MK5 Outside everything the picture draws.** Where `G_m(p) = (0, 0, 0, 0)` the value is **the transfer of the backdrop's
+value**, not 0: `ALPHA`: `TR(0)`; `LUMINANCE`: `clamp01(TR(clamp01(k . B_L)))`. It holds over the whole plane: the mask
+has no extent of its own. A format's mask region (SVG's mask region, CSS's `mask-clip`, PDF's `/BBox`) is lowered into
+the picture as a clip, which makes the value outside it the outside value (0 for a black backdrop and the identity
+transfer). A mask placement (MK6) that is singular makes every item of the picture degenerate, so the value is the
+outside value everywhere, with no notice (a fill with a singular map draws nothing silently too; a notice is for a paint
+that needs the inverse).
+
+**MK6 The frame.** A list's group push has no frame of its own (emission folds every group's map into the items inside
+it), so the mask's placement is a field of the group. The mask picture is drawn under the chain `T I_1 ... I_k` of the
+maps of the instances enclosing the group's push (the last being the target's), preceded by the group's **mask map**
+`Q` (the mask's space to the space of the group's items): `soft_mask_map` in `GSHSCENE_Group`, a zero-filled map meaning
+the identity; a group node's `soft_mask_map`, in the node's own space as `clip_map` is, composed by emission with the
+group's accumulated map exactly as the clip's is. The mask resource stays context-free, so one mask is one handle
+however many places use it (a writer emits one `SMask`; a GPU sink caches one texture). A picture's own items keep their
+own maps. Its `FOREGROUND` and `PALETTE` paints resolve against the list that draws, as an instance's picture's do (N10,
+N14); a front end that wants the mask's own color bakes it. The mask never sees the clips in force around the group (N9:
+those multiply once, at the pop) nor the group's content.
+
+**MK7 At the group's pop (completes T3 to T5).** With `v(p)` from MK2, T5's element changes by one substitution:
+- `OPACITY` (the default; SVG, CSS, PDF without alpha-is-shape): **`o` becomes `o v(p)`**, for PDF's operators (shape
+  `m fg`, `A = m o v G`) and for every other operator (shape `m`, `S = o v G`).
+- `SHAPE` (PDF with alpha-is-shape): **`m` becomes `m v(p)`**, for PDF's operators (shape `m v fg`, `A = m v o G`) and
+  for every other operator (shape `m v`, `S = o G`).
+
+The clip product `m`, `v` and `o` are multiplied with no clamp or rounding between them, so the order "clip, mask,
+opacity, then blend and composite" (CSS Compositing's and PDF's) is a product followed by T5's composite. Nothing merges
+shape and opacity (T2): the two cases differ only in which of T3's inputs gets `v`. **When they differ:** a *bounded*
+operator (source-over, the blend modes and every Porter-Duff operator that is zero where the source is zero) is affine
+in the source, so weighting the whole operator by the shape and scaling the source by the opacity give the same answer;
+the two differ **only when the parent layer is a knockout group** (T3: the backdrop `Bk` is not the layer `L`). An
+*unbounded* operator (`DEST_IN`, `SRC`, `SRC_IN`, `SRC_OUT`, `CLEAR`: those that change the backdrop where the source is
+zero) takes the shape as a weight on the whole operator, `(1 - f) L + f op(S, Bk)`, and the two **differ under every
+parent**. The vectors cover both. A masked group may be non-isolated or knockout (T4, T5 compute `G` first; the mask
+then acts on `G`). A mask on one fill is a group of one. The group's `opacity`, `composite` and `blend_space` keep their
+meanings.
+
+**MK8 A clip is not a mask.** A clip is a geometric region with exact-area coverage that multiplies what it clips (N9); a
+mask is a per-pixel value of a rendered picture. Neither is lowered as the other. In particular **a union clip is never
+lowered as an alpha mask**: a mask leaves a seam along an edge two clip shapes share, because two pixels each half
+covered compose to three quarters, not to one. The conformance suite holds the case (two abutting shapes at half
+coverage in the shared pixel: the mask gives 3/4 where an exact union gives 1).
+
+**MK9 Planning and the report.** The planning pass (S-rules below) **enters a mask's picture**: it plans every item of the
+picture as it plans an instance's, with the chain of maps `T I_1 ... I_k Q` for the dispositions that need it (gradient
+and stroke notices, map predicates), and reports with the chain `[... , i, j ...]` where `i` indexes the group push
+whose mask it is and `j` the item inside the picture; entries sort as chains do, so a mask's entries come before the
+group's content's. The expansion count, the progress units and the cancel bound are unchanged: a mask's items are work
+inside the group's pop. The group's own refusals, in order: `COMPOSITE`, `GROUP_ISOLATION`, `GROUP_KNOCKOUT`, `SOFT_MASK`
+(no `GSHSCENE_CAP_GROUP_SOFT_MASK`), then **`MASK_FEATURE`**: the sink's `mask_native` caps field is a set of
+`GSHSCENE_MASK_NATIVE_*` bits (`ALPHA`, `LUMINANCE`, `BACKDROP` (a nonzero backdrop), `TRANSFER_EXPONENTIAL`,
+`TRANSFER_TABLE`, `TRANSFER_STITCHING`, `COEFF_W3C`, `COEFF_REC709`, `COEFF_LUM`, `COEFF_SPACE_Y`, `SPACES` (`L`, `R` or
+the backdrop's space other than the enclosing one), `ACTS_ON_SHAPE`); `gshscene_mask_required` is the set a mask
+needs; one missing is `REFUSED` `MASK_FEATURE`, `second` naming the missing bits, found by the plan so a strict render
+leaves the target untouched. A mask is never drawn as another mode.
+
+**MK10 What a front end owes.** Each front end owns its lowering; the waist asks for these. PDF applies a soft mask **to
+each object painted while it is in the graphics state**, so a PDF front end wraps each such object in a group of one with
+the mask (a mask on a group of several objects is a different picture: the objects would composite before masking). PDF's
+mask frame is the CTM at the `gs` operator (the soft-mask group's `Matrix` composed with it, as `Q`). Alpha-is-shape
+also reinterprets the constant alpha as shape, which the scene spells as a group's opacity; the front end lowers a
+constant alpha under it as a constant shape-acting mask: an `ALPHA` mask over an empty picture with an `EXPONENTIAL`
+transfer `{c0 = c1 = ca}`, whose outside value (MK5) is the constant everywhere. An image's `/SMask` of other dimensions
+than the image is a group holding the image fill, masked by a `LUMINANCE` mask (`LUM` for `DeviceGray`) whose picture is
+the gray image's fill. SVG: a `<mask>` is a mask whose picture holds its children with the region as a clip; `maskUnits`
+and `maskContentUnits` become maps; a `mask` on a child inside the mask is a mask of a mask. CSS: each layer's
+`mask-mode` selects `ALPHA` or `LUMINANCE`, a luminance layer inside a multi-layer stack is converted to alpha first (a
+group holding an opaque fill, masked by that layer's luminance mask), and layers combine with N4's operators in an alpha
+mask (`add` source-over, `subtract` source-out, `intersect` source-in, `exclude` xor; the bottom layer first);
+`mask-clip`, `mask-origin`, `mask-size`, `mask-position` and `mask-repeat` are clips, maps and image-paint extends.
+Canvas 2D has no mask (`destination-in` is a composite, already expressible). PDF's image `/Matte` and `/SMaskInData`
+have no counterpart: a front end un-preblends or reports `APPROXIMATED`.
+
+**MK11 Bounds and damage.** A masked group's bounds and damage are **its content's**; the mask never enlarges them (a
+nonzero outside value only means the mask does not shrink them) and is not used to shrink them either. A change of the
+group's mask (a different handle) or of its placement **damages the group's content bounds in both versions** (and the
+whole target if the group's operator is unbounded, N13). Pictures are immutable, so a mask's picture cannot change
+under a handle.
+
+**MK12 Limits.** A mask's picture counts toward the picture nesting exactly as an instance's does: a group naming a mask
+whose picture holds a group naming a mask is one more level. The group push itself is not refused; the limit
+(`max_picture_depth`) fires where a picture holding the masked group is interned (`ERR_LIMIT` from
+`gshscene_store_intern_picture`) and where a version is published, which is where an instance's does. Also: MK4's pieces
+and samples, MK1's component and exponent bounds. Each is asserted at its bound and one past it.
+
+**MK13 Hash, dump, equality, the node.** A group with a field that is not the default sets bit 7 of the composite byte and
+writes `u8` flags and the `u64` content hash of the mask (0 for none) as T1 spells it; **after** the mask hash, when the
+mask is not 0, it writes the `u64` hash of `Q` (the identity's, if zero-filled). The dump line adds `mask=<hash>
+maskmap=<hash>`. Equality compares the mask by handle and `Q` bit for bit; `Q` without a mask is `ERR_INVALID`, and a
+group with no mask reads back zero-filled. A group node has `soft_mask_map` (the identity from `gshscene_node_init`); a node with
+a mask map and no mask is `ERR_INVALID`; `edit` sets, diffs and damages it (MK11). The mask's content hash is over the
+kind, the picture's hash, `mode`, `coefficients`, both spaces, the backdrop's bits and space, `acts_on` and the canonical
+transfer (mask.h spells it). Every format stays 1, and a group with no mask hashes and dumps as before.
+
+**MK14 Sinks and the test sink.** A sink claims `GSHSCENE_CAP_GROUP_SOFT_MASK` and `mask_native` for what it composites.
+The test sink's writer-like configuration records a mask **once per handle**, in a record holding the hash, mode,
+coefficients, spaces, backdrop, acts-on, transfer and the picture's hash (never its items), and the group's record
+names it, as a writer emits an `SMask` once; its raster-like configuration claims the flag with every feature; its
+toolpath-like one claims neither, so a mask is refused `SOFT_MASK`. `tests/sink_conformance.h` runs the cases for these
+against every sink.
 
 ## Gradients (normative; color-paint story P1)
 

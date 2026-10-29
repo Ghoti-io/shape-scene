@@ -22,8 +22,10 @@
  * @file mask.h
  *
  * The mask: what a group's soft-mask slot names, and the transfer that turns a mask picture's value into a number.
- * Rules MK1 to MK7 are the ones this header defines; the frame, the order at the group's pop and the planning pass
- * (MK6, MK7, MK9) are used by the sinks and the planner.
+ * This header defines the resource, the coefficient sets, the transfer and the hash and dump (MK1, MK3, MK4, MK13); the
+ * mask's value, the frame, the order at the group's pop and the planning pass (MK2, MK5 to MK7, MK9) are in
+ * `documentation/design.md` and are used by the sinks and the planner.  Shape and opacity differ under every parent only
+ * for an unbounded operator (`DEST_IN`, `SRC`, `SRC_IN`, `SRC_OUT`, `CLEAR`); for a bounded one only under a knockout parent (MK7).
  *
  * ### The resource (MK1)
  *

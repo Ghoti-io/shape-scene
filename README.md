@@ -20,8 +20,10 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
   8, 12 or 16-bit integers or 32-bit floats as gray, RGB or RGBA, kept as imported and interned
   by content in 64-by-64-texel tiles, copied in or taken from an owned raster), and an image paint
   (`image_paint.h`: an image with an integer window, a map, an edge mode per axis, a magnify and a
-  minify filter, a filter space and a tint for a stencil). A stroke
-  style's width profile is named and reserved.
+  minify filter, a filter space and a tint for a stencil), and a mask (`mask.h`: a picture read as
+  alpha or luminance, with a luminance coefficient set, the spaces it is rendered and measured in, a
+  backdrop color and a transfer function, acting on a group's opacity or its shape, interned by
+  content). A stroke style's width profile is named and reserved.
 - **Recording without floats** (`fixed.h`). Integer-only calls, for a front end whose headers
   name no floating type: fills and clips of glyph runs under a design map of fixed-point ops,
   palette and foreground paints, groups by operator, a palette from 8-bit entries, a gradient from
@@ -46,8 +48,16 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
   one function every sink calls at draw time; a group has a blend space, an opacity, a composite
   operator (a Porter-Duff operator, or one of W3C's fifteen blend modes, numbered as COLRv1 numbers
   them: a per-draw blend is a group of one) and an ordering context; PDF's non-isolated and knockout groups
-  and a soft-mask slot are defined on the group, and refused by every sink until it composites them. Exact references (`tools/composite-oracle.py`,
+  and a soft mask (a mask resource and its placement) are defined on the group, and refused by every sink until it
+  composites them. Exact references (`tools/composite-oracle.py`,
   `tools/gradient-oracle.py`) and committed known answers define what two sinks must agree on.
+- **Masks** (`mask.h`; MK1 to MK14 in `documentation/design.md`). The value of a mask at a pixel is a
+  function of the rendered mask picture: its alpha or its luminance over a backdrop, through a transfer
+  (identity, exponential, sampled table or a stitching of them, PDF's function types 0, 2 and 3), and
+  outside everything the picture draws it is the transfer of the backdrop. A group multiplies its opacity
+  or its shape by the value at its pop. The planning pass enters a mask's picture and refuses a mask by
+  the features a sink lacks (`MASK_FEATURE`). `tools/composite-oracle.py` restates the rules in exact
+  rationals and `tests/mask_vectors.h` commits known answers.
 - **Hash and dump** of every resource and list, in `shape-geometry`'s spelling (FNV-1a 64 over
   little-endian fields), the same on every target.
 - **Limits** on everything a caller can make unbounded, each asserted by its bound, including the
@@ -94,7 +104,9 @@ front-end and a driver; `examples/sink.c` renders a list through the sink contra
 sink; `examples/gradient.c` interns, resolves and renders gradients; `examples/stroke.c` strokes an
 element after its fill and shows what a writer and a toolpath make of the strokes; `examples/image.c`
 imports rasters by copy and by take and shows what makes two images one; `examples/image_paint.c` paints
-a rectangle with an image, recognizes a drawn image as a writer does and shows what a sink's capabilities make of it.
+a rectangle with an image, recognizes a drawn image as a writer does and shows what a sink's capabilities make of it;
+`examples/mask.c` makes an SVG-style luminance mask and a PDF-style soft mask and shows the numbers every sink shares and
+the reasons a sink without a feature is refused with.
 
 ## Building
 
