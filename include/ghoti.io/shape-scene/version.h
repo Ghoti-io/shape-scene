@@ -224,8 +224,10 @@ typedef struct GSHSCENE_Node {
   uint32_t ordering;                 ///< Group: a ::GSHSCENE_Ordering, the context of its children.  Else ::GSHSCENE_ORDER_FLAT.
   uint32_t isolation;                ///< Group: a ::GSHSCENE_Isolation (T1); isolated, 0, by default.  Else 0.
   uint32_t knockout;                 ///< Group: 0 or 1, a knockout group (T1).  Else 0.
-  /** Group: the soft mask's slot (T1, T7): NULL, or a picture of the scene's store, which the node holds.  Else NULL. */
+  /** Group: the soft mask's slot (T1, T7, MK1): NULL, or a mask resource of the scene's store, which the node holds.  Else NULL. */
   const GSHSCENE_Resource * soft_mask;
+  /** Group with a soft mask: the mask's placement in the group's own space (MK6), composed by emission with the group's accumulated map as `clip_map` is.  Else the identity; a map that is not the identity without a mask is ::GSHSCENE_ERR_INVALID. */
+  GSHGEOM_Map soft_mask_map;
   const GSHSCENE_Resource * clip;    ///< Group: a path or glyph run clipping the group, or NULL.  Else NULL.
   GSHGEOM_Map clip_map;              ///< Group with a clip: the clip's placement in the group's own space.  Else the identity.
   GSHGEOM_Fill_Rule clip_rule;       ///< Group with a clip: its rule.  Else nonzero.

@@ -2461,8 +2461,14 @@ TEST_P(SinkConformance, S19_PdfGroupFieldsAreRefusedWithoutTheirCaps) {
     GSHSCENE_Paint white = solid(1.0, 1.0, 1.0, 1.0);
     EXPECT_EQ(gshscene_list_fill(mask_list, s.sq(0, 0, 30), nullptr, GSHGEOM_FILL_NONZERO, &white, 0, 0.0), GSHSCENE_OK);
     EXPECT_EQ(gshscene_list_close(mask_list), GSHSCENE_OK);
+    const GSHSCENE_Resource * mask_picture = nullptr;
+    ASSERT_EQ(gshscene_store_intern_picture(s.store, mask_list, &mask_picture), GSHSCENE_OK);
+    s.held.push_back(mask_picture);
+    GSHSCENE_Mask mask_content{};
+    mask_content.picture = mask_picture;
+    mask_content.mode = GSHSCENE_MASK_ALPHA;
     const GSHSCENE_Resource * mask = nullptr;
-    ASSERT_EQ(gshscene_store_intern_picture(s.store, mask_list, &mask), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_store_intern_mask(s.store, &mask_content, &mask), GSHSCENE_OK);
     s.held.push_back(mask);
     struct Field {
       const char * name;
@@ -2906,9 +2912,15 @@ inline const GSHSCENE_List * with_placeholders(Scene & s, const GSHSCENE_Sink_Ca
   }
   // A group with a soft mask: a sink that does not apply masks refuses the block (S19), and the placeholder inside it
   // is skipped with the block (PH3); one that does reports it.
+  GSHSCENE_Mask mask_content{};
+  mask_content.picture = picture;
+  mask_content.mode = GSHSCENE_MASK_ALPHA;
+  const GSHSCENE_Resource * mask = nullptr;
+  EXPECT_EQ(gshscene_store_intern_mask(s.store, &mask_content, &mask), GSHSCENE_OK);
+  s.held.push_back(mask);
   GSHSCENE_Group masked{};
   masked.opacity = 1.0;
-  masked.soft_mask = picture;
+  masked.soft_mask = mask;
   gshscene_list_group_push(l, &masked, 0, 0.0);
   gshscene_list_fill(l, s.sq(40, 40, 6), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0);
   if (with) {

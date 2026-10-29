@@ -296,11 +296,17 @@ typedef struct GSHSCENE_Group {
   /** 0 (the default) or 1, a knockout group: each element composites with the group's initial backdrop (T1, T3). */
   uint32_t knockout;
   /**
-   * The soft mask's slot (T1, T7): NULL (the default, none), or a picture of the list's store, which the list retains.
-   * What a mask means beyond being named here (PDF's alpha or luminosity mask, its backdrop, its transfer) is decided
-   * with the sink work that composites it; until then every sink refuses a group that names one.
+   * The soft mask's slot (T1, T7, MK1): NULL (the default, none), or a mask resource of the list's store (mask.h), which
+   * the list retains.  A sink that does not claim ::GSHSCENE_CAP_GROUP_SOFT_MASK refuses a group that names one.
    */
   const GSHSCENE_Resource * soft_mask;
+  /**
+   * The mask's placement (MK6): the map from the mask's space to the space of the group's items, so that one mask is one
+   * handle however many places use it.  A zero-filled map (dimension 0) is the identity and is the only value a group with
+   * no mask may have; it must be 2D and valid (::GSHSCENE_ERR_INVALID otherwise, ::GSHSCENE_ERR_UNSUPPORTED for a 3D one).
+   * A group item reads it back as the identity (dimension 2) when it names a mask, and zero-filled when it does not.
+   */
+  GSHGEOM_Map soft_mask_map;
 } GSHSCENE_Group;
 
 /**

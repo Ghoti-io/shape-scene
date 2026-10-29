@@ -134,7 +134,14 @@ static GSHSCENE_Result emit_group_enter(
     }
   }
   if (gshscene_group_pushes(p, walk->context)) {
-    GSHSCENE_Group g = {p->opacity, p->blend_space, p->ordering, p->composite, p->isolation, p->knockout, p->soft_mask};
+    GSHSCENE_Group g = {p->opacity, p->blend_space, p->ordering, p->composite, p->isolation, p->knockout, p->soft_mask,
+        {0}};
+    if (p->soft_mask) {
+      /* MK6: the mask's placement is composed with the group's accumulated map exactly as the clip's is. */
+      if (gshgeom_map_compose(base, &p->soft_mask_map, &g.soft_mask_map) != GSHGEOM_OK) {
+        return GSHSCENE_ERR_LIMIT;
+      }
+    }
     result = gshscene_list_group_push(s->list, &g, p->layer, p->depth);
     if (result == GSHSCENE_OK) {
       result = sink_origin(s, group->id);

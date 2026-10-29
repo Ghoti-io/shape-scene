@@ -34,8 +34,8 @@ static const std::uint64_t kGradientSweepHash = UINT64_C(0x91e9d5ee628077be);
 static const std::uint64_t kGradientListHash = UINT64_C(0x40244174011182f3);
 static const std::uint64_t kGradientSceneHash = UINT64_C(0x3abc5c4837c1b04e);
 static const std::uint64_t kBlendListHash = UINT64_C(0xcf6c9a2d69db9773);
-static const std::uint64_t kPdfGroupListHash = UINT64_C(0x90a2275ae4d9c0d1);
-static const std::uint64_t kPdfGroupSceneHash = UINT64_C(0x155057e8d234391d);
+static const std::uint64_t kPdfGroupListHash = UINT64_C(0x85eff5deb1be7906);
+static const std::uint64_t kPdfGroupSceneHash = UINT64_C(0xf05ebcf7f0e035e1);
 static const std::uint64_t kStrokeDefaultHash = UINT64_C(0xec1048adcb87f83b);
 static const std::uint64_t kStrokeDeviceHash = UINT64_C(0xf6f6bf8e08c31778);
 static const std::uint64_t kStrokeClipHash = UINT64_C(0x299f54062a3730a0);
@@ -267,24 +267,24 @@ mask picture=5949280bf106409b mode=2 coeff=1 acts=0 rspace=0:0:0000000000000000 
 tr kind=0 c0=0000000000000000 c1=0000000000000000 n=0000000000000000 samples=0 pieces=0
 )DUMP";
 static const char * const kPdfGroupListDump =
-R"DUMP(gshscene.list 1 items=12 ties=0 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=90a2275ae4d9c0d1
+R"DUMP(gshscene.list 1 items=12 ties=0 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=85eff5deb1be7906
 F res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=0 3fd0000000000000 3fe0000000000000 3fe8000000000000 3ff0000000000000 space=0:0:0000000000000000 entry=0 resource=0000000000000000 layer=0 depth=0000000000000000
 G opacity=3ff0000000000000 blend=0:0:0000000000000000 composite=0 order=0 isolation=1 knockout=0 mask=0000000000000000 layer=0 depth=0000000000000000
 F res=path:0a107c56241f4b98 map=d242bc481e41cf7c rule=1 paint=0 3ff0000000000000 0000000000000000 3fe0000000000000 3fe8000000000000 space=0:0:0000000000000000 entry=0 resource=0000000000000000 layer=0 depth=0000000000000000
 G opacity=3fe0000000000000 blend=0:0:0000000000000000 composite=23 order=0 isolation=0 knockout=1 mask=0000000000000000 layer=2 depth=3ff0000000000000
-G opacity=3ff0000000000000 blend=1:1:0000000000000000 composite=0 order=0 isolation=0 knockout=0 mask=5949280bf106409b layer=0 depth=0000000000000000
+G opacity=3ff0000000000000 blend=1:1:0000000000000000 composite=0 order=0 isolation=0 knockout=0 mask=a8c8b2fb1d42e0a5 maskmap=1f5787abb2e02a06 layer=0 depth=0000000000000000
 g
 g
 g
-G opacity=3fe8000000000000 blend=0:0:0000000000000000 composite=0 order=0 isolation=1 knockout=1 mask=5949280bf106409b layer=0 depth=0000000000000000
+G opacity=3fe8000000000000 blend=0:0:0000000000000000 composite=0 order=0 isolation=1 knockout=1 mask=54a42049d57283df maskmap=d242bc481e41cf7c layer=0 depth=0000000000000000
 g
 G opacity=3fd0000000000000 blend=0:0:0000000000000000 composite=0 order=0 layer=0 depth=0000000000000000
 g
 )DUMP";
 static const char * const kPdfGroupSceneDump =
-R"DUMP(gshscene.version 1 nodes=4 root=1 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=155057e8d234391d
+R"DUMP(gshscene.version 1 nodes=4 root=1 fg=0000000000000000 0000000000000000 0000000000000000 3ff0000000000000 0:0:0000000000000000 palette=0000000000000000 hash=f05ebcf7f0e035e1
 G id=1 parent=0 flags=0 key=- map=1f5787abb2e02a06 opacity=3ff0000000000000 blend=0:0:0000000000000000 composite=0 order=0 layer=0 depth=0000000000000000 clip=- children=2,4
-G id=2 parent=1 flags=0 key=- map=1f5787abb2e02a06 opacity=3fe0000000000000 blend=0:0:0000000000000000 composite=0 order=0 isolation=1 knockout=1 mask=5949280bf106409b layer=1 depth=4000000000000000 clip=- children=3
+G id=2 parent=1 flags=0 key=- map=1f5787abb2e02a06 opacity=3fe0000000000000 blend=0:0:0000000000000000 composite=0 order=0 isolation=1 knockout=1 mask=4235f5676186f68d maskmap=ff01deda28fd860d layer=1 depth=4000000000000000 clip=- children=3
 S id=3 parent=2 flags=0 key=- res=path:b0a83b16e6cec382 map=1f5787abb2e02a06 rule=0 paint=0 3fd0000000000000 3fe0000000000000 3fe8000000000000 3ff0000000000000 space=0:0:0000000000000000 entry=0 resource=0000000000000000 layer=0 depth=0000000000000000
 G id=4 parent=1 flags=0 key=- map=1f5787abb2e02a06 opacity=3ff0000000000000 blend=0:0:0000000000000000 composite=24 order=0 isolation=0 knockout=1 mask=0000000000000000 layer=0 depth=0000000000000000 clip=- children=-
 )DUMP";

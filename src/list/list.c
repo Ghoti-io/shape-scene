@@ -271,14 +271,14 @@ static void items_release(GSHSCENE_List * list) {
   }
 }
 
-/* The deepest picture an item names: an instance's, or a group's soft mask (T7; a sink that composites masks walks
- * it, so it counts toward the nesting limit now). */
+/* The deepest picture an item names: an instance's, or a group's soft mask's (MK12: a mask counts exactly as an instance;
+ * a sink that composites masks walks it, so it counts toward the nesting limit). */
 static size_t item_picture_depth(const GSHSCENE_Item * item) {
   if (item->kind == GSHSCENE_ITEM_INSTANCE) {
     return item->resource->u.picture.depth;
   }
   if (item->kind == GSHSCENE_ITEM_GROUP_PUSH && item->group.soft_mask) {
-    return item->group.soft_mask->u.picture.depth;
+    return item->group.soft_mask->u.mask.m.picture->u.picture.depth;
   }
   return 0;
 }
@@ -462,6 +462,33 @@ GSHSCENE_Result gshscene_list_canonical_depth(double depth, double * out) {
   return GSHSCENE_OK;
 }
 
+static int map_bits_equal(const GSHGEOM_Map * a, const GSHGEOM_Map * b) {
+  if (a->dim != b->dim || a->kind != b->kind) {
+    return 0;
+  }
+  for (int i = 0; i < a->dim; i++) {
+    for (int j = 0; j < a->dim; j++) {
+      if (gshgeom_f64_bits(a->m[i][j]) != gshgeom_f64_bits(b->m[i][j])) {
+        return 0;
+      }
+    }
+    if (gshgeom_f64_bits(a->t[i]) != gshgeom_f64_bits(b->t[i])) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
+/* The hash of a mask's placement: a group with a mask has a 2D map; the zero-filled spelling is the identity's. */
+static uint64_t placement_hash(const GSHGEOM_Map * map) {
+  GSHGEOM_Map identity;
+  if (map->dim == 0) {
+    gshgeom_map_identity(2, &identity);
+    return gshgeom_map_hash(&identity);
+  }
+  return gshgeom_map_hash(map);
+}
+
 static GSHSCENE_Result canonical_group(const GSHSCENE_Store * store, const GSHSCENE_Group * group, GSHSCENE_Group * out) {
   memset(out, 0, sizeof *out);
   out->opacity = 1.0;
@@ -481,12 +508,32 @@ static GSHSCENE_Result canonical_group(const GSHSCENE_Store * store, const GSHSC
     return GSHSCENE_ERR_INVALID;
   }
   if (group->soft_mask &&
-      (group->soft_mask->kind != GSHSCENE_RESOURCE_PICTURE || group->soft_mask->store != store)) {
+      (group->soft_mask->kind != GSHSCENE_RESOURCE_MASK || group->soft_mask->store != store)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  /* MK6: the mask's placement; a zero-filled map is the identity, and only a group with a mask may place one. */
+  GSHGEOM_Map placement;
+  gshgeom_map_identity(2, &placement);
+  int placed = group->soft_mask_map.dim != 0;
+  if (placed) {
+    GSHSCENE_Result mapped = canonical_map(&group->soft_mask_map, &placement);
+    if (mapped != GSHSCENE_OK) {
+      return mapped;
+    }
+  } else if (group->soft_mask_map.kind != 0) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  GSHGEOM_Map identity;
+  gshgeom_map_identity(2, &identity);
+  if (!group->soft_mask && placed && !map_bits_equal(&placement, &identity)) {
     return GSHSCENE_ERR_INVALID;
   }
   GSHSCENE_Result result = gshscene_color_space_check(&group->blend_space);
   if (result != GSHSCENE_OK) {
     return result;
+  }
+  if (placement.dim != 2) {
+    return GSHSCENE_ERR_UNSUPPORTED; /* a mask is planar */
   }
   out->opacity = group->opacity;
   out->blend_space = group->blend_space;
@@ -495,6 +542,9 @@ static GSHSCENE_Result canonical_group(const GSHSCENE_Store * store, const GSHSC
   out->isolation = group->isolation;
   out->knockout = group->knockout;
   out->soft_mask = group->soft_mask;
+  if (group->soft_mask) {
+    out->soft_mask_map = placement; /* one spelling: the identity is spelled as a 2D identity */
+  }
   return GSHSCENE_OK;
 }
 
@@ -505,7 +555,7 @@ int gshscene_group_pdf_default(uint32_t isolation, uint32_t knockout, const GSHS
 }
 
 void gshscene_group_hash_composite(GSHGEOM_Hash * h, uint32_t composite, uint32_t isolation, uint32_t knockout,
-    const GSHSCENE_Resource * soft_mask) {
+    const GSHSCENE_Resource * soft_mask, const GSHGEOM_Map * soft_mask_map) {
   if (gshscene_group_pdf_default(isolation, knockout, soft_mask)) {
     gshgeom_hash_u8(h, (uint8_t)composite); /* the spelling every group had before the fields existed */
     return;
@@ -513,14 +563,22 @@ void gshscene_group_hash_composite(GSHGEOM_Hash * h, uint32_t composite, uint32_
   gshgeom_hash_u8(h, (uint8_t)(composite | 0x80u));
   gshgeom_hash_u8(h, (uint8_t)((isolation == (uint32_t)GSHSCENE_ISOLATION_NON_ISOLATED ? 1u : 0u) | (knockout ? 2u : 0u)));
   gshgeom_hash_u64(h, soft_mask ? gshscene_resource_hash(soft_mask) : 0);
+  if (soft_mask) {
+    gshgeom_hash_u64(h, placement_hash(soft_mask_map)); /* MK13: the placement follows the mask */
+  }
 }
 
-int gshscene_group_dump_pdf(FILE * out, uint32_t isolation, uint32_t knockout, const GSHSCENE_Resource * soft_mask) {
+int gshscene_group_dump_pdf(FILE * out, uint32_t isolation, uint32_t knockout, const GSHSCENE_Resource * soft_mask,
+    const GSHGEOM_Map * soft_mask_map) {
   if (gshscene_group_pdf_default(isolation, knockout, soft_mask)) {
     return 0;
   }
-  return fprintf(out, " isolation=%u knockout=%u mask=%016llx", (unsigned)isolation, (unsigned)knockout,
+  int written = fprintf(out, " isolation=%u knockout=%u mask=%016llx", (unsigned)isolation, (unsigned)knockout,
       (unsigned long long)(soft_mask ? gshscene_resource_hash(soft_mask) : 0));
+  if (written >= 0 && soft_mask) {
+    written = fprintf(out, " maskmap=%016llx", (unsigned long long)placement_hash(soft_mask_map));
+  }
+  return written;
 }
 
 /* The same checks for a retained scene's nodes (src/scene), which share the rules of a fill. */
@@ -1423,7 +1481,7 @@ static int item_equal(const GSHSCENE_Item * a, const GSHSCENE_Item * b) {
          gshscene_space_equal(&a->group.blend_space, &b->group.blend_space) &&
          a->group.composite == b->group.composite && a->group.ordering == b->group.ordering &&
          a->group.isolation == b->group.isolation && a->group.knockout == b->group.knockout &&
-         a->group.soft_mask == b->group.soft_mask;
+         a->group.soft_mask == b->group.soft_mask && map_bits_equal(&a->group.soft_mask_map, &b->group.soft_mask_map);
 }
 
 int gshscene_list_equal(const GSHSCENE_List * a, const GSHSCENE_List * b) {
@@ -1513,7 +1571,7 @@ uint64_t gshscene_list_hash(const GSHSCENE_List * list) {
         gshgeom_hash_f64(&h, item->group.opacity);
         gshscene_space_hash(&h, &item->group.blend_space);
         gshscene_group_hash_composite(&h, item->group.composite, item->group.isolation, item->group.knockout,
-            item->group.soft_mask);
+            item->group.soft_mask, &item->group.soft_mask_map);
         gshgeom_hash_u32(&h, item->group.ordering);
         gshgeom_hash_i32(&h, item->layer);
         gshgeom_hash_f64(&h, item->depth);
@@ -1664,7 +1722,8 @@ GSHSCENE_Result gshscene_list_dump(const GSHSCENE_List * list, FILE * out) {
           written = fprintf(out, " composite=%u order=%u", (unsigned)item->group.composite, (unsigned)item->group.ordering);
         }
         if (written >= 0) {
-          written = gshscene_group_dump_pdf(out, item->group.isolation, item->group.knockout, item->group.soft_mask);
+          written = gshscene_group_dump_pdf(out, item->group.isolation, item->group.knockout, item->group.soft_mask,
+              &item->group.soft_mask_map);
         }
         if (written >= 0) {
           written = dump_layer_depth(out, item);

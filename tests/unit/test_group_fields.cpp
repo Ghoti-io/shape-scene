@@ -33,6 +33,8 @@
 
 #include <ghoti.io/shape-scene/fixed.h>
 
+#include <limits>
+
 using namespace scene;
 
 namespace {
@@ -62,6 +64,13 @@ GSHSCENE_Group pdf_group(double opacity, uint32_t isolation, uint32_t knockout, 
   g.knockout = knockout;
   g.soft_mask = mask;
   return g;
+}
+
+/** The fixture picture and, over it, the default alpha mask (known::kMaskHashes[0]); the picture's own reference is released. */
+const GSHSCENE_Resource * fixture_mask(GSHSCENE_Store * store, const GSHSCENE_Resource * sq, const GSHSCENE_Resource * p2,
+    int which = 0) {
+  Ref pic(fixture_picture(store, sq, p2));
+  return known_mask(store, pic.get(), which);
 }
 
 uint64_t live(GSHSCENE_Store * store) {
@@ -97,18 +106,29 @@ TEST(GroupFields, EachIsRecordedAndEachInvalidValueIsRefused) {
   Ref sq(intern_square(s.store));
   Ref p2(intern_fixture(s.store));
   Ref pic(fixture_picture(s.store, sq.get(), p2.get()));
+  Ref mask(known_mask(s.store, pic.get(), 0));
   Ref other_sq(intern_square(other.store));
   Ref other_p2(intern_fixture(other.store));
-  Ref other_pic(fixture_picture(other.store, other_sq.get(), other_p2.get()));
+  Ref other_mask(fixture_mask(other.store, other_sq.get(), other_p2.get()));
   ListHolder l(s.store);
-  GSHSCENE_Group g = pdf_group(0.5, GSHSCENE_ISOLATION_NON_ISOLATED, 1, pic.get(), GSHSCENE_COMPOSITE_HUE);
+  GSHSCENE_Group g = pdf_group(0.5, GSHSCENE_ISOLATION_NON_ISOLATED, 1, mask.get(), GSHSCENE_COMPOSITE_HUE);
   ASSERT_EQ(gshscene_list_group_push(l.list, &g, 3, 1.0), GSHSCENE_OK);
   const GSHSCENE_Item * item = nullptr;
   ASSERT_EQ(gshscene_list_item(l.list, 0, &item), GSHSCENE_OK);
   EXPECT_EQ(item->group.isolation, (uint32_t)GSHSCENE_ISOLATION_NON_ISOLATED);
   EXPECT_EQ(item->group.knockout, 1u);
-  EXPECT_EQ(item->group.soft_mask, pic.get());
-  EXPECT_EQ(item->group.composite, (uint32_t)GSHSCENE_COMPOSITE_HUE);
+  EXPECT_EQ(item->group.soft_mask, mask.get());
+  EXPECT_EQ(item->group.soft_mask_map.dim, 2) << "a mask's placement reads back as the 2D identity";
+  EXPECT_EQ(gshgeom_map_hash(&item->group.soft_mask_map), known::kMapIdentityHash);
+  GSHSCENE_Group placed_without = pdf_group(1.0, 0, 0, nullptr);
+  placed_without.soft_mask_map = translate(1.0, 2.0);
+  GSHSCENE_Group bad_placement = pdf_group(1.0, 0, 0, mask.get());
+  bad_placement.soft_mask_map = translate(1.0, 2.0);
+  bad_placement.soft_mask_map.m[0][0] = std::numeric_limits<double>::quiet_NaN();
+  GSHSCENE_Group three_d = pdf_group(1.0, 0, 0, mask.get());
+  gshgeom_map_identity(3, &three_d.soft_mask_map);
+  GSHSCENE_Group kind_only = pdf_group(1.0, 0, 0, mask.get());
+  kind_only.soft_mask_map.kind = 1;
   struct Bad {
     const char * why;
     GSHSCENE_Group g;
@@ -118,42 +138,56 @@ TEST(GroupFields, EachIsRecordedAndEachInvalidValueIsRefused) {
       {"a knockout of 2", pdf_group(1.0, 0, 2, nullptr)},
       {"a knockout of all ones", pdf_group(1.0, 0, 0xffffffffu, nullptr)},
       {"a soft mask that is a path", pdf_group(1.0, 0, 0, sq.get())},
-      {"a soft mask of another store", pdf_group(1.0, 0, 0, other_pic.get())},
+      {"a soft mask that is a picture (the slot holds a mask)", pdf_group(1.0, 0, 0, pic.get())},
+      {"a soft mask of another store", pdf_group(1.0, 0, 0, other_mask.get())},
+      {"a placement without a mask", placed_without},
+      {"an invalid placement", bad_placement},
+      {"a zero-filled placement that carries a kind", kind_only},
   };
   size_t count = gshscene_list_count(l.list);
   for (const Bad & b : bad) {
     EXPECT_EQ(gshscene_list_group_push(l.list, &b.g, 0, 0.0), GSHSCENE_ERR_INVALID) << b.why;
     EXPECT_EQ(gshscene_list_count(l.list), count) << b.why << ": a failing call leaves the list as it was";
   }
+  EXPECT_EQ(gshscene_list_group_push(l.list, &three_d, 0, 0.0), GSHSCENE_ERR_UNSUPPORTED) << "a mask is placed in the plane";
+  EXPECT_EQ(gshscene_list_count(l.list), count);
+  // A group with no mask may spell the identity placement, and reads it back as the zero-filled default.
+  GSHSCENE_Group identity_without = pdf_group(1.0, 0, 0, nullptr);
+  gshgeom_map_identity(2, &identity_without.soft_mask_map);
+  ASSERT_EQ(gshscene_list_group_push(l.list, &identity_without, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_item(l.list, count, &item), GSHSCENE_OK);
+  EXPECT_EQ(item->group.soft_mask_map.dim, 0);
 }
 
 TEST(GroupFields, TheListHoldsTheSoftMaskAndReleasesItOnDestroyResetAndTruncate) {
   StoreHolder s;
   Ref sq(intern_square(s.store));
   Ref p2(intern_fixture(s.store));
-  const GSHSCENE_Resource * pic = fixture_picture(s.store, sq.get(), p2.get());
-  uint64_t before = live(s.store);
+  const GSHSCENE_Resource * mask = fixture_mask(s.store, sq.get(), p2.get());
+  uint64_t before = live(s.store); // the mask and the picture it holds
   {
     ListHolder l(s.store);
-    GSHSCENE_Group g = pdf_group(1.0, 0, 0, pic);
+    GSHSCENE_Group g = pdf_group(1.0, 0, 0, mask);
     ASSERT_EQ(gshscene_list_group_push(l.list, &g, 0, 0.0), GSHSCENE_OK);
-    gshscene_resource_release(pic); // the list holds its own
-    EXPECT_EQ(live(s.store), before) << "the picture lives while the list names it";
+    gshscene_resource_release(mask); // the list holds its own
+    EXPECT_EQ(live(s.store), before) << "the mask lives while the list names it";
     ASSERT_EQ(gshscene_list_truncate(l.list, 0), GSHSCENE_OK);
-    EXPECT_EQ(live(s.store), before - 1) << "truncating the push released the mask";
-    pic = fixture_picture(s.store, sq.get(), p2.get());
-    g.soft_mask = pic;
+    EXPECT_EQ(live(s.store), before - 2) << "truncating the push released the mask, and the picture the mask held";
+    mask = fixture_mask(s.store, sq.get(), p2.get());
+    g.soft_mask = mask;
     ASSERT_EQ(gshscene_list_group_push(l.list, &g, 0, 0.0), GSHSCENE_OK);
     ASSERT_EQ(gshscene_list_group_pop(l.list), GSHSCENE_OK);
     ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
-    // A picture of a list whose group names a mask holds the mask, and counts it in its nesting.
+    // A picture of a list whose group names a mask holds the mask, and counts its picture in its nesting (MK12).
     const GSHSCENE_Resource * outer = nullptr;
     ASSERT_EQ(gshscene_store_intern_picture(s.store, l.list, &outer), GSHSCENE_OK);
-    EXPECT_EQ(gshscene_resource_picture_depth(outer), gshscene_resource_picture_depth(pic) + 1);
+    GSHSCENE_Mask content;
+    ASSERT_EQ(gshscene_resource_mask(mask, &content), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_resource_picture_depth(outer), gshscene_resource_picture_depth(content.picture) + 1);
     gshscene_resource_release(outer);
-    gshscene_resource_release(pic);
+    gshscene_resource_release(mask);
   }
-  EXPECT_EQ(live(s.store), before - 1) << "destroying the list released the mask";
+  EXPECT_EQ(live(s.store), before - 2) << "destroying the list released the mask";
 }
 
 TEST(GroupFields, EqualityHashAndDumpSeeEachField) {
@@ -161,6 +195,7 @@ TEST(GroupFields, EqualityHashAndDumpSeeEachField) {
   Ref sq(intern_square(s.store));
   Ref p2(intern_fixture(s.store));
   Ref pic(fixture_picture(s.store, sq.get(), p2.get()));
+  Ref mask(known_mask(s.store, pic.get(), 0));
   Ref pic2(intern_square(s.store, 1.0)); // not a picture: only used to make a second picture below
   GSHSCENE_List * mask_list = nullptr;
   ASSERT_EQ(gshscene_list_create(nullptr, nullptr, s.store, &mask_list), GSHSCENE_OK);
@@ -169,14 +204,20 @@ TEST(GroupFields, EqualityHashAndDumpSeeEachField) {
   const GSHSCENE_Resource * other_pic = nullptr;
   ASSERT_EQ(gshscene_store_intern_picture(s.store, mask_list, &other_pic), GSHSCENE_OK);
   gshscene_list_destroy(mask_list);
-  Ref other(other_pic);
+  Ref other_picture(other_pic);
+  Ref other(known_mask(s.store, other_picture.get(), 0));
+  GSHSCENE_Group placed = pdf_group(1.0, 0, 0, mask.get());
+  placed.soft_mask_map = translate(1.5, -2.25);
+  GSHSCENE_Group explicit_identity = pdf_group(1.0, 0, 0, mask.get());
+  gshgeom_map_identity(2, &explicit_identity.soft_mask_map);
   const GSHSCENE_Group variants[] = {
       pdf_group(1.0, 0, 0, nullptr),
       pdf_group(1.0, 1, 0, nullptr),
       pdf_group(1.0, 0, 1, nullptr),
-      pdf_group(1.0, 0, 0, pic.get()),
+      pdf_group(1.0, 0, 0, mask.get()),
       pdf_group(1.0, 0, 0, other.get()),
-      pdf_group(1.0, 1, 1, pic.get()),
+      pdf_group(1.0, 1, 1, mask.get()),
+      placed,
   };
   std::vector<uint64_t> hashes;
   std::vector<std::string> dumps;
@@ -201,6 +242,17 @@ TEST(GroupFields, EqualityHashAndDumpSeeEachField) {
     ASSERT_EQ(gshscene_list_group_push(b.list, &variants[i], 0, 0.0), GSHSCENE_OK);
     EXPECT_FALSE(gshscene_list_equal(a.list, b.list)) << i;
   }
+  // A zero-filled placement and the explicit identity are one spelling (MK13).
+  {
+    ListHolder a(s.store), b(s.store);
+    ASSERT_EQ(gshscene_list_group_push(a.list, &variants[3], 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_group_push(b.list, &explicit_identity, 0, 0.0), GSHSCENE_OK);
+    EXPECT_TRUE(gshscene_list_equal(a.list, b.list));
+    EXPECT_EQ(gshscene_list_hash(a.list), gshscene_list_hash(b.list));
+    EXPECT_EQ(dump_list(a.list), dump_list(b.list));
+  }
+  EXPECT_NE(dumps[3].find(" maskmap="), std::string::npos) << "a mask is followed by its placement: " << dumps[3];
+  EXPECT_EQ(dumps[1].find("maskmap"), std::string::npos) << "no mask, no placement";
   // The default group's line has no field of T1: the spelling is the one before the fields.
   EXPECT_EQ(dumps[0].find("isolation="), std::string::npos);
   EXPECT_NE(dumps[1].find(" isolation=1 knockout=0 mask=0000000000000000 layer="), std::string::npos) << dumps[1];
@@ -212,14 +264,19 @@ TEST(GroupFields, AListAndAVersionHashAndDumpAsTheGeneratorSays) {
   Ref p2(intern_fixture(s.store));
   Ref pic(fixture_picture(s.store, sq.get(), p2.get()));
   ASSERT_EQ(gshscene_resource_hash(pic.get()), known::kPictureHash);
+  Ref mask0(known_mask(s.store, pic.get(), 0));
+  Ref mask1(known_mask(s.store, pic.get(), 1));
+  Ref mask2(known_mask(s.store, pic.get(), 2));
+  ASSERT_EQ(gshscene_resource_hash(mask0.get()), known::kMaskHashes[0]);
   ListHolder l(s.store);
   GSHGEOM_Map t = translate(1.5, -2.25);
   GSHSCENE_Paint a = solid(0.25, 0.5, 0.75, 1.0), b = solid(1.0, 0.0, 0.5, 0.75);
   GSHSCENE_Group non_isolated = pdf_group(1.0, GSHSCENE_ISOLATION_NON_ISOLATED, 0, nullptr);
   GSHSCENE_Group knockout = pdf_group(0.5, 0, 1, nullptr, GSHSCENE_COMPOSITE_MULTIPLY);
-  GSHSCENE_Group masked = pdf_group(1.0, 0, 0, pic.get());
+  GSHSCENE_Group masked = pdf_group(1.0, 0, 0, mask0.get());
   masked.blend_space = linear_srgb_space();
-  GSHSCENE_Group all = pdf_group(0.75, GSHSCENE_ISOLATION_NON_ISOLATED, 1, pic.get());
+  GSHSCENE_Group all = pdf_group(0.75, GSHSCENE_ISOLATION_NON_ISOLATED, 1, mask1.get());
+  all.soft_mask_map = t;
   GSHSCENE_Group plain = make_group(0.25);
   ASSERT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &a, 0, 0.0), GSHSCENE_OK);
   ASSERT_EQ(gshscene_list_group_push(l.list, &non_isolated, 0, 0.0), GSHSCENE_OK);
@@ -242,7 +299,8 @@ TEST(GroupFields, AListAndAVersionHashAndDumpAsTheGeneratorSays) {
   g2.depth = 2.0;
   g2.isolation = GSHSCENE_ISOLATION_NON_ISOLATED;
   g2.knockout = 1;
-  g2.soft_mask = pic.get();
+  g2.soft_mask = mask2.get();
+  gshgeom_map_design_to_model(2.5, 10, 20, &g2.soft_mask_map);
   uint64_t id2 = add(e.edit, GSHSCENE_ROOT_ID, g2);
   GSHSCENE_Node shape = shape_node(sq.get());
   shape.paint = solid(0.25, 0.5, 0.75, 1.0);
@@ -258,14 +316,15 @@ TEST(GroupFields, AListAndAVersionHashAndDumpAsTheGeneratorSays) {
   GSHSCENE_Node_Info info = info_of(v.get(), id2);
   EXPECT_EQ(info.node.isolation, (uint32_t)GSHSCENE_ISOLATION_NON_ISOLATED);
   EXPECT_EQ(info.node.knockout, 1u);
-  EXPECT_EQ(info.node.soft_mask, pic.get());
+  EXPECT_EQ(info.node.soft_mask, mask2.get());
+  EXPECT_EQ(gshgeom_map_hash(&info.node.soft_mask_map), known::kMapDesignHash);
 }
 
 TEST(GroupFields, AVersionEmitsTheFieldsAsAGroupPushAndAChangeDamagesTheSubtree) {
   StoreHolder s;
   Ref sq(intern_square(s.store));
   Ref p2(intern_fixture(s.store));
-  Ref pic(fixture_picture(s.store, sq.get(), p2.get()));
+  Ref pic(fixture_mask(s.store, sq.get(), p2.get()));
   SceneHolder sc(nullptr, nullptr, s.store);
   uint64_t gid = 0;
   VersionRef v1;
@@ -304,6 +363,40 @@ TEST(GroupFields, AVersionEmitsTheFieldsAsAGroupPushAndAChangeDamagesTheSubtree)
   ASSERT_EQ(gshscene_version_list(v2.get(), &list), GSHSCENE_OK);
   ASSERT_EQ(gshscene_list_item(list, 0, &push), GSHSCENE_OK);
   EXPECT_EQ(push->group.soft_mask, pic.get());
+  EXPECT_EQ(gshgeom_map_hash(&push->group.soft_mask_map), known::kMapIdentityHash);
+  // MK6: the placement is composed with the group's accumulated map as the clip's is, and a change of it only damages too.
+  VersionRef v2b;
+  {
+    EditHolder e(sc, v2.get());
+    GSHSCENE_Node_Info info = info_of(v2.get(), gid);
+    GSHSCENE_Node g = info.node;
+    g.map = translate(1.0, 2.0);
+    g.soft_mask_map = translate(3.0, 4.0);
+    ASSERT_EQ(gshscene_edit_set(e.edit, gid, &g), GSHSCENE_OK);
+    publish(sc, e, &v2b);
+  }
+  ASSERT_EQ(gshscene_version_list(v2b.get(), &list), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_item(list, 0, &push), GSHSCENE_OK);
+  ASSERT_EQ(push->kind, GSHSCENE_ITEM_GROUP_PUSH);
+  GSHGEOM_Map composed = translate(4.0, 6.0);
+  EXPECT_EQ(gshgeom_map_hash(&push->group.soft_mask_map), gshgeom_map_hash(&composed));
+  {
+    GSHSCENE_Diff * d2 = nullptr;
+    ASSERT_EQ(gshscene_diff(v2.get(), v2b.get(), nullptr, nullptr, &d2), GSHSCENE_OK);
+    GSHSCENE_Damage damage2;
+    ASSERT_EQ(gshscene_diff_damage(d2, &damage2), GSHSCENE_OK);
+    EXPECT_FALSE(damage2.empty);
+    gshscene_diff_destroy(d2);
+  }
+  // A node whose placement is not the identity and that names no mask is invalid (MK13).
+  {
+    EditHolder e(sc, v2.get());
+    GSHSCENE_Node_Info info = info_of(v2.get(), gid);
+    GSHSCENE_Node g = info.node;
+    g.soft_mask = nullptr;
+    g.soft_mask_map = translate(3.0, 4.0);
+    EXPECT_EQ(gshscene_edit_set(e.edit, gid, &g), GSHSCENE_ERR_INVALID);
+  }
   // A shape or instance node carries none of them.
   EditHolder e(sc, v2.get());
   GSHSCENE_Node shape = shape_node(sq.get());
@@ -323,7 +416,7 @@ TEST(GroupFields, AGroupNodeHoldsItsSoftMaskAndReleasesItWithTheScene) {
   StoreHolder s;
   Ref sq(intern_square(s.store));
   Ref p2(intern_fixture(s.store));
-  const GSHSCENE_Resource * pic = fixture_picture(s.store, sq.get(), p2.get());
+  const GSHSCENE_Resource * pic = fixture_mask(s.store, sq.get(), p2.get());
   uint64_t with_mask = live(s.store);
   {
     SceneHolder sc(nullptr, nullptr, s.store);
@@ -339,11 +432,11 @@ TEST(GroupFields, AGroupNodeHoldsItsSoftMaskAndReleasesItWithTheScene) {
       publish(sc, e, &v);
       GSHSCENE_Node_Info info = info_of(v.get(), gid);
       ASSERT_EQ(info.node.soft_mask, pic);
-      EXPECT_EQ(gshscene_resource_hash(info.node.soft_mask), known::kPictureHash) << "the mask is alive, and the same";
+      EXPECT_EQ(gshscene_resource_hash(info.node.soft_mask), known::kMaskHashes[0]) << "the mask is alive, and the same";
     }
     EXPECT_EQ(live(s.store), with_mask) << "the scene's version holds the mask";
   }
-  EXPECT_EQ(live(s.store), with_mask - 1) << "and with the scene gone nothing does";
+  EXPECT_EQ(live(s.store), with_mask - 2) << "and with the scene gone nothing does (nor the picture the mask held)";
 }
 
 TEST(GroupFields, ASoftMaskCountsTowardThePictureNestingAtPublish) {
@@ -356,8 +449,9 @@ TEST(GroupFields, ASoftMaskCountsTowardThePictureNestingAtPublish) {
     StoreHolder s;
     Ref sq(intern_square(s.store));
     Ref p2(intern_fixture(s.store));
-    Ref pic(fixture_picture(s.store, sq.get(), p2.get())); // depth 1
-    ASSERT_EQ(gshscene_resource_picture_depth(pic.get()), 1u);
+    Ref picture(fixture_picture(s.store, sq.get(), p2.get())); // depth 1
+    ASSERT_EQ(gshscene_resource_picture_depth(picture.get()), 1u);
+    Ref pic(known_mask(s.store, picture.get(), 0));
     SceneHolder sc(&l, nullptr, s.store);
     EditHolder e(sc);
     GSHSCENE_Node g = group_node();
@@ -382,7 +476,7 @@ TEST(GroupFields, ThePlanningPassRefusesEachWithoutItsCap) {
   StoreHolder s;
   Ref sq(intern_square(s.store));
   Ref p2(intern_fixture(s.store));
-  Ref pic(fixture_picture(s.store, sq.get(), p2.get()));
+  Ref pic(fixture_mask(s.store, sq.get(), p2.get()));
   GSHSCENE_Sink_Caps caps{};
   caps.item_kinds = 0x7e;
   caps.composites = 0x0fffffff;

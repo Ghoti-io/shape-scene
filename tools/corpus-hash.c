@@ -1260,10 +1260,18 @@ static void blend_section(void) {
   GSHSCENE_Paint white = random_paint();
   check(gshscene_list_fill(mask_list, paths[0], NULL, GSHGEOM_FILL_NONZERO, &white, 0, 0.0), "mask fill");
   check(gshscene_list_close(mask_list), "mask close");
-  const GSHSCENE_Resource * mask = NULL;
-  check(gshscene_store_intern_picture(store, mask_list, &mask), "mask picture");
+  const GSHSCENE_Resource * mask_picture = NULL;
+  check(gshscene_store_intern_picture(store, mask_list, &mask_picture), "mask picture");
   gshscene_list_destroy(mask_list);
-  feed(gshscene_resource_hash(mask));
+  feed(gshscene_resource_hash(mask_picture));
+  /* M1: the soft-mask slot names a mask resource: the default alpha mask over the picture. */
+  GSHSCENE_Mask mask_content;
+  memset(&mask_content, 0, sizeof mask_content);
+  mask_content.picture = mask_picture;
+  mask_content.mode = GSHSCENE_MASK_ALPHA;
+  const GSHSCENE_Resource * mask = NULL;
+  check(gshscene_store_intern_mask(store, &mask_content, &mask), "mask");
+  gshscene_resource_release(mask_picture);
   for (unsigned l = 0; l < 12; l++) {
     GSHSCENE_List * list = NULL;
     check(gshscene_list_create(NULL, NULL, store, &list), "blend list");

@@ -420,12 +420,13 @@ GSHSCENE_Result gshscene_list_canonical_group(
 /** T1: whether a group's isolation, knockout and soft mask are the defaults (isolated, 0, none). */
 int gshscene_group_pdf_default(uint32_t isolation, uint32_t knockout, const GSHSCENE_Resource * soft_mask);
 
-/** T1: a group's `u8` composite in a hash, and after it PDF's fields when one is not the default (list.h). */
+/** T1, MK13: a group's `u8` composite in a hash, and after it PDF's fields when one is not the default, the mask's placement after its hash (list.h). */
 void gshscene_group_hash_composite(GSHGEOM_Hash * h, uint32_t composite, uint32_t isolation, uint32_t knockout,
-    const GSHSCENE_Resource * soft_mask);
+    const GSHSCENE_Resource * soft_mask, const GSHGEOM_Map * soft_mask_map);
 
-/** T1: ` isolation=N knockout=N mask=<hash>` in a dump when one of them is not the default; else nothing.  < 0 on error. */
-int gshscene_group_dump_pdf(FILE * out, uint32_t isolation, uint32_t knockout, const GSHSCENE_Resource * soft_mask);
+/** T1, MK13: ` isolation=N knockout=N mask=<hash>` (and ` maskmap=<hash>` with a mask) in a dump when one of them is not the default; else nothing.  < 0 on error. */
+int gshscene_group_dump_pdf(FILE * out, uint32_t isolation, uint32_t knockout, const GSHSCENE_Resource * soft_mask,
+    const GSHGEOM_Map * soft_mask_map);
 GSHSCENE_Result gshscene_list_canonical_depth(double depth, double * out);
 
 /** PH1, PH2: a placeholder's fields by the rules of the record call (a retained scene's node shares them); -0 becomes +0. */

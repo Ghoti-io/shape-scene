@@ -421,22 +421,30 @@ def clip_push(rkind, rhash, mhash, rule, layer=0, depth=0.0):
     return dict(k=CLIP_PUSH, rkind=rkind, rhash=rhash, mhash=mhash, rule=rule, layer=layer, depth=depth)
 
 
-def group_push(opacity, blend=TARGET, composite=0, order=ORDER_FLAT, layer=0, depth=0.0, isolation=0, knockout=0, mask=0):
+def group_push(opacity, blend=TARGET, composite=0, order=ORDER_FLAT, layer=0, depth=0.0, isolation=0, knockout=0, mask=0,
+               maskmap=None):
     return dict(k=GROUP_PUSH, opacity=opacity, blend=blend, composite=composite, order=order, layer=layer, depth=depth,
-                isolation=isolation, knockout=knockout, mask=mask)
+                isolation=isolation, knockout=knockout, mask=mask, maskmap=IDENTITY if maskmap is None else maskmap)
 
 
-def composite_bytes(composite, isolation=0, knockout=0, mask=0):
-    """T1 (list.h): the u8 composite, and PDF's group fields after it, bit 7 set, only when one is not the default."""
+def composite_bytes(composite, isolation=0, knockout=0, mask=0, maskmap=None):
+    """T1, MK13 (list.h): the u8 composite, and PDF's group fields after it, bit 7 set, only when one is not the default;
+    the mask's placement follows the mask's hash when there is a mask."""
     if not isolation and not knockout and not mask:
         return u8(composite)
-    return u8(0x80 | composite) + u8((1 if isolation else 0) + (2 if knockout else 0)) + u64(mask)
+    out = u8(0x80 | composite) + u8((1 if isolation else 0) + (2 if knockout else 0)) + u64(mask)
+    if mask:
+        out += u64(IDENTITY if maskmap is None else maskmap)
+    return out
 
 
-def pdf_fields_text(isolation=0, knockout=0, mask=0):
+def pdf_fields_text(isolation=0, knockout=0, mask=0, maskmap=None):
     if not isolation and not knockout and not mask:
         return ""
-    return " isolation=%d knockout=%d mask=%016x" % (isolation, knockout, mask)
+    text = " isolation=%d knockout=%d mask=%016x" % (isolation, knockout, mask)
+    if mask:
+        text += " maskmap=%016x" % (IDENTITY if maskmap is None else maskmap)
+    return text
 
 
 def stroke(rkind, rhash, shash, mhash, rgba, space=TARGET, layer=0, depth=0.0, paint=PAINT_SOLID, entry=0, grad=0):
@@ -482,7 +490,7 @@ def item_bytes(it):
         out += u64(it["rhash"]) + u64(it["mhash"]) + u8(it["rule"]) + i32(it["layer"]) + f64(it["depth"])
     elif k == GROUP_PUSH:
         out += f64(it["opacity"]) + space_bytes(it["blend"])
-        out += composite_bytes(it["composite"], it.get("isolation", 0), it.get("knockout", 0), it.get("mask", 0))
+        out += composite_bytes(it["composite"], it.get("isolation", 0), it.get("knockout", 0), it.get("mask", 0), it.get("maskmap"))
         out += u32(it["order"]) + i32(it["layer"]) + f64(it["depth"])
     elif k == INSTANCE:
         out += u64(it["rhash"]) + u64(it["mhash"]) + i32(it["layer"]) + f64(it["depth"])
@@ -517,7 +525,7 @@ def item_line(it):
     if k == GROUP_PUSH:
         return "G opacity=%016x blend=%s composite=%d order=%d%s %s" % (
             bits(it["opacity"]), space_text(it["blend"]), it["composite"], it["order"],
-            pdf_fields_text(it.get("isolation", 0), it.get("knockout", 0), it.get("mask", 0)), ld)
+            pdf_fields_text(it.get("isolation", 0), it.get("knockout", 0), it.get("mask", 0), it.get("maskmap")), ld)
     if k == GROUP_POP:
         return "g"
     if k == STROKE:
@@ -723,11 +731,11 @@ PDF_LIST_ITEMS = [
     group_push(1.0, isolation=1),
     fill(KIND_PATH, P2_RES, TRANSLATE, 1, (1.0, 0.0, 0.5, 0.75)),
     group_push(0.5, composite=COMPOSITE["multiply"], knockout=1, layer=2, depth=1.0),
-    group_push(1.0, blend=SRGB_LINEAR, mask=PICTURE_RES),
+    group_push(1.0, blend=SRGB_LINEAR, mask=MASK_RES),
     GROUP_POP_ITEM,
     GROUP_POP_ITEM,
     GROUP_POP_ITEM,
-    group_push(0.75, isolation=1, knockout=1, mask=PICTURE_RES),
+    group_push(0.75, isolation=1, knockout=1, mask=MASKS[1]["hash"], maskmap=TRANSLATE),
     GROUP_POP_ITEM,
     group_push(0.25),
     GROUP_POP_ITEM,
@@ -785,7 +793,7 @@ def node_bytes(n):
     out = u64(n["id"]) + u8(n["kind"]) + u8(n["flags"]) + u64(n["parent"]) + key_bytes(n["key"])
     if n["kind"] == NODE_GROUP:
         out += u64(n["map"]) + f64(n["opacity"]) + space_bytes(n["blend"])
-        out += composite_bytes(n["composite"], n.get("isolation", 0), n.get("knockout", 0), n.get("mask", 0))
+        out += composite_bytes(n["composite"], n.get("isolation", 0), n.get("knockout", 0), n.get("mask", 0), n.get("maskmap"))
         out += u32(n["order"]) + i32(n["layer"]) + f64(n["depth"])
         clip = n["clip"]
         if clip is None:
@@ -826,7 +834,7 @@ def node_line(n):
         children = ",".join(str(c) for c in n["children"]) if n["children"] else "-"
         return "%s map=%016x opacity=%016x blend=%s composite=%d order=%d%s layer=%d depth=%016x clip=%s children=%s" % (
             head, n["map"], bits(n["opacity"]), space_text(n["blend"]), n["composite"], n["order"],
-            pdf_fields_text(n.get("isolation", 0), n.get("knockout", 0), n.get("mask", 0)), n["layer"],
+            pdf_fields_text(n.get("isolation", 0), n.get("knockout", 0), n.get("mask", 0), n.get("maskmap")), n["layer"],
             bits(n["depth"]), clip_text, children)
     if n["kind"] in (NODE_SHAPE, NODE_STROKE):
         style = " style=%016x" % n["style"] if n["kind"] == NODE_STROKE else ""
@@ -902,7 +910,7 @@ GRAD_SCENE_NODES = [
 GRAD_SCENE_HASH = version_hash(GRAD_SCENE_NODES)
 PDF_SCENE_NODES = [
     group_node(1, 0, [2, 4]),
-    group_node(2, 1, [3], isolation=1, knockout=1, mask=PICTURE_RES, opacity=0.5, layer=1, depth=2.0),
+    group_node(2, 1, [3], isolation=1, knockout=1, mask=MASKS[2]["hash"], maskmap=DESIGN, opacity=0.5, layer=1, depth=2.0),
     shape_node(3, 2, (KIND_PATH, SQ_RES), rgba=(0.25, 0.5, 0.75, 1.0)),
     group_node(4, 1, [], knockout=1, composite=COMPOSITE["hue"]),
 ]

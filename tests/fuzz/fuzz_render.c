@@ -726,12 +726,20 @@ static GSHSCENE_List * build(Scene * s, Input * in, int * ties) {
           g.isolation = pdf != 6 ? GSHSCENE_ISOLATION_NON_ISOLATED : GSHSCENE_ISOLATION_ISOLATED;
           g.knockout = pdf != 5;
         }
+        const GSHSCENE_Resource * mask = NULL;
         if ((c & 0x70) == 0x70 && s->picture_count) {
-          g.soft_mask = s->pictures[a % s->picture_count];
+          GSHSCENE_Mask content;
+          memset(&content, 0, sizeof content);
+          content.picture = s->pictures[a % s->picture_count];
+          content.mode = GSHSCENE_MASK_ALPHA;
+          if (gshscene_store_intern_mask(s->store, &content, &mask) == GSHSCENE_OK) {
+            g.soft_mask = mask;
+          }
         }
         if (depth < sizeof stack && gshscene_list_group_push(list, &g, layer, d) == GSHSCENE_OK) {
           stack[depth++] = 2;
         }
+        gshscene_resource_release(mask); /* the list holds its own */
         break;
       }
       case 4:

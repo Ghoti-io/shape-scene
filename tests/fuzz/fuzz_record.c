@@ -276,6 +276,16 @@ static GSHGEOM_Path * make_path(S * s, unsigned recipe) {
   return path;
 }
 
+/** An alpha mask over @p picture (a picture of @p store), or NULL where a limit refuses it: the soft-mask slot's value (MK1). */
+static const GSHSCENE_Resource * mask_over(GSHSCENE_Store * store, const GSHSCENE_Resource * picture) {
+  GSHSCENE_Mask m;
+  memset(&m, 0, sizeof m);
+  m.picture = picture;
+  m.mode = GSHSCENE_MASK_ALPHA;
+  const GSHSCENE_Resource * r = NULL;
+  return gshscene_store_intern_mask(store, &m, &r) == GSHSCENE_OK ? r : NULL;
+}
+
 static const GSHSCENE_Resource * intern_recipe(S * s, GSHSCENE_Store * store, unsigned recipe, GSHSCENE_Result * result) {
   GSHGEOM_Path * path = make_path(s, recipe);
   if (!path) {
@@ -2135,10 +2145,12 @@ static void op(S * s, unsigned code) {
       g.isolation = pick(s, 3);
       g.knockout = pick(s, 3);
       unsigned mask = pick(s, 3);
-      g.soft_mask = mask == 1 ? s->pictures[pick(s, POOL)] : mask == 2 ? s->res[pick(s, POOL)] : NULL;
-      int path_mask = g.soft_mask && gshscene_resource_kind(g.soft_mask) != GSHSCENE_RESOURCE_PICTURE;
+      const GSHSCENE_Resource * held = mask == 1 ? mask_over(s->store, s->pictures[pick(s, POOL)]) : NULL;
+      g.soft_mask = mask == 1 ? held : mask == 2 ? s->res[pick(s, POOL)] : NULL;
+      int path_mask = g.soft_mask && gshscene_resource_kind(g.soft_mask) != GSHSCENE_RESOURCE_MASK;
       int invalid = g.composite >= GSHSCENE_COMPOSITE_COUNT || g.isolation > 1 || g.knockout > 1 || path_mask;
       r = gshscene_list_group_push(s->list, &g, 0, 0.0);
+      gshscene_resource_release(held); /* the list holds its own */
       if (invalid) {
         CHECK(r == GSHSCENE_ERR_INVALID);
         outcomes[OUT_PDF_INVALID] += g.isolation > 1 || g.knockout > 1 || path_mask;
@@ -2180,7 +2192,11 @@ static void op(S * s, unsigned code) {
             gshscene_list_create(&s->alloc, &s->limits, store, &l) == GSHSCENE_OK &&
             gshscene_list_fill(l, shape, NULL, GSHGEOM_FILL_NONZERO, NULL, 0, 0.0) == GSHSCENE_OK &&
             gshscene_list_close(l) == GSHSCENE_OK) {
-          gshscene_store_intern_picture(store, l, &mask);
+          const GSHSCENE_Resource * picture = NULL;
+          if (gshscene_store_intern_picture(store, l, &picture) == GSHSCENE_OK) {
+            mask = mask_over(store, picture);
+            gshscene_resource_release(picture);
+          }
         }
         gshscene_list_destroy(l);
         gshscene_resource_release(shape);
