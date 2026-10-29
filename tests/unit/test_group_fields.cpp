@@ -502,10 +502,150 @@ TEST(GroupFields, ThePlanningPassRefusesEachWithoutItsCap) {
   caps.flags |= GSHSCENE_CAP_GROUP_KNOCKOUT;
   EXPECT_EQ(decide(pdf_group(1.0, 1, 1, pic.get())).reason, GSHSCENE_REASON_SOFT_MASK);
   caps.flags |= GSHSCENE_CAP_GROUP_SOFT_MASK;
+  EXPECT_EQ(decide(pdf_group(1.0, 1, 1, pic.get())).reason, GSHSCENE_REASON_MASK_FEATURE) << "the flag alone is not the mask's features";
+  caps.mask_native = GSHSCENE_MASK_NATIVE_ALL;
   EXPECT_EQ(decide(pdf_group(1.0, 1, 1, pic.get())).entry_class, 0) << "a sink that claims all three draws it";
   EXPECT_STREQ(gshscene_reason_string(GSHSCENE_REASON_GROUP_ISOLATION), "group-isolation");
   EXPECT_STREQ(gshscene_reason_string(GSHSCENE_REASON_GROUP_KNOCKOUT), "group-knockout");
   EXPECT_STREQ(gshscene_reason_string(GSHSCENE_REASON_SOFT_MASK), "soft-mask");
+}
+
+// MK9: the features a mask needs and the sink lacks are one more refusal, after the others, with the bits in `detail`.
+TEST(GroupFields, AMaskTheSinkLacksAFeatureOfIsRefusedLastAndNamesTheMissingBits) {
+  StoreHolder s;
+  Ref sq(intern_square(s.store));
+  Ref p2(intern_fixture(s.store));
+  Ref plain(fixture_mask(s.store, sq.get(), p2.get(), 0));  // alpha, identity, opacity
+  Ref table(fixture_mask(s.store, sq.get(), p2.get(), 2));  // luminance, LUM, table
+  Ref shape(fixture_mask(s.store, sq.get(), p2.get(), 1));  // luminance, spaces, backdrop, exponential, shape
+  GSHSCENE_Sink_Caps caps{};
+  caps.item_kinds = 0x7e;
+  caps.composites = 0x0fffffff;
+  caps.flags = GSHSCENE_CAP_CAN_BLOCK | GSHSCENE_CAP_GROUP_NON_ISOLATED | GSHSCENE_CAP_GROUP_KNOCKOUT;
+  GSHSCENE_Item item{};
+  item.kind = GSHSCENE_ITEM_GROUP_PUSH;
+  auto decide = [&](const GSHSCENE_Group & g) {
+    item.group = g;
+    return gshscene_caps_disposition(&caps, &item, nullptr, 0, nullptr, nullptr, nullptr);
+  };
+  // Without the flag the mask's features are not looked at: SOFT_MASK, whatever mask_native says.
+  caps.mask_native = GSHSCENE_MASK_NATIVE_ALL;
+  EXPECT_EQ(decide(pdf_group(1.0, 0, 0, plain.get())).reason, GSHSCENE_REASON_SOFT_MASK);
+  EXPECT_EQ(decide(pdf_group(1.0, 0, 0, plain.get())).detail, 0u);
+  caps.flags |= GSHSCENE_CAP_GROUP_SOFT_MASK;
+  EXPECT_EQ(decide(pdf_group(1.0, 0, 0, plain.get())).entry_class, 0) << "a sink with the flag and every feature draws it";
+  EXPECT_EQ(decide(pdf_group(1.0, 0, 0, shape.get())).entry_class, 0);
+  // A sink with the flag and no feature lacks the mask's own.
+  caps.mask_native = 0;
+  GSHSCENE_Disposition d = decide(pdf_group(1.0, 0, 0, plain.get()));
+  EXPECT_EQ(d.entry_class, GSHSCENE_ENTRY_REFUSED);
+  EXPECT_EQ(d.reason, GSHSCENE_REASON_MASK_FEATURE);
+  EXPECT_EQ(d.detail, (uint64_t)GSHSCENE_MASK_NATIVE_ALPHA);
+  // Lacking the table transfer, and only it.
+  caps.mask_native = GSHSCENE_MASK_NATIVE_ALL & ~GSHSCENE_MASK_NATIVE_TRANSFER_TABLE;
+  d = decide(pdf_group(1.0, 0, 0, table.get()));
+  EXPECT_EQ(d.reason, GSHSCENE_REASON_MASK_FEATURE);
+  EXPECT_EQ(d.detail, (uint64_t)GSHSCENE_MASK_NATIVE_TRANSFER_TABLE);
+  EXPECT_EQ(decide(pdf_group(1.0, 0, 0, plain.get())).entry_class, 0) << "the same sink draws a mask that needs no table";
+  // Lacking acting on the shape, and only it.
+  caps.mask_native = GSHSCENE_MASK_NATIVE_ALL & ~GSHSCENE_MASK_NATIVE_ACTS_ON_SHAPE;
+  d = decide(pdf_group(1.0, 0, 0, shape.get()));
+  EXPECT_EQ(d.reason, GSHSCENE_REASON_MASK_FEATURE);
+  EXPECT_EQ(d.detail, (uint64_t)GSHSCENE_MASK_NATIVE_ACTS_ON_SHAPE);
+  // Every missing bit is named, and they are the mask's required set less the sink's.
+  caps.mask_native = GSHSCENE_MASK_NATIVE_ALPHA | GSHSCENE_MASK_NATIVE_LUMINANCE;
+  d = decide(pdf_group(1.0, 0, 0, shape.get()));
+  EXPECT_EQ(d.detail, (uint64_t)(gshscene_mask_required(shape.get()) & ~caps.mask_native))
+      << "the enclosing space is not known here (no target space): SPACES stays in the need";
+  EXPECT_NE(d.detail & GSHSCENE_MASK_NATIVE_SPACES, 0u);
+  EXPECT_NE(d.detail & GSHSCENE_MASK_NATIVE_BACKDROP, 0u);
+  EXPECT_NE(d.detail & GSHSCENE_MASK_NATIVE_TRANSFER_EXPONENTIAL, 0u);
+  EXPECT_NE(d.detail & GSHSCENE_MASK_NATIVE_ACTS_ON_SHAPE, 0u);
+  EXPECT_NE(d.detail & GSHSCENE_MASK_NATIVE_COEFF_W3C, 0u);
+  // The order of the reasons is fixed: COMPOSITE, GROUP_ISOLATION, GROUP_KNOCKOUT, SOFT_MASK, MASK_FEATURE.
+  caps.mask_native = 0;
+  caps.flags &= ~GSHSCENE_CAP_GROUP_KNOCKOUT;
+  EXPECT_EQ(decide(pdf_group(1.0, 0, 1, plain.get())).reason, GSHSCENE_REASON_GROUP_KNOCKOUT);
+  caps.flags &= ~GSHSCENE_CAP_GROUP_NON_ISOLATED;
+  EXPECT_EQ(decide(pdf_group(1.0, 1, 1, plain.get())).reason, GSHSCENE_REASON_GROUP_ISOLATION);
+  caps.flags |= GSHSCENE_CAP_GROUP_NON_ISOLATED | GSHSCENE_CAP_GROUP_KNOCKOUT;
+  EXPECT_EQ(decide(pdf_group(1.0, 1, 1, plain.get())).reason, GSHSCENE_REASON_MASK_FEATURE);
+  caps.composites &= ~(1u << GSHSCENE_COMPOSITE_SRC_OVER);
+  EXPECT_EQ(decide(pdf_group(1.0, 1, 1, plain.get())).reason, GSHSCENE_REASON_COMPOSITE);
+  caps.composites = 0x0fffffff;
+  caps.flags &= ~GSHSCENE_CAP_GROUP_SOFT_MASK;
+  EXPECT_EQ(decide(pdf_group(1.0, 1, 1, plain.get())).reason, GSHSCENE_REASON_SOFT_MASK);
+  // A group with no mask is never refused for a mask feature.
+  caps.flags |= GSHSCENE_CAP_GROUP_SOFT_MASK;
+  EXPECT_EQ(decide(pdf_group(1.0, 1, 1, nullptr)).entry_class, 0);
+  EXPECT_STREQ(gshscene_reason_string(GSHSCENE_REASON_MASK_FEATURE), "mask-feature");
+}
+
+// MK9: SPACES is needed only where the mask's render, luminance or backdrop space differs from the one the group
+// composites in, when that is known; where it is not the need stays conservative.
+TEST(GroupFields, TheSpacesFeatureIsNeededOnlyWhereASpaceDiffersFromTheEnclosingOne) {
+  StoreHolder s;
+  Ref sq(intern_square(s.store));
+  Ref p2(intern_fixture(s.store));
+  Ref pic(fixture_picture(s.store, sq.get(), p2.get()));
+  auto luminance = [&](GSHSCENE_Color_Space render, GSHSCENE_Color_Space lum, GSHSCENE_Color_Space backdrop_space,
+                       double white) {
+    GSHSCENE_Mask m{};
+    m.picture = pic.get();
+    m.mode = GSHSCENE_MASK_LUMINANCE;
+    m.render_space = render;
+    m.space = lum;
+    m.backdrop[0] = m.backdrop[1] = m.backdrop[2] = white;
+    m.backdrop_space = backdrop_space;
+    const GSHSCENE_Resource * r = nullptr;
+    EXPECT_EQ(gshscene_store_intern_mask(s.store, &m, &r), GSHSCENE_OK);
+    return Ref(r);
+  };
+  GSHSCENE_Color_Space none{};
+  GSHSCENE_Color_Space srgb = srgb_space();
+  GSHSCENE_Color_Space linear = linear_srgb_space();
+  Ref all_target(luminance(none, none, none, 0.0));
+  Ref names_srgb(luminance(srgb, srgb, srgb, 1.0));
+  Ref names_linear_luminance(luminance(none, linear, none, 0.0));
+  Ref black_backdrop_in_linear(luminance(srgb, none, linear, 0.0));
+  EXPECT_EQ(gshscene_mask_required(all_target.get()) & GSHSCENE_MASK_NATIVE_SPACES, 0u);
+  EXPECT_NE(gshscene_mask_required(names_srgb.get()) & GSHSCENE_MASK_NATIVE_SPACES, 0u) << "the resource alone is conservative";
+  GSHSCENE_Sink_Caps caps{};
+  caps.item_kinds = 0x7e;
+  caps.composites = 0x0fffffff;
+  caps.flags = GSHSCENE_CAP_CAN_BLOCK | GSHSCENE_CAP_GROUP_SOFT_MASK | GSHSCENE_CAP_BLEND_SPACES;
+  caps.mask_native = GSHSCENE_MASK_NATIVE_ALL & ~GSHSCENE_MASK_NATIVE_SPACES;
+  GSHSCENE_Item item{};
+  item.kind = GSHSCENE_ITEM_GROUP_PUSH;
+  auto decide = [&](const GSHSCENE_Resource * mask, const GSHSCENE_Color_Space & blend, const GSHSCENE_Color_Space * target) {
+    item.group = pdf_group(1.0, 0, 0, mask);
+    item.group.blend_space = blend;
+    return gshscene_caps_disposition(&caps, &item, nullptr, 0, nullptr, target, nullptr);
+  };
+  // Every space of the mask zero: the group's, so nothing differs, known or not.
+  EXPECT_EQ(decide(all_target.get(), none, nullptr).entry_class, 0);
+  EXPECT_EQ(decide(all_target.get(), none, &srgb).entry_class, 0);
+  EXPECT_EQ(decide(all_target.get(), linear, &srgb).entry_class, 0);
+  // A mask that names the space the group composites in: the target's, or the group's own stated one.
+  EXPECT_EQ(decide(names_srgb.get(), none, &srgb).entry_class, 0) << "the target's space is srgb";
+  EXPECT_EQ(decide(names_srgb.get(), srgb, nullptr).entry_class, 0) << "the group's stated space is srgb";
+  GSHSCENE_Disposition d = decide(names_srgb.get(), none, &linear);
+  EXPECT_EQ(d.reason, GSHSCENE_REASON_MASK_FEATURE) << "the target's space is linear: the mask's differ";
+  EXPECT_EQ(d.detail, (uint64_t)GSHSCENE_MASK_NATIVE_SPACES);
+  d = decide(names_srgb.get(), linear, &srgb);
+  EXPECT_EQ(d.detail, (uint64_t)GSHSCENE_MASK_NATIVE_SPACES) << "the group's stated space wins over the target's";
+  d = decide(names_srgb.get(), none, nullptr);
+  EXPECT_EQ(d.detail, (uint64_t)GSHSCENE_MASK_NATIVE_SPACES) << "the enclosing space is not known: conservative";
+  // Only the luminance space differs.
+  EXPECT_EQ(decide(names_linear_luminance.get(), none, &srgb).detail, (uint64_t)GSHSCENE_MASK_NATIVE_SPACES);
+  EXPECT_EQ(decide(names_linear_luminance.get(), none, &linear).entry_class, 0);
+  // A black backdrop's space is not looked at (black converts to black); a lit one's is.
+  EXPECT_EQ(decide(black_backdrop_in_linear.get(), none, &srgb).entry_class, 0);
+  Ref lit_backdrop_in_linear(luminance(srgb, none, linear, 0.5));
+  EXPECT_EQ(decide(lit_backdrop_in_linear.get(), none, &srgb).detail, (uint64_t)GSHSCENE_MASK_NATIVE_SPACES);
+  // A sink that has SPACES takes all of them.
+  caps.mask_native = GSHSCENE_MASK_NATIVE_ALL;
+  EXPECT_EQ(decide(names_srgb.get(), none, &linear).entry_class, 0);
 }
 
 int main(int argc, char ** argv) {

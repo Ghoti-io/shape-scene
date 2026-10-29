@@ -166,6 +166,7 @@ typedef enum GSHSCENE_Reason {
   GSHSCENE_REASON_IMAGE = 32,         ///< Refused, per fill: an image paint the sink cannot draw (an edge mode, a sample format, or none at all); `second` names the missing features (image_paint.h, S21, IP15).
   GSHSCENE_REASON_IMAGE_FILTER = 33,  ///< Approximated, per fill: the filter the item's map calls for is not one the sink draws (IP15).
   GSHSCENE_REASON_IMAGE_FILTER_SPACE = 34, ///< Approximated, per fill: the image paint's stated filter space is not the one the sink filters in (IP15).
+  GSHSCENE_REASON_MASK_FEATURE = 35,  ///< Refused, per group: its mask needs a feature the sink lacks; `second` names the missing `GSHSCENE_MASK_NATIVE_*` bits (mask.h, MK9).
   GSHSCENE_REASON_COUNT               ///< Closes the enum.
 } GSHSCENE_Reason;
 

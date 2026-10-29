@@ -70,6 +70,7 @@ GSHSCENE_Result gshscene_expansion_init(GSHSCENE_Expansion * walk, const GSHSCEN
   walk->chain[0] = 0;
   walk->level = 1;
   walk->pending = 0;
+  walk->masks = 0;
   return GSHSCENE_OK;
 }
 
@@ -101,6 +102,10 @@ int gshscene_expansion_next(
     return 0;
   }
   const GSHSCENE_List * picture = item->kind == GSHSCENE_ITEM_INSTANCE ? gshscene_resource_picture(item->resource) : NULL;
+  if (walk->masks && item->kind == GSHSCENE_ITEM_GROUP_PUSH && item->group.soft_mask) {
+    /* MK9: the planning pass alone enters a mask's picture, as the unit after the group's push; its content follows. */
+    picture = gshscene_resource_picture(item->group.soft_mask->u.mask.m.picture);
+  }
   if (picture && walk->level < walk->capacity) {
     walk->lists[walk->level] = picture;
     walk->pending = 2;
@@ -119,6 +124,31 @@ int gshscene_expansion_next(
 static int glyphs_from_font(const GSHSCENE_Resource * resource) {
   GSHSCENE_Glyph_Run run;
   return gshscene_resource_glyph_run(resource, &run) == GSHSCENE_OK && run.source == GSHSCENE_GLYPHS_FROM_FONT;
+}
+
+/**
+ * The mask features @p group's mask needs and @p caps lack (MK9).  `SPACES` is dropped from the need when the mask's
+ * render, luminance and (for a nonzero backdrop) backdrop spaces all resolve to the space the group composites in, which is
+ * its blend space, or @p target_space when that is the target's; with neither known the need stays conservative.
+ */
+static uint32_t mask_missing(const GSHSCENE_Sink_Caps * caps, const GSHSCENE_Item * group, const GSHSCENE_Color_Space * target_space) {
+  const GSHSCENE_Resource * mask = group->group.soft_mask;
+  uint32_t need = gshscene_mask_required(mask);
+  if (need & GSHSCENE_MASK_NATIVE_SPACES) {
+    const GSHSCENE_Color_Space * enclosing =
+        gshscene_color_space_is_target(&group->group.blend_space) ? target_space : &group->group.blend_space;
+    GSHSCENE_Mask_Resolved r;
+    if (enclosing && !gshscene_color_space_is_target(enclosing) && gshscene_mask_resolve(mask, enclosing, &r) == GSHSCENE_OK) {
+      const GSHSCENE_Mask * m = &mask->u.mask.m;
+      int backdrop = m->backdrop[0] != 0.0 || m->backdrop[1] != 0.0 || m->backdrop[2] != 0.0;
+      int same = gshscene_space_equal(&r.render_space, enclosing) && gshscene_space_equal(&r.luminance_space, enclosing) &&
+          (!backdrop || gshscene_space_equal(&r.backdrop_space, enclosing));
+      if (same) {
+        need &= ~GSHSCENE_MASK_NATIVE_SPACES;
+      }
+    }
+  }
+  return need & ~caps->mask_native;
 }
 
 GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps, const GSHSCENE_Item * item,
@@ -228,6 +258,16 @@ GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps, 
       refused = GSHSCENE_REASON_GROUP_KNOCKOUT;
     } else if (item->group.soft_mask && !(caps->flags & GSHSCENE_CAP_GROUP_SOFT_MASK)) {
       refused = GSHSCENE_REASON_SOFT_MASK;
+    } else if (item->group.soft_mask) {
+      /* MK9: the features the mask needs and the sink lacks, named.  SPACES is needed only where a space differs from the
+       * one the group composites in, when that one is known. */
+      uint32_t missing = mask_missing(caps, item, target_space);
+      if (missing) {
+        d.entry_class = GSHSCENE_ENTRY_REFUSED;
+        d.reason = GSHSCENE_REASON_MASK_FEATURE;
+        d.detail = missing;
+        return d;
+      }
     }
     if (refused) {
       d.entry_class = GSHSCENE_ENTRY_REFUSED;
@@ -783,6 +823,7 @@ static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
   if (result != GSHSCENE_OK) {
     return result;
   }
+  walk.masks = 1; /* MK9: the plan alone enters a mask's picture, so a refusal inside one is not silent */
   result = plan_ties(report, list, key, 1); /* plan_ties writes key[0] */
   if (result != GSHSCENE_OK) {
     return result;
@@ -835,9 +876,13 @@ static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
         continue;
       }
     }
-    if (item->kind == GSHSCENE_ITEM_INSTANCE) {
-      maps[count - 1] = item->map;
-      const GSHSCENE_List * picture = gshscene_resource_picture(item->resource);
+    if (item->kind == GSHSCENE_ITEM_INSTANCE ||
+        (item->kind == GSHSCENE_ITEM_GROUP_PUSH && item->group.soft_mask)) {
+      /* An instance's picture is drawn under its map, a mask's under the group's placement of it (MK6): the chain T I_1 .. I_k Q. */
+      int is_mask = item->kind == GSHSCENE_ITEM_GROUP_PUSH;
+      maps[count - 1] = is_mask ? item->group.soft_mask_map : item->map;
+      const GSHSCENE_List * picture = gshscene_resource_picture(
+          is_mask ? item->group.soft_mask->u.mask.m.picture : item->resource);
       memcpy(key, chain, count * sizeof *chain); /* key[count] is written by plan_ties */
       result = plan_ties(report, picture, key, count + 1);
       if (result != GSHSCENE_OK) {

@@ -217,7 +217,12 @@
  * sink whose caps say so (::GSHSCENE_CAP_GROUP_NON_ISOLATED,
  * ::GSHSCENE_CAP_GROUP_KNOCKOUT, ::GSHSCENE_CAP_GROUP_SOFT_MASK); otherwise the
  * planning pass refuses it (`GROUP_ISOLATION`, `GROUP_KNOCKOUT`, `SOFT_MASK`),
- * so it is never drawn as an isolated, non-knockout or unmasked group.  A
+ * so it is never drawn as an isolated, non-knockout or unmasked group.  A sink that composites masks names in
+ * `mask_native` the features of mask.h (MK9) it has; a masked group whose mask needs one it lacks
+ * (::gshscene_mask_required, less `SPACES` when every space the mask names is the enclosing one) is refused after the
+ * rest, `MASK_FEATURE`, the missing bits in the entry's `second`.  The planning pass enters the mask's picture
+ * (::GSHSCENE_Expansion with masks entered) and plans its items with the chain `[... , i, j]`: `i` the group's push,
+ * `j` the item in the picture; the expansion's count and the progress units are those of the list alone.  A
  * refused push skips its block, as every refused push does (S6).  The fields'
  * defaults are N5 to N9 exactly (T6), so a sink without the caps draws every
  * group that does not set them.
@@ -407,7 +412,7 @@ typedef struct GSHSCENE_Target {
 #define GSHSCENE_MASK_NATIVE_COEFF_REC709 (UINT32_C(1) << 7)        ///< The `REC709` coefficients.
 #define GSHSCENE_MASK_NATIVE_COEFF_LUM (UINT32_C(1) << 8)           ///< The `LUM` coefficients.
 #define GSHSCENE_MASK_NATIVE_COEFF_SPACE_Y (UINT32_C(1) << 9)       ///< The `SPACE_Y` coefficients.
-#define GSHSCENE_MASK_NATIVE_SPACES (UINT32_C(1) << 10)             ///< A luminance, render or backdrop space other than the enclosing one.
+#define GSHSCENE_MASK_NATIVE_SPACES (UINT32_C(1) << 10)             ///< A luminance, render or backdrop space other than the enclosing one (the planning pass drops it when they are the enclosing space).
 #define GSHSCENE_MASK_NATIVE_ACTS_ON_SHAPE (UINT32_C(1) << 11)      ///< A mask acting on the shape rather than the opacity.
 #define GSHSCENE_MASK_NATIVE_ALL ((UINT32_C(1) << 12) - 1)          ///< Every feature defined.
 /** @} */
@@ -438,6 +443,12 @@ typedef struct GSHSCENE_Sink_Caps {
   uint32_t image_extends;
   /** The `GSHSCENE_IMAGE_FORMAT_*` sample types, layouts and the alpha-only mark it reads; a missing one is refused, `IMAGE`. */
   uint32_t image_formats;
+  /**
+   * The `GSHSCENE_MASK_NATIVE_*` features of a soft mask (mask.h, MK9) a sink composites; 0, none.  A group's mask needing one
+   * the sink lacks is refused, `MASK_FEATURE`, the missing bits in `second`; a sink without ::GSHSCENE_CAP_GROUP_SOFT_MASK
+   * refuses every masked group, `SOFT_MASK`, whatever this says.
+   */
+  uint32_t mask_native;
   uint8_t _reserved[8];       ///< Zero.
 } GSHSCENE_Sink_Caps;
 
@@ -762,7 +773,8 @@ typedef struct GSHSCENE_Disposition {
  * entry @p palette does not have (::gshscene_paint_resolve, G3) is refused (`PALETTE_ENTRY`); a group whose operator
  * the caps do not composite is refused (`COMPOSITE`); a non-isolated group without `GROUP_NON_ISOLATED`, a knockout
  * group without `GROUP_KNOCKOUT` and a group with a soft mask without `GROUP_SOFT_MASK` are refused, in that order
- * (`GROUP_ISOLATION`, `GROUP_KNOCKOUT`, `SOFT_MASK`, S19); a stroke with a required feature
+ * (`GROUP_ISOLATION`, `GROUP_KNOCKOUT`, `SOFT_MASK`, S19), then a group whose mask needs a feature `mask_native` lacks
+ * (`MASK_FEATURE`, the missing bits in `detail`, MK9); a stroke with a required feature
  * (::gshscene_stroke_required, which reads the chain) that `stroke_native` lacks, without `STROKE_EXPAND`, is refused
  * (`STROKE_STYLE`, the missing features in `detail`; S20, SK11), after every other refusal and before any
  * approximation; a clip push without `CLIP_AA` is approximated (`CLIP_ALIASED`); a group whose own blend space is
@@ -810,6 +822,7 @@ typedef struct GSHSCENE_Expansion {
   size_t capacity;              ///< Private: the levels there is room for.
   size_t level;                 ///< Private: the levels in use (0 when done).
   int pending;                  ///< Private: how the next call steps past the last unit.
+  int masks;                    ///< Private: the walk enters a masked group's mask picture (set by the planning pass only).
 } GSHSCENE_Expansion;
 
 /** @brief The bytes a walk of @p list needs; 0 for NULL. */

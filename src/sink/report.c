@@ -131,6 +131,8 @@ const char * gshscene_reason_string(GSHSCENE_Reason reason) {
       return "image-filter";
     case GSHSCENE_REASON_IMAGE_FILTER_SPACE:
       return "image-filter-space";
+    case GSHSCENE_REASON_MASK_FEATURE:
+      return "mask-feature";
     case GSHSCENE_REASON_COUNT:
       break;
   }
