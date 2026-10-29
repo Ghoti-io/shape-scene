@@ -54,10 +54,11 @@ FILES = {
     "src/resource/gradient.c": "bg",
     "src/paint/convert.c": "bv",
     "src/resource/stroke.c": "bk",
+    "src/resource/mask.c": "mk",
 }
 LINE_FILTER = {
     "src/store/store.c": r"bytes|fits\(",
-    "src/resource/resource.c": r"BYTES|bytes|sat_|palette|rgba|colors|PALETTE|gradient|GRADIENT|stroke|STROKE",
+    "src/resource/resource.c": r"BYTES|bytes|sat_|palette|rgba|colors|PALETTE|gradient|GRADIENT|stroke|STROKE|MASK|mask",
     "src/list/list.c": r"max_bytes|max_nodes|max_node_depth|NODE_DEPTH_CEILING|gshscene_list_canonical|gshscene_list_check_rule|return canonical_|return check_rule"
     # story 12: the order, the ties, the foreground, the composite helpers and the new equality
     r"|unit|frame|scratch|\btie|ties|nonflat|composite|foreground|context|space_equal|color_equal|open_n|out_n|prev_pos|closing|match\["
@@ -70,7 +71,9 @@ LINE_FILTER = {
     r"|item_picture_depth|picture_depth|0x80u|SCREEN|OVERLAY|DARKEN|LIGHTEN|DODGE|BURN|LIGHT|DIFFERENCE|EXCLUSION"
     r"|MULTIPLY|HUE|SATURATION|COLOR:|LUMINOSITY|\"(screen|overlay|darken|lighten|color|hard|soft|difference|exclusion|multiply|hue|saturation|luminosity)"
     # strokes story S1: the stroke item, its style, centerline and paint helpers, hash and dump
-    r"|stroke|STROKE|style|centerline|paint_hash|dump_paint",
+    r"|stroke|STROKE|style|centerline|paint_hash|dump_paint"
+    # masks-images-patterns story M1: the mask slot, its placement, its depth and the helpers that compare and hash a map
+    r"|mask|MASK|placement|placed\b|map_bits_equal|a->dim|a->m\[i\]\[j\]|a->t\[i\]",
     "src/core/core.c": r"max_bytes|max_nodes|max_node_depth|REFUSED|refused",
 }
 EXTRA = {
@@ -81,10 +84,10 @@ EXTRA = {
 }
 TESTS_EXTRA = ["testBytes", "testCore", "testStore", "testScene_limits", "testOrder", "testList", "testColor", "testDump",
                "testComposite", "testPaint_scene", "testEmit", "testPalette", "testGradient", "testColor_bound",
-               "testGroup_fields", "testStroke", "testPlane", "testPlaceholder", "testImage_paint"]
+               "testGroup_fields", "testStroke", "testPlane", "testPlaceholder", "testImage_paint", "testMask"]
 TESTS_BY_FILE = {
     "src/paint/color_space.c": ["testColor", "testColor_bound", "testList", "testNode", "testPaint_scene", "testScene_dump", "testPlane"],
-    "src/scene/node.c": ["testNode", "testEdit", "testScene", "testScene_dump", "testVersion", "testPaint_scene", "testOrder", "testEmit", "testPalette", "testGradient", "testGroup_fields", "testStroke", "testPlane", "testPlaceholder"],
+    "src/scene/node.c": ["testNode", "testDiff", "testEdit", "testScene", "testScene_dump", "testVersion", "testPaint_scene", "testOrder", "testEmit", "testPalette", "testGradient", "testGroup_fields", "testStroke", "testPlane", "testPlaceholder"],
     "src/scene/edit.c": ["testEdit", "testScene", "testNode", "testPaint_scene", "fuzz-replay", "testPalette", "testPlane", "testPlaceholder"],
     "src/scene/scene.c": ["testScene", "testEdit", "testScene_limits", "testDiff", "testEmit", "testPaint_scene", "fuzz-replay", "testPalette", "testPlane", "testPlaceholder"],
     "src/scene/version.c": ["testVersion", "testScene_dump", "testScene", "testEmit", "testDiff", "testPaint_scene", "testOrder", "testPalette", "testGradient", "testGroup_fields", "testStroke", "testPlane", "testPlaceholder"],
@@ -94,9 +97,13 @@ TESTS_BY_FILE = {
     "src/scene/diff.c": ["testDiff", "testScene", "testVersion", "testPaint_scene", "testGlyph", "testPalette", "testGradient", "testGroup_fields", "testStroke", "testPlane", "testPlaceholder"],
     "src/list/fixed.c": ["testPalette", "testGradient", "testPlane", "testPlaceholder", "fuzz-replay"],
     "src/resource/gradient.c": ["testGradient", "testColor_bound", "testDump", "testDump_sink", "fuzz-replay", "fuzz-render", "probe", "testStroke"],
-    "src/paint/convert.c": ["testGradient", "testColor_bound", "probe"],
+    "src/paint/convert.c": ["testGradient", "testColor_bound", "testMask", "probe"],
     "src/resource/stroke.c": ["testStroke", "testDiff", "testDump", "testDump_sink", "testResource", "testSink",
                               "testPlane", "testPlaceholder", "fuzz-replay", "fuzz-render", "probe"],
+    # masks-images-patterns story M1: the resource's unit tests, then the evaluator's known answers (the transfer and the
+    # coefficients), the group and the sink that record it, the fuzzers and the cross-target probe
+    "src/resource/mask.c": ["testMask", "testComposite", "testGroup_fields", "testDump_sink", "testSink", "testResource", "testDump",
+                            "fuzz-replay", "fuzz-render", "probe"],
 }
 
 SINK_FILES = {
@@ -261,7 +268,7 @@ def candidates(path):
     return out
 
 
-STRING_FILES = {"src/scene/version.c", "src/scene/validate.c", "src/scene/node.c", "src/list/list.c",
+STRING_FILES = {"src/resource/mask.c", "src/scene/version.c", "src/scene/validate.c", "src/scene/node.c", "src/list/list.c",
                 "src/sink/report.c", "src/sink/dump_sink.c", "src/sink/sink.c", "src/resource/gradient.c",
                 "src/resource/stroke.c"}
 

@@ -60,6 +60,18 @@ own plant is a flipped bit in one result.  Ids by file:
                and close, equality field by field, the hash spelling field by
                field, the dump text and its widths
 
+  mk-          (masks-images-patterns story M1) the mask (mask.h, MK1 to MK14).  The hand-written ones: the evaluator and the
+               transfer the known answers reach (``tst`` recompiles tests/ref_composite.h into testComposite), the intern's every
+               rule and the order of its results (a picture of another store, a field accepted where alpha has none, an
+               unsupported space before a bound), the transfer's validity field by field, the canonical form (minus zero in
+               every field), the hash and the equality field by field (with every index colliding, so that only the content
+               decides), the dump, the coefficients and spaces it resolves, the features a mask needs and their pinned bits, the
+               group's placement and the node's (its hash, equality, canonical form, emission and the order of its
+               composition), the planning pass (the order of the reasons, the missing bits, the space refinement, the
+               mask's picture entered with the placement in the chain), the picture depth through a mask, and the test sink's
+               records.  The generated ones (tools/gen-scene-plants.py) carry the tag mk- and a line number of
+               src/resource/mask.c, or the tag of the file whose mask lines they mutate
+
   nd-, ed-, sc-, vs-, wk-, va-, em-, df-, bs-, br-, bl-, bc-
                the retained scene, generated rather than written: every
                comparison, condition, statement, hash width, output letter
@@ -136,6 +148,24 @@ changes no result, cannot be seen by any test:
     hash (no fixture's hash has a leading zero); and the kind test of ``gshscene_image_decode`` (the ``ip-decode-kind``
     note below).  Candidates that do not compile (an unused variable made by a deleted statement, a duplicate case) are
     dropped
+  - (masks, story M1) the mutants of src/resource/mask.c and its neighbors that change no result:
+      * the clamps at their edge (``x >= 0.0`` for ``x > 0.0``, ``x >= 1.0`` for ``x > 1.0``, ``i >= m - 2`` for ``i > m - 2``)
+        give the same number, and ``mk-317-del`` and ``mk-335-del`` (``samples = NULL``) and ``mk-323-del`` (the offset after
+        the top level's samples) change nothing, because validation requires no array where there is no count and a table
+        has no pieces;
+      * the out-of-memory arms of the build (the discard of a half-built resource, the free of the pieces);
+      * ``pz`` of a piece's ``hi`` (it exceeds ``lo``, which is not below 0, so it is never minus zero), the comparison of
+        ``lo`` or of ``hi`` alone (each is the other's of the next piece, and the last ``hi`` is 1), the comparison of the
+        piece count (the last ``hi`` is 1, so counts that differ differ in a ``hi``), a stitching with no pieces, a nested
+        stitching and a non-finite bound (each refused by a later check: the end check, the leaf's kind, ``lo`` against its
+        expected value), a piece's clamp of its encoded input (it lies between ``e0`` and ``e1``, which are in range);
+      * the placement hash of a zero-dimension map (a group's canonical form always spells the identity as 2D), the loop
+        bound of the map comparison (``i <= dim`` reads the entries past the dimension, which are the identity's);
+      * the return checks of the mask's dump (a count above 0), and the 16-digit width of a hash or of a piece's ``hi`` (no
+        fixture's hash has a leading zero, and a bound is never 0), as for the image records above;
+      * the removal of the table's clamp ``i = m - 2`` (a read one past the array when ``x`` is 1, which ASan sees and a
+        result does not), and the test sink's workspace counting a mask record for every group rather than every handle (a
+        larger workspace is not a result: ``ds-287-eq``, ``-and``, ``-neg`` count it for other groups too)
   - the values of ``GSHSCENE_GLYPHS_FROM_OUTLINES`` and of the depth ordering
     context, and the ceiling constant: the library treats every other value as
     outlines or as unsupported alike, and the ceiling is 2^30 items
@@ -1209,7 +1239,7 @@ PLANTS += [
     ('ls-group-composite-range', 'src', LS, '|| group->composite >= (uint32_t)GSHSCENE_COMPOSITE_COUNT) {', '|| group->composite > (uint32_t)GSHSCENE_COMPOSITE_COUNT) {', L),
     ('ls-group-ordering-unchecked', 'src', LS, '  if (group->ordering >= (uint32_t)GSHSCENE_ORDERING_COUNT || group->composite >= (uint32_t)GSHSCENE_COMPOSITE_COUNT) {', '  if (group->composite >= (uint32_t)GSHSCENE_COMPOSITE_COUNT) {', L),
     ('ls-group-composite-unchecked', 'src', LS, '  if (group->ordering >= (uint32_t)GSHSCENE_ORDERING_COUNT || group->composite >= (uint32_t)GSHSCENE_COMPOSITE_COUNT) {', '  if (group->ordering >= (uint32_t)GSHSCENE_ORDERING_COUNT) {', L),
-    ('ls-group-blend-check', 'src', LS, '  GSHSCENE_Result result = gshscene_color_space_check(&group->blend_space);\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  out->opacity = group->opacity;', '  out->opacity = group->opacity;', L),
+    ('ls-group-blend-check', 'src', LS, '  GSHSCENE_Result result = gshscene_color_space_check(&group->blend_space);\n  if (result != GSHSCENE_OK) {\n    return result;\n  }\n  if (placement.dim != 2) {', '  if (placement.dim != 2) {', L),
     ('ls-group-opacity-copy', 'src', LS, '  out->opacity = group->opacity;\n  out->blend_space = group->blend_space;', '  out->blend_space = group->blend_space;', L + CP),
     ('ls-group-blend-copy', 'src', LS, '  out->blend_space = group->blend_space;\n  out->ordering = group->ordering;', '  out->ordering = group->ordering;', LD),
     ('ls-group-ordering-copy', 'src', LS, '  out->ordering = group->ordering;\n  out->composite = group->composite;\n  out->isolation', '  out->composite = group->composite;\n  out->isolation', O),
@@ -1838,7 +1868,7 @@ PLANTS += [
     ('gl-note-limit-is-unavailable', 'src', GL, '  if (result == GSHSCENE_ERR_LIMIT) {\n    note_set(note, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_RESOURCE_LIMIT);', '  if (0) {\n    note_set(note, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_RESOURCE_LIMIT);', ['testGlyph']),
     ('gl-note-oom-is-a-refusal', 'src', GL, '  if (result == GSHSCENE_ERR_OOM) {\n    return result;\n  }\n  if (result == GSHSCENE_ERR_LIMIT)', '  if (result == GSHSCENE_ERR_LIMIT)', ['testGlyph']),
     ('rule-S6-glyph-route', 'src', SK, '    if (plan_route(job, item, maps, count, &route) && route.entry_class) {', '    if (0) {', GLT + ['testSink']),
-    ('rule-S6-glyph-instance-maps', 'src', SK, '    if (item->kind == GSHSCENE_ITEM_INSTANCE) {\n      maps[count - 1] = item->map;', '    if (item->kind == GSHSCENE_ITEM_INSTANCE) {', GLT),
+    ('rule-S6-glyph-instance-maps', 'src', SK, "      int is_mask = item->kind == GSHSCENE_ITEM_GROUP_PUSH;\n      maps[count - 1] = is_mask ? item->group.soft_mask_map : item->map;", "      int is_mask = item->kind == GSHSCENE_ITEM_GROUP_PUSH;", GLT),
     ('rule-S6-glyph-target-map', 'src', SK, '  if (gshgeom_map_compose_chain(maps, count, &job->target.map, &composed) != GSHGEOM_OK) {', '  if (gshgeom_map_compose_chain(maps, count, NULL, &composed) != GSHGEOM_OK) {', GLT),
     ('rule-S6-glyph-refusal-skips', 'src', SK, '      if (route.entry_class == GSHSCENE_ENTRY_REFUSED) {\n        (*refused)++;', '      if (0) {\n        (*refused)++;', GLT),
     ('rule-S6-glyph-entry-second', 'src', SK, '  return gshscene_report_add(job->request.report, entry_class, reason, chain, chain_count, glyph, 0.0);', '  return gshscene_report_add(job->request.report, entry_class, reason, chain, chain_count, glyph * 0u, 0.0);', GLT),
@@ -2017,8 +2047,8 @@ PLANTS += [
     ('ds-notice', 'src', DS, '      if (notice) {\n        snprintf', '      if (0) {\n        snprintf', GTD),
     ('ds-notice-class', 'src', DS, '(int)GSHSCENE_ENTRY_NOTICE, (int)notice);\n        emit_text(run, run->line, &failed);\n        return failed;\n      }\n', '(int)GSHSCENE_ENTRY_REFUSED, (int)notice);\n        emit_text(run, run->line, &failed);\n        return failed;\n      }\n', GTD),
     ('ds-notice-instances', 'src', DS, 'gshscene_paint_notice(item, run->maps, count - 1, &run->job->target.map);', 'gshscene_paint_notice(item, run->maps, 0, &run->job->target.map);', GTD),
-    ('ds-record-once', 'src', DS, '    if (run->gradients[i] == id) {', '    if (0) {', GTD),
-    ('ds-record-remember', 'src', DS, '  run->gradients[run->gradient_count++] = id;\n', '', GTD),
+    ('ds-record-once', 'src', DS, '  uint64_t id = gshscene_resource_id(gradient);\n  for (size_t i = 0; i < run->gradient_count; i++) {\n    if (run->gradients[i] == id) {', '  uint64_t id = gshscene_resource_id(gradient);\n  for (size_t i = 0; i < run->gradient_count; i++) {\n    if (0) {', GTD),
+    ('ds-record-remember', 'src', DS, '  run->gradients[run->gradient_count++] = id;\n  size_t n = gradient->u.gradient.g.stop_count;', '  size_t n = gradient->u.gradient.g.stop_count;', GTD),
     ('ds-record-id', 'src', DS, 'item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {\n        snprintf(run->line, LINE_BYTES, " grad=%" PRIu64, gshscene_resource_id(item->paint.resource));', 'item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {\n        snprintf(run->line, LINE_BYTES, " grad=%" PRIu64, gshscene_resource_hash(item->paint.resource));', GTD),
     ('ds-record-fill-only', 'src', DS, '      if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {\n        GSHSCENE_Result r = gradient_record', '      if (0) {\n        GSHSCENE_Result r = gradient_record', GTD),
     ('ds-record-foreground', 'src', DS, '  gshscene_list_foreground(list, &foreground);\n', '  gshscene_color_init(&foreground);\n', GTD),
@@ -2161,7 +2191,7 @@ PLANTS += [
     ('tst-t-knockout-backdrop', 'tst', 'tests/ref_composite.h', '  const Px & bk = frame.group.knockout ? frame.initial : frame.layer;', '  const Px & bk = frame.layer;', ['testComposite']),
     ('tst-t-group-alpha-backdrop', 'tst', 'tests/ref_composite.h', '  double agb = frame.group.knockout ? 0.0 : frame.alpha_g;', '  double agb = frame.alpha_g;', ['testComposite']),
     ('tst-t-removal', 'tst', 'tests/ref_composite.h', 'own.v[k] = sat(done.layer.v[k] - (1.0 - done.alpha_g) * done.initial.v[k]); /* T5 */', 'own.v[k] = sat(done.layer.v[k] - done.initial.v[k]); /* T5 */', ['testComposite']),
-    ('tst-t-element-shape', 'tst', 'tests/ref_composite.h', 'element(parent, done.outer * done.shape_g, composite,', 'element(parent, done.outer, composite,', ['testComposite']),
+    ('tst-t-element-shape', 'tst', 'tests/ref_composite.h', '    double f = done.outer * (shape ? v : 1.0) * done.shape_g;', '    double f = done.outer * (shape ? v : 1.0);', ['testComposite']),
     ('tst-t-initial', 'tst', 'tests/ref_composite.h', '          g.layer = convert_premultiplied(top.group.knockout ? top.initial : top.layer, top.space, g.space);', '          g.layer = top.layer;', ['testComposite']),
     ('tst-t-shape-union', 'tst', 'tests/ref_composite.h', '  frame.shape_g = frame.shape_g + f - frame.shape_g * f;', '  frame.shape_g = f;', ['testComposite']),
     # the composite oracle and the gradient oracle
@@ -2778,6 +2808,331 @@ PLANTS += [
     ('ip-filter-determinant', 'src', IPF, '*out = gshgeom_map_stretches_every_direction(&acc) ? p->magnify : p->minify;', '*out = (acc.m[0][0] * acc.m[1][1] - acc.m[0][1] * acc.m[1][0] > 1.0 || acc.m[0][0] * acc.m[1][1] - acc.m[0][1] * acc.m[1][0] < -1.0) ? p->magnify : p->minify;', IPT),
     ('ip-filter-limit', 'src', IPF, '  if (r != GSHGEOM_OK) {\n    return GSHSCENE_ERR_LIMIT;\n  }\n  *out', '  if (r != GSHGEOM_OK) {\n    return GSHSCENE_ERR_INVALID;\n  }\n  *out', IPT),
     ('ip-filter-instance-maps', 'src', IPF, '(instance_count && !instance_maps)) {', '0) {', IPT),
+]
+
+
+# masks-images-patterns story M1: the mask (mask.h, MK1 to MK14).  The first block is the evaluator and the transfer, reached
+# by the known answers (tests/mask_vectors.h): the defects of the oracle itself are planted by the oracle
+# (`composite-oracle.py --selftest --plant NAME`, `make check-composite` runs every one).  The rest is the resource's
+# intern, canonical form, hash, equality and dump (MK1, MK13), the coefficients and the transfer (MK3, MK4), the group's
+# placement and the node's (MK6, MK13), the planning pass, the reasons and the features (MK9), the limits (MK12) and the test
+# sink's records (MK14).  The generated candidates of src/resource/mask.c and of the lines the mask touched in the other
+# files are in tools/scene-plants.json and tools/sink-plants.json (gen-scene-plants.py).
+RC = "tests/ref_composite.h"
+MKC = "src/resource/mask.c"
+HMK = "include/ghoti.io/shape-scene/mask.h"
+HSK = "include/ghoti.io/shape-scene/sink.h"
+ND = "src/scene/node.c"
+VA = "src/scene/validate.c"
+MT = ["testMask"]
+MCT = ["testComposite"]
+MG = ["testMask", "testGroup_fields"]
+MSK = ["testGroup_fields", "testSink", "testDump_sink"]
+LUMINANCE_BLOCK = '''  Px c = convert_premultiplied(g, r_space, l_space);
+  double backdrop[3] = {m.backdrop[0], m.backdrop[1], m.backdrop[2]}, b[3];
+  convert(backdrop, b_space, l_space, b);
+  double over[3];
+  for (int k = 0; k < 3; k++) {
+    over[k] = sat(c.v[k] + (1.0 - a) * b[k]);
+  }
+  double y = sat(res.k[0] * over[0] + res.k[1] * over[1] + res.k[2] * over[2]);'''
+PLANTS += [
+    # the evaluator (MK2, MK5, MK7), tests/ref_composite.h recompiled into testComposite
+    ('mk-tst-luminance-of-straight-color', 'tst', RC, '    over[k] = sat(c.v[k] + (1.0 - a) * b[k]);',
+     '    over[k] = sat((a != 0.0 ? c.v[k] / a : 0.0) + (1.0 - a) * b[k]);', MCT),
+    ('mk-tst-mask-after-blend', 'tst', RC, '          group_element(parent, done, moved, v, m.acts_on == GSHSCENE_MASK_ACTS_ON_SHAPE);',
+     '          GFrame before = parent;\n          group_element(parent, done, moved, 1.0, false);\n'
+     '          for (int k = 0; k < 4; k++) {\n            parent.layer.v[k] = (1.0 - v) * before.layer.v[k] + v * parent.layer.v[k];\n          }', MCT),
+    ('mk-tst-tr0-as-zero-outside-alpha', 'tst', RC, '  if (m.mode == GSHSCENE_MASK_ALPHA) {\n    return clamp01(',
+     '  if (m.mode == GSHSCENE_MASK_ALPHA) {\n    if (g.v[3] == 0.0) {\n      return 0.0;\n    }\n    return clamp01(', MCT),
+    ('mk-tst-tr0-as-zero-outside-luminance', 'tst', RC, '  double y = sat(res.k[0] * over[0]',
+     '  if (g.v[3] == 0.0) {\n    return 0.0;\n  }\n  double y = sat(res.k[0] * over[0]', MCT),
+    ('mk-tst-shape-merged-into-opacity', 'tst', RC, 'group_element(parent, done, moved, v, m.acts_on == GSHSCENE_MASK_ACTS_ON_SHAPE);',
+     'group_element(parent, done, moved, v, false);', MCT),
+    ('mk-tst-acts-on-ignored', 'tst', RC, 'group_element(parent, done, moved, v, m.acts_on == GSHSCENE_MASK_ACTS_ON_SHAPE);',
+     'group_element(parent, done, moved, v, true);', MCT),
+    ('mk-tst-backdrop-before-conversion', 'tst', RC, LUMINANCE_BLOCK,
+     '''  double backdrop[3] = {m.backdrop[0], m.backdrop[1], m.backdrop[2]}, b[3];
+  convert(backdrop, b_space, r_space, b);
+  double composed[3], over[3];
+  for (int k = 0; k < 3; k++) {
+    composed[k] = sat(g.v[k] + (1.0 - a) * b[k]);
+  }
+  convert(composed, r_space, l_space, over);
+  double y = sat(res.k[0] * over[0] + res.k[1] * over[1] + res.k[2] * over[2]);''', MCT),
+    ('mk-tst-coefficient-order', 'tst', RC, 'double y = sat(res.k[0] * over[0] + res.k[1] * over[1] + res.k[2] * over[2]);',
+     'double y = sat(res.k[2] * over[0] + res.k[1] * over[1] + res.k[0] * over[2]);', MCT),
+    ('mk-tst-opacity-into-shape-too', 'tst', RC, '    double ov = o * (shape ? 1.0 : v);', '    double ov = o * v;', MCT),
+    ('mk-tst-pdf-shape-without-v', 'tst', RC, '    double f = done.outer * (shape ? v : 1.0) * done.shape_g;',
+     '    double f = done.outer * done.shape_g;', MCT),
+    ('mk-tst-picture-space', 'tst', RC, '  Px g = evaluate_general(picture, pictures->at(m.picture), r_space, Px{{0, 0, 0, 0}}, pictures);',
+     '  Px g = evaluate_general(picture, pictures->at(m.picture), enclosing, Px{{0, 0, 0, 0}}, pictures);', MCT),
+    # the library's transfer and coefficients (MK3, MK4), reached by the known answers
+    ('mk-src-lum-is-rec709', 'src', MKC, '      r.k[0] = 30.0 / 100.0;\n      r.k[1] = 59.0 / 100.0;\n      r.k[2] = 11.0 / 100.0;',
+     '      r.k[0] = 2126.0 / 10000.0;\n      r.k[1] = 7152.0 / 10000.0;\n      r.k[2] = 722.0 / 10000.0;', MCT + MT),
+    ('mk-src-w3c-blue', 'src', MKC, '      r.k[2] = 721.0 / 10000.0;', '      r.k[2] = 722.0 / 10000.0;', MCT + MT),
+    ('mk-src-backdrop-space-default', 'src', MKC, '? r.luminance_space : m->backdrop_space;', '? r.render_space : m->backdrop_space;', MCT + MT),
+    ('mk-src-stitching-side', 'src', MKC, '      if (x < t->pieces[mid].hi) {', '      if (x <= t->pieces[mid].hi) {', MCT + MT),
+    ('mk-src-exponent-inverted', 'src', MKC, 'gmath_pow(x, leaf->n)', 'gmath_pow(x, 1.0 / leaf->n)', MCT + MT),
+    ('mk-src-table-last-interval', 'src', MKC, '      if (i > m - 2) {\n        i = m - 2;', '      if (i > m - 3) {\n        i = m - 3;', MCT + MT),
+    ('mk-src-dropped-clamp', 'src', MKC, '  return clamp01(y);\n}\n\ndouble gshscene_mask_transfer', '  return y;\n}\n\ndouble gshscene_mask_transfer', MCT + MT),
+    ('mk-src-input-clamp', 'src', MKC, '  x = clamp01(x);\n  double y;', '  double y;', MCT + MT),
+    ('mk-src-zero-power', 'src', MKC, 'leaf->n == 0.0 ? 1.0 : (x == 0.0 ? 0.0 : gmath_pow(x, leaf->n))', '(x == 0.0 ? 0.0 : gmath_pow(x, leaf->n))', MCT + MT),
+    ('mk-src-last-piece-at-one', 'src', MKC, '    size_t hi = t->piece_count - 1;\n    while (lo < hi) {', '    size_t hi = t->piece_count - 1;\n    if (x == 1.0) {\n      hi = 0;\n    }\n    while (lo < hi) {', MCT + MT),
+    ('mk-src-piece-encode', 'src', MKC, '    double xp = clamp01(p->e0 + ((x - p->lo) * (p->e1 - p->e0)) / (p->hi - p->lo));',
+     '    double xp = clamp01(p->e0 + ((x - p->lo) * (p->e1 - p->e0)) / (p->hi - p->lo + 1.0));', MCT + MT),
+    ('mk-src-exponential-c0', 'src', MKC, '      return leaf->c0 + power * (leaf->c1 - leaf->c0);', '      return power * (leaf->c1 - leaf->c0);', MCT + MT),
+    ('mk-src-table-interpolation', 'src', MKC, '      return leaf->samples[i] + t * (leaf->samples[i + 1] - leaf->samples[i]);', '      return leaf->samples[i] + 0.0 * t * (leaf->samples[i + 1] - leaf->samples[i]);', MCT + MT),
+    ('mk-src-table-grid', 'src', MKC, '      double u = x * (double)(m - 1);', '      double u = x * (double)m;', MCT + MT),
+    ('mk-src-nan-transfer', 'src', MKC, '  return !(x > 0.0) ? 0.0 : (x > 1.0 ? 1.0 : x);', '  return x < 0.0 ? 0.0 : (x > 1.0 ? 1.0 : x);', MT),
+    ('mk-src-resolve-alpha-coefficients', 'src', MKC, '  if (!luminance) {\n    *out = r; /* alpha: no color, no coefficients */', '  if (0) {\n    *out = r; /* alpha: no color, no coefficients */', MT),
+    ('mk-src-resolve-luminance-space', 'src', MKC, '  r.luminance_space = gshscene_color_space_is_target(&m->space) ? r.render_space : m->space;',
+     '  r.luminance_space = r.render_space;', MT),
+    ('mk-src-resolve-render-space', 'src', MKC, '  if (!gshscene_color_space_is_target(&m->render_space)) {\n    r.render_space = m->render_space;\n  } else if (have_enclosing) {',
+     '  if (0) {\n    r.render_space = m->render_space;\n  } else if (have_enclosing) {', MT),
+    ('mk-src-space-y-row', 'src', MKC, '      gshscene_space_luminance_row(&r.luminance_space, r.k);', '      gshscene_space_luminance_row(&r.render_space, r.k);', MT),
+    ('mk-src-rec709-red', 'src', MKC, '      r.k[0] = 2126.0 / 10000.0;', '      r.k[0] = 2125.0 / 10000.0;', MCT + MT),
+    # MK1: the intern (validity first, then unsupported, then the bounds)
+    ('mk-intern-picture-null', 'src', MKC, '  if (!picture || picture->kind != GSHSCENE_RESOURCE_PICTURE || picture->store != store) {',
+     '  if (picture->kind != GSHSCENE_RESOURCE_PICTURE || picture->store != store) {', MT),
+    ('mk-intern-picture-kind', 'src', MKC, '  if (!picture || picture->kind != GSHSCENE_RESOURCE_PICTURE || picture->store != store) {',
+     '  if (!picture || picture->store != store) {', MT),
+    ('mk-intern-picture-other-store', 'src', MKC, '  if (!picture || picture->kind != GSHSCENE_RESOURCE_PICTURE || picture->store != store) {',
+     '  if (!picture || picture->kind != GSHSCENE_RESOURCE_PICTURE || (store && 0)) {', MT),
+    ('mk-intern-mode-zero', 'src', MKC, '  if (in->mode == 0 || in->mode >= (uint32_t)GSHSCENE_MASK_MODE_COUNT ||', '  if (in->mode >= (uint32_t)GSHSCENE_MASK_MODE_COUNT ||', MT),
+    ('mk-intern-mode-count', 'src', MKC, '  if (in->mode == 0 || in->mode >= (uint32_t)GSHSCENE_MASK_MODE_COUNT ||', '  if (in->mode == 0 || in->mode > (uint32_t)GSHSCENE_MASK_MODE_COUNT ||', MT),
+    ('mk-intern-coefficients-count', 'src', MKC, '      in->coefficients >= (uint32_t)GSHSCENE_MASK_COEFF_COUNT || in->acts_on >= (uint32_t)GSHSCENE_MASK_ACTS_ON_COUNT) {',
+     '      in->acts_on >= (uint32_t)GSHSCENE_MASK_ACTS_ON_COUNT) {', MT),
+    ('mk-intern-acts-on-count', 'src', MKC, '      in->coefficients >= (uint32_t)GSHSCENE_MASK_COEFF_COUNT || in->acts_on >= (uint32_t)GSHSCENE_MASK_ACTS_ON_COUNT) {',
+     '      in->coefficients >= (uint32_t)GSHSCENE_MASK_COEFF_COUNT) {', MT),
+    ('mk-intern-space-invalid-ignored', 'src', MKC, '    if (r == GSHSCENE_ERR_INVALID) {\n      return r;\n    }\n    unsupported |=', '    unsupported |=', MT),
+    ('mk-intern-space-unsupported-ignored', 'src', MKC, '    unsupported |= r == GSHSCENE_ERR_UNSUPPORTED;\n', '', MT),
+    ('mk-intern-backdrop-nan', 'src', MKC, '    if (!gshscene_finite(in->backdrop[i])) {\n      return GSHSCENE_ERR_INVALID;\n    }\n', '', MT),
+    ('mk-intern-alpha-coefficients', 'src', MKC, '    if (in->coefficients != 0 || !gshscene_color_space_is_target(&in->space) ||', '    if (!gshscene_color_space_is_target(&in->space) ||', MT),
+    ('mk-intern-alpha-space', 'src', MKC, '!gshscene_color_space_is_target(&in->space) ||\n        !gshscene_color_space_is_target(&in->backdrop_space)', '!gshscene_color_space_is_target(&in->backdrop_space)', MT),
+    ('mk-intern-alpha-backdrop-space', 'src', MKC, '        !gshscene_color_space_is_target(&in->backdrop_space) || in->backdrop[0] != 0.0', '        in->backdrop[0] != 0.0', MT),
+    ('mk-intern-alpha-backdrop-red', 'src', MKC, 'in->backdrop[0] != 0.0 || in->backdrop[1] != 0.0 ||', 'in->backdrop[1] != 0.0 ||', MT),
+    ('mk-intern-alpha-backdrop-green', 'src', MKC, 'in->backdrop[0] != 0.0 || in->backdrop[1] != 0.0 ||', 'in->backdrop[0] != 0.0 ||', MT),
+    ('mk-intern-alpha-backdrop-blue', 'src', MKC, 'in->backdrop[1] != 0.0 ||\n        in->backdrop[2] != 0.0) {', 'in->backdrop[1] != 0.0) {', MT),
+    ('mk-intern-order-unsupported-first', 'src', MKC, '  GSHSCENE_Result r = check_transfer(&in->transfer, tally);\n  if (r != GSHSCENE_OK) {\n    return r;\n  }\n  if (unsupported) {\n    return GSHSCENE_ERR_UNSUPPORTED;\n  }',
+     '  GSHSCENE_Result r = check_transfer(&in->transfer, tally);\n  if (unsupported) {\n    return GSHSCENE_ERR_UNSUPPORTED;\n  }\n  if (r != GSHSCENE_OK) {\n    return r;\n  }', MT),
+    ('mk-intern-limit-before-invalid', 'src', MKC, '  memset(tally, 0, sizeof *tally);\n  GSHSCENE_Result r = check_transfer(&in->transfer, tally);\n  if (r != GSHSCENE_OK) {\n    return r;\n  }',
+     '  memset(tally, 0, sizeof *tally);\n  GSHSCENE_Result r = check_transfer(&in->transfer, tally);\n  if (r != GSHSCENE_OK) {\n    return r;\n  }\n  if (tally->limit) {\n    return GSHSCENE_ERR_LIMIT;\n  }', MT),
+    ('mk-intern-backdrop-bound-negative', 'src', MKC, 'in->backdrop[0] >= -GSHSCENE_MASK_BACKDROP_MAX && in->backdrop[0] <= GSHSCENE_MASK_BACKDROP_MAX &&',
+     'in->backdrop[0] <= GSHSCENE_MASK_BACKDROP_MAX &&', MT),
+    ('mk-intern-backdrop-bound-blue', 'src', MKC, 'in->backdrop[2] >= -GSHSCENE_MASK_BACKDROP_MAX && in->backdrop[2] <= GSHSCENE_MASK_BACKDROP_MAX)',
+     'in->backdrop[2] <= GSHSCENE_MASK_BACKDROP_MAX)', MT),
+    ('mk-intern-samples-summed', 'src', MKC, '      tally->samples = gshscene_sat_add(tally->samples, leaf->count);', '      tally->samples = leaf->count;', MT),
+    ('mk-intern-bytes-pieces', 'src', MKC, 'gshscene_sat_add(gshscene_sat_mul(tally.pieces, GSHSCENE_BYTES_PER_TRANSFER_PIECE),', 'gshscene_sat_add(gshscene_sat_mul(0, GSHSCENE_BYTES_PER_TRANSFER_PIECE),', MT),
+    ('mk-intern-bytes-samples', 'src', MKC, 'gshscene_sat_mul(tally.samples, GSHSCENE_BYTES_PER_TRANSFER_SAMPLE)));', 'gshscene_sat_mul(0, GSHSCENE_BYTES_PER_TRANSFER_SAMPLE)));', MT),
+    # MK4: the transfer's validity
+    ('mk-transfer-identity-c0', 'src', MKC, '      if (leaf->c0 != 0.0 || leaf->c1 != 0.0 || leaf->n != 0.0 || leaf->count != 0 || leaf->samples) {\n        return GSHSCENE_ERR_INVALID;\n      }\n      return GSHSCENE_OK;\n    case GSHSCENE_TRANSFER_EXPONENTIAL:',
+     '      if (leaf->c1 != 0.0 || leaf->n != 0.0 || leaf->count != 0 || leaf->samples) {\n        return GSHSCENE_ERR_INVALID;\n      }\n      return GSHSCENE_OK;\n    case GSHSCENE_TRANSFER_EXPONENTIAL:', MT),
+    ('mk-transfer-identity-c1', 'src', MKC, '      if (leaf->c0 != 0.0 || leaf->c1 != 0.0 || leaf->n != 0.0 || leaf->count != 0 || leaf->samples) {',
+     '      if (leaf->c0 != 0.0 || leaf->n != 0.0 || leaf->count != 0 || leaf->samples) {', MT),
+    ('mk-transfer-identity-n', 'src', MKC, '      if (leaf->c0 != 0.0 || leaf->c1 != 0.0 || leaf->n != 0.0 || leaf->count != 0 || leaf->samples) {',
+     '      if (leaf->c0 != 0.0 || leaf->c1 != 0.0 || leaf->count != 0 || leaf->samples) {', MT),
+    ('mk-transfer-identity-count', 'src', MKC, '      if (leaf->c0 != 0.0 || leaf->c1 != 0.0 || leaf->n != 0.0 || leaf->count != 0 || leaf->samples) {',
+     '      if (leaf->c0 != 0.0 || leaf->c1 != 0.0 || leaf->n != 0.0 || leaf->samples) {', MT),
+    ('mk-transfer-identity-samples', 'src', MKC, '      if (leaf->c0 != 0.0 || leaf->c1 != 0.0 || leaf->n != 0.0 || leaf->count != 0 || leaf->samples) {',
+     '      if (leaf->c0 != 0.0 || leaf->c1 != 0.0 || leaf->n != 0.0 || leaf->count != 0) {', MT),
+    ('mk-transfer-exponential-c0', 'src', MKC, '      if (!gshscene_finite(leaf->c0) || !gshscene_finite(leaf->c1) || !gshscene_finite(leaf->n) || leaf->n < 0.0 ||',
+     '      if (!gshscene_finite(leaf->c1) || !gshscene_finite(leaf->n) || leaf->n < 0.0 ||', MT),
+    ('mk-transfer-exponential-c1', 'src', MKC, '      if (!gshscene_finite(leaf->c0) || !gshscene_finite(leaf->c1) || !gshscene_finite(leaf->n) || leaf->n < 0.0 ||',
+     '      if (!gshscene_finite(leaf->c0) || !gshscene_finite(leaf->n) || leaf->n < 0.0 ||', MT),
+    ('mk-transfer-exponential-n-finite', 'src', MKC, '      if (!gshscene_finite(leaf->c0) || !gshscene_finite(leaf->c1) || !gshscene_finite(leaf->n) || leaf->n < 0.0 ||',
+     '      if (!gshscene_finite(leaf->c0) || !gshscene_finite(leaf->c1) || leaf->n < 0.0 ||', MT),
+    ('mk-transfer-exponential-n-negative', 'src', MKC, '      if (!gshscene_finite(leaf->c0) || !gshscene_finite(leaf->c1) || !gshscene_finite(leaf->n) || leaf->n < 0.0 ||',
+     '      if (!gshscene_finite(leaf->c0) || !gshscene_finite(leaf->c1) || !gshscene_finite(leaf->n) ||', MT),
+    ('mk-transfer-exponential-samples', 'src', MKC, '          leaf->count != 0 || leaf->samples) {\n        return GSHSCENE_ERR_INVALID;\n      }\n      if (leaf->n > GSHSCENE_MASK_MAX_EXPONENT) {',
+     '          leaf->samples) {\n        return GSHSCENE_ERR_INVALID;\n      }\n      if (leaf->n > GSHSCENE_MASK_MAX_EXPONENT) {', MT),
+    ('mk-transfer-exponential-bound', 'src', MKC, '      if (leaf->n > GSHSCENE_MASK_MAX_EXPONENT) {\n        tally->limit = 1;\n      }', '', MT),
+    ('mk-transfer-table-count', 'src', MKC, '      if (leaf->count < 2 || !leaf->samples ||', '      if (leaf->count < 1 || !leaf->samples ||', MT),
+    ('mk-transfer-table-pointer', 'src', MKC, '      if (leaf->count < 2 || !leaf->samples ||', '      if (leaf->count < 2 ||', MT),
+    ('mk-transfer-table-c0', 'src', MKC, ' || leaf->c0 != 0.0 || leaf->c1 != 0.0 || leaf->n != 0.0) {\n        return GSHSCENE_ERR_INVALID;\n      }\n      for (size_t i = 0; i < leaf->count; i++) {',
+     ' || leaf->c1 != 0.0 || leaf->n != 0.0) {\n        return GSHSCENE_ERR_INVALID;\n      }\n      for (size_t i = 0; i < leaf->count; i++) {', MT),
+    ('mk-transfer-table-finite', 'src', MKC, '        if (!gshscene_finite(leaf->samples[i])) {\n          return GSHSCENE_ERR_INVALID;\n        }\n', '', MT),
+    ('mk-transfer-table-kinds', 'src', MKC, '    default:\n      return GSHSCENE_ERR_INVALID;\n  }\n}\n\nstatic GSHSCENE_Result check_transfer', '    default:\n      return GSHSCENE_OK;\n  }\n}\n\nstatic GSHSCENE_Result check_transfer', MT),
+    ('mk-transfer-stray-pieces', 'src', MKC, '    if (t->piece_count != 0 || t->pieces) {\n      return GSHSCENE_ERR_INVALID;\n    }', '', MT),
+    ('mk-transfer-stitching-stray-samples', 'src', MKC, ' || t->sample_count != 0 ||\n      t->samples) {', ') {', MT),
+    ('mk-transfer-stitching-start', 'src', MKC, '  double expect_lo = 0.0;', '  double expect_lo = 0.25;', MT),
+    ('mk-transfer-stitching-gap', 'src', MKC, 'p->lo != expect_lo || !(p->lo < p->hi)', '!(p->lo < p->hi)', MT),
+    ('mk-transfer-stitching-empty-piece', 'src', MKC, 'p->lo != expect_lo || !(p->lo < p->hi) ||', 'p->lo != expect_lo ||', MT),
+    ('mk-transfer-stitching-e0', 'src', MKC, '!(p->e0 >= 0.0 && p->e0 <= 1.0) || !(p->e1 >= 0.0 && p->e1 <= 1.0) ||', '!(p->e1 >= 0.0 && p->e1 <= 1.0) ||', MT),
+    ('mk-transfer-stitching-e1', 'src', MKC, '!(p->e0 >= 0.0 && p->e0 <= 1.0) || !(p->e1 >= 0.0 && p->e1 <= 1.0) ||', '!(p->e0 >= 0.0 && p->e0 <= 1.0) ||', MT),
+    ('mk-transfer-stitching-end', 'src', MKC, '  if (expect_lo != 1.0) {', '  if (expect_lo > 1.0) {', MT),
+    ('mk-transfer-stitching-pieces-counted', 'src', MKC, '  tally->pieces = t->piece_count;', '  tally->pieces = 0;', MT),
+    # MK13: the canonical form (-0 is +0), the hash, equality and dump
+    ('mk-canonical-negative-zero', 'src', MKC, 'static double pz(double x) {\n  return x == 0.0 ? 0.0 : x;\n}', 'static double pz(double x) {\n  return x;\n}', MT),
+    ('mk-canonical-backdrop', 'src', MKC, '    m->backdrop[i] = pz(s->backdrop[i]);', '    m->backdrop[i] = s->backdrop[i];', MT),
+    ('mk-canonical-c0', 'src', MKC, '  m->transfer.c0 = pz(t->c0);', '  m->transfer.c0 = t->c0;', MT),
+    ('mk-canonical-c1', 'src', MKC, '  m->transfer.c1 = pz(t->c1);', '  m->transfer.c1 = t->c1;', MT),
+    ('mk-canonical-n', 'src', MKC, '  m->transfer.n = pz(t->n);', '  m->transfer.n = t->n;', MT),
+    ('mk-canonical-sample', 'src', MKC, '      data[at + i] = pz(t->samples[i]);', '      data[at + i] = t->samples[i];', MT),
+    ('mk-canonical-piece-lo', 'src', MKC, '    pieces[i].lo = pz(pieces[i].lo);\n', '', MT),
+    ('mk-canonical-piece-e0', 'src', MKC, '    pieces[i].e0 = pz(pieces[i].e0);\n', '', MT),
+    ('mk-canonical-piece-e1', 'src', MKC, '    pieces[i].e1 = pz(pieces[i].e1);\n', '', MT),
+    ('mk-canonical-piece-c0', 'src', MKC, '    pieces[i].c0 = pz(pieces[i].c0);\n', '', MT),
+    ('mk-canonical-piece-c1', 'src', MKC, '    pieces[i].c1 = pz(pieces[i].c1);\n', '', MT),
+    ('mk-canonical-piece-n', 'src', MKC, '    pieces[i].n = pz(pieces[i].n);\n', '', MT),
+    ('mk-canonical-piece-sample', 'src', MKC, '        data[at + j] = pz(t->pieces[i].samples[j]);', '        data[at + j] = t->pieces[i].samples[j];', MT),
+    ('mk-hash-format', 'src', MKC, '#define MASK_FORMAT_VERSION 1u', '#define MASK_FORMAT_VERSION 2u', MT),
+    ('mk-hash-backdrop-negative-zero', 'src', MKC, '    gshgeom_hash_f64(&h, pz(m->backdrop[i]));', '    gshgeom_hash_f64(&h, m->backdrop[i]);', MT),
+    ('mk-hash-exponential-c0', 'src', MKC, '    gshgeom_hash_f64(h, pz(leaf->c0));', '    gshgeom_hash_f64(h, leaf->c0);', MT),
+    ('mk-hash-exponential-c1', 'src', MKC, '    gshgeom_hash_f64(h, pz(leaf->c1));', '    gshgeom_hash_f64(h, leaf->c1);', MT),
+    ('mk-hash-exponential-n', 'src', MKC, '    gshgeom_hash_f64(h, pz(leaf->n));', '    gshgeom_hash_f64(h, leaf->n);', MT),
+    ('mk-hash-sample', 'src', MKC, '      gshgeom_hash_f64(h, pz(leaf->samples[i]));', '      gshgeom_hash_f64(h, leaf->samples[i]);', MT),
+    ('mk-hash-piece-lo', 'src', MKC, '      gshgeom_hash_f64(&h, pz(p->lo));', '      gshgeom_hash_f64(&h, p->lo);', MT),
+    ('mk-hash-piece-e0', 'src', MKC, '      gshgeom_hash_f64(&h, pz(p->e0));', '      gshgeom_hash_f64(&h, p->e0);', MT),
+    ('mk-hash-piece-e1', 'src', MKC, '      gshgeom_hash_f64(&h, pz(p->e1));', '      gshgeom_hash_f64(&h, p->e1);', MT),
+    ('mk-hash-stitching-top-kind', 'src', MKC, '  if (t->kind == GSHSCENE_TRANSFER_STITCHING) {\n    gshgeom_hash_u8(&h, (uint8_t)t->kind);', '  if (t->kind == GSHSCENE_TRANSFER_STITCHING) {', MT),
+    ('mk-hash-picture', 'src', MKC, '  gshgeom_hash_u64(&h, gshscene_resource_hash(m->picture));', '  gshgeom_hash_u64(&h, gshscene_resource_id(m->picture));', MT),
+    ('mk-equal-picture', 'src', MKC, '  if (have->picture != want->picture || have->mode != want->mode ||', '  if (have->mode != want->mode ||', MT),
+    ('mk-equal-mode', 'src', MKC, ' || have->mode != want->mode || have->coefficients != want->coefficients ||', ' || have->coefficients != want->coefficients ||', MT),
+    ('mk-equal-coefficients', 'src', MKC, ' || have->coefficients != want->coefficients ||\n      have->acts_on != want->acts_on', ' ||\n      have->acts_on != want->acts_on', MT),
+    ('mk-equal-acts-on', 'src', MKC, 'have->acts_on != want->acts_on || !gshscene_space_equal(&have->space, &want->space) ||', '!gshscene_space_equal(&have->space, &want->space) ||', MT),
+    ('mk-equal-space', 'src', MKC, '!gshscene_space_equal(&have->space, &want->space) ||\n      !gshscene_space_equal(&have->render_space', '!gshscene_space_equal(&have->render_space', MT),
+    ('mk-equal-render-space', 'src', MKC, '!gshscene_space_equal(&have->render_space, &want->render_space) ||\n      !gshscene_space_equal(&have->backdrop_space', '!gshscene_space_equal(&have->backdrop_space', MT),
+    ('mk-equal-backdrop-space', 'src', MKC, ' ||\n      !gshscene_space_equal(&have->backdrop_space, &want->backdrop_space)) {', ') {', MT),
+    ('mk-equal-backdrop', 'src', MKC, '    if (!bits_equal(have->backdrop[i], pz(want->backdrop[i]))) {\n      return 0;\n    }\n', '', MT),
+    ('mk-equal-transfer-kind', 'src', MKC, '  if (a->kind != b->kind || !bits_equal(a->c0, pz(b->c0))', '  if (!bits_equal(a->c0, pz(b->c0))', MT),
+    ('mk-equal-transfer-c0', 'src', MKC, ' || !bits_equal(a->c0, pz(b->c0)) || !bits_equal(a->c1', ' || !bits_equal(a->c1', MT),
+    ('mk-equal-transfer-c1', 'src', MKC, ' || !bits_equal(a->c1, pz(b->c1)) ||', ' ||', MT),
+    ('mk-equal-transfer-n', 'src', MKC, '      !bits_equal(a->n, pz(b->n)) || a->sample_count', '      a->sample_count', MT),
+    ('mk-equal-transfer-sample-count', 'src', MKC, ' || a->sample_count != b->sample_count || a->piece_count', ' || a->piece_count', MT),
+    ('mk-equal-transfer-samples', 'src', MKC, '      !samples_match(a->samples, b->samples, a->sample_count)) {\n    return 0;', '      0) {\n    return 0;', MT),
+    ('mk-equal-piece-e0', 'src', MKC, ' || !bits_equal(p->e0, pz(q->e0)) ||', ' ||', MT),
+    ('mk-equal-piece-e1', 'src', MKC, '        !bits_equal(p->e1, pz(q->e1)) || p->leaf_kind', '        p->leaf_kind', MT),
+    ('mk-equal-piece-leaf', 'src', MKC, ' || p->leaf_kind != q->leaf_kind ||', ' ||', MT),
+    ('mk-equal-piece-c0', 'src', MKC, ' || !bits_equal(p->c0, pz(q->c0)) ||', ' ||', MT),
+    ('mk-equal-piece-c1', 'src', MKC, '        !bits_equal(p->c1, pz(q->c1)) || !bits_equal(p->n', '        !bits_equal(p->n', MT),
+    ('mk-equal-piece-n', 'src', MKC, ' || !bits_equal(p->n, pz(q->n)) ||', ' ||', MT),
+    ('mk-equal-piece-sample-count', 'src', MKC, ' || p->sample_count != q->sample_count ||', ' ||', MT),
+    ('mk-equal-piece-samples', 'src', MKC, ' ||\n        !samples_match(p->samples, q->samples, p->sample_count)) {', ') {', MT),
+    ('mk-build-no-retain', 'src', MKC, '  m->picture = gshscene_resource_retain(s->picture);', '  m->picture = s->picture;', MT),
+    ('mk-free-no-release', 'src', MKC, '  gshscene_resource_release(resource->u.mask.m.picture);\n', '', MT),
+    ('mk-free-pieces', 'src', MKC, '  gshscene_free(&resource->store->alloc, resource->u.mask.pieces);\n', '', MT),
+    ('mk-free-samples', 'src', MKC, '  gshscene_free(&resource->store->alloc, resource->u.mask.samples);\n', '', MT),
+    ('mk-dump-order', 'src', MKC, '          m->mode, m->coefficients, m->acts_on) < 0 ||', '          m->coefficients, m->mode, m->acts_on) < 0 ||', MT),
+    ('mk-dump-spaces-swapped', 'src', MKC, '      gshscene_space_dump(out, &m->render_space) < 0 || fputs(" lspace=", out) == EOF ||\n      gshscene_space_dump(out, &m->space) < 0 ||',
+     '      gshscene_space_dump(out, &m->space) < 0 || fputs(" lspace=", out) == EOF ||\n      gshscene_space_dump(out, &m->render_space) < 0 ||', MT),
+    ('mk-dump-backdrop-order', 'src', MKC, 'HEX(gshgeom_f64_bits(m->backdrop[0])),\n          HEX(gshgeom_f64_bits(m->backdrop[1])), HEX(gshgeom_f64_bits(m->backdrop[2]))',
+     'HEX(gshgeom_f64_bits(m->backdrop[1])),\n          HEX(gshgeom_f64_bits(m->backdrop[0])), HEX(gshgeom_f64_bits(m->backdrop[2]))', MT),
+    ('mk-dump-picture-by-id', 'src', MKC, 'fprintf(out, "mask picture=%016llx mode=%u coeff=%u acts=%u rspace=", HEX(gshscene_resource_hash(m->picture)),',
+     'fprintf(out, "mask picture=%016llx mode=%u coeff=%u acts=%u rspace=", HEX(gshscene_resource_id(m->picture)),', MT),
+    ('mk-dump-samples-dropped', 'src', MKC, '      dump_samples(out, t->samples, t->sample_count) < 0) {\n    return -1;\n  }\n  for (size_t i = 0; i < t->piece_count; i++) {',
+     '      0) {\n    return -1;\n  }\n  for (size_t i = 0; i < t->piece_count; i++) {', MT),
+    ('mk-dump-piece-samples-dropped', 'src', MKC, '        dump_samples(out, p->samples, p->sample_count) < 0) {', '        0) {', MT),
+    # MK9: what a mask needs of a sink
+    ('mk-required-alpha', 'src', MKC, '    need |= GSHSCENE_MASK_NATIVE_ALPHA;\n  } else {', '    need |= GSHSCENE_MASK_NATIVE_LUMINANCE;\n  } else {', MT + MSK),
+    ('mk-required-backdrop', 'src', MKC, '    if (m->backdrop[0] != 0.0 || m->backdrop[1] != 0.0 || m->backdrop[2] != 0.0) {\n      need |= GSHSCENE_MASK_NATIVE_BACKDROP;',
+     '    if (m->backdrop[0] != 0.0 || m->backdrop[1] != 0.0) {\n      need |= GSHSCENE_MASK_NATIVE_BACKDROP;', MT),
+    ('mk-required-spaces-render', 'src', MKC, '  if (!gshscene_color_space_is_target(&m->space) || !gshscene_color_space_is_target(&m->render_space) ||',
+     '  if (!gshscene_color_space_is_target(&m->space) ||', MT),
+    ('mk-required-spaces-backdrop', 'src', MKC, ' ||\n      !gshscene_color_space_is_target(&m->backdrop_space)) {\n    need |= GSHSCENE_MASK_NATIVE_SPACES;', ') {\n    need |= GSHSCENE_MASK_NATIVE_SPACES;', MT),
+    ('mk-required-spaces-luminance', 'src', MKC, '  if (!gshscene_color_space_is_target(&m->space) || !gshscene_color_space_is_target(&m->render_space) ||',
+     '  if (!gshscene_color_space_is_target(&m->render_space) ||', MT),
+    ('mk-required-acts-on', 'src', MKC, '  if (m->acts_on == (uint32_t)GSHSCENE_MASK_ACTS_ON_SHAPE) {\n    need |= GSHSCENE_MASK_NATIVE_ACTS_ON_SHAPE;\n  }\n  return need;',
+     '  return need;', MT),
+    ('mk-required-kind-guard', 'src', MKC, '  if (!mask || mask->kind != GSHSCENE_RESOURCE_MASK) {\n    return 0;\n  }\n  const GSHSCENE_Mask * m = &mask->u.mask.m;\n  uint32_t need = 0;',
+     '  const GSHSCENE_Mask * m = &mask->u.mask.m;\n  uint32_t need = 0;', MT),
+    # MK6, MK13: the placement Q on a group and on a node (hash, equality, canonical form, emission)
+    ('mk-q-hash', 'src', LS, '  if (soft_mask) {\n    gshgeom_hash_u64(h, placement_hash(soft_mask_map)); /* MK13: the placement follows the mask */\n  }\n', '  (void)soft_mask_map;\n', MG),
+    ('mk-q-hash-without-mask', 'src', LS, '  if (soft_mask) {\n    gshgeom_hash_u64(h, placement_hash(soft_mask_map)); /* MK13: the placement follows the mask */\n  }\n',
+     '  gshgeom_hash_u64(h, placement_hash(soft_mask_map));\n', MG),
+    ('mk-q-dump', 'src', LS, '  if (written >= 0 && soft_mask) {\n    written = fprintf(out, " maskmap=%016llx", (unsigned long long)placement_hash(soft_mask_map));\n  }\n', '  (void)soft_mask_map;\n', MG),
+    ('mk-q-equal', 'src', LS, ' && map_equal(&a->group.soft_mask_map, &b->group.soft_mask_map);', ';', MG),
+    ('mk-q-canonical', 'src', LS, '  if (group->soft_mask) {\n    out->soft_mask_map = placement; /* one spelling: the identity is spelled as a 2D identity */\n  }\n', '', MG),
+    ('mk-q-without-mask', 'src', LS, '  if (!group->soft_mask && placed && !map_equal(&placement, &identity)) {\n    return GSHSCENE_ERR_INVALID;\n  }\n', '', MG),
+    ('mk-q-kind-without-dim', 'src', LS, '  } else if (group->soft_mask_map.kind != 0) {\n    return GSHSCENE_ERR_INVALID;\n  }', '  }', MG),
+    ('mk-q-planar', 'src', LS, '  if (placement.dim != 2) {\n    return GSHSCENE_ERR_UNSUPPORTED; /* a mask is planar */\n  }\n', '', MG),
+    ('mk-q-map-check', 'src', LS, '    GSHSCENE_Result mapped = canonical_map(&group->soft_mask_map, &placement);\n    if (mapped != GSHSCENE_OK) {\n      return mapped;\n    }',
+     '    placement = group->soft_mask_map;', MG),
+    ('mk-q-slot-kind', 'src', LS, '(group->soft_mask->kind != GSHSCENE_RESOURCE_MASK || group->soft_mask->store != store)', '(group->soft_mask->store != store)', MG),
+    ('mk-q-slot-store', 'src', LS, '(group->soft_mask->kind != GSHSCENE_RESOURCE_MASK || group->soft_mask->store != store)', '(group->soft_mask->kind != GSHSCENE_RESOURCE_MASK || (store && 0))', MG),
+    ('mk-node-equal-mask', 'src', ND, '          a->soft_mask != b->soft_mask || !map_equal(&a->soft_mask_map, &b->soft_mask_map)) {', '          !map_equal(&a->soft_mask_map, &b->soft_mask_map)) {', MG + ["testDiff"]),
+    ('mk-node-equal-placement', 'src', ND, '          a->soft_mask != b->soft_mask || !map_equal(&a->soft_mask_map, &b->soft_mask_map)) {', '          a->soft_mask != b->soft_mask) {', MG + ["testDiff"]),
+    ('mk-node-canonical', 'src', ND, '      if (canonical.soft_mask) {\n        node.soft_mask_map = canonical.soft_mask_map;\n      }\n', '', MG + ["testNode"]),
+    ('mk-node-init-identity', 'src', ND, '  gshgeom_map_identity(2, &node->soft_mask_map);\n', '', MG + ["testNode"]),
+    ('mk-node-hash-wrong-map', 'src', ND, 'p->knockout, p->soft_mask, &p->soft_mask_map);', 'p->knockout, p->soft_mask, &p->map);', MG + ["testNode"]),
+    ('mk-node-group-fields', 'src', ND, 'in->isolation, in->knockout,\n          in->soft_mask, in->soft_mask_map};', 'in->isolation, in->knockout,\n          in->soft_mask, in->map};', MG + ["testNode"]),
+    ('mk-emit-placement-dropped', 'src', EM, '      if (gshgeom_map_compose(base, &p->soft_mask_map, &g.soft_mask_map) != GSHGEOM_OK) {', '      g.soft_mask_map = *base;\n      if (0) {', MG + ["testEmit"]),
+    ('mk-emit-base-dropped', 'src', EM, '      if (gshgeom_map_compose(base, &p->soft_mask_map, &g.soft_mask_map) != GSHGEOM_OK) {', '      g.soft_mask_map = p->soft_mask_map;\n      if (0) {', MG + ["testEmit"]),
+    ('mk-emit-order-swapped', 'src', EM, '      if (gshgeom_map_compose(base, &p->soft_mask_map, &g.soft_mask_map) != GSHGEOM_OK) {', '      if (gshgeom_map_compose(&p->soft_mask_map, base, &g.soft_mask_map) != GSHGEOM_OK) {', MG + ["testEmit"]),
+    ('mk-emit-no-mask-guard', 'src', EM, '    if (p->soft_mask) {\n      /* MK6: the mask\'s placement is composed with the group\'s accumulated map exactly as the clip\'s is. */', '    if (1) {\n      /* MK6: the mask\'s placement is composed with the group\'s accumulated map exactly as the clip\'s is. */', MG + ["testEmit"]),
+    # MK12: the picture depth counts a mask exactly as an instance
+    ('mk-depth-list', 'src', LS, '    return item->group.soft_mask->u.mask.m.picture->u.picture.depth;', '    return 0;', MG),
+    ('mk-depth-list-plus-one', 'src', LS, '    return item->group.soft_mask->u.mask.m.picture->u.picture.depth;', '    return item->group.soft_mask->u.mask.m.picture->u.picture.depth + 1;', MG),
+    ('mk-depth-node', 'src', VA, '  m->pic = node->p.soft_mask ? node->p.soft_mask->u.mask.m.picture->u.picture.depth : 0;', '  m->pic = 0;', MG),
+    ('mk-depth-node-plus-one', 'src', VA, '  m->pic = node->p.soft_mask ? node->p.soft_mask->u.mask.m.picture->u.picture.depth : 0;', '  m->pic = node->p.soft_mask ? node->p.soft_mask->u.mask.m.picture->u.picture.depth + 1 : 0;', MG),
+    ('mk-hdr-max-pieces', 'hdr', HMK, '#define GSHSCENE_MASK_MAX_PIECES ((size_t)256)', '#define GSHSCENE_MASK_MAX_PIECES ((size_t)257)', MT),
+    ('mk-hdr-max-samples', 'hdr', HMK, '#define GSHSCENE_MASK_MAX_SAMPLES ((size_t)4096)', '#define GSHSCENE_MASK_MAX_SAMPLES ((size_t)4097)', MT),
+    ('mk-hdr-max-exponent', 'hdr', HMK, '#define GSHSCENE_MASK_MAX_EXPONENT 65536.0', '#define GSHSCENE_MASK_MAX_EXPONENT 65537.0', MT),
+    ('mk-hdr-backdrop-max', 'hdr', HMK, '#define GSHSCENE_MASK_BACKDROP_MAX 65536.0', '#define GSHSCENE_MASK_BACKDROP_MAX 65537.0', MT),
+    # the pinned values: they are hashed (mask.h), or reported (report.h, resource.h, sink.h)
+    ('mk-hdr-mode-alpha', 'hdr', HMK, '  GSHSCENE_MASK_ALPHA = 1,     ///<', '  GSHSCENE_MASK_ALPHA = 5,     ///<', MT),
+    ('mk-hdr-mode-luminance', 'hdr', HMK, '  GSHSCENE_MASK_LUMINANCE = 2, ///<', '  GSHSCENE_MASK_LUMINANCE = 6, ///<', MT),
+    ('mk-hdr-coeff-rec709', 'hdr', HMK, '  GSHSCENE_MASK_COEFF_REC709 = 1, ///<', '  GSHSCENE_MASK_COEFF_REC709 = 5, ///<', MT),
+    ('mk-hdr-coeff-lum', 'hdr', HMK, '  GSHSCENE_MASK_COEFF_LUM = 2,    ///<', '  GSHSCENE_MASK_COEFF_LUM = 6,    ///<', MT),
+    ('mk-hdr-coeff-space-y', 'hdr', HMK, '  GSHSCENE_MASK_COEFF_SPACE_Y = 3, ///<', '  GSHSCENE_MASK_COEFF_SPACE_Y = 7, ///<', MT),
+    ('mk-hdr-acts-on-shape', 'hdr', HMK, '  GSHSCENE_MASK_ACTS_ON_SHAPE = 1,   ///<', '  GSHSCENE_MASK_ACTS_ON_SHAPE = 5,   ///<', MT),
+    ('mk-hdr-transfer-exponential', 'hdr', HMK, '  GSHSCENE_TRANSFER_EXPONENTIAL = 1, ///<', '  GSHSCENE_TRANSFER_EXPONENTIAL = 5, ///<', MT),
+    ('mk-hdr-transfer-table', 'hdr', HMK, '  GSHSCENE_TRANSFER_TABLE = 2,       ///<', '  GSHSCENE_TRANSFER_TABLE = 6,       ///<', MT),
+    ('mk-hdr-transfer-stitching', 'hdr', HMK, '  GSHSCENE_TRANSFER_STITCHING = 3,   ///<', '  GSHSCENE_TRANSFER_STITCHING = 7,   ///<', MT),
+    ('mk-hdr-kind', 'hdr', HR, '  GSHSCENE_RESOURCE_MASK = 11,     ///<', '  GSHSCENE_RESOURCE_MASK = 14,     ///<', MT + R),
+    ('mk-hdr-reason', 'hdr', HRP, '  GSHSCENE_REASON_MASK_FEATURE = 35,  ///<', '  GSHSCENE_REASON_MASK_FEATURE = 44,  ///<', MSK + ["testReport"]),
+    ('mk-hdr-native-alpha', 'hdr', HSK, '#define GSHSCENE_MASK_NATIVE_ALPHA (UINT32_C(1) << 0) ', '#define GSHSCENE_MASK_NATIVE_ALPHA (UINT32_C(1) << 13) ', MSK + MT),
+    ('mk-hdr-native-luminance', 'hdr', HSK, '#define GSHSCENE_MASK_NATIVE_LUMINANCE (UINT32_C(1) << 1) ', '#define GSHSCENE_MASK_NATIVE_LUMINANCE (UINT32_C(1) << 13) ', MSK + MT),
+    ('mk-hdr-native-backdrop', 'hdr', HSK, '#define GSHSCENE_MASK_NATIVE_BACKDROP (UINT32_C(1) << 2) ', '#define GSHSCENE_MASK_NATIVE_BACKDROP (UINT32_C(1) << 13) ', MSK + MT),
+    ('mk-hdr-native-exponential', 'hdr', HSK, '#define GSHSCENE_MASK_NATIVE_TRANSFER_EXPONENTIAL (UINT32_C(1) << 3)', '#define GSHSCENE_MASK_NATIVE_TRANSFER_EXPONENTIAL (UINT32_C(1) << 13)', MSK + MT),
+    ('mk-hdr-native-table', 'hdr', HSK, '#define GSHSCENE_MASK_NATIVE_TRANSFER_TABLE (UINT32_C(1) << 4)', '#define GSHSCENE_MASK_NATIVE_TRANSFER_TABLE (UINT32_C(1) << 13)', MSK + MT),
+    ('mk-hdr-native-stitching', 'hdr', HSK, '#define GSHSCENE_MASK_NATIVE_TRANSFER_STITCHING (UINT32_C(1) << 5)', '#define GSHSCENE_MASK_NATIVE_TRANSFER_STITCHING (UINT32_C(1) << 13)', MSK + MT),
+    ('mk-hdr-native-w3c', 'hdr', HSK, '#define GSHSCENE_MASK_NATIVE_COEFF_W3C (UINT32_C(1) << 6)', '#define GSHSCENE_MASK_NATIVE_COEFF_W3C (UINT32_C(1) << 13)', MSK + MT),
+    ('mk-hdr-native-rec709', 'hdr', HSK, '#define GSHSCENE_MASK_NATIVE_COEFF_REC709 (UINT32_C(1) << 7)', '#define GSHSCENE_MASK_NATIVE_COEFF_REC709 (UINT32_C(1) << 13)', MSK + MT),
+    ('mk-hdr-native-lum', 'hdr', HSK, '#define GSHSCENE_MASK_NATIVE_COEFF_LUM (UINT32_C(1) << 8)', '#define GSHSCENE_MASK_NATIVE_COEFF_LUM (UINT32_C(1) << 13)', MSK + MT),
+    ('mk-hdr-native-space-y', 'hdr', HSK, '#define GSHSCENE_MASK_NATIVE_COEFF_SPACE_Y (UINT32_C(1) << 9)', '#define GSHSCENE_MASK_NATIVE_COEFF_SPACE_Y (UINT32_C(1) << 13)', MSK + MT),
+    ('mk-hdr-native-spaces', 'hdr', HSK, '#define GSHSCENE_MASK_NATIVE_SPACES (UINT32_C(1) << 10)', '#define GSHSCENE_MASK_NATIVE_SPACES (UINT32_C(1) << 13)', MSK + MT),
+    ('mk-hdr-native-shape', 'hdr', HSK, '#define GSHSCENE_MASK_NATIVE_ACTS_ON_SHAPE (UINT32_C(1) << 11)', '#define GSHSCENE_MASK_NATIVE_ACTS_ON_SHAPE (UINT32_C(1) << 13)', MSK + MT),
+    ('mk-hdr-native-all', 'hdr', HSK, '#define GSHSCENE_MASK_NATIVE_ALL ((UINT32_C(1) << 12) - 1)', '#define GSHSCENE_MASK_NATIVE_ALL ((UINT32_C(1) << 11) - 1)', MSK + MT),
+    # MK9: the planning pass, the order of the reasons and the chain
+    ('mk-plan-reason-order', 'src', SK, '    } else if (item->group.soft_mask && !(caps->flags & GSHSCENE_CAP_GROUP_SOFT_MASK)) {',
+     '    } else if (item->group.soft_mask && !(caps->flags & GSHSCENE_CAP_GROUP_SOFT_MASK) && !mask_missing(caps, item, target_space)) {', MSK),
+    ('mk-plan-feature-detail', 'src', SK, '        d.detail = missing;\n        return d;', '        d.detail = 0;\n        return d;', MSK),
+    ('mk-plan-feature-class', 'src', SK, '        d.entry_class = GSHSCENE_ENTRY_REFUSED;\n        d.reason = GSHSCENE_REASON_MASK_FEATURE;', '        d.entry_class = GSHSCENE_ENTRY_APPROXIMATED;\n        d.reason = GSHSCENE_REASON_MASK_FEATURE;', MSK),
+    ('mk-plan-feature-reason', 'src', SK, '        d.reason = GSHSCENE_REASON_MASK_FEATURE;', '        d.reason = GSHSCENE_REASON_SOFT_MASK;', MSK),
+    ('mk-plan-feature-lacking', 'src', SK, '  return need & ~caps->mask_native;', '  (void)caps;\n  return need;', MSK),
+    ('mk-plan-spaces-dropped', 'src', SK, '      if (same) {\n        need &= ~GSHSCENE_MASK_NATIVE_SPACES;\n      }', '      (void)same;', MSK),
+    ('mk-plan-spaces-backdrop', 'src', SK, '          (!backdrop || gshscene_space_equal(&r.backdrop_space, enclosing));', '          ((void)backdrop, 1);', MSK),
+    ('mk-plan-spaces-luminance', 'src', SK, 'gshscene_space_equal(&r.render_space, enclosing) && gshscene_space_equal(&r.luminance_space, enclosing) &&', 'gshscene_space_equal(&r.render_space, enclosing) &&', MSK),
+    ('mk-plan-spaces-render', 'src', SK, 'gshscene_space_equal(&r.render_space, enclosing) && gshscene_space_equal(&r.luminance_space, enclosing) &&', 'gshscene_space_equal(&r.luminance_space, enclosing) &&', MSK),
+    ('mk-plan-spaces-target', 'src', SK, '        gshscene_color_space_is_target(&group->group.blend_space) ? target_space : &group->group.blend_space;', '        ((void)target_space, &group->group.blend_space);', MSK),
+    ('mk-plan-enters-masks', 'src', SK, '  if (walk->masks && item->kind == GSHSCENE_ITEM_GROUP_PUSH && item->group.soft_mask) {', '  if (item->kind == GSHSCENE_ITEM_GROUP_PUSH && item->group.soft_mask) {', MSK),
+    ('mk-plan-enters-nothing', 'src', SK, '  walk.masks = 1; /* MK9: the plan alone enters a mask\'s picture, so a refusal inside one is not silent */\n', '', MSK),
+    ('mk-plan-chain-is-mask', 'src', SK, '      int is_mask = item->kind == GSHSCENE_ITEM_GROUP_PUSH;\n      maps[count - 1] = is_mask ?', '      int is_mask = 0;\n      maps[count - 1] = is_mask ?', MSK),
+    ('mk-plan-chain-placement', 'src', SK, '      maps[count - 1] = is_mask ? item->group.soft_mask_map : item->map;', '      maps[count - 1] = item->map;', MSK),
+    # MK14: the test sink's mask records, once per handle
+    ('mk-ds-record-once', 'src', DS, '  uint64_t id = gshscene_resource_id(mask);\n  for (size_t i = 0; i < run->gradient_count; i++) {\n    if (run->gradients[i] == id) {',
+     '  uint64_t id = gshscene_resource_id(mask);\n  for (size_t i = 0; i < run->gradient_count; i++) {\n    if (0) {', MSK),
+    ('mk-ds-record-remember', 'src', DS, '  run->gradients[run->gradient_count++] = id;\n  const GSHSCENE_Mask * m = &mask->u.mask.m;', '  const GSHSCENE_Mask * m = &mask->u.mask.m;', MSK),
+    ('mk-ds-record-after-group', 'src', DS, '      if (item->group.soft_mask) {\n        GSHSCENE_Result mr = mask_record(run, item->group.soft_mask, &failed);', '      if (item->group.soft_mask && item->group.soft_mask_map.dim == 0) {\n        GSHSCENE_Result mr = mask_record(run, item->group.soft_mask, &failed);', MSK),
+    ('mk-ds-record-picture-hash', 'src', DS, 'id, gshscene_resource_hash(mask), gshscene_resource_hash(m->picture), m->mode, m->coefficients, m->acts_on,', 'id, gshscene_resource_hash(mask), gshscene_resource_hash(mask), m->mode, m->coefficients, m->acts_on,', MSK),
+    ('mk-ds-record-mask-hash', 'src', DS, 'id, gshscene_resource_hash(mask), gshscene_resource_hash(m->picture), m->mode, m->coefficients, m->acts_on,', 'id, gshscene_resource_hash(m->picture), gshscene_resource_hash(m->picture), m->mode, m->coefficients, m->acts_on,', MSK),
+    ('mk-ds-record-mode', 'src', DS, 'gshscene_resource_hash(m->picture), m->mode, m->coefficients, m->acts_on,', 'gshscene_resource_hash(m->picture), m->coefficients, m->mode, m->acts_on,', MSK),
+    ('mk-ds-record-acts', 'src', DS, 'gshscene_resource_hash(m->picture), m->mode, m->coefficients, m->acts_on,', 'gshscene_resource_hash(m->picture), m->mode, m->coefficients, m->mode,', MSK),
+    ('mk-ds-record-rspace', 'src', DS, '(unsigned)m->render_space.primaries, (unsigned)m->render_space.transfer, gshgeom_f64_bits(m->render_space.gamma),\n      (unsigned)m->space.primaries,',
+     '(unsigned)m->space.primaries, (unsigned)m->space.transfer, gshgeom_f64_bits(m->space.gamma),\n      (unsigned)m->space.primaries,', MSK),
+    ('mk-ds-record-backdrop', 'src', DS, 'gshgeom_f64_bits(m->backdrop[0]), gshgeom_f64_bits(m->backdrop[1]), gshgeom_f64_bits(m->backdrop[2]),\n      (unsigned)m->backdrop_space.primaries',
+     'gshgeom_f64_bits(m->backdrop[1]), gshgeom_f64_bits(m->backdrop[0]), gshgeom_f64_bits(m->backdrop[2]),\n      (unsigned)m->backdrop_space.primaries', MSK),
+    ('mk-ds-record-transfer', 'src', DS, '      t->kind, gshgeom_f64_bits(t->c0), gshgeom_f64_bits(t->c1), gshgeom_f64_bits(t->n), (uint64_t)t->sample_count,', '      t->kind, gshgeom_f64_bits(t->c1), gshgeom_f64_bits(t->c0), gshgeom_f64_bits(t->n), (uint64_t)t->sample_count,', MSK),
+    ('mk-ds-record-samples', 'src', DS, '  for (size_t i = 0; i < t->sample_count; i++) {\n    snprintf(run->line, LINE_BYTES, "s %016" PRIx64 "\\n", gshgeom_f64_bits(t->samples[i]));\n    emit_text(run, run->line, failed);\n  }\n', '', MSK),
+    ('mk-ds-record-pieces', 'src', DS, '  for (size_t i = 0; i < t->piece_count; i++) {\n    const GSHSCENE_Transfer_Piece * p = &t->pieces[i];\n    snprintf(run->line, LINE_BYTES,\n        "p lo=',
+     '  for (size_t i = 0; i + 1 < t->piece_count; i++) {\n    const GSHSCENE_Transfer_Piece * p = &t->pieces[i];\n    snprintf(run->line, LINE_BYTES,\n        "p lo=', MSK),
+    ('mk-ds-record-maskmap', 'src', DS, 'gshgeom_map_hash(&item->group.soft_mask_map));\n        }', 'gshgeom_map_hash(&item->map));\n        }', MSK),
+    ('mk-ds-record-maskmap-line', 'src', DS, '          size_t at = strlen(run->line) - 1;\n          snprintf(run->line + at, LINE_BYTES - at, " maskmap=', '          size_t at = strlen(run->line);\n          snprintf(run->line + at, LINE_BYTES - at, " maskmap=', MSK),
+    ('mk-ds-need', 'src', DS, '    if (item->kind == GSHSCENE_ITEM_GROUP_PUSH && item->group.soft_mask) {\n      *fills = gshscene_sat_add(*fills, 1); /* its mask\'s record, once per render, by id */\n    }\n', '', MSK),
+    ('mk-ds-caps-flag', 'src', DS, '  caps->flags |= GSHSCENE_CAP_GROUP_SOFT_MASK;\n  caps->mask_native = GSHSCENE_MASK_NATIVE_ALL;', '  caps->mask_native = GSHSCENE_MASK_NATIVE_ALL;', MSK),
+    ('mk-ds-caps-native', 'src', DS, '  caps->flags |= GSHSCENE_CAP_GROUP_SOFT_MASK;\n  caps->mask_native = GSHSCENE_MASK_NATIVE_ALL;', '  caps->flags |= GSHSCENE_CAP_GROUP_SOFT_MASK;\n  caps->mask_native = GSHSCENE_MASK_NATIVE_ALPHA;', MSK),
+    ('mk-ds-caps-valid', 'src', DS, ' && !(caps->mask_native & ~GSHSCENE_MASK_NATIVE_ALL) &&', ' &&', MSK),
 ]
 
 
