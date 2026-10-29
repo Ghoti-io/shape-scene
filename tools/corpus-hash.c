@@ -1955,7 +1955,24 @@ static void image_section(void) {
     if (gimg_raster_copy(raster, &near) != GIMG_OK) {
       fail("image near");
     }
-    *(unsigned char *)gimg_raster_pixels(near) ^= 1u;
+    {
+      /* The least significant bit of the first sample, whatever the host's byte order puts where (flipping the first
+       * byte is the sample's top byte on a big-endian host, a different image there). */
+      unsigned char * first = (unsigned char *)gimg_raster_pixels(near);
+      if (bits <= 8) {
+        *first ^= 1u;
+      } else if (bits <= 16) {
+        uint16_t sample;
+        memcpy(&sample, first, sizeof sample);
+        sample ^= 1u;
+        memcpy(first, &sample, sizeof sample);
+      } else {
+        uint32_t sample;
+        memcpy(&sample, first, sizeof sample);
+        sample ^= 1u;
+        memcpy(first, &sample, sizeof sample);
+      }
+    }
     const GSHSCENE_Resource * other = NULL;
     check(gshscene_store_intern_image_take(store, near, &params, &other), "take near");
     if (other == image) {

@@ -695,6 +695,27 @@ TEST(ImagePaint, ThePaintHoldsItsImageUntilItsLastRelease) {
   EXPECT_EQ(gshscene_resource_refcount(f.color.get()), before);
 }
 
+TEST(ImageDecode, OnlyAnImageResourceIsDecodedWhateverElseTheStoreHolds) {
+  // The texel bounds are read from the resource's own union, so a resource of another kind whose bytes happen to be a
+  // small width and height must still be refused by its kind, not by luck.
+  Fixture f;
+  double out[4] = {-1.0, -1.0, -1.0, -1.0};
+  Ref paint;
+  ASSERT_EQ(intern_paint(f.store.store, paint_of(f.color.get()), &paint), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_image_decode(paint.get(), 0, 0, out), GSHSCENE_ERR_INVALID) << "an image paint";
+  const GSHSCENE_Resource * plane = nullptr;
+  ASSERT_EQ(gshscene_store_intern_plane(f.store.store, &plane), GSHSCENE_OK);
+  Ref plane_ref(plane);
+  EXPECT_EQ(gshscene_image_decode(plane, 0, 0, out), GSHSCENE_ERR_INVALID) << "the plane";
+  const GSHSCENE_Color entry[1] = {{{1, 0, 0, 1}, {}}};
+  const GSHSCENE_Resource * palette = nullptr;
+  ASSERT_EQ(gshscene_store_intern_palette(f.store.store, 1, entry, &palette), GSHSCENE_OK);
+  Ref palette_ref(palette);
+  EXPECT_EQ(gshscene_image_decode(palette, 0, 0, out), GSHSCENE_ERR_INVALID) << "a palette";
+  EXPECT_EQ(out[0], -1.0);
+  EXPECT_EQ(out[3], -1.0);
+}
+
 TEST(ImagePaint, AGradientStopIsNeverAnImagePaint) {
   Fixture f;
   Ref paint;

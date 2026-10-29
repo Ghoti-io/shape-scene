@@ -81,7 +81,7 @@ EXTRA = {
 }
 TESTS_EXTRA = ["testBytes", "testCore", "testStore", "testScene_limits", "testOrder", "testList", "testColor", "testDump",
                "testComposite", "testPaint_scene", "testEmit", "testPalette", "testGradient", "testColor_bound",
-               "testGroup_fields", "testStroke", "testPlane", "testPlaceholder"]
+               "testGroup_fields", "testStroke", "testPlane", "testPlaceholder", "testImage_paint"]
 TESTS_BY_FILE = {
     "src/paint/color_space.c": ["testColor", "testColor_bound", "testList", "testNode", "testPaint_scene", "testScene_dump", "testPlane"],
     "src/scene/node.c": ["testNode", "testEdit", "testScene", "testScene_dump", "testVersion", "testPaint_scene", "testOrder", "testEmit", "testPalette", "testGradient", "testGroup_fields", "testStroke", "testPlane", "testPlaceholder"],
@@ -108,6 +108,13 @@ SINK_FILES = {
 }
 SINK_TESTS = ["testDump_sink", "testSink", "testReport", "testGlyph", "testPalette", "testGradient", "testGroup_fields",
               "testStroke", "testPlane", "testPlaceholder", "fuzz-render", "probe"]
+
+# The image paint's tests (testImage_paint) see the image arms of list.c, diff.c, gradient.c, stroke.c, sink.c and dump_sink.c,
+# which no other test reaches; a candidate on those lines was a survivor only because this test was not asked.
+for _tests in TESTS_BY_FILE.values():
+    if "testImage_paint" not in _tests:
+        _tests.append("testImage_paint")
+SINK_TESTS.append("testImage_paint")
 
 REL = [("==", "!="), ("!=", "=="), ("<=", "<"), (">=", ">"), ("<", "<="), (">", ">=")]
 
