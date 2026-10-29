@@ -74,6 +74,9 @@ TEST(NodeInit, EveryKindStartsAtTheDocumentedDefaults) {
     EXPECT_EQ(n.clip_rule, GSHGEOM_FILL_NONZERO);
     EXPECT_EQ(gshgeom_map_hash(&n.map), identity_hash());
     EXPECT_EQ(gshgeom_map_hash(&n.clip_map), identity_hash());
+    EXPECT_EQ(gshgeom_map_hash(&n.soft_mask_map), identity_hash()) << "MK13: a node's mask placement starts as the identity";
+    EXPECT_EQ(n.soft_mask_map.dim, 2);
+    EXPECT_EQ(n.soft_mask, nullptr);
     EXPECT_EQ(n.map.dim, 2);
     EXPECT_EQ(n.paint.kind, GSHSCENE_PAINT_SOLID);
     EXPECT_EQ(n.paint.rgba[0], 0.0);

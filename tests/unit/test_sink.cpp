@@ -798,6 +798,42 @@ TEST(Sink, TheExpansionWalk) {
   EXPECT_EQ(gshscene_expansion_next(&walk, &item, &chain, &count), 0) << "a finished walk stays finished";
 }
 
+// MK9: the walk every sink makes (the progress units, the order of a render) does not enter a mask's picture, and a walk never
+// takes the flag that says otherwise from what the memory held: only the planning pass enters masks.
+TEST(Sink, TheExpansionWalkDoesNotEnterAMasksPictureUnlessThePlanAsks) {
+  Scene s;
+  GSHSCENE_Paint white = solid(1, 1, 1);
+  GSHSCENE_List * pl = s.open();
+  gshscene_list_fill(pl, s.sq(0, 0, 8), nullptr, GSHGEOM_FILL_NONZERO, &white, 0, 0.0);
+  gshscene_list_fill(pl, s.sq(1, 1, 8), nullptr, GSHGEOM_FILL_NONZERO, &white, 1, 0.0);
+  const GSHSCENE_Resource * picture = sinkconf::picture_of(s, pl);
+  GSHSCENE_List * l = sinkconf::masked_list(s, sinkconf::make_mask(s, picture));  // items: fill, group push, fill, group pop
+  size_t bytes = gshscene_expansion_bytes(l);
+  std::vector<unsigned char> memory(bytes);
+  GSHSCENE_Expansion walk;
+  std::memset(&walk, 0xFF, sizeof walk);
+  ASSERT_EQ(gshscene_expansion_init(&walk, l, memory.data(), bytes), GSHSCENE_OK);
+  EXPECT_EQ(walk.masks, 0);
+  const GSHSCENE_Item * item;
+  const size_t * chain;
+  size_t count;
+  size_t units = 0;
+  while (gshscene_expansion_next(&walk, &item, &chain, &count)) {
+    EXPECT_EQ(count, 1u) << "no unit of the mask's picture";
+    units++;
+  }
+  EXPECT_EQ(units, gshscene_list_expansion(l));
+  // The planning pass asks: the picture's two fills follow the group's push, one level down.
+  std::memset(&walk, 0xFF, sizeof walk);
+  ASSERT_EQ(gshscene_expansion_init(&walk, l, memory.data(), bytes), GSHSCENE_OK);
+  walk.masks = 1;
+  std::vector<size_t> depths;
+  while (gshscene_expansion_next(&walk, &item, &chain, &count)) {
+    depths.push_back(count);
+  }
+  EXPECT_EQ(depths, (std::vector<size_t>{1, 1, 2, 2, 1, 1}));
+}
+
 // The busy guard is per surface: two surfaces in flight on one sink are fine; the slot is given back at completion.
 TEST(Sink, TheBusyGuardIsPerSurface) {
   GSHSCENE_Limits limits{};

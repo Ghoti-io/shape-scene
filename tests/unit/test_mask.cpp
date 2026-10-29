@@ -29,10 +29,13 @@
 #include "scene_fixtures.h"
 
 #include "../known_answers.h"
+#include "../alloc_tracker.h"
 
 #include <cmath>
 #include <cstring>
+#include <functional>
 #include <limits>
+#include <utility>
 #include <vector>
 
 using namespace scene;
@@ -63,6 +66,7 @@ const GSHSCENE_Resource * fixture_picture(GSHSCENE_Store * store, const GSHSCENE
 /** A store with the fixture picture. */
 struct World {
   StoreHolder s;
+  explicit World(GSHSCENE_Index_Hash_Fn index_hash = nullptr) : s(nullptr, nullptr, index_hash) {}
   Ref sq{intern_square(s.store)};
   Ref p2{intern_fixture(s.store)};
   Ref pic{fixture_picture(s.store, sq.get(), p2.get())};
@@ -354,6 +358,321 @@ TEST(Mask, NegativeZeroIsSpelledAsPositiveZero) {
   gshscene_resource_release(b);
 }
 
+namespace {
+
+/** A mask with the arrays its transfer points at, copyable: a change is made to the copy and bound again. */
+struct Owned {
+  GSHSCENE_Mask m{};
+  std::vector<double> samples;
+  std::vector<GSHSCENE_Transfer_Piece> pieces;
+  std::vector<std::vector<double>> piece_samples;
+  Owned() = default;
+  Owned(const Owned & o) : m(o.m), samples(o.samples), pieces(o.pieces), piece_samples(o.piece_samples) { bind(); }
+  Owned & operator=(const Owned & o) {
+    m = o.m;
+    samples = o.samples;
+    pieces = o.pieces;
+    piece_samples = o.piece_samples;
+    bind();
+    return *this;
+  }
+  void bind() {
+    m.transfer.sample_count = samples.size();
+    m.transfer.samples = samples.empty() ? nullptr : samples.data();
+    m.transfer.piece_count = pieces.size();
+    m.transfer.pieces = pieces.empty() ? nullptr : pieces.data();
+    piece_samples.resize(pieces.size());
+    for (size_t i = 0; i < pieces.size(); i++) {
+      pieces[i].sample_count = piece_samples[i].size();
+      pieces[i].samples = piece_samples[i].empty() ? nullptr : piece_samples[i].data();
+    }
+  }
+};
+
+typedef std::pair<const char *, std::function<void(Owned &)>> Change;
+
+/** @p base is one handle however it is spelled, and each change (one field) is another handle, whatever the hash says. */
+void expect_each_change_is_another_mask(World & w, const Owned & base, const std::vector<Change> & changes) {
+  const GSHSCENE_Resource * a = nullptr;
+  ASSERT_EQ(w.intern(base.m, &a), GSHSCENE_OK);
+  Ref hold(a);
+  Owned same = base;  // the same content from other memory
+  const GSHSCENE_Resource * again = nullptr;
+  ASSERT_EQ(w.intern(same.m, &again), GSHSCENE_OK);
+  Ref hold_again(again);
+  EXPECT_EQ(again, a) << "equal content is one handle even when every hash collides";
+  std::vector<Ref> held;
+  std::vector<const GSHSCENE_Resource *> seen = {a};
+  for (const Change & c : changes) {
+    Owned v = base;
+    c.second(v);
+    v.bind();
+    const GSHSCENE_Resource * r = nullptr;
+    ASSERT_EQ(w.intern(v.m, &r), GSHSCENE_OK) << c.first;
+    held.emplace_back(r);
+    for (const GSHSCENE_Resource * earlier : seen) {
+      EXPECT_NE(r, earlier) << c.first;
+    }
+    seen.push_back(r);
+  }
+}
+
+}  // namespace
+
+// MK1: a hash never decides equality.  With every handle's index forced to the same value the store compares content alone, so
+// each field of the content (and each field of the transfer, its pieces and their leaves) must be compared on its own.
+TEST(Mask, EqualityIsDecidedFieldByFieldWhenEveryIndexCollides) {
+  World w(all_zero);
+  Ref second_square(intern_square(w.s.store, 7.0));
+  GSHSCENE_List * l = nullptr;
+  ASSERT_EQ(gshscene_list_create(nullptr, nullptr, w.s.store, &l), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(l, second_square.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  const GSHSCENE_Resource * raw_picture = nullptr;
+  ASSERT_EQ(gshscene_store_intern_picture(w.s.store, l, &raw_picture), GSHSCENE_OK);
+  gshscene_list_destroy(l);
+  Ref second_picture(raw_picture);
+  // The fields every mask has, and a table.
+  Owned a;
+  a.m = w.luminance();
+  a.m.coefficients = GSHSCENE_MASK_COEFF_LUM;
+  a.m.space = linear_srgb_space();
+  a.m.render_space = srgb_space();
+  a.m.backdrop[0] = 0.25;
+  a.m.backdrop[1] = 0.5;
+  a.m.backdrop[2] = 0.75;
+  a.m.backdrop_space = srgb_space();
+  a.m.transfer.kind = GSHSCENE_TRANSFER_TABLE;
+  a.samples = {0.0, 0.5, 1.0};
+  a.bind();
+  expect_each_change_is_another_mask(w, a, {
+      {"the picture", [&](Owned & v) { v.m.picture = second_picture.get(); }},
+      {"the mode", [](Owned & v) {
+         v.m.mode = GSHSCENE_MASK_ALPHA;
+         v.m.coefficients = 0;
+         v.m.space = GSHSCENE_Color_Space{};
+         v.m.backdrop[0] = v.m.backdrop[1] = v.m.backdrop[2] = 0.0;
+         v.m.backdrop_space = GSHSCENE_Color_Space{};
+       }},
+      {"the coefficients", [](Owned & v) { v.m.coefficients = GSHSCENE_MASK_COEFF_SPACE_Y; }},
+      {"acts_on", [](Owned & v) { v.m.acts_on = GSHSCENE_MASK_ACTS_ON_SHAPE; }},
+      {"the luminance space", [](Owned & v) { v.m.space = srgb_space(); }},
+      {"the render space", [](Owned & v) { v.m.render_space = linear_srgb_space(); }},
+      {"the backdrop's space", [](Owned & v) { v.m.backdrop_space = linear_srgb_space(); }},
+      {"backdrop red", [](Owned & v) { v.m.backdrop[0] = 0.125; }},
+      {"backdrop green", [](Owned & v) { v.m.backdrop[1] = 0.125; }},
+      {"backdrop blue", [](Owned & v) { v.m.backdrop[2] = 0.125; }},
+      {"the transfer kind (identity)", [](Owned & v) {
+         v.m.transfer.kind = GSHSCENE_TRANSFER_IDENTITY;
+         v.samples.clear();
+       }},
+      {"the transfer kind (exponential)", [](Owned & v) {
+         v.m.transfer.kind = GSHSCENE_TRANSFER_EXPONENTIAL;
+         v.m.transfer.c1 = 0.5;
+         v.m.transfer.n = 0.5;
+         v.samples.clear();
+       }},
+      {"a sample added", [](Owned & v) { v.samples.push_back(1.0); }},
+      {"a sample removed", [](Owned & v) { v.samples.pop_back(); }},
+      {"the first sample", [](Owned & v) { v.samples[0] = 0.125; }},
+      {"the middle sample", [](Owned & v) { v.samples[1] = 0.625; }},
+      {"the last sample", [](Owned & v) { v.samples[2] = 0.875; }},
+  });
+  // Pairs that differ in one field only, with nothing else to tell them apart: the mode (an alpha mask has no color to differ
+  // in), the transfer's kind (an identity and an exponential of all zeros) and a leaf's kind.
+  Owned plain;
+  plain.m = w.alpha();
+  plain.bind();
+  expect_each_change_is_another_mask(w, plain, {
+      {"the mode alone", [](Owned & v) { v.m.mode = GSHSCENE_MASK_LUMINANCE; }},
+      {"the transfer's kind alone", [](Owned & v) { v.m.transfer.kind = GSHSCENE_TRANSFER_EXPONENTIAL; }},
+  });
+  Owned one_piece;
+  one_piece.m = w.alpha();
+  one_piece.m.transfer.kind = GSHSCENE_TRANSFER_STITCHING;
+  one_piece.pieces = {piece(0.0, 1.0, 0.0, 1.0)};
+  one_piece.bind();
+  expect_each_change_is_another_mask(w, one_piece, {
+      {"a leaf's kind alone", [](Owned & v) { v.pieces[0].leaf_kind = GSHSCENE_TRANSFER_EXPONENTIAL; }},
+      {"a piece's count of samples", [](Owned & v) {
+         v.pieces[0].leaf_kind = GSHSCENE_TRANSFER_TABLE;
+         v.piece_samples[0] = {0.0, 1.0};
+       }},
+  });
+  // An exponential.
+  Owned b;
+  b.m = w.alpha();
+  b.m.transfer.kind = GSHSCENE_TRANSFER_EXPONENTIAL;
+  b.m.transfer.c0 = 0.125;
+  b.m.transfer.c1 = 0.875;
+  b.m.transfer.n = 2.0;
+  b.bind();
+  expect_each_change_is_another_mask(w, b, {
+      {"c0", [](Owned & v) { v.m.transfer.c0 = 0.25; }},
+      {"c1", [](Owned & v) { v.m.transfer.c1 = 0.75; }},
+      {"the exponent", [](Owned & v) { v.m.transfer.n = 3.0; }},
+  });
+  // A stitching of two pieces: an exponential and a table.
+  Owned c;
+  c.m = w.alpha();
+  c.m.transfer.kind = GSHSCENE_TRANSFER_STITCHING;
+  GSHSCENE_Transfer_Piece first = piece(0.0, 0.5, 0.25, 0.75);
+  first.leaf_kind = GSHSCENE_TRANSFER_EXPONENTIAL;
+  first.c0 = 0.125;
+  first.c1 = 0.875;
+  first.n = 2.0;
+  GSHSCENE_Transfer_Piece last = piece(0.5, 1.0, 0.0, 1.0);
+  last.leaf_kind = GSHSCENE_TRANSFER_TABLE;
+  c.pieces = {first, last};
+  c.piece_samples = {{}, {0.25, 0.5, 1.0}};
+  c.bind();
+  expect_each_change_is_another_mask(w, c, {
+      {"a piece added", [](Owned & v) {
+         v.pieces[1].hi = 0.75;
+         GSHSCENE_Transfer_Piece extra = piece(0.75, 1.0, 0.0, 1.0);
+         v.pieces.push_back(extra);
+         v.piece_samples.push_back({});
+       }},
+      {"a bound between pieces", [](Owned & v) {
+         v.pieces[0].hi = 0.25;
+         v.pieces[1].lo = 0.25;
+       }},
+      {"the first piece's first encode", [](Owned & v) { v.pieces[0].e0 = 0.5; }},
+      {"the first piece's last encode", [](Owned & v) { v.pieces[0].e1 = 1.0; }},
+      {"the last piece's first encode", [](Owned & v) { v.pieces[1].e0 = 0.125; }},
+      {"the last piece's last encode", [](Owned & v) { v.pieces[1].e1 = 0.875; }},
+      {"the first piece's leaf kind", [](Owned & v) {
+         v.pieces[0].leaf_kind = GSHSCENE_TRANSFER_IDENTITY;
+         v.pieces[0].c0 = v.pieces[0].c1 = v.pieces[0].n = 0.0;
+       }},
+      {"the last piece's leaf kind", [](Owned & v) {
+         v.pieces[1].leaf_kind = GSHSCENE_TRANSFER_EXPONENTIAL;
+         v.pieces[1].c1 = 1.0;
+         v.pieces[1].n = 1.0;
+         v.piece_samples[1].clear();
+       }},
+      {"a leaf's c0", [](Owned & v) { v.pieces[0].c0 = 0.25; }},
+      {"a leaf's c1", [](Owned & v) { v.pieces[0].c1 = 0.75; }},
+      {"a leaf's exponent", [](Owned & v) { v.pieces[0].n = 3.0; }},
+      {"a leaf's sample added", [](Owned & v) { v.piece_samples[1].push_back(1.0); }},
+      {"a leaf's first sample", [](Owned & v) { v.piece_samples[1][0] = 0.125; }},
+      {"a leaf's middle sample", [](Owned & v) { v.piece_samples[1][1] = 0.625; }},
+      {"a leaf's last sample", [](Owned & v) { v.piece_samples[1][2] = 0.875; }},
+  });
+}
+
+// MK1, MK13: minus zero is spelled plus zero, wherever it stands and whichever spelling is interned first: what is stored has
+// no sign on a zero, and the two spellings are one handle.
+TEST(Mask, EveryNegativeZeroIsStoredAsPositiveZeroWhicheverSpellingComesFirst) {
+  for (int negative_first = 1; negative_first >= 0; negative_first--) {
+    World w;
+    const double nz = -0.0;
+    auto spelled = [&](bool negative) {
+      const double z = negative ? nz : 0.0;
+      std::vector<Owned> masks(4);
+      masks[0].m = w.luminance();
+      masks[0].m.backdrop[0] = masks[0].m.backdrop[1] = masks[0].m.backdrop[2] = z;
+      masks[1].m = w.alpha();
+      masks[1].m.transfer.kind = GSHSCENE_TRANSFER_EXPONENTIAL;
+      masks[1].m.transfer.c0 = z;
+      masks[1].m.transfer.c1 = z;
+      masks[1].m.transfer.n = z;
+      masks[2].m = w.alpha();
+      masks[2].m.transfer.kind = GSHSCENE_TRANSFER_TABLE;
+      masks[2].samples = {z, z, 1.0};
+      masks[3].m = w.alpha();
+      masks[3].m.transfer.kind = GSHSCENE_TRANSFER_STITCHING;
+      GSHSCENE_Transfer_Piece p0 = piece(z, 0.5, z, z);
+      p0.leaf_kind = GSHSCENE_TRANSFER_EXPONENTIAL;
+      p0.c0 = z;
+      p0.c1 = z;
+      p0.n = z;
+      GSHSCENE_Transfer_Piece p1 = piece(0.5, 1.0, 1.0, z);
+      p1.leaf_kind = GSHSCENE_TRANSFER_TABLE;
+      masks[3].pieces = {p0, p1};
+      masks[3].piece_samples = {{}, {z, z}};
+      for (Owned & o : masks) {
+        o.bind();
+      }
+      return masks;
+    };
+    std::vector<Owned> first = spelled(negative_first != 0), second = spelled(negative_first == 0);
+    std::vector<Ref> held;
+    for (size_t i = 0; i < first.size(); i++) {
+      const GSHSCENE_Resource * a = nullptr;
+      const GSHSCENE_Resource * b = nullptr;
+      ASSERT_EQ(w.intern(first[i].m, &a), GSHSCENE_OK);
+      ASSERT_EQ(w.intern(second[i].m, &b), GSHSCENE_OK);
+      held.emplace_back(a);
+      held.emplace_back(b);
+      EXPECT_EQ(a, b) << "mask " << i << ", the negative spelling " << (negative_first ? "first" : "second");
+      GSHSCENE_Mask read;
+      ASSERT_EQ(gshscene_resource_mask(a, &read), GSHSCENE_OK);
+      for (int k = 0; k < 3; k++) {
+        EXPECT_EQ(bits(read.backdrop[k]), 0u);
+      }
+      if (i == 1) {
+        EXPECT_EQ(bits(read.transfer.c0), 0u);
+        EXPECT_EQ(bits(read.transfer.c1), 0u);
+        EXPECT_EQ(bits(read.transfer.n), 0u);
+      }
+      if (i == 2) {
+        EXPECT_EQ(bits(read.transfer.samples[0]), 0u);
+        EXPECT_EQ(bits(read.transfer.samples[1]), 0u);
+      }
+      if (i == 3) {
+        const GSHSCENE_Transfer_Piece & p = read.transfer.pieces[0];
+        const GSHSCENE_Transfer_Piece & q = read.transfer.pieces[1];
+        EXPECT_EQ(bits(p.lo), 0u);
+        EXPECT_EQ(bits(p.e0), 0u);
+        EXPECT_EQ(bits(p.e1), 0u);
+        EXPECT_EQ(bits(p.c0), 0u);
+        EXPECT_EQ(bits(p.c1), 0u);
+        EXPECT_EQ(bits(p.n), 0u);
+        EXPECT_EQ(bits(q.e1), 0u);
+        EXPECT_EQ(bits(q.samples[0]), 0u);
+        EXPECT_EQ(bits(q.samples[1]), 0u);
+      }
+    }
+  }
+}
+
+// MK1: what a mask allocates for its transfer (the pieces, the samples) is freed with its last release, whichever of them it has.
+TEST(Mask, TheLastReleaseFreesTheTransfersArrays) {
+  tracker::Tracker t;
+  GSHSCENE_Allocator alloc = tracker::allocator_for(&t);
+  StoreHolder s(nullptr, &alloc);
+  Ref sq(intern_square(s.store));
+  Ref p2(intern_fixture(s.store));
+  Ref pic(fixture_picture(s.store, sq.get(), p2.get()));
+  size_t before = t.live.size();
+  static const double samples[3] = {0.0, 0.5, 1.0};
+  GSHSCENE_Mask base{};
+  base.picture = pic.get();
+  base.mode = GSHSCENE_MASK_ALPHA;
+  GSHSCENE_Mask tabled = base;
+  tabled.transfer.kind = GSHSCENE_TRANSFER_TABLE;
+  tabled.transfer.sample_count = 3;
+  tabled.transfer.samples = samples;
+  GSHSCENE_Transfer_Piece leaf_table = piece(0.0, 0.5, 0.0, 1.0);
+  leaf_table.leaf_kind = GSHSCENE_TRANSFER_TABLE;
+  leaf_table.sample_count = 3;
+  leaf_table.samples = samples;
+  GSHSCENE_Transfer_Piece pieces[2] = {leaf_table, piece(0.5, 1.0, 0.0, 1.0)};
+  GSHSCENE_Mask stitched = base;
+  stitched.transfer.kind = GSHSCENE_TRANSFER_STITCHING;
+  stitched.transfer.piece_count = 2;
+  stitched.transfer.pieces = pieces;
+  GSHSCENE_Mask identity = base;
+  for (const GSHSCENE_Mask * m : {&tabled, &stitched, &identity}) {
+    const GSHSCENE_Resource * r = nullptr;
+    ASSERT_EQ(gshscene_store_intern_mask(s.store, m, &r), GSHSCENE_OK);
+    EXPECT_GT(t.live.size(), before);
+    gshscene_resource_release(r);
+    EXPECT_EQ(t.live.size(), before) << "the mask, its arrays and its hold on the picture are gone";
+  }
+}
+
 TEST(Mask, ReadBackIsTheContentAndTheMaskHoldsItsPicture) {
   World w;
   size_t before = gshscene_resource_refcount(w.pic.get());
@@ -436,6 +755,33 @@ TEST(Mask, EveryInvalidFieldIsRefused) {
   bad("identity with a stray exponent", [](GSHSCENE_Mask & m) { m.transfer.n = 1.0; });
   bad("identity with a stray constant", [](GSHSCENE_Mask & m) { m.transfer.c0 = 0.5; });
   bad("identity with a sample count", [](GSHSCENE_Mask & m) { m.transfer.sample_count = 2; });
+  static const double stray_samples[2] = {0.0, 1.0};
+  bad("a backdrop (red) in alpha mode", [](GSHSCENE_Mask & m) { m.backdrop[0] = 0.5; });
+  bad("a backdrop (blue) in alpha mode", [](GSHSCENE_Mask & m) { m.backdrop[2] = 0.5; });
+  bad("identity with a stray upper constant", [](GSHSCENE_Mask & m) { m.transfer.c1 = 0.5; });
+  bad("identity with a samples array and no count", [](GSHSCENE_Mask & m) { m.transfer.samples = stray_samples; });
+  bad("an exponential with a samples array and no count", [](GSHSCENE_Mask & m) {
+    m.transfer.kind = GSHSCENE_TRANSFER_EXPONENTIAL;
+    m.transfer.n = 1.0;
+    m.transfer.samples = stray_samples;
+  });
+  bad("an exponential with a sample count and no array", [](GSHSCENE_Mask & m) {
+    m.transfer.kind = GSHSCENE_TRANSFER_EXPONENTIAL;
+    m.transfer.n = 1.0;
+    m.transfer.sample_count = 2;
+  });
+  bad("a table with a stray constant", [](GSHSCENE_Mask & m) {
+    m.transfer.kind = GSHSCENE_TRANSFER_TABLE;
+    m.transfer.sample_count = 2;
+    m.transfer.samples = stray_samples;
+    m.transfer.c0 = 0.5;
+  });
+  bad("a table with a stray upper constant", [](GSHSCENE_Mask & m) {
+    m.transfer.kind = GSHSCENE_TRANSFER_TABLE;
+    m.transfer.sample_count = 2;
+    m.transfer.samples = stray_samples;
+    m.transfer.c1 = 0.5;
+  });
   for (const Case & c : cases) {
     const GSHSCENE_Resource * r = nullptr;
     EXPECT_EQ(gshscene_store_intern_mask(w.s.store, &c.m, &r), GSHSCENE_ERR_INVALID) << c.what;
@@ -775,6 +1121,12 @@ TEST(MaskTransfer, IdentityClampsItsInputAndANaNIsZero) {
   EXPECT_EQ(transfer_at(w, id, -kInf), 0.0);
   EXPECT_EQ(transfer_at(w, id, kInf), 1.0);
   EXPECT_EQ(transfer_at(w, id, kNaN), 0.0);
+  EXPECT_EQ(bits(transfer_at(w, id, -0.0)), 0u) << "minus zero clamps to plus zero";
+  // A transfer that is not in a mask is evaluated as it stands: a stitching with no pieces has nothing to select.
+  GSHSCENE_Transfer empty_stitching{};
+  empty_stitching.kind = GSHSCENE_TRANSFER_STITCHING;
+  EXPECT_EQ(gshscene_transfer_eval(&empty_stitching, 0.25), 0.25);
+  EXPECT_EQ(gshscene_transfer_eval(nullptr, 7.0), 1.0) << "no transfer is the identity, clamped";
   EXPECT_EQ(gshscene_mask_transfer(nullptr, 0.5), 0.0) << "no mask, no value";
   EXPECT_EQ(gshscene_mask_transfer(w.pic.get(), 0.5), 0.0) << "not a mask";
 }
@@ -1069,6 +1421,16 @@ TEST(MaskRequired, EachFeatureIsItsOwnBit) {
   m = w.luminance();
   m.backdrop[1] = 0.5;
   EXPECT_EQ(required(m), (uint32_t)(GSHSCENE_MASK_NATIVE_LUMINANCE | GSHSCENE_MASK_NATIVE_COEFF_W3C | GSHSCENE_MASK_NATIVE_BACKDROP));
+  for (int component = 0; component < 3; component++) {
+    m = w.luminance();
+    m.backdrop[component] = 0.5;
+    EXPECT_EQ(required(m), (uint32_t)(GSHSCENE_MASK_NATIVE_LUMINANCE | GSHSCENE_MASK_NATIVE_COEFF_W3C | GSHSCENE_MASK_NATIVE_BACKDROP))
+        << "a backdrop with only component " << component << " lit";
+  }
+  m = w.luminance();
+  m.backdrop_space = linear_srgb_space();
+  EXPECT_EQ(required(m), (uint32_t)(GSHSCENE_MASK_NATIVE_LUMINANCE | GSHSCENE_MASK_NATIVE_COEFF_W3C | GSHSCENE_MASK_NATIVE_SPACES))
+      << "a backdrop space alone";
   m = w.luminance();
   m.space = linear_srgb_space();
   EXPECT_EQ(required(m), (uint32_t)(GSHSCENE_MASK_NATIVE_LUMINANCE | GSHSCENE_MASK_NATIVE_COEFF_W3C | GSHSCENE_MASK_NATIVE_SPACES));
@@ -1093,6 +1455,23 @@ TEST(MaskRequired, EachFeatureIsItsOwnBit) {
   EXPECT_EQ(gshscene_mask_required(full.get()),
       (uint32_t)(GSHSCENE_MASK_NATIVE_LUMINANCE | GSHSCENE_MASK_NATIVE_COEFF_W3C | GSHSCENE_MASK_NATIVE_BACKDROP |
           GSHSCENE_MASK_NATIVE_TRANSFER_EXPONENTIAL | GSHSCENE_MASK_NATIVE_SPACES | GSHSCENE_MASK_NATIVE_ACTS_ON_SHAPE));
+}
+
+// MK9: the bits a sink states its features in are pinned.
+TEST(MaskRequired, TheFeatureBitsArePinned) {
+  EXPECT_EQ(GSHSCENE_MASK_NATIVE_ALPHA, 1u << 0);
+  EXPECT_EQ(GSHSCENE_MASK_NATIVE_LUMINANCE, 1u << 1);
+  EXPECT_EQ(GSHSCENE_MASK_NATIVE_BACKDROP, 1u << 2);
+  EXPECT_EQ(GSHSCENE_MASK_NATIVE_TRANSFER_EXPONENTIAL, 1u << 3);
+  EXPECT_EQ(GSHSCENE_MASK_NATIVE_TRANSFER_TABLE, 1u << 4);
+  EXPECT_EQ(GSHSCENE_MASK_NATIVE_TRANSFER_STITCHING, 1u << 5);
+  EXPECT_EQ(GSHSCENE_MASK_NATIVE_COEFF_W3C, 1u << 6);
+  EXPECT_EQ(GSHSCENE_MASK_NATIVE_COEFF_REC709, 1u << 7);
+  EXPECT_EQ(GSHSCENE_MASK_NATIVE_COEFF_LUM, 1u << 8);
+  EXPECT_EQ(GSHSCENE_MASK_NATIVE_COEFF_SPACE_Y, 1u << 9);
+  EXPECT_EQ(GSHSCENE_MASK_NATIVE_SPACES, 1u << 10);
+  EXPECT_EQ(GSHSCENE_MASK_NATIVE_ACTS_ON_SHAPE, 1u << 11);
+  EXPECT_EQ(GSHSCENE_MASK_NATIVE_ALL, (1u << 12) - 1u);
 }
 
 // --- MK12: the picture depth counts a mask exactly as it counts an instance ---------------------------------------------

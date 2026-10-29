@@ -242,6 +242,14 @@ TEST(GroupFields, EqualityHashAndDumpSeeEachField) {
     ASSERT_EQ(gshscene_list_group_push(b.list, &variants[i], 0, 0.0), GSHSCENE_OK);
     EXPECT_FALSE(gshscene_list_equal(a.list, b.list)) << i;
   }
+  // The placement alone: the same mask, placed and not, makes two lists that are not equal (MK13).
+  {
+    ListHolder a(s.store), b(s.store);
+    ASSERT_EQ(gshscene_list_group_push(a.list, &variants[3], 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_group_push(b.list, &placed, 0, 0.0), GSHSCENE_OK);
+    EXPECT_FALSE(gshscene_list_equal(a.list, b.list));
+    EXPECT_NE(gshscene_list_hash(a.list), gshscene_list_hash(b.list));
+  }
   // A zero-filled placement and the explicit identity are one spelling (MK13).
   {
     ListHolder a(s.store), b(s.store);
@@ -370,7 +378,7 @@ TEST(GroupFields, AVersionEmitsTheFieldsAsAGroupPushAndAChangeDamagesTheSubtree)
     EditHolder e(sc, v2.get());
     GSHSCENE_Node_Info info = info_of(v2.get(), gid);
     GSHSCENE_Node g = info.node;
-    g.map = translate(1.0, 2.0);
+    ASSERT_EQ(gshgeom_map_scale(2, 2.0, 2.0, 1.0, &g.map), GSHGEOM_OK);  // maps that do not commute with the placement
     g.soft_mask_map = translate(3.0, 4.0);
     ASSERT_EQ(gshscene_edit_set(e.edit, gid, &g), GSHSCENE_OK);
     publish(sc, e, &v2b);
@@ -378,8 +386,14 @@ TEST(GroupFields, AVersionEmitsTheFieldsAsAGroupPushAndAChangeDamagesTheSubtree)
   ASSERT_EQ(gshscene_version_list(v2b.get(), &list), GSHSCENE_OK);
   ASSERT_EQ(gshscene_list_item(list, 0, &push), GSHSCENE_OK);
   ASSERT_EQ(push->kind, GSHSCENE_ITEM_GROUP_PUSH);
-  GSHGEOM_Map composed = translate(4.0, 6.0);
-  EXPECT_EQ(gshgeom_map_hash(&push->group.soft_mask_map), gshgeom_map_hash(&composed));
+  // The placement is applied first, then the group's map: p -> 2 (p + (3, 4)).
+  const GSHGEOM_Map & composed = push->group.soft_mask_map;
+  EXPECT_EQ(composed.m[0][0], 2.0);
+  EXPECT_EQ(composed.m[1][1], 2.0);
+  EXPECT_EQ(composed.m[0][1], 0.0);
+  EXPECT_EQ(composed.m[1][0], 0.0);
+  EXPECT_EQ(composed.t[0], 6.0);
+  EXPECT_EQ(composed.t[1], 8.0);
   {
     GSHSCENE_Diff * d2 = nullptr;
     ASSERT_EQ(gshscene_diff(v2.get(), v2b.get(), nullptr, nullptr, &d2), GSHSCENE_OK);
@@ -608,6 +622,7 @@ TEST(GroupFields, TheSpacesFeatureIsNeededOnlyWhereASpaceDiffersFromTheEnclosing
   Ref names_srgb(luminance(srgb, srgb, srgb, 1.0));
   Ref names_linear_luminance(luminance(none, linear, none, 0.0));
   Ref black_backdrop_in_linear(luminance(srgb, none, linear, 0.0));
+  Ref render_alone_differs(luminance(linear, srgb, none, 0.0));
   EXPECT_EQ(gshscene_mask_required(all_target.get()) & GSHSCENE_MASK_NATIVE_SPACES, 0u);
   EXPECT_NE(gshscene_mask_required(names_srgb.get()) & GSHSCENE_MASK_NATIVE_SPACES, 0u) << "the resource alone is conservative";
   GSHSCENE_Sink_Caps caps{};
@@ -636,6 +651,9 @@ TEST(GroupFields, TheSpacesFeatureIsNeededOnlyWhereASpaceDiffersFromTheEnclosing
   EXPECT_EQ(d.detail, (uint64_t)GSHSCENE_MASK_NATIVE_SPACES) << "the group's stated space wins over the target's";
   d = decide(names_srgb.get(), none, nullptr);
   EXPECT_EQ(d.detail, (uint64_t)GSHSCENE_MASK_NATIVE_SPACES) << "the enclosing space is not known: conservative";
+  // Only the render space differs (the luminance space is named, so it does not follow it).
+  EXPECT_EQ(decide(render_alone_differs.get(), none, &srgb).detail, (uint64_t)GSHSCENE_MASK_NATIVE_SPACES);
+  EXPECT_EQ(decide(render_alone_differs.get(), none, &linear).detail, (uint64_t)GSHSCENE_MASK_NATIVE_SPACES) << "now the luminance space differs";
   // Only the luminance space differs.
   EXPECT_EQ(decide(names_linear_luminance.get(), none, &srgb).detail, (uint64_t)GSHSCENE_MASK_NATIVE_SPACES);
   EXPECT_EQ(decide(names_linear_luminance.get(), none, &linear).entry_class, 0);

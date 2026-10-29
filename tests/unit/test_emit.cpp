@@ -327,6 +327,38 @@ TEST(Emit, AClippedFadingGroupPutsTheClipOutsideAndItsMapBeforeTheClipsOwn) {
   (void)gi;
 }
 
+TEST(Emit, AMaskPlacementPastTheMapBoundIsErrLimitAtEmissionAndOnlyForAGroupWithAMask) {
+  // MK6: the placement is composed with the group's accumulated map as the clip's is, and the composition fails as the clip's does.
+  SceneHolder s;
+  Ref sq(intern_square(s.store()));
+  GSHSCENE_List * l = nullptr;
+  ASSERT_EQ(gshscene_list_create(nullptr, nullptr, s.store(), &l), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(l, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  const GSHSCENE_Resource * picture = nullptr;
+  ASSERT_EQ(gshscene_store_intern_picture(s.store(), l, &picture), GSHSCENE_OK);
+  gshscene_list_destroy(l);
+  Ref pic(picture);
+  Ref mask(known_mask(s.store(), pic.get(), 0));
+  ASSERT_NE(mask.get(), nullptr);
+  for (int masked = 0; masked < 2; masked++) {
+    EditHolder e(s);
+    GSHSCENE_Node g = group_node();
+    g.map = scale_map(std::ldexp(1.0, 60));
+    if (masked) {
+      g.soft_mask = mask.get();
+      g.soft_mask_map = scale_map(std::ldexp(1.0, 60));  // 2^120 with the group's map: past the 2^100 bound
+    }
+    uint64_t gid = add(e.edit, GSHSCENE_ROOT_ID, g);
+    add(e.edit, gid, shape_node(sq.get()));
+    VersionRef v;
+    publish(s, e, &v);
+    const GSHSCENE_List * list = nullptr;
+    EXPECT_EQ(gshscene_version_list(v.get(), &list), masked ? GSHSCENE_ERR_LIMIT : GSHSCENE_OK) << (masked ? "masked" : "unmasked");
+    EXPECT_EQ(list == nullptr, masked != 0);
+  }
+}
+
 TEST(Emit, AComposedMapPastTheMapBoundIsErrLimitAtEmissionAndNeverTruncated) {
   SceneHolder s;
   Ref sq(intern_square(s.store()));

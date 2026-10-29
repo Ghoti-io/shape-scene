@@ -1650,6 +1650,8 @@ TEST(DumpSink, TheConfigurationIsValidated) {
       [](GSHSCENE_Dump_Sink_Config & c) { c.raster_caps.work_measure = nullptr; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.raster_caps._reserved[2] = 1; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.stream_caps.stroke_native |= 1u << 16; },
+      [](GSHSCENE_Dump_Sink_Config & c) { c.raster_caps.mask_native |= 1u << 12; },
+      [](GSHSCENE_Dump_Sink_Config & c) { c.stream_caps.mask_native |= 1u << 20; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.raster_caps.flags |= GSHSCENE_CAP_THREAD_AFFINE; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.stream_caps.flags &= ~GSHSCENE_CAP_CAN_BLOCK; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.targets |= 1u << GSHSCENE_TARGET_GPU_TEXTURE; },
@@ -2440,6 +2442,153 @@ TEST(DumpSink, AMaskIsRecordedOncePerHandleAndTheGroupNamesItAndItsPlacement) {
     std::snprintf(want, sizeof want, " picture=%016llx ", (unsigned long long)gshscene_resource_hash(pic_a));
     EXPECT_EQ(text.find(want) != std::string::npos, w.records > 0) << w.name;
   }
+}
+
+// MK14: a mask's record is its fields, line by line, as the format states them: restated here from the resource's content and
+// compared with what the sink wrote, with zeros that print in full, and the group's line names the mask and the placement's hash.
+TEST(DumpSink, AMaskRecordIsExactlyItsFieldsAndTheGroupLineNamesItsMaskAndPlacement) {
+  Scene s;
+  GSHSCENE_List * pl = s.open();
+  GSHSCENE_Paint white = solid(1, 1, 1);
+  EXPECT_EQ(gshscene_list_fill(pl, s.sq(1, 1, 8), nullptr, GSHGEOM_FILL_NONZERO, &white, 0, 0.0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_close(pl), GSHSCENE_OK);
+  const GSHSCENE_Resource * pic = nullptr;
+  ASSERT_EQ(gshscene_store_intern_picture(s.store, pl, &pic), GSHSCENE_OK);
+  s.held.push_back(pic);
+  static const double leaf_samples[3] = {0.0, 0.25, 1.0};
+  static const double table[2] = {0.0, 0.75};
+  GSHSCENE_Transfer_Piece pieces[2];
+  std::memset(pieces, 0, sizeof pieces);
+  pieces[0].lo = 0.0;
+  pieces[0].hi = 0.5;
+  pieces[0].e0 = 0.0;  // zero prints as sixteen digits
+  pieces[0].e1 = 0.0;
+  pieces[0].leaf_kind = GSHSCENE_TRANSFER_EXPONENTIAL;
+  pieces[0].c0 = 0.125;
+  pieces[0].c1 = 0.875;
+  pieces[0].n = 2.0;
+  pieces[1].lo = 0.5;
+  pieces[1].hi = 1.0;
+  pieces[1].e0 = 0.25;
+  pieces[1].e1 = 0.0;
+  pieces[1].leaf_kind = GSHSCENE_TRANSFER_TABLE;
+  pieces[1].sample_count = 3;
+  pieces[1].samples = leaf_samples;
+  GSHSCENE_Mask stitched{};
+  stitched.picture = pic;
+  stitched.mode = GSHSCENE_MASK_LUMINANCE;
+  stitched.coefficients = GSHSCENE_MASK_COEFF_REC709;
+  stitched.acts_on = GSHSCENE_MASK_ACTS_ON_SHAPE;
+  auto named = [](GCOL_Primaries primaries, GCOL_Transfer transfer, double gamma) {
+    GSHSCENE_Color_Space sp{};
+    sp.primaries = primaries;
+    sp.transfer = transfer;
+    sp.gamma = gamma;
+    return sp;
+  };
+  stitched.space = named(GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_LINEAR, 0.0);
+  stitched.render_space = named(GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_SRGB, 0.0);
+  stitched.backdrop[0] = 0.25;
+  stitched.backdrop[1] = 0.5;
+  stitched.backdrop[2] = 0.75;
+  stitched.backdrop_space = named(GCOL_PRIMARIES_ADOBE_RGB, GCOL_TRANSFER_GAMMA, 2.2);
+  stitched.transfer.kind = GSHSCENE_TRANSFER_STITCHING;
+  stitched.transfer.piece_count = 2;
+  stitched.transfer.pieces = pieces;
+  GSHSCENE_Mask tabled{};
+  tabled.picture = pic;
+  tabled.mode = GSHSCENE_MASK_ALPHA;
+  tabled.transfer.kind = GSHSCENE_TRANSFER_TABLE;
+  tabled.transfer.sample_count = 2;
+  tabled.transfer.samples = table;
+  GSHSCENE_Mask powered{};
+  powered.picture = pic;
+  powered.mode = GSHSCENE_MASK_ALPHA;
+  powered.transfer.kind = GSHSCENE_TRANSFER_EXPONENTIAL;
+  powered.transfer.c0 = 0.125;
+  powered.transfer.c1 = 0.875;
+  powered.transfer.n = 2.0;
+  const GSHSCENE_Resource * ms = nullptr;
+  const GSHSCENE_Resource * mt = nullptr;
+  const GSHSCENE_Resource * mp = nullptr;
+  ASSERT_EQ(gshscene_store_intern_mask(s.store, &stitched, &ms), GSHSCENE_OK);
+  s.held.push_back(ms);
+  ASSERT_EQ(gshscene_store_intern_mask(s.store, &powered, &mp), GSHSCENE_OK);
+  s.held.push_back(mp);
+  ASSERT_EQ(gshscene_store_intern_mask(s.store, &tabled, &mt), GSHSCENE_OK);
+  s.held.push_back(mt);
+  GSHGEOM_Map moved;
+  ASSERT_EQ(gshgeom_map_translate(2, 5.0, 6.0, 0.0, &moved), GSHGEOM_OK);
+  GSHSCENE_List * l = s.open();
+  GSHSCENE_List * unmasked = s.open();  // the same groups with no mask: only the records differ
+  for (const GSHSCENE_Resource * mask : {ms, mt, mp}) {
+    GSHSCENE_Group g{};
+    g.opacity = 1.0;
+    g.soft_mask = mask;
+    g.soft_mask_map = moved;
+    ASSERT_EQ(gshscene_list_group_push(l, &g, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_fill(l, s.sq(2, 2, 8), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);
+    GSHSCENE_Group plain{};
+    plain.opacity = 1.0;
+    plain.isolation = GSHSCENE_ISOLATION_NON_ISOLATED;  // a group that is pushed without a mask
+    ASSERT_EQ(gshscene_list_group_push(unmasked, &plain, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_fill(unmasked, s.sq(2, 2, 8), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_group_pop(unmasked), GSHSCENE_OK);
+  }
+  ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(unmasked), GSHSCENE_OK);
+  SinkRef sink(make_full(nullptr, nullptr));
+  auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+  ReportRef report;
+  ASSERT_EQ(render_job(sink.sink, request_for(l, *stream, report.report)).result, GSHSCENE_OK);
+  auto x = [](double v) {
+    uint64_t b;
+    std::memcpy(&b, &v, sizeof b);
+    char buf[24];
+    std::snprintf(buf, sizeof buf, "%016llx", (unsigned long long)b);
+    return std::string(buf);
+  };
+  auto h = [](uint64_t v) {
+    char buf[24];
+    std::snprintf(buf, sizeof buf, "%016llx", (unsigned long long)v);
+    return std::string(buf);
+  };
+  auto space = [&](const GSHSCENE_Color_Space & sp) {
+    return std::to_string((unsigned)sp.primaries) + ":" + std::to_string((unsigned)sp.transfer) + ":" + x(sp.gamma);
+  };
+  std::string want;
+  want += "W " + std::to_string(gshscene_resource_id(ms)) + " " + h(gshscene_resource_hash(ms)) + " picture=" +
+          h(gshscene_resource_hash(pic)) + " mode=2 coeff=1 acts=1 rspace=" + space(stitched.render_space) + " lspace=" +
+          space(stitched.space) + " backdrop=" + x(0.25) + " " + x(0.5) + " " + x(0.75) + " bspace=" + space(stitched.backdrop_space) + "\n";
+  want += "w kind=3 c0=" + x(0) + " c1=" + x(0) + " n=" + x(0) + " samples=0 pieces=2\n";
+  want += "p lo=" + x(0.0) + " hi=" + x(0.5) + " e0=" + x(0.0) + " e1=" + x(0.0) + " leaf=1 c0=" + x(0.125) + " c1=" + x(0.875) +
+          " n=" + x(2.0) + " samples=0\n";
+  want += "p lo=" + x(0.5) + " hi=" + x(1.0) + " e0=" + x(0.25) + " e1=" + x(0.0) + " leaf=2 c0=" + x(0) + " c1=" + x(0) + " n=" + x(0) +
+          " samples=3\n";
+  want += "s " + x(0.0) + "\ns " + x(0.25) + "\ns " + x(1.0) + "\n";
+ std::string power_record = "W " + std::to_string(gshscene_resource_id(mp)) + " " + h(gshscene_resource_hash(mp)) + " picture=" +
+      h(gshscene_resource_hash(pic)) + " mode=1 coeff=0 acts=0 rspace=0:0:" + x(0) + " lspace=0:0:" + x(0) + " backdrop=" + x(0) + " " +
+      x(0) + " " + x(0) + " bspace=0:0:" + x(0) + "\nw kind=1 c0=" + x(0.125) + " c1=" + x(0.875) + " n=" + x(2.0) + " samples=0 pieces=0\n";
+  std::string table_record = "W " + std::to_string(gshscene_resource_id(mt)) + " " + h(gshscene_resource_hash(mt)) + " picture=" +
+      h(gshscene_resource_hash(pic)) + " mode=1 coeff=0 acts=0 rspace=0:0:" + x(0) + " lspace=0:0:" + x(0) + " backdrop=" + x(0) + " " +
+      x(0) + " " + x(0) + " bspace=0:0:" + x(0) + "\nw kind=2 c0=" + x(0) + " c1=" + x(0) + " n=" + x(0) + " samples=2 pieces=0\ns " +
+      x(0.0) + "\ns " + x(0.75) + "\n";
+  EXPECT_NE(stream->bytes.find(want), std::string::npos) << "the stitched mask's record, line by line:\n" << want << "\nin\n" << stream->bytes;
+  EXPECT_NE(stream->bytes.find(table_record), std::string::npos) << "the table mask's record:\n" << table_record << "\nin\n" << stream->bytes;
+  EXPECT_NE(stream->bytes.find(power_record), std::string::npos) << "the exponential mask's record:\n" << power_record << "\nin\n" << stream->bytes;
+  // The group's line: the mask's hash, then the placement's.
+  EXPECT_NE(stream->bytes.find(" mask=" + h(gshscene_resource_hash(ms)) + " maskmap=" + h(gshgeom_map_hash(&moved)) + "\n"), std::string::npos)
+      << stream->bytes;
+  EXPECT_NE(stream->bytes.find(" mask=" + h(gshscene_resource_hash(mt)) + " maskmap=" + h(gshgeom_map_hash(&moved)) + "\n"), std::string::npos);
+  // The ids the records are remembered by are in the sink's workspace: the need grows with the masks, over the same groups
+  // without them (each is one more id to remember).
+  GSHSCENE_Render_Request probe = request_for(l, *stream, report.report);
+  size_t with_masks = 0, without_masks = 0;
+  ASSERT_EQ(gshscene_sink_workspace_bytes(sink.sink, &probe, &with_masks), GSHSCENE_OK);
+  GSHSCENE_Render_Request plain_request = request_for(unmasked, *stream, report.report);
+  ASSERT_EQ(gshscene_sink_workspace_bytes(sink.sink, &plain_request, &without_masks), GSHSCENE_OK);
+  EXPECT_GE(with_masks, without_masks + 3 * sizeof(uint64_t)) << "three masks are three ids to remember";
 }
 
 int main(int argc, char ** argv) {

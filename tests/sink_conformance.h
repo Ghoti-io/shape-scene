@@ -2908,6 +2908,111 @@ TEST_P(SinkConformance, MK14_TheCapsAreConsistent) {
   }
 }
 
+// MK9, MK3: a space is needed of a sink only where it differs from the space the group composites in.  A mask rendered in
+// the group's own blend space needs no `SPACES`, one rendered in another does, and the missing bits are named in either case.
+TEST_P(SinkConformance, MK9_ASpaceIsNeededOnlyWhereItDiffersFromTheGroupsOwn) {
+  int checked = 0;
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    if (!applies_alpha_masks(caps) || !(caps.flags & GSHSCENE_CAP_BLEND_SPACES)) {
+      continue;
+    }
+    GSHSCENE_Paint white = solid(1, 1, 1);
+    GSHSCENE_List * pl = s.open();
+    EXPECT_EQ(gshscene_list_fill(pl, s.sq(0, 0, 30), nullptr, GSHGEOM_FILL_NONZERO, &white, 0, 0.0), GSHSCENE_OK);
+    const GSHSCENE_Resource * picture = picture_of(s, pl);
+    GSHSCENE_Color_Space linear{}, p3{};
+    linear.primaries = GCOL_PRIMARIES_SRGB;
+    linear.transfer = GCOL_TRANSFER_LINEAR;
+    p3.primaries = GCOL_PRIMARIES_DISPLAY_P3;
+    p3.transfer = GCOL_TRANSFER_LINEAR;
+    for (int same = 1; same >= 0; same--) {
+      GSHSCENE_Mask m{};
+      m.picture = picture;
+      m.mode = GSHSCENE_MASK_ALPHA;
+      m.render_space = same ? linear : p3;
+      const GSHSCENE_Resource * mask = nullptr;
+      ASSERT_EQ(gshscene_store_intern_mask(s.store, &m, &mask), GSHSCENE_OK);
+      s.held.push_back(mask);
+      GSHSCENE_Group base{};
+      base.blend_space = linear;
+      GSHSCENE_List * l = masked_list(s, mask, nullptr, &base);
+      auto out = make_surface(kind);
+      ReportRef r;
+      EXPECT_EQ(run(f(), sink.sink, request_for(l, *out, r.report)).result, GSHSCENE_OK);
+      uint32_t need = gshscene_mask_required(mask);
+      EXPECT_NE(need & GSHSCENE_MASK_NATIVE_SPACES, 0u) << "a mask with a render space names the feature before the plan refines it";
+      uint32_t missing = (same ? need & ~(uint32_t)GSHSCENE_MASK_NATIVE_SPACES : need) & ~caps.mask_native;
+      std::vector<size_t> refused;
+      for (const auto & e : entries(r.report)) {
+        if (e.entry_class == GSHSCENE_ENTRY_REFUSED) {
+          EXPECT_EQ(e.reason, GSHSCENE_REASON_MASK_FEATURE) << "the only thing refused is the mask";
+          EXPECT_EQ(e.second, (size_t)missing) << (same ? "a space of the group's own" : "another space");
+          refused.push_back(e.chain_count ? e.chain[0] : 0);
+        }
+      }
+      EXPECT_EQ(refused.size(), missing ? 1u : 0u) << (same ? "a space of the group's own" : "another space");
+      checked++;
+    }
+  }
+  if (checked == 0) {
+    GTEST_SKIP() << "the sink applies no alpha mask in a blend space";
+  }
+}
+
+// MK8: a clip is not a mask.  The two halves of a region, as the pieces of a union clip, are clips to every sink: planned as
+// clips and never refused for a mask reason, whatever the sink says of masks.  A masked group beside them is the control: a sink
+// without the soft-mask flag names it, so the check can fail.
+TEST_P(SinkConformance, MK8_AClipIsNeverPlannedAsAMask) {
+  int checked = 0;
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    if (!(caps.item_kinds & (1u << GSHSCENE_ITEM_CLIP_PUSH))) {
+      continue;
+    }
+    GSHSCENE_Paint red = solid(1, 0, 0);
+    GSHSCENE_List * l = s.open();
+    for (int piece = 0; piece < 2; piece++) {  // two regions that share the edge x = 16
+      EXPECT_EQ(gshscene_list_clip_push(l, s.sq(piece ? 16 : 0, 0, 16), nullptr, GSHGEOM_FILL_NONZERO, 0, 0.0), GSHSCENE_OK);
+      EXPECT_EQ(gshscene_list_fill(l, s.sq(0, 0, 32), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0), GSHSCENE_OK);
+      EXPECT_EQ(gshscene_list_clip_pop(l), GSHSCENE_OK);
+    }
+    EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+    auto out = make_surface(kind);
+    ReportRef r;
+    Outcome o = run(f(), sink.sink, request_for(l, *out, r.report));
+    EXPECT_EQ(o.result, GSHSCENE_OK);
+    for (const auto & e : entries(r.report)) {
+      EXPECT_NE(e.reason, GSHSCENE_REASON_SOFT_MASK) << "a clip is not a mask (MK8)";
+      EXPECT_NE(e.reason, GSHSCENE_REASON_MASK_FEATURE) << "a clip is not a mask (MK8)";
+    }
+    if ((caps.item_kinds & (1u << GSHSCENE_ITEM_GROUP_PUSH)) && (caps.composites & 1u) && !(caps.flags & GSHSCENE_CAP_GROUP_SOFT_MASK)) {
+      GSHSCENE_Paint white = solid(1, 1, 1);
+      GSHSCENE_List * pl = s.open();
+      EXPECT_EQ(gshscene_list_fill(pl, s.sq(0, 0, 30), nullptr, GSHGEOM_FILL_NONZERO, &white, 0, 0.0), GSHSCENE_OK);
+      GSHSCENE_List * masked = masked_list(s, make_mask(s, picture_of(s, pl)));
+      auto out2 = make_surface(kind);
+      ReportRef r2;
+      EXPECT_EQ(run(f(), sink.sink, request_for(masked, *out2, r2.report)).result, GSHSCENE_OK);
+      int named = 0;
+      for (const auto & e : entries(r2.report)) {
+        named += e.reason == GSHSCENE_REASON_SOFT_MASK;
+      }
+      EXPECT_EQ(named, 1) << "the control: a sink without the flag names a masked group";
+    }
+    checked++;
+  }
+  if (checked == 0) {
+    GTEST_SKIP() << "the sink draws no clips";
+  }
+}
+
 /* --- S20: strokes (stroke.h, SK1 to SK14; strokes story S1) ------------------------------------------------------ */
 
 namespace sinkconf {
