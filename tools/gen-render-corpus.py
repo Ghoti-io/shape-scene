@@ -168,6 +168,23 @@ def scripted():
     out["scripted-placeholders-strict.bin"] = header(request=1) + placeholders
     out["scripted-placeholders-raster.bin"] = header() + placeholders
     out["scripted-placeholders-approximated.bin"] = header(request=1) + ops(fill(), (PLACEHOLDER, 0, 1, 0x21), fill(4, 4, 3))
+    # Masks-images-patterns story M1 (MK9, MK14).  A group whose c byte has bits 4 to 6 set takes a mask over a picture frozen before
+    # it: mode b & 1 (luminance), coefficient set (a >> 2) & 3, a space b & 2, a backdrop c & 1, a transfer (a >> 4) & 3 (identity,
+    # exponential, table, stitching), acting on a & 0x40, a placement c & 0x80.  The stroke header's high nibble takes mask features
+    # from the caps: 1 the flag and all, 2 a writer's set, 3 the table and the stitching, 4 the shape and the backdrop, 5 all
+    # but alpha.  A mask recorded by the sink with every feature; refused for its table; refused by a writer's set for a transfer, a
+    # coefficient set and the shape; refused without the flag; and a refused placeholder inside a mask's picture, reported with the
+    # chain [group, item].
+    def masked(a, b, c=0x70):
+        return (FILL, 2, 2, 6), (FREEZE, 0, 0, 0), (GROUP, a, b, c), (FILL, 4, 4, 9), (GROUP_POP, 0, 0, 0)
+    out["scripted-mask-recorded.bin"] = header(request=4) + ops(*masked(0x04, 1, 0xF1))
+    out["scripted-mask-refused-table.bin"] = header(stroke=0x30) + ops(*masked(0x20, 0))
+    out["scripted-mask-refused-writer.bin"] = header(stroke=0x20) + ops(*masked(0x78, 3, 0xF1))
+    out["scripted-mask-refused-strict.bin"] = header(request=1, stroke=0x50) + ops(*masked(0x04, 1))
+    out["scripted-mask-refused-flag.bin"] = header(stroke=0x10) + ops(*masked(0x04, 1))
+    out["scripted-mask-refused-shape.bin"] = header(stroke=0x40) + ops(*masked(0x40, 1, 0xF1))
+    out["scripted-mask-picture-entry.bin"] = header() + ops(fill(), (PLACEHOLDER, 0, 1, 0x20), (FREEZE, 0, 0, 0),
+                                                           (GROUP, 0, 0, 0x70), fill(4, 4, 9), (GROUP_POP, 0, 0, 0))
     return out
 
 

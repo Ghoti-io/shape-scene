@@ -64,6 +64,14 @@
  *   allocator (which also fails the chosen call), and it says nothing is live at
  *   the end.
  *
+ * Masks-images-patterns story M1: a group whose `c` byte has bits 4 to 6 set takes a mask whose mode, coefficient set, luminance
+ * and render space, backdrop, transfer (identity, exponential, table, stitching), acting-on and placement come from the
+ * group's own bytes, over a picture of the list (which may itself hold masked groups); the stroke byte's high nibble takes mask
+ * features, or the flag itself, away from the sink's caps (MK9, MK14).  After the render a mask feature is refused only by caps
+ * that lack it and its entry names exactly the bits missing, an entry inside a mask's picture carries the chain `[group, item]`,
+ * and, where nothing is made to fail, a second render of the same request on the same sink writes the same pixels and the same
+ * report (planning is a function of the list and the caps).
+ *
  * The replay fails if the corpus never reaches an outcome (each result, an
  * approximation, a tie, a deferred completion, a before-submit sink running past
  * its token): tools/gen-render-corpus.py writes it.
@@ -97,7 +105,8 @@ enum {
   OUT_TIES, OUT_DEFERRED, OUT_INVALID, OUT_UNSUPPORTED, OUT_GRADIENT_DRAWN, OUT_GRADIENT_REFUSED, OUT_NOTICE,
   OUT_GRADIENT_BUILT, OUT_GRADIENT_LIMIT, OUT_COLOR_LIMIT, OUT_COLOR_AT_BOUND, OUT_STOP_SATURATED, OUT_BLEND_RECORDED,
   OUT_BLEND_REFUSED, OUT_PDF_REFUSED, OUT_PDF_RECORDED, OUT_STROKE_DRAWN, OUT_STROKE_EXPANDED, OUT_STROKE_REFUSED,
-  OUT_STROKE_NOTICE, OUT_STROKE_KIND_REFUSED, OUT_PLACEHOLDER_REFUSED, OUT_PLACEHOLDER_APPROXIMATED, OUT_COUNT
+  OUT_STROKE_NOTICE, OUT_STROKE_KIND_REFUSED, OUT_PLACEHOLDER_REFUSED, OUT_PLACEHOLDER_APPROXIMATED,
+  OUT_MASK_RECORDED, OUT_MASK_FEATURE, OUT_MASK_PICTURE_ENTRY, OUT_MASK_REPLAYED, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"ok", "strict, refused by the plan", "strict, refused while drawing",
@@ -111,7 +120,9 @@ static const char * const outcome_names[OUT_COUNT] = {"ok", "strict, refused by 
     "a blend mode refused by the caps", "a group of PDF's fields refused (S19)", "a group of PDF's fields recorded",
     "a stroke recorded (S20)", "a stroke recorded with features to expand", "a stroke refused for its style",
     "a stroke that draws nothing (SK8)", "a stroke refused by caps without the kind",
-    "a placeholder reported refused (PH3)", "a placeholder reported approximated (PH3)"};
+    "a placeholder reported refused (PH3)", "a placeholder reported approximated (PH3)",
+    "a group with a mask recorded (MK14)", "a mask refused for a feature the caps lack (MK9)",
+    "an entry inside a mask's picture (MK9)", "a second render with the same pixels and the same report"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -728,12 +739,59 @@ static GSHSCENE_List * build(Scene * s, Input * in, int * ties) {
         }
         const GSHSCENE_Resource * mask = NULL;
         if ((c & 0x70) == 0x70 && s->picture_count) {
+          /* M1: the mode (b bit 0), its coefficient set (a bits 2 and 3), a luminance space (b bit 1; for an alpha mask a render
+           * space), a backdrop (c bit 0, luminance only), a transfer (a bits 4 and 5), the acting-on (a bit 6) and a
+           * placement (c bit 7). */
+          static const double table[3] = {0.0, 0.25, 1.0};
+          static const GSHSCENE_Transfer_Piece pieces[2] = {
+              {0.0, 0.5, 0.0, 1.0, GSHSCENE_TRANSFER_IDENTITY, 0.0, 0.0, 0.0, 0, NULL},
+              {0.5, 1.0, 1.0, 0.0, GSHSCENE_TRANSFER_EXPONENTIAL, 0.0, 1.0, 0.5, 0, NULL}};
           GSHSCENE_Mask content;
           memset(&content, 0, sizeof content);
           content.picture = s->pictures[a % s->picture_count];
-          content.mode = GSHSCENE_MASK_ALPHA;
+          content.mode = (b & 1) ? GSHSCENE_MASK_LUMINANCE : GSHSCENE_MASK_ALPHA;
+          GSHSCENE_Color_Space linear;
+          memset(&linear, 0, sizeof linear);
+          linear.primaries = GCOL_PRIMARIES_SRGB;
+          linear.transfer = GCOL_TRANSFER_LINEAR;
+          if (content.mode == GSHSCENE_MASK_LUMINANCE) {
+            content.coefficients = (a >> 2) & 3u;
+            if (b & 2) {
+              content.space = linear;
+            }
+            if (c & 1) {
+              content.backdrop[0] = 0.5;
+              content.backdrop[1] = 0.25;
+              content.backdrop[2] = 1.0;
+            }
+          } else if (b & 2) {
+            content.render_space = linear;
+          }
+          switch ((a >> 4) & 3u) {
+            case 1:
+              content.transfer.kind = GSHSCENE_TRANSFER_EXPONENTIAL;
+              content.transfer.c1 = 1.0;
+              content.transfer.n = 2.0;
+              break;
+            case 2:
+              content.transfer.kind = GSHSCENE_TRANSFER_TABLE;
+              content.transfer.sample_count = 3;
+              content.transfer.samples = table;
+              break;
+            case 3:
+              content.transfer.kind = GSHSCENE_TRANSFER_STITCHING;
+              content.transfer.piece_count = 2;
+              content.transfer.pieces = pieces;
+              break;
+            default:
+              break;
+          }
+          content.acts_on = (a >> 6) & 1u;
           if (gshscene_store_intern_mask(s->store, &content, &mask) == GSHSCENE_OK) {
             g.soft_mask = mask;
+            if (c & 0x80) {
+              gshgeom_map_translate(2, (double)(a % 8), (double)(b % 8), 0.0, &g.soft_mask_map);
+            }
           }
         }
         if (depth < sizeof stack && gshscene_list_group_push(list, &g, layer, d) == GSHSCENE_OK) {
@@ -859,7 +917,7 @@ static int chain_less_eq(const GSHSCENE_Report_Entry * a, const GSHSCENE_Report_
 }
 
 static void check_report(const GSHSCENE_Report * report, size_t cap, GSHSCENE_Result result,
-    const GSHSCENE_Sink_Caps * caps) {
+    const GSHSCENE_Sink_Caps * caps, const GSHSCENE_List * list) {
   GSHSCENE_Report_Summary sum;
   CHECK(gshscene_report_summary(report, &sum) == GSHSCENE_OK);
   CHECK(sum.result == result);
@@ -902,6 +960,23 @@ static void check_report(const GSHSCENE_Report * report, size_t cap, GSHSCENE_Re
       CHECK((e.second >> 16) != 0 && (e.second & 0xffffu) != 0 && (e.second >> 16) <= 3 && e.depth == 0.0);
       outcomes[OUT_PLACEHOLDER_REFUSED] += e.entry_class == GSHSCENE_ENTRY_REFUSED;
       outcomes[OUT_PLACEHOLDER_APPROXIMATED] += e.entry_class == GSHSCENE_ENTRY_APPROXIMATED;
+    }
+    if (e.reason == GSHSCENE_REASON_MASK_FEATURE) {
+      /* MK9: refused, never approximated, only by caps that claim the flag and lack a feature, and the entry names the
+       * missing bits and no others. */
+      CHECK(e.entry_class == GSHSCENE_ENTRY_REFUSED);
+      CHECK(caps->flags & GSHSCENE_CAP_GROUP_SOFT_MASK);
+      CHECK(e.second != 0 && (e.second & ~(size_t)GSHSCENE_MASK_NATIVE_ALL) == 0);
+      CHECK((e.second & caps->mask_native) == 0);
+      outcomes[OUT_MASK_FEATURE]++;
+    }
+    if (list && e.chain_count >= 2) {
+      /* MK9: an entry inside a mask's picture is [the group's push, the item]; the group's own content starts after the push. */
+      const GSHSCENE_Item * head = NULL;
+      if (gshscene_list_item(list, e.chain[0], &head) == GSHSCENE_OK && head->kind == GSHSCENE_ITEM_GROUP_PUSH && head->group.soft_mask) {
+        CHECK(caps->flags & GSHSCENE_CAP_GROUP_SOFT_MASK);
+        outcomes[OUT_MASK_PICTURE_ENTRY]++;
+      }
     }
     CHECK(e.reason != GSHSCENE_REASON_GRADIENT || e.entry_class == GSHSCENE_ENTRY_REFUSED);
     CHECK(e.reason != GSHSCENE_REASON_INTERPOLATION_SPACE || e.entry_class == GSHSCENE_ENTRY_APPROXIMATED);
@@ -1049,6 +1124,30 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
     if (h_stroke & 8) {
       c->item_kinds &= ~(UINT32_C(1) << GSHSCENE_ITEM_STROKE);
     }
+    /* M1, MK9, MK14: a sink that applies no mask (a toolpath's), a writer's (alpha and luminance in the web coefficient sets, no
+     * transfer, backdrop or acting on the shape), one without a transfer table or a stitching, one without the shape or the
+     * backdrop, and one that applies the alpha mask alone. */
+    switch (h_stroke >> 4) {
+      case 1:
+        c->flags &= ~GSHSCENE_CAP_GROUP_SOFT_MASK;
+        c->mask_native = 0;
+        break;
+      case 2:
+        c->mask_native = GSHSCENE_MASK_NATIVE_ALPHA | GSHSCENE_MASK_NATIVE_LUMINANCE | GSHSCENE_MASK_NATIVE_COEFF_W3C |
+            GSHSCENE_MASK_NATIVE_COEFF_REC709 | GSHSCENE_MASK_NATIVE_SPACES;
+        break;
+      case 3:
+        c->mask_native &= ~(GSHSCENE_MASK_NATIVE_TRANSFER_TABLE | GSHSCENE_MASK_NATIVE_TRANSFER_STITCHING);
+        break;
+      case 4:
+        c->mask_native &= ~(GSHSCENE_MASK_NATIVE_ACTS_ON_SHAPE | GSHSCENE_MASK_NATIVE_BACKDROP);
+        break;
+      case 5:
+        c->mask_native = GSHSCENE_MASK_NATIVE_ALPHA;
+        break;
+      default:
+        break;
+    }
   }
   expandable = (h_stroke & 1) ? GSHSCENE_STROKE_NATIVE_ALL & ~config.stream_caps.stroke_native : 0;
   if (h_caps & 16) {
@@ -1162,7 +1261,7 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
     GSHSCENE_Sink_Caps caps;
     CHECK(gshscene_sink_caps(sink, &target, &caps) == GSHSCENE_OK);
     counter.fail_at = -1;
-    check_report(report, cap, result, &caps);
+    check_report(report, cap, result, &caps, list);
     GSHSCENE_Report_Summary sum;
     gshscene_report_summary(report, &sum);
     CHECK(sum.work_max <= caps.cancel_work_bound);
@@ -1234,6 +1333,60 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
     }
     if (untouched && stream_target) {
       CHECK(stream.writes == 0);
+    }
+    /* MK14: a masked group the caps carry in full is recorded. */
+    for (size_t i = 0; list && result == GSHSCENE_OK && i < gshscene_list_count(list); i++) {
+      const GSHSCENE_Item * it;
+      CHECK(gshscene_list_item(list, i, &it) == GSHSCENE_OK);
+      outcomes[OUT_MASK_RECORDED] += it->kind == GSHSCENE_ITEM_GROUP_PUSH && it->group.soft_mask &&
+          (caps.flags & GSHSCENE_CAP_GROUP_SOFT_MASK) && !(gshscene_mask_required(it->group.soft_mask) & ~caps.mask_native);
+    }
+    /* Planning and drawing are functions of the list and the caps: where nothing is made to fail, a second render of the
+     * request, on the same sink into a second raster, writes the same pixels and the same report (MK9). */
+    if (!h_alloc && !h_cancel && !stream_target && !(h_request & 2) && !(h_caps & 16) &&
+        (result == GSHSCENE_OK || result == GSHSCENE_ERR_REFUSED)) {
+      GIMG_Raster * raster2 = NULL;
+      GSHSCENE_Report * report2 = NULL;
+      CHECK(gimg_raster_create(SIDE, SIDE, &GIMG_PIXEL_RGBA8, GIMG_RASTER_OWNED, NULL, 0, &raster2) == GIMG_OK);
+      memset(gimg_raster_pixels(raster2), 0x5a, gimg_raster_stride_bytes(raster2) * SIDE);
+      CHECK(gshscene_report_create(&alloc, &limits, &report2) == GSHSCENE_OK);
+      GSHSCENE_Target target2 = target;
+      target2.surface = raster2;
+      GSHSCENE_Render_Request request2 = request;
+      request2.target = &target2;
+      request2.report = report2;
+      progress.last = 0; /* one call per unit, counted again */
+      GSHSCENE_Job job2;
+      memset(&job2, 0, sizeof job2);
+      GSHSCENE_Result begun2 = gshscene_sink_begin(sink, &request2, &job2);
+      GSHSCENE_Job_Status st2;
+      CHECK(gshscene_job_poll(&job2, &st2) == GSHSCENE_OK);
+      int turns2 = 0;
+      while (st2.state == GSHSCENE_JOB_RUNNING) {
+        CHECK(gshscene_dump_sink_step(sink, NULL) == GSHSCENE_OK);
+        CHECK(gshscene_job_poll(&job2, &st2) == GSHSCENE_OK);
+        CHECK(++turns2 < 100000);
+      }
+      CHECK(begun2 == begun && st2.state != GSHSCENE_JOB_IDLE && st2.result == result);
+      CHECK(raster_hash(raster2) == raster_hash(raster));
+      GSHSCENE_Report_Summary sum2;
+      CHECK(gshscene_report_summary(report2, &sum2) == GSHSCENE_OK);
+      CHECK(sum2.counted == sum.counted && sum2.units_total == sum.units_total && sum2.units_processed == sum.units_processed &&
+            sum2.units_done == sum.units_done && sum2.overflowed == sum.overflowed && sum2.work_max == sum.work_max);
+      for (int k = 0; k < GSHSCENE_ENTRY_CLASS_COUNT; k++) {
+        CHECK(sum2.by_class[k] == sum.by_class[k]);
+      }
+      CHECK(gshscene_report_count(report2) == gshscene_report_count(report));
+      for (size_t k = 0; k < gshscene_report_count(report); k++) {
+        GSHSCENE_Report_Entry x, y;
+        CHECK(gshscene_report_entry(report, k, &x) == GSHSCENE_OK && gshscene_report_entry(report2, k, &y) == GSHSCENE_OK);
+        CHECK(x.entry_class == y.entry_class && x.reason == y.reason && x.chain_count == y.chain_count && x.second == y.second &&
+              x.depth == y.depth);
+        CHECK(x.chain_count == 0 || memcmp(x.chain, y.chain, x.chain_count * sizeof *x.chain) == 0);
+      }
+      outcomes[OUT_MASK_REPLAYED]++;
+      gshscene_report_destroy(report2);
+      gimg_raster_destroy(raster2);
     }
   }
   /* Outside the damage and the extent, the raster is as it was. */

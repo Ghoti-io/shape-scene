@@ -64,6 +64,15 @@
  * edge modes, filters, filter space and tint chosen to be valid, invalid or past a bound, whose result class is predicted
  * from IP1 and whose content is read back, filled into the list and put through the recognition and the filter choice.
  *
+ * Masks-images-patterns story M1 adds three: a mask interned from the input (every mode, coefficient set, space, backdrop,
+ * transfer kind and acting-on, one field invalid or past a bound at a time), whose result class is predicted from MK1
+ * (invalid before unsupported before a limit), whose canonical form, required features, handle, hash and dump are read back and
+ * which is found again and told apart from its nearest neighbor; a group recorded with a mask from the pool and a placement
+ * (MK6, MK13), whose item is read back and whose list is equal, with an equal hash and dump, to a second list recorded alike
+ * and not equal to one that differs in the mask or the placement; and a group node of a scene of its own that is given a mask and
+ * a placement, published, diffed (MK11) and emitted.  A freeze asserts MK12: a picture holding a masked group is one level
+ * deeper than the mask's picture.
+ *
  * The op numbers below are mirrored by tools/gen-fuzz-corpus.py; the replay
  * also fails if the corpus never reaches an outcome (a limit, a refusal, an
  * invalid publish), which is what keeps a corpus from measuring nothing.
@@ -97,7 +106,8 @@ enum {
   OP_FILL_EX, OP_CLIP_PUSH_EX, OP_GROUP_PUSH_EX, OP_LIST_FOREGROUND, OP_NODE_PROPS, OP_EDIT_FOREGROUND, OP_LIST_PALETTE,
   OP_FILL_FIXED, OP_TRUNCATE, OP_EDIT_PALETTE, OP_INTERN_GRADIENT, OP_FILL_GRADIENT, OP_SCENE_GRADIENT,
   OP_GRADIENT_NODE, OP_COLOR_BOUND, OP_GROUP_PDF, OP_NODE_PDF, OP_INTERN_STYLE, OP_STROKE, OP_STROKE_NODE, OP_PLACEHOLDER,
-  OP_PLACEHOLDER_NODE, OP_INTERN_IMAGE, OP_IMAGE_NOT_SHAPE, OP_IMAGE_PAINT, OP_COUNT
+  OP_PLACEHOLDER_NODE, OP_INTERN_IMAGE, OP_IMAGE_NOT_SHAPE, OP_IMAGE_PAINT, OP_INTERN_MASK,
+  OP_GROUP_MASK, OP_NODE_MASK, OP_COUNT
 };
 
 /* --- the outcomes the corpus must reach ------------------------------------------------------------ */
@@ -112,7 +122,10 @@ enum {
   OUT_STROKE_UNSUPPORTED, OUT_STROKE_NODE, OUT_STROKE_EMITTED, OUT_PLACEHOLDER_RECORDED, OUT_PLACEHOLDER_INVALID,
   OUT_PLACEHOLDER_NODE, OUT_PLACEHOLDER_EMITTED, OUT_IMAGE_INTERNED, OUT_IMAGE_INVALID, OUT_IMAGE_UNSUPPORTED,
   OUT_IMAGE_LIMIT, OUT_IMAGE_BAD_SAMPLE, OUT_IMAGE_HIT, OUT_IMAGE_TAKEN, OUT_IMAGE_NOT_SHAPE, OUT_IMAGE_PAINT,
-  OUT_IMAGE_PAINT_STENCIL, OUT_IMAGE_PAINT_INVALID, OUT_IMAGE_PAINT_LIMIT, OUT_IMAGE_PAINT_FILL, OUT_COUNT
+  OUT_IMAGE_PAINT_STENCIL, OUT_IMAGE_PAINT_INVALID, OUT_IMAGE_PAINT_LIMIT, OUT_IMAGE_PAINT_FILL, OUT_MASK_INTERNED,
+  OUT_MASK_LUMINANCE, OUT_MASK_TRANSFER, OUT_MASK_INVALID, OUT_MASK_UNSUPPORTED, OUT_MASK_LIMIT, OUT_MASK_HIT, OUT_MASK_NEAR,
+  OUT_MASK_GROUP, OUT_MASK_GROUP_INVALID, OUT_MASK_GROUP_UNSUPPORTED, OUT_MASK_LIST_EQUAL, OUT_MASK_DEPTH, OUT_MASK_DEPTH_LIMIT,
+  OUT_MASK_NODE, OUT_MASK_NODE_INVALID, OUT_MASK_DAMAGE, OUT_MASK_NO_DAMAGE, OUT_MASK_EMITTED, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limit", "edit limit", "publish limit",
@@ -129,7 +142,14 @@ static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limi
     "a placeholder recorded", "a placeholder refused as invalid", "a placeholder node", "an emitted list with a placeholder",
     "an image interned", "an image refused as invalid", "an image refused as unsupported", "an image past IM10's bounds refused",
     "an image refused for a sample value", "an image found again", "an image taken", "an image refused where a shape goes", "an image paint interned", "a tinted image paint interned",
-    "an image paint refused as invalid", "an image paint past IP1's bounds refused", "a fill with an image paint recorded"};
+    "an image paint refused as invalid", "an image paint past IP1's bounds refused", "a fill with an image paint recorded",
+    "a mask interned", "a luminance mask interned", "a mask with a transfer interned", "a mask refused as invalid",
+    "a mask refused as unsupported", "a mask past MK1's or MK4's bounds refused", "a mask found again",
+    "a mask told apart from its nearest neighbor", "a group recorded with a mask", "a group with a placement refused as invalid",
+    "a group with a placement refused as unsupported", "two lists with a masked group, equal", "a picture holding a mask, one level deeper",
+    "a masked group past the picture depth, refused at the freeze", "a group node with a mask", "a group node with a mask refused as invalid",
+    "a changed mask or placement damaging the group's content", "an unchanged mask damaging nothing",
+    "an emitted list with a masked group"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -210,6 +230,8 @@ typedef struct S {
   const GSHSCENE_Resource * styles[4];     /* stroke styles, in the standalone store (strokes story S1) */
   const GSHSCENE_Resource * sstyles[2];    /* stroke styles, in the scene's store */
   const GSHSCENE_Resource * images[3];     /* images, in the standalone store (masks-images-patterns story I1) */
+  const GSHSCENE_Resource * masks[4];      /* masks, in the standalone store (story M1) */
+  uint64_t mask_hash[4];                   /* each mask's hash when it was made: a handle's hash never changes (MK13) */
   GSHSCENE_Edit * edits[EDITS];
   unsigned edit_generation[EDITS];
   const GSHSCENE_Version * versions[VERSIONS];
@@ -555,6 +577,11 @@ static void version_checks(S * s, const GSHSCENE_Version * v) {
 }
 
 static void hold_check(S * s) {
+  for (int i = 0; i < 4; i++) {
+    if (s->masks[i]) {
+      CHECK(gshscene_resource_hash(s->masks[i]) == s->mask_hash[i]); /* MK13: a handle's hash never changes */
+    }
+  }
   for (int i = 0; i < VERSIONS; i++) {
     if (s->versions[i]) {
       CHECK(gshscene_version_hash(s->versions[i]) == s->version_hash[i]);
@@ -605,6 +632,654 @@ static size_t style_dash_count(const double * dashes, size_t n) {
 /** Whether @p x and @p y are the same double, bit for bit (so -0 is not 0). */
 static int same_bits(double x, double y) {
   return memcmp(&x, &y, sizeof x) == 0;
+}
+
+/* --- masks (masks-images-patterns story M1: MK1 to MK6, MK9, MK11 to MK13) ---------------------------------------------- */
+
+/** The whole of @p f as a malloc'd string (never the counting allocator's), closing it; NULL where it cannot be read. */
+static char * slurp_close(FILE * f) {
+  char * text = NULL;
+  if (fflush(f) == 0 && fseek(f, 0, SEEK_END) == 0) {
+    long n = ftell(f);
+    if (n >= 0 && fseek(f, 0, SEEK_SET) == 0 && (text = malloc((size_t)n + 1)) != NULL) {
+      size_t got = fread(text, 1, (size_t)n, f);
+      text[got] = '\0';
+    }
+  }
+  fclose(f);
+  return text;
+}
+
+static char * resource_text(const GSHSCENE_Resource * r) {
+  FILE * f = tmpfile();
+  if (!f) {
+    return NULL;
+  }
+  CHECK(gshscene_resource_dump(r, f) == GSHSCENE_OK);
+  return slurp_close(f);
+}
+
+static char * list_text(const GSHSCENE_List * l) {
+  FILE * f = tmpfile();
+  if (!f) {
+    return NULL;
+  }
+  CHECK(gshscene_list_dump(l, f) == GSHSCENE_OK);
+  return slurp_close(f);
+}
+
+/** MK12 restated: the deepest picture a list names, as an instance or as a group's mask (0 for none). */
+static size_t list_picture_depth(const GSHSCENE_List * list) {
+  size_t depth = 0;
+  for (size_t i = 0; i < gshscene_list_count(list); i++) {
+    const GSHSCENE_Item * it;
+    CHECK(gshscene_list_item(list, i, &it) == GSHSCENE_OK);
+    size_t d = 0;
+    if (it->kind == GSHSCENE_ITEM_INSTANCE) {
+      d = gshscene_resource_picture_depth(it->resource);
+    } else if (it->kind == GSHSCENE_ITEM_GROUP_PUSH && it->group.soft_mask) {
+      GSHSCENE_Mask content;
+      CHECK(gshscene_resource_mask(it->group.soft_mask, &content) == GSHSCENE_OK);
+      d = gshscene_resource_picture_depth(content.picture);
+    }
+    depth = d > depth ? d : depth;
+  }
+  return depth;
+}
+
+/** A picture of one fill of a path recipe, made in @p store; NULL where a limit or an allocation refuses it. */
+static const GSHSCENE_Resource * one_fill_picture(S * s, GSHSCENE_Store * store, unsigned recipe) {
+  GSHGEOM_Path * path = make_path(s, recipe);
+  const GSHSCENE_Resource * shape = NULL;
+  const GSHSCENE_Resource * picture = NULL;
+  GSHSCENE_List * l = NULL;
+  if (path && gshscene_store_intern_path(store, path, &shape) == GSHSCENE_OK &&
+      gshscene_list_create(&s->alloc, &s->limits, store, &l) == GSHSCENE_OK &&
+      gshscene_list_fill(l, shape, NULL, GSHGEOM_FILL_NONZERO, NULL, 0, 0.0) == GSHSCENE_OK && gshscene_list_close(l) == GSHSCENE_OK &&
+      gshscene_store_intern_picture(store, l, &picture) != GSHSCENE_OK) {
+    picture = NULL;
+  }
+  gshscene_list_destroy(l);
+  gshscene_resource_release(shape);
+  gshgeom_path_destroy(path);
+  return picture;
+}
+
+/** A space of a mask from a pick: 0 none, 1 to 3 carried, 4 one this library does not carry (ProPhoto), 5 half given. */
+static GSHSCENE_Color_Space mask_space(unsigned sel, int * invalid, int * unsupported) {
+  GSHSCENE_Color_Space sp;
+  memset(&sp, 0, sizeof sp);
+  switch (sel % 6) {
+    case 1:
+      sp.primaries = GCOL_PRIMARIES_SRGB;
+      sp.transfer = GCOL_TRANSFER_LINEAR;
+      break;
+    case 2:
+      sp.primaries = GCOL_PRIMARIES_DISPLAY_P3;
+      sp.transfer = GCOL_TRANSFER_SRGB;
+      break;
+    case 3:
+      sp.primaries = GCOL_PRIMARIES_ADOBE_RGB;
+      sp.transfer = GCOL_TRANSFER_GAMMA;
+      sp.gamma = 2.2;
+      break;
+    case 4:
+      sp.primaries = GCOL_PRIMARIES_PROPHOTO;
+      sp.transfer = GCOL_TRANSFER_LINEAR;
+      *unsupported = 1;
+      break;
+    case 5:
+      sp.primaries = GCOL_PRIMARIES_SRGB; /* a gamut with no transfer */
+      *invalid = 1;
+      break;
+    default:
+      break;
+  }
+  return sp;
+}
+
+static int space_is_zero(const GSHSCENE_Color_Space * sp) {
+  return sp->primaries == GCOL_PRIMARIES_UNKNOWN && sp->transfer == GCOL_TRANSFER_UNKNOWN && same_bits(sp->gamma, 0.0);
+}
+
+static int space_same(const GSHSCENE_Color_Space * a, const GSHSCENE_Color_Space * b) {
+  return a->primaries == b->primaries && a->transfer == b->transfer && same_bits(a->gamma, b->gamma);
+}
+
+#define MASK_BIG_PIECES 257
+#define MASK_BIG_SAMPLES 4097
+
+/** The features MK9 says a mask of these fields needs, restated. */
+static uint32_t mask_features(const GSHSCENE_Mask * m) {
+  uint32_t need = 0;
+  if (m->mode == GSHSCENE_MASK_ALPHA) {
+    need |= GSHSCENE_MASK_NATIVE_ALPHA;
+  } else {
+    need |= GSHSCENE_MASK_NATIVE_LUMINANCE;
+    need |= GSHSCENE_MASK_NATIVE_COEFF_W3C << m->coefficients;
+    if (m->backdrop[0] != 0.0 || m->backdrop[1] != 0.0 || m->backdrop[2] != 0.0) {
+      need |= GSHSCENE_MASK_NATIVE_BACKDROP;
+    }
+  }
+  need |= m->transfer.kind ? GSHSCENE_MASK_NATIVE_TRANSFER_EXPONENTIAL << (m->transfer.kind - 1) : 0u;
+  if (!space_is_zero(&m->space) || !space_is_zero(&m->render_space) || !space_is_zero(&m->backdrop_space)) {
+    need |= GSHSCENE_MASK_NATIVE_SPACES;
+  }
+  return need | (m->acts_on == GSHSCENE_MASK_ACTS_ON_SHAPE ? GSHSCENE_MASK_NATIVE_ACTS_ON_SHAPE : 0u);
+}
+
+/** Variant @p v of a small set of valid masks over @p picture (a picture of @p store). */
+static const GSHSCENE_Resource * mask_variant(GSHSCENE_Store * store, const GSHSCENE_Resource * picture, unsigned v) {
+  static const double table[3] = {0.0, 0.25, 1.0};
+  GSHSCENE_Mask m;
+  memset(&m, 0, sizeof m);
+  m.picture = picture;
+  m.mode = GSHSCENE_MASK_ALPHA;
+  switch (v % 6) {
+    case 1:
+      m.mode = GSHSCENE_MASK_LUMINANCE;
+      break;
+    case 2:
+      m.mode = GSHSCENE_MASK_LUMINANCE;
+      m.coefficients = GSHSCENE_MASK_COEFF_REC709;
+      m.space.primaries = GCOL_PRIMARIES_SRGB;
+      m.space.transfer = GCOL_TRANSFER_LINEAR;
+      m.backdrop[1] = 0.5;
+      break;
+    case 3:
+      m.acts_on = GSHSCENE_MASK_ACTS_ON_SHAPE;
+      m.transfer.kind = GSHSCENE_TRANSFER_TABLE;
+      m.transfer.sample_count = 3;
+      m.transfer.samples = table;
+      break;
+    case 4:
+      m.transfer.kind = GSHSCENE_TRANSFER_EXPONENTIAL;
+      m.transfer.c1 = 1.0;
+      m.transfer.n = 2.0;
+      break;
+    case 5:
+      m.mode = GSHSCENE_MASK_LUMINANCE;
+      m.coefficients = GSHSCENE_MASK_COEFF_LUM;
+      break;
+    default:
+      break;
+  }
+  const GSHSCENE_Resource * r = NULL;
+  return gshscene_store_intern_mask(store, &m, &r) == GSHSCENE_OK ? r : NULL;
+}
+
+/** MK1 to MK4, MK9, MK13: a mask from the input, its result class predicted and its content read back. */
+static void fuzz_mask(S * s) {
+  const GSHSCENE_Limits * lim = &s->limits;
+  unsigned psel = pick(s, 11), mode = pick(s, 4), coeff = pick(s, 5), acts = pick(s, 3);
+  unsigned lsel = pick(s, 6), rsel = pick(s, 6), bsel = pick(s, 6), back = pick(s, 6), tsel = pick(s, 13);
+  unsigned slot = pick(s, 4), clean = pick(s, 4);
+  /* Three in four of the alpha masks are spelled as MK1 asks (no coefficient set, no luminance space, no backdrop). */
+  if (clean && mode == GSHSCENE_MASK_ALPHA) {
+    coeff = 0;
+    lsel = 0;
+    bsel = 0;
+    back = 0;
+  }
+  const GSHSCENE_Resource * foreign = NULL;
+  const GSHSCENE_Resource * pic = NULL;
+  if (psel < POOL) {
+    pic = s->pictures[psel];
+  } else if (psel == POOL) {
+    pic = s->res[0]; /* a path */
+  } else if (psel == POOL + 1 && s->scene) {
+    foreign = one_fill_picture(s, gshscene_scene_store(s->scene), 2); /* a picture of another store */
+    pic = foreign;
+  }
+  int pic_ok = psel < POOL && pic != NULL;
+  int invalid = !pic_ok, unsupported = 0, limit = 0;
+  GSHSCENE_Mask m;
+  memset(&m, 0, sizeof m);
+  m.picture = pic;
+  m.mode = mode;
+  m.coefficients = coeff;
+  m.acts_on = acts;
+  m.space = mask_space(lsel, &invalid, &unsupported);
+  m.render_space = mask_space(rsel, &invalid, &unsupported);
+  m.backdrop_space = mask_space(bsel, &invalid, &unsupported);
+  switch (back) {
+    case 1:
+      m.backdrop[0] = 0.25;
+      m.backdrop[1] = 0.5;
+      m.backdrop[2] = 1.0;
+      break;
+    case 2:
+      m.backdrop[0] = 0x1p16;
+      m.backdrop[1] = -0x1p16;
+      break;
+    case 3:
+      m.backdrop[0] = 0x1.0000000000001p16;
+      limit = 1;
+      break;
+    case 4:
+      m.backdrop[0] = (double)NAN;
+      invalid = 1;
+      break;
+    case 5:
+      m.backdrop[0] = -0.0;
+      break;
+    default:
+      break;
+  }
+  int backdrop_set = m.backdrop[0] != 0.0 || m.backdrop[1] != 0.0 || m.backdrop[2] != 0.0;
+  GSHSCENE_Transfer_Piece pieces[MASK_BIG_PIECES];
+  static const double two[2] = {0.0, 1.0};
+  static const double one[1] = {0.5};
+  static const double big[MASK_BIG_SAMPLES];
+  GSHSCENE_Transfer * t = &m.transfer;
+  switch (tsel) {
+    case 2:
+      t->kind = GSHSCENE_TRANSFER_EXPONENTIAL;
+      t->c0 = 0.1;
+      t->c1 = 0.9;
+      t->n = 2.0;
+      break;
+    case 3:
+      t->kind = GSHSCENE_TRANSFER_EXPONENTIAL;
+      t->n = -1.0;
+      invalid = 1;
+      break;
+    case 4:
+      t->kind = GSHSCENE_TRANSFER_EXPONENTIAL;
+      t->c1 = 1.0;
+      t->n = 0x1p16;
+      break;
+    case 5:
+      t->kind = GSHSCENE_TRANSFER_EXPONENTIAL;
+      t->c1 = 1.0;
+      t->n = 0x1.0000000000001p16;
+      limit = 1;
+      break;
+    case 6:
+      t->kind = GSHSCENE_TRANSFER_TABLE;
+      t->sample_count = 2;
+      t->samples = two;
+      break;
+    case 7:
+      t->kind = GSHSCENE_TRANSFER_TABLE;
+      t->sample_count = 1;
+      t->samples = one;
+      invalid = 1;
+      break;
+    case 8:
+    case 9:
+    case 10:
+    case 11: {
+      size_t k = tsel == 10 ? 257 : tsel == 11 ? 256 : 2;
+      t->kind = GSHSCENE_TRANSFER_STITCHING;
+      t->piece_count = k;
+      t->pieces = pieces;
+      memset(pieces, 0, sizeof pieces);
+      for (size_t i = 0; i < k; i++) {
+        pieces[i].lo = (double)i / (double)k;
+        pieces[i].hi = (double)(i + 1) / (double)k;
+        pieces[i].e0 = 0.0;
+        pieces[i].e1 = 1.0;
+        pieces[i].leaf_kind = i % 2 ? GSHSCENE_TRANSFER_EXPONENTIAL : GSHSCENE_TRANSFER_IDENTITY;
+        pieces[i].c1 = i % 2 ? 1.0 : 0.0;
+        pieces[i].n = i % 2 ? 0.5 : 0.0;
+      }
+      if (tsel == 9) {
+        pieces[1].lo = 0.75; /* a gap */
+        invalid = 1;
+      }
+      limit = limit || k > GSHSCENE_MASK_MAX_PIECES;
+      break;
+    }
+    case 12:
+      t->kind = GSHSCENE_TRANSFER_TABLE;
+      t->sample_count = MASK_BIG_SAMPLES;
+      t->samples = big;
+      limit = 1;
+      break;
+    default:
+      break;
+  }
+  int alpha = mode == GSHSCENE_MASK_ALPHA;
+  invalid = invalid || mode == 0 || mode >= GSHSCENE_MASK_MODE_COUNT || coeff >= GSHSCENE_MASK_COEFF_COUNT ||
+      acts >= GSHSCENE_MASK_ACTS_ON_COUNT ||
+      (alpha && (coeff != 0 || lsel % 6 != 0 || bsel % 6 != 0 || backdrop_set));
+  GSHSCENE_Result want = invalid ? GSHSCENE_ERR_INVALID : unsupported ? GSHSCENE_ERR_UNSUPPORTED : limit ? GSHSCENE_ERR_LIMIT : GSHSCENE_OK;
+  const GSHSCENE_Resource * made = NULL;
+  GSHSCENE_Store_Stats before, after;
+  CHECK(gshscene_store_stats(s->store, &before) == GSHSCENE_OK);
+  GSHSCENE_Result r = gshscene_store_intern_mask(s->store, &m, &made);
+  CHECK(gshscene_store_stats(s->store, &after) == GSHSCENE_OK);
+  CHECK(r != GSHSCENE_ERR_INTERNAL && r != GSHSCENE_ERR_OOM && r != GSHSCENE_ERR_CORRUPT && r != GSHSCENE_ERR_IO);
+  if (want != GSHSCENE_OK) {
+    CHECK(r == want); /* MK1: invalid, then unsupported, then a bound */
+    outcomes[OUT_MASK_INVALID] += want == GSHSCENE_ERR_INVALID;
+    outcomes[OUT_MASK_UNSUPPORTED] += want == GSHSCENE_ERR_UNSUPPORTED;
+    outcomes[OUT_MASK_LIMIT] += want == GSHSCENE_ERR_LIMIT;
+  } else if (r != GSHSCENE_OK) {
+    CHECK(r == GSHSCENE_ERR_LIMIT); /* only the store's own limits refuse what MK1 accepts */
+    CHECK(before.live >= lim->max_resources || before.bytes + GSHSCENE_BYTES_BASE > lim->max_bytes);
+    outcomes[OUT_MASK_LIMIT]++;
+  }
+  if (r != GSHSCENE_OK) {
+    CHECK(made == NULL && before.live == after.live && before.bytes == after.bytes && before.created == after.created);
+    gshscene_resource_release(foreign);
+    return;
+  }
+  outcomes[OUT_MASK_INTERNED]++;
+  outcomes[OUT_MASK_LUMINANCE] += mode == GSHSCENE_MASK_LUMINANCE;
+  outcomes[OUT_MASK_TRANSFER] += t->kind != GSHSCENE_TRANSFER_IDENTITY;
+  CHECK(gshscene_resource_kind(made) == GSHSCENE_RESOURCE_MASK);
+  uint64_t hash = gshscene_resource_hash(made);
+  CHECK(hash != 0);
+  GSHSCENE_Mask back_m;
+  CHECK(gshscene_resource_mask(made, &back_m) == GSHSCENE_OK);
+  CHECK(back_m.picture == pic && back_m.mode == mode && back_m.coefficients == coeff && back_m.acts_on == acts);
+  CHECK(space_same(&back_m.space, &m.space) && space_same(&back_m.render_space, &m.render_space) &&
+        space_same(&back_m.backdrop_space, &m.backdrop_space));
+  for (int i = 0; i < 3; i++) {
+    CHECK(same_bits(back_m.backdrop[i], m.backdrop[i] == 0.0 ? 0.0 : m.backdrop[i])); /* -0 is spelled +0 */
+  }
+  CHECK(back_m.transfer.kind == t->kind && back_m.transfer.sample_count == t->sample_count &&
+        back_m.transfer.piece_count == t->piece_count);
+  CHECK(gshscene_mask_required(made) == mask_features(&back_m));
+  /* The transfer is a number in [0, 1] whatever the input (MK2, MK4). */
+  for (int i = 0; i < 5; i++) {
+    double v = gshscene_mask_transfer(made, i / 4.0 * 1.5 - 0.25);
+    CHECK(v >= 0.0 && v <= 1.0);
+  }
+  /* Found again: one handle (MK1), and the hash is the handle's (MK13). */
+  const GSHSCENE_Resource * again = NULL;
+  CHECK(gshscene_store_intern_mask(s->store, &m, &again) == GSHSCENE_OK && again == made);
+  CHECK(gshscene_resource_hash(again) == hash);
+  gshscene_resource_release(again);
+  outcomes[OUT_MASK_HIT]++;
+  /* The nearest neighbor, one field away (the acting-on), is another handle with another hash. */
+  GSHSCENE_Mask near_m = m;
+  near_m.acts_on = acts ^ 1u;
+  const GSHSCENE_Resource * other = NULL;
+  GSHSCENE_Result nr = gshscene_store_intern_mask(s->store, &near_m, &other);
+  CHECK(nr == GSHSCENE_OK || nr == GSHSCENE_ERR_LIMIT);
+  if (nr == GSHSCENE_OK) {
+    CHECK(other != made && gshscene_resource_hash(other) != hash);
+    GSHSCENE_Mask other_m;
+    CHECK(gshscene_resource_mask(other, &other_m) == GSHSCENE_OK && other_m.acts_on == (acts ^ 1u));
+    gshscene_resource_release(other);
+    outcomes[OUT_MASK_NEAR]++;
+  }
+  /* The dump is the content's: twice the same, naming the picture by hash and never holding its items. */
+  char * d0 = resource_text(made);
+  char * d1 = resource_text(made);
+  if (d0 && d1) {
+    CHECK(strcmp(d0, d1) == 0 && strstr(d0, "picture=") != NULL && strstr(d0, "mode=") != NULL);
+  }
+  free(d0);
+  free(d1);
+  /* A mask in the pool is checked at every hold (hold_check): its hash is its content's, for as long as it is held. */
+  CHECK(!s->masks[slot] || gshscene_resource_hash(s->masks[slot]) == s->mask_hash[slot]);
+  gshscene_resource_release(s->masks[slot]);
+  s->masks[slot] = made;
+  s->mask_hash[slot] = hash;
+  gshscene_resource_release(foreign);
+}
+
+/** A list of one masked group (and a fill in it), closed, in the standalone store; NULL where a limit refuses it. */
+static GSHSCENE_List * masked_pair(S * s, const GSHSCENE_Group * g, const GSHSCENE_Resource * fill) {
+  GSHSCENE_List * l = NULL;
+  if (gshscene_list_create(&s->alloc, &s->limits, s->store, &l) != GSHSCENE_OK) {
+    return NULL;
+  }
+  if (gshscene_list_group_push(l, g, 0, 0.0) != GSHSCENE_OK ||
+      (fill && gshscene_list_fill(l, fill, NULL, GSHGEOM_FILL_NONZERO, NULL, 0, 0.0) != GSHSCENE_OK) ||
+      gshscene_list_group_pop(l) != GSHSCENE_OK || gshscene_list_close(l) != GSHSCENE_OK) {
+    gshscene_list_destroy(l);
+    return NULL;
+  }
+  return l;
+}
+
+/** MK6, MK12, MK13: a group recorded with a mask of the pool and a placement; a list of it equal to another alike. */
+static void fuzz_mask_group(S * s) {
+  unsigned msel = pick(s, 5), psel = pick(s, 8), isol = pick(s, 2), ko = pick(s, 2), op = pick(s, 5);
+  if (!s->list) {
+    return;
+  }
+  const GSHSCENE_Resource * mask = msel < 4 ? s->masks[msel] : NULL;
+  GSHSCENE_Group g;
+  memset(&g, 0, sizeof g);
+  g.opacity = op / 4.0;
+  g.isolation = isol ? GSHSCENE_ISOLATION_NON_ISOLATED : GSHSCENE_ISOLATION_ISOLATED;
+  g.knockout = (uint32_t)ko;
+  g.soft_mask = mask;
+  GSHGEOM_Map placement;
+  gshgeom_map_identity(2, &placement);
+  int placed = 1;
+  GSHSCENE_Result want = GSHSCENE_OK;
+  switch (psel) {
+    case 0:
+      placed = 0; /* the zero-filled map: the identity */
+      break;
+    case 1:
+      break; /* an identity given */
+    case 2:
+      gshgeom_map_translate(2, 3.0, -2.0, 0.0, &placement);
+      want = mask ? GSHSCENE_OK : GSHSCENE_ERR_INVALID; /* only a group with a mask places one */
+      break;
+    case 3:
+      gshgeom_map_rotate(GSHGEOM_ANGLE_DEGREES, 90.0, &placement);
+      want = mask ? GSHSCENE_OK : GSHSCENE_ERR_INVALID;
+      break;
+    case 4:
+      gshgeom_map_scale(2, 0.0, 1.0, 1.0, &placement); /* singular: legal (MK5) */
+      want = mask ? GSHSCENE_OK : GSHSCENE_ERR_INVALID;
+      break;
+    case 5:
+      placement.m[0][0] = (double)NAN;
+      want = GSHSCENE_ERR_INVALID;
+      break;
+    case 6:
+      gshgeom_map_identity(3, &placement); /* a mask is planar */
+      want = mask ? GSHSCENE_ERR_UNSUPPORTED : GSHSCENE_ERR_INVALID;
+      break;
+    default:
+      gshgeom_map_translate(2, 1.0, 1.0, 0.0, &placement);
+      want = mask ? GSHSCENE_OK : GSHSCENE_ERR_INVALID;
+      break;
+  }
+  if (placed) {
+    g.soft_mask_map = placement;
+  }
+  ListSnap b = snap(s->list);
+  GSHSCENE_Result r = gshscene_list_group_push(s->list, &g, 0, 0.0);
+  if (want != GSHSCENE_OK) {
+    CHECK(r == want);
+    outcomes[OUT_MASK_GROUP_INVALID] += want == GSHSCENE_ERR_INVALID;
+    outcomes[OUT_MASK_GROUP_UNSUPPORTED] += want == GSHSCENE_ERR_UNSUPPORTED;
+    list_after(s, b, r, 1, 0);
+    return;
+  }
+  list_after(s, b, r, 1, 0);
+  if (r != GSHSCENE_OK) {
+    return;
+  }
+  const GSHSCENE_Item * item = NULL;
+  CHECK(gshscene_list_item(s->list, gshscene_list_count(s->list) - 1, &item) == GSHSCENE_OK);
+  CHECK(item->group.soft_mask == mask);
+  if (mask) {
+    const GSHGEOM_Map * got = &item->group.soft_mask_map;
+    CHECK(got->dim == 2);
+    for (int i = 0; i < 2; i++) {
+      CHECK(same_bits(got->t[i], placed ? placement.t[i] : 0.0));
+      for (int j = 0; j < 2; j++) {
+        CHECK(same_bits(got->m[i][j], placed ? placement.m[i][j] : (i == j ? 1.0 : 0.0)));
+      }
+    }
+    /* MK12: a list holding a masked group is as deep as the mask's picture. */
+    GSHSCENE_Mask content;
+    CHECK(gshscene_resource_mask(mask, &content) == GSHSCENE_OK);
+    CHECK(list_picture_depth(s->list) >= gshscene_resource_picture_depth(content.picture));
+    outcomes[OUT_MASK_GROUP]++;
+  }
+  /* Equality by content (MK13): a second list of the same group is equal, with the same hash and the same dump; one with
+   * another mask or another placement is not. */
+  if (mask) {
+    GSHSCENE_List * a = masked_pair(s, &g, s->res[0]);
+    GSHSCENE_List * c = masked_pair(s, &g, s->res[0]);
+    if (a && c) {
+      CHECK(gshscene_list_equal(a, c) && gshscene_list_hash(a) == gshscene_list_hash(c));
+      char * da = list_text(a);
+      char * dc = list_text(c);
+      if (da && dc) {
+        CHECK(strcmp(da, dc) == 0 && strstr(da, "mask=") != NULL && strstr(da, "maskmap=") != NULL);
+      }
+      free(da);
+      free(dc);
+      outcomes[OUT_MASK_LIST_EQUAL]++;
+      GSHSCENE_Group h = g;
+      GSHGEOM_Map moved;
+      gshgeom_map_translate(2, 7.5, 0.0, 0.0, &moved);
+      h.soft_mask_map = moved;
+      GSHSCENE_List * d = masked_pair(s, &h, s->res[0]);
+      if (d) {
+        CHECK(!gshscene_list_equal(a, d) && gshscene_list_hash(a) != gshscene_list_hash(d)); /* the placement is hashed and compared */
+        gshscene_list_destroy(d);
+      }
+      for (unsigned k = 0; k < 4; k++) {
+        if (s->masks[k] && s->masks[k] != mask) {
+          h = g;
+          h.soft_mask = s->masks[k];
+          GSHSCENE_List * e = masked_pair(s, &h, s->res[0]);
+          if (e) {
+            CHECK(!gshscene_list_equal(a, e) && gshscene_list_hash(a) != gshscene_list_hash(e)); /* the mask is hashed and compared */
+            gshscene_list_destroy(e);
+          }
+          break;
+        }
+      }
+    }
+    gshscene_list_destroy(a);
+    gshscene_list_destroy(c);
+  }
+}
+
+/** MK6, MK11, MK13: a group node of a scene of its own given a mask and a placement, published, diffed and emitted. */
+static void fuzz_mask_node(S * s) {
+  unsigned va = pick(s, 6), vb = pick(s, 6), psel = pick(s, 5), kind = pick(s, 3), mapsel = pick(s, 3);
+  GSHSCENE_Scene * sc = NULL;
+  if (gshscene_scene_create(&s->alloc, NULL, NULL, &sc) != GSHSCENE_OK) {
+    return;
+  }
+  GSHSCENE_Store * store = gshscene_scene_store(sc);
+  GSHSCENE_Result ignored;
+  const GSHSCENE_Resource * picture = one_fill_picture(s, store, 2);
+  const GSHSCENE_Resource * shape = intern_recipe(s, store, 2, &ignored);
+  const GSHSCENE_Resource * ma = picture ? mask_variant(store, picture, va) : NULL;
+  const GSHSCENE_Resource * mb = picture ? mask_variant(store, picture, vb + (vb == va ? 1u : 0u)) : NULL;
+  GSHSCENE_Edit * e = NULL;
+  GSHSCENE_Problems * problems = NULL;
+  const GSHSCENE_Version * v[4] = {NULL, NULL, NULL, NULL};
+  if (ma && mb && shape && gshscene_scene_open_edit(sc, NULL, &e) == GSHSCENE_OK) {
+    GSHSCENE_Node g;
+    gshscene_node_init(GSHSCENE_NODE_GROUP, &g);
+    GSHGEOM_Map node_map;
+    gshgeom_map_translate(2, mapsel * 10.0, 0.0, 0.0, &node_map);
+    g.map = node_map;
+    /* A placement with no mask is invalid (MK13); one with a mask is stored. */
+    GSHSCENE_Node bad = g;
+    gshgeom_map_translate(2, 2.0, 3.0, 0.0, &bad.soft_mask_map);
+    uint64_t gid = 0, sid = 0;
+    int built = gshscene_edit_add(e, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, &g, NULL, &gid) == GSHSCENE_OK;
+    if (built) {
+      CHECK(gshscene_edit_set(e, gid, &bad) == GSHSCENE_ERR_INVALID);
+      outcomes[OUT_MASK_NODE_INVALID]++;
+      GSHSCENE_Node sh;
+      gshscene_node_init(GSHSCENE_NODE_SHAPE, &sh);
+      sh.resource = shape;
+      built = gshscene_edit_add(e, gid, GSHSCENE_APPEND, &sh, NULL, &sid) == GSHSCENE_OK;
+    }
+    GSHSCENE_Edit * one[1] = {e};
+    const GSHSCENE_Version * out = NULL;
+    if (built && gshscene_scene_merge(sc, one, 1, &problems, &out) == GSHSCENE_OK) {
+      v[0] = out; /* a reference for the caller */
+      /* Version 1 holds the mask ma placed by q; version 2 the same again (nothing changes); version 3 the mask mb. */
+      GSHGEOM_Map q;
+      gshgeom_map_identity(2, &q);
+      switch (psel) {
+        case 1: gshgeom_map_translate(2, 4.0, 1.0, 0.0, &q); break;
+        case 2: gshgeom_map_rotate(GSHGEOM_ANGLE_DEGREES, 90.0, &q); break;
+        case 3: gshgeom_map_scale(2, 0.0, 1.0, 1.0, &q); break;
+        default: break;
+      }
+      const GSHSCENE_Resource * masks[4] = {NULL, ma, ma, mb};
+      for (int step = 1; step < 4; step++) {
+        GSHSCENE_Edit * ed = NULL;
+        if (gshscene_scene_open_edit(sc, v[step - 1], &ed) != GSHSCENE_OK) {
+          break;
+        }
+        GSHSCENE_Node n = g;
+        n.soft_mask = masks[step];
+        n.soft_mask_map = q;
+        n.isolation = kind == 1 ? GSHSCENE_ISOLATION_NON_ISOLATED : GSHSCENE_ISOLATION_ISOLATED;
+        CHECK(gshscene_edit_set(ed, gid, &n) == GSHSCENE_OK);
+        outcomes[OUT_MASK_NODE]++;
+        GSHSCENE_Edit * list[1] = {ed};
+        const GSHSCENE_Version * merged = NULL;
+        GSHSCENE_Result mr = gshscene_scene_merge(sc, list, 1, &problems, &merged);
+        gshscene_edit_destroy(ed);
+        if (mr != GSHSCENE_OK) {
+          break;
+        }
+        v[step] = merged;
+      }
+      for (int step = 1; step < 4 && v[step]; step++) {
+        GSHSCENE_Diff * d = NULL;
+        GSHSCENE_Damage dmg;
+        CHECK(gshscene_diff(v[step - 1], v[step], NULL, NULL, &d) == GSHSCENE_OK);
+        CHECK(gshscene_diff_damage(d, &dmg) == GSHSCENE_OK);
+        if (step == 2) {
+          /* The same handle and the same placement: nothing changed, nothing damaged (MK11). */
+          CHECK(gshscene_diff_count(d) == 0 && dmg.empty && !dmg.unbounded);
+          outcomes[OUT_MASK_NO_DAMAGE]++;
+        } else {
+          /* A mask added or swapped: a change of the group, and its content damaged (MK11). */
+          CHECK(gshscene_diff_count(d) == 1 && !dmg.empty);
+          uint64_t id;
+          GSHSCENE_Diff_Kind dk;
+          CHECK(gshscene_diff_get(d, 0, &id, &dk) == GSHSCENE_OK && id == gid);
+          outcomes[OUT_MASK_DAMAGE]++;
+        }
+        gshscene_diff_destroy(d);
+        /* The emitted list names the mask and the placement composed with the node's map (MK6). */
+        const GSHSCENE_List * emitted = NULL;
+        if (gshscene_version_list(v[step], &emitted) == GSHSCENE_OK) {
+          int pushes = 0;
+          for (size_t i = 0; i < gshscene_list_count(emitted); i++) {
+            const GSHSCENE_Item * it;
+            CHECK(gshscene_list_item(emitted, i, &it) == GSHSCENE_OK);
+            if (it->kind == GSHSCENE_ITEM_GROUP_PUSH && it->group.soft_mask) {
+              GSHGEOM_Map want;
+              CHECK(it->group.soft_mask == masks[step]);
+              CHECK(gshgeom_map_compose(&node_map, &q, &want) == GSHGEOM_OK);
+              CHECK(gshgeom_map_hash(&want) == gshgeom_map_hash(&it->group.soft_mask_map));
+              pushes++;
+            }
+          }
+          CHECK(pushes == 1);
+          outcomes[OUT_MASK_EMITTED]++;
+        }
+      }
+    }
+  }
+  for (int step = 0; step < 4; step++) {
+    gshscene_version_release(v[step]);
+  }
+  gshscene_problems_destroy(problems);
+  gshscene_edit_destroy(e);
+  gshscene_resource_release(ma);
+  gshscene_resource_release(mb);
+  gshscene_resource_release(shape);
+  gshscene_resource_release(picture);
+  gshscene_scene_destroy(sc);
 }
 
 /* --- one op ----------------------------------------------------------------------------------------------------------- */
@@ -1093,9 +1768,28 @@ static void op(S * s, unsigned code) {
       const GSHSCENE_Resource * pic = NULL;
       GSHSCENE_Store_Stats before;
       CHECK(gshscene_store_stats(s->store, &before) == GSHSCENE_OK);
+      size_t list_depth = list_picture_depth(s->list);
+      int deepest_is_mask = 0;
+      for (size_t i = 0; i < gshscene_list_count(s->list); i++) {
+        const GSHSCENE_Item * it;
+        CHECK(gshscene_list_item(s->list, i, &it) == GSHSCENE_OK);
+        if (it->kind == GSHSCENE_ITEM_GROUP_PUSH && it->group.soft_mask) {
+          GSHSCENE_Mask content;
+          CHECK(gshscene_resource_mask(it->group.soft_mask, &content) == GSHSCENE_OK);
+          deepest_is_mask = deepest_is_mask || gshscene_resource_picture_depth(content.picture) == list_depth;
+        }
+      }
       r = gshscene_store_intern_picture(s->store, s->list, &pic);
       CHECK(r == GSHSCENE_OK || r == GSHSCENE_ERR_INVALID || r == GSHSCENE_ERR_LIMIT);
+      /* MK12: a mask counts as an instance does, so a picture is one level deeper than the deepest picture it names, and the
+       * bound is met when that passes max_picture_depth. */
+      if (list_depth + 1 > lim->max_picture_depth) {
+        CHECK(r != GSHSCENE_OK);
+        outcomes[OUT_MASK_DEPTH_LIMIT] += deepest_is_mask && r == GSHSCENE_ERR_LIMIT;
+      }
       if (r == GSHSCENE_OK) {
+        CHECK(gshscene_resource_picture_depth(pic) == list_depth + 1);
+        outcomes[OUT_MASK_DEPTH] += deepest_is_mask && list_depth > 0;
         unsigned slot = pick(s, POOL);
         gshscene_resource_release(s->pictures[slot]);
         s->pictures[slot] = pic;
@@ -2643,6 +3337,15 @@ static void op(S * s, unsigned code) {
       gshscene_resource_release(made);
       break;
     }
+    case OP_INTERN_MASK:
+      fuzz_mask(s);
+      break;
+    case OP_GROUP_MASK:
+      fuzz_mask_group(s);
+      break;
+    case OP_NODE_MASK:
+      fuzz_mask_node(s);
+      break;
     default:
       break;
   }
@@ -2733,6 +3436,10 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
   }
   for (int i = 0; i < 3; i++) {
     gshscene_resource_release(s->images[i]);
+  }
+  for (int i = 0; i < 4; i++) {
+    CHECK(!s->masks[i] || gshscene_resource_hash(s->masks[i]) == s->mask_hash[i]);
+    gshscene_resource_release(s->masks[i]);
   }
   gshscene_scene_destroy(s->scene);
   GSHSCENE_Store_Stats stats;

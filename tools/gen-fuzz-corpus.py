@@ -35,7 +35,8 @@ OPS = ["LIST_CREATE", "FILL", "CLIP_PUSH", "CLIP_POP", "GROUP_PUSH", "GROUP_POP"
        "PUBLISH", "MERGE", "HOLD", "RELEASE_VERSION", "DIFF", "EMIT", "VISIT", "DUMP", "SCENE_INTERN",
        "FILL_EX", "CLIP_PUSH_EX", "GROUP_PUSH_EX", "LIST_FOREGROUND", "NODE_PROPS", "EDIT_FOREGROUND", "LIST_PALETTE",
        "FILL_FIXED", "TRUNCATE", "EDIT_PALETTE", "INTERN_GRADIENT", "FILL_GRADIENT", "SCENE_GRADIENT", "GRADIENT_NODE",
-       "COLOR_BOUND", "GROUP_PDF", "NODE_PDF", "INTERN_STYLE", "STROKE", "STROKE_NODE", "PLACEHOLDER", "PLACEHOLDER_NODE", "INTERN_IMAGE", "IMAGE_NOT_SHAPE", "IMAGE_PAINT"]
+       "COLOR_BOUND", "GROUP_PDF", "NODE_PDF", "INTERN_STYLE", "STROKE", "STROKE_NODE", "PLACEHOLDER", "PLACEHOLDER_NODE", "INTERN_IMAGE", "IMAGE_NOT_SHAPE", "IMAGE_PAINT",
+       "INTERN_MASK", "GROUP_MASK", "NODE_MASK"]
 OP = {name: i for i, name in enumerate(OPS)}
 
 BIASED = {
@@ -46,7 +47,7 @@ BIASED = {
     "FILL_EX": 5, "CLIP_PUSH_EX": 2, "GROUP_PUSH_EX": 4, "LIST_FOREGROUND": 1, "NODE_PROPS": 5, "EDIT_FOREGROUND": 2,
     "LIST_PALETTE": 2, "FILL_FIXED": 4, "TRUNCATE": 2, "EDIT_PALETTE": 2, "INTERN_GRADIENT": 4, "FILL_GRADIENT": 4,
     "SCENE_GRADIENT": 4, "GRADIENT_NODE": 5, "INTERN_STYLE": 5, "STROKE": 4, "STROKE_NODE": 4,
-    "INTERN_IMAGE": 6, "IMAGE_NOT_SHAPE": 2, "IMAGE_PAINT": 6,
+    "INTERN_IMAGE": 6, "IMAGE_NOT_SHAPE": 2, "IMAGE_PAINT": 6, "INTERN_MASK": 8, "GROUP_MASK": 6, "NODE_MASK": 3,
 }
 
 BIASED_FILES = 160
@@ -128,6 +129,11 @@ def scripted():
     # Two sibling edits that both add under the root overlap on the root: the merge is refused.
     seq = bytearray([0xFF, 0xFF]) + open_edit(0) + open_edit(1) + add_shape(0, 0) + add_shape(0, 1) + merge_two()
     out["scripted-merge-refused.bin"] = bytes(seq)
+    # Two sibling edits of disjoint parts merge: a group published first, then one edit adds a shape under it and the other
+    # one under the root (random inputs reached this by luck until the op table grew).
+    seq = (bytearray([0xFF, 0xFF]) + open_edit(0) + add_group(0, 0) + publish(0) + bytes([OP["DESTROY_EDIT"], 0])
+           + open_edit(0) + open_edit(1) + add_shape(2, 0) + add_shape(0, 1) + merge_two())
+    out["scripted-merge-ok.bin"] = bytes(seq)
     # An instance of a node that is not there: refused at publish, naming it (ADD kind 2: the target is an id pick, 1 is bogus).
     seq = bytearray([0xFF, 0xFF]) + open_edit(0) + bytes([OP["ADD"], 0, 0, 5, 2, 1, 2, 0, 0, 1, 0, 0, 0]) + publish(0)
     out["scripted-publish-invalid.bin"] = bytes(seq)
@@ -301,6 +307,71 @@ def scripted():
               + paint(3, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0)         # a path where an image goes: invalid
               + paint(4, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0))        # nothing: invalid
     out["scripted-image-paints.bin"] = bytes(bytearray([0xFF, 0xFF]) + paints)
+    # Masks-images-patterns story M1.  INTERN_MASK reads: the picture pick (0 to 7 the pool, 8 a path, 9 a picture of the scene's
+    # store, 10 none), the mode (0 and 3 invalid), the coefficient set (4 invalid), the acting-on (2 invalid), the luminance, render
+    # and backdrop space picks (0 none, 1 to 3 carried, 4 ProPhoto: unsupported, 5 half given: invalid), the backdrop pick (0 zero,
+    # 1 ordinary, 2 at the bound, 3 one step past it, 4 NaN, 5 minus zero), the transfer pick (0 and 1 identity, 2 an exponential,
+    # 3 a negative exponent, 4 and 5 the exponent at and past 2^16, 6 a two-sample table, 7 a one-sample table, 8 a two-piece
+    # stitching, 9 one with a gap, 10 257 pieces, 11 256, 12 4097 samples), the pool slot and whether an alpha mask is spelled as
+    # MK1 asks (nonzero: the coefficient, luminance space and backdrop are cleared).  GROUP_MASK reads the mask's slot (4 none),
+    # the placement pick (0 none given, 1 the identity, 2 a translation, 3 a rotation, 4 singular, 5 NaN, 6 three-dimensional,
+    # 7 another translation), the isolation, the knockout and the opacity.  NODE_MASK reads two mask variants, the placement
+    # (identity, translation, rotation, singular), the isolation pick and the node's own translation.
+    def mask(pic, mode, coeff, acts, lsel, rsel, bsel, back, tsel, slot, clean):
+        return bytes([OP["INTERN_MASK"], pic, mode, coeff, acts, lsel, rsel, bsel, back, tsel, slot, clean])
+
+    def gmask(slot, place, isolation=0, knockout=0, opacity=4):
+        return bytes([OP["GROUP_MASK"], slot, place, isolation, knockout, opacity])
+
+    pop = bytes([OP["GROUP_POP"]])
+    start = bytes([OP["LIST_CREATE"], OP["CLOSE"], OP["FREEZE"], 0, OP["LIST_CREATE"]])  # the empty picture in pool slot 0, a fresh list
+    made = (mask(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)                # slot 0: an alpha mask, identity transfer
+            + mask(0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 1)              # slot 1: a luminance mask, W3C
+            + mask(0, 2, 2, 1, 1, 2, 1, 1, 2, 2, 1)              # slot 2: luminance, LUM, three spaces, a backdrop, exponential, shape
+            + mask(0, 1, 0, 0, 0, 3, 0, 0, 6, 3, 1)              # slot 3: alpha in a render space, a two-sample table
+            + mask(0, 1, 0, 0, 0, 0, 0, 5, 8, 0, 1)              # slot 0 again: a two-piece stitching, a backdrop of minus zero
+            + mask(0, 1, 0, 0, 0, 0, 0, 0, 11, 0, 1)             # 256 pieces: at the bound
+            + mask(0, 1, 0, 0, 0, 0, 0, 0, 8, 0, 1)              # back to two pieces in slot 0
+            + mask(0, 2, 0, 0, 0, 0, 0, 2, 4, 1, 1)              # the backdrop and the exponent at their bounds
+            + mask(0, 2, 3, 1, 3, 0, 0, 0, 0, 1, 1)             # slot 1: SPACE_Y in a gamma space, acting on the shape
+            + mask(0, 1, 0, 0, 0, 0, 0, 0, 0, 3, 1))             # slot 3: the first again (found)
+    refused = (mask(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)             # mode zero
+               + mask(0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 1)           # mode past the enum
+               + mask(0, 1, 4, 0, 0, 0, 0, 0, 0, 0, 1)           # a coefficient set past the enum
+               + mask(0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0)           # a coefficient set on an alpha mask
+               + mask(0, 1, 0, 2, 0, 0, 0, 0, 0, 0, 1)           # acting-on past the enum
+               + mask(0, 1, 0, 0, 2, 0, 0, 0, 0, 0, 0)           # a luminance space on an alpha mask
+               + mask(0, 2, 0, 0, 5, 0, 0, 0, 0, 0, 1)           # a half-given space
+               + mask(0, 2, 0, 0, 0, 0, 0, 4, 0, 0, 1)           # a NaN backdrop
+               + mask(0, 2, 0, 0, 0, 0, 0, 0, 3, 0, 1)           # a negative exponent
+               + mask(0, 2, 0, 0, 0, 0, 0, 0, 7, 0, 1)           # a one-sample table
+               + mask(0, 2, 0, 0, 0, 0, 0, 0, 9, 0, 1)           # a stitching with a gap
+               + mask(8, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)           # a path where a picture goes
+               + mask(9, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)           # a picture of another store
+               + mask(10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)          # no picture
+               + mask(1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)           # an empty pool slot
+               + mask(0, 2, 0, 0, 4, 0, 0, 0, 0, 0, 1)           # a space this library does not carry
+               + mask(0, 2, 0, 0, 0, 0, 0, 3, 0, 0, 1)           # a backdrop past 2^16
+               + mask(0, 1, 0, 0, 0, 0, 0, 0, 5, 0, 1)           # an exponent past 2^16
+               + mask(0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 1)          # 257 pieces
+               + mask(0, 1, 0, 0, 0, 0, 0, 0, 12, 0, 1))         # 4097 samples
+    groups = (gmask(0, 0) + pop                                   # a group with a mask and no placement given
+              + gmask(1, 2, 1, 1) + pop                           # placed, non-isolated knockout
+              + gmask(2, 3) + pop + gmask(3, 4) + pop             # rotated, singular
+              + gmask(0, 1) + pop + gmask(1, 7, 0, 1, 2) + pop    # an identity given, another translation
+              + gmask(2, 5) + gmask(2, 6)                         # NaN: invalid; three-dimensional: unsupported
+              + gmask(4, 2) + gmask(4, 5) + gmask(4, 6)           # a placement and no mask: invalid
+              + gmask(4, 0) + pop)                                # no mask, no placement: an ordinary group
+    frozen = gmask(0, 2) + pop + bytes([OP["CLOSE"], OP["FREEZE"], 1])  # a picture holding a masked group, into pool slot 1
+    nested = bytes([OP["LIST_CREATE"]]) + mask(1, 1, 0, 0, 0, 0, 0, 0, 0, 2, 1) + gmask(2, 2) + pop + bytes([OP["CLOSE"], OP["FREEZE"], 2])
+    out["scripted-masks.bin"] = bytes(bytearray([0xFF, 0xFF]) + start + made + refused + groups + frozen + nested)
+    # The same under a picture depth of one: a picture holding a masked group is one level deeper than the mask's picture, so its
+    # freeze passes the bound and is refused (b0 = 0xCF: depth 256, items 2^20, picture depth 1, expansion 2^24).
+    out["scripted-masks-depth.bin"] = bytes(bytearray([0xCF, 0xFF]) + start + made[:12] + gmask(0, 0) + pop + bytes([OP["CLOSE"], OP["FREEZE"], 1]))
+    # A group node of a scene of its own: two mask variants, a placement, an isolation pick and the node's translation.
+    def node(va, vb, place, iso, tr):
+        return bytes([OP["NODE_MASK"], va, vb, place, iso, tr])
+    out["scripted-mask-nodes.bin"] = bytes(bytearray([0xFF, 0xFF]) + node(1, 3, 1, 1, 1) + node(0, 0, 0, 0, 0) + node(2, 5, 2, 2, 2) + node(4, 1, 3, 0, 1))
     out["scripted-images.bin"] = bytes(bytearray([0xFF, 0xFF]) + images)
     # The same under a store whose bytes are bounded (b1 = 0x40: max_bytes 1500): an image that does not fit is refused by
     # the store's limit, and one that does is interned.
