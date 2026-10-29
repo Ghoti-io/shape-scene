@@ -18,6 +18,7 @@
 #include "../scene_helpers.h"
 
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <vector>
@@ -319,6 +320,49 @@ TEST(Palette, ItsBytesAreAccountedAndTheLimitIsExact) {
   GSHSCENE_Store_Stats st;
   ASSERT_EQ(gshscene_store_stats(tight.store, &st), GSHSCENE_OK);
   EXPECT_EQ(st.bytes, 0u) << "the last release gives the bytes back";
+}
+
+namespace {
+// An allocator whose fresh memory is never zero, so that a field a constructor forgot to set is seen.
+void * dirty_malloc(void *, size_t n) {
+  void * p = std::malloc(n ? n : 1);
+  if (p) std::memset(p, 0xA5, n ? n : 1);
+  return p;
+}
+void * dirty_calloc(void *, size_t c, size_t n) {
+  size_t total = (c ? c : 1) * (n ? n : 1);
+  void * p = std::malloc(total);
+  if (p) std::memset(p, 0, total);
+  return p;
+}
+void * dirty_realloc(void *, void * old, size_t n) { return std::realloc(old, n ? n : 1); }
+void dirty_free(void *, void * p) { std::free(p); }
+}  // namespace
+
+TEST(Palette, TheRgba8ConstructorSetsEveryFieldOfEveryColorOnDirtyMemory) {
+  GSHSCENE_Allocator alloc;
+  alloc.ctx = nullptr;
+  alloc.malloc_fn = dirty_malloc;
+  alloc.calloc_fn = dirty_calloc;
+  alloc.realloc_fn = dirty_realloc;
+  alloc.free_fn = dirty_free;
+  StoreHolder s(nullptr, &alloc);
+  ASSERT_NE(s.store, nullptr);
+  const uint8_t bytes[8] = {1, 2, 3, 4, 250, 251, 252, 253};
+  Ref p;
+  ASSERT_EQ(gshscene_store_intern_palette_rgba8(s.store, 2, bytes, &p.resource), GSHSCENE_OK);
+  for (size_t i = 0; i < 2; i++) {
+    GSHSCENE_Color got;
+    ASSERT_EQ(gshscene_resource_palette_color(p.get(), i, &got), GSHSCENE_OK);
+    GSHSCENE_Color want;
+    std::memset(&want, 0, sizeof want);
+    for (int k = 0; k < 4; k++) {
+      want.rgba[k] = (double)bytes[4 * i + (size_t)k] / 255.0;
+    }
+    want.space.primaries = GCOL_PRIMARIES_SRGB;
+    want.space.transfer = GCOL_TRANSFER_SRGB;
+    EXPECT_EQ(std::memcmp(&got.space, &want.space, sizeof want.space), 0) << i;
+  }
 }
 
 TEST(Palette, AnAllocationFailureAtEveryCallLeavesNothing) {

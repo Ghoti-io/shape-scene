@@ -1105,7 +1105,7 @@ PLANTS = [
     ('hdr-kind-path', 'hdr', HR, '  GSHSCENE_RESOURCE_PATH = 1,      ///< A model path.', '  GSHSCENE_RESOURCE_PATH = 19,      ///< A model path.', R + D),
     ('hdr-kind-glyph-run', 'hdr', HR, '  GSHSCENE_RESOURCE_GLYPH_RUN = 2, ///< Glyphs, by font and id or as outlines.', '  GSHSCENE_RESOURCE_GLYPH_RUN = 19, ///< Glyphs, by font and id or as outlines.', R + D),
     ('hdr-kind-picture', 'hdr', HR, '  GSHSCENE_RESOURCE_PICTURE = 3,   ///< A closed list, frozen: what an instance draws.', '  GSHSCENE_RESOURCE_PICTURE = 100,   ///< A closed list, frozen: what an instance draws.', R + D),
-    ('hdr-kind-gradient', 'hdr', HR, '  GSHSCENE_RESOURCE_GRADIENT = 4,  ///< A gradient: a color line over a geometry, which a gradient paint names (paint.h, G1).', '  GSHSCENE_RESOURCE_GRADIENT = 12,  ///< A gradient: a color line over a geometry, which a gradient paint names (paint.h, G1).', R),
+    ('hdr-kind-gradient', 'hdr', HR, '  GSHSCENE_RESOURCE_GRADIENT = 4,  ///< A gradient: a color line over a geometry, which a gradient paint names (paint.h, G1).', '  GSHSCENE_RESOURCE_GRADIENT = 100,  ///< A gradient: a color line over a geometry, which a gradient paint names (paint.h, G1).', R),
     ('hdr-kind-image', 'hdr', HR, "  GSHSCENE_RESOURCE_IMAGE = 5,     ///< An image: a raster's samples, interned by content (image.h, IM1 to IM14).", "  GSHSCENE_RESOURCE_IMAGE = 13,     ///< An image: a raster's samples, interned by content (image.h, IM1 to IM14).", R),
     ('hdr-source-font', 'hdr', HR, '  GSHSCENE_GLYPHS_FROM_FONT = 0,', '  GSHSCENE_GLYPHS_FROM_FONT = 1,', D + R),
     ('hdr-item-fill', 'hdr', HL, '  GSHSCENE_ITEM_FILL = 1,       ///< Fill a resource under a map with a paint.', '  GSHSCENE_ITEM_FILL = 17,       ///< Fill a resource under a map with a paint.', L + D),
@@ -2415,6 +2415,7 @@ PLANTS += [
     ('pl2-3d-plane-map', 'src', LS, '  if (result == GSHSCENE_OK && resource->kind == GSHSCENE_RESOURCE_PLANE && item.map.dim != 2) {', '  if (result == GSHSCENE_OK && resource->kind == GSHSCENE_RESOURCE_PLANE && item.map.dim != 3) {', PLN),
     ('pl5-node-takes-plane', 'src', "src/scene/node.c", '  if (resource->kind != GSHSCENE_RESOURCE_PATH && resource->kind != GSHSCENE_RESOURCE_GLYPH_RUN) {', '  if (resource->kind != GSHSCENE_RESOURCE_PATH && resource->kind != GSHSCENE_RESOURCE_GLYPH_RUN && resource->kind != GSHSCENE_RESOURCE_PLANE) {', PLN),
     ('pl6-sink-box-empty', 'src', DS, '        emit_text(run, "*\\n", &failed); /* PL6: unbounded, not empty */', '        emit_text(run, "-\\n", &failed); /* PL6: unbounded, not empty */', PLN),
+    # Removed, nd-64-lt (generated): equivalent: `entry <= have` in gshscene_index_reserve's rebuild loop inserts one phantom entry, hashed from a slot past the table, into an index with room to spare (cap >= 2 * want); no lookup can name it and no result changes, so only a bounds checker could see it.
     # Removed, pl6-sink-extent-applies: equivalent: the plane's box is marked empty just before, and an empty box never meets the extent limit, whatever the limit is.
     ('pl6-sink-stamps-nothing', 'src', DS, '      GSHSCENE_Rect r = plane ? run->area : (box.empty', '      GSHSCENE_Rect r = plane ? (GSHSCENE_Rect){0, 0, 0, 0} : (box.empty', PLN),
     ('pl4-fixed-plane-needs-no-frame', 'src', FX, '      (op_count && !frame)) {', '      0) {', PLN),
