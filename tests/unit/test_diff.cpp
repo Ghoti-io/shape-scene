@@ -1394,6 +1394,163 @@ TEST(DamageOracle, EveryPixelWhoseDrawingDiffersLiesInsideTheDamage) {
   (void)checked_cells;
 }
 
+// --- masks (MK11): a masked group's bounds and damage are its content's ------------------------------------------
+
+namespace {
+
+/** A picture of one fill of @p shape and, over it, the known mask @p which (scene_helpers.h); the caller owns the mask. */
+const GSHSCENE_Resource * mask_over(GSHSCENE_Store * store, const GSHSCENE_Resource * shape, int which, double far = 0.0) {
+  GSHSCENE_List * l = nullptr;
+  gshscene_list_create(nullptr, nullptr, store, &l);
+  GSHGEOM_Map move = translate(far, far);
+  gshscene_list_fill(l, shape, &move, GSHGEOM_FILL_NONZERO, nullptr, 0, 0);
+  gshscene_list_close(l);
+  const GSHSCENE_Resource * picture = nullptr;
+  gshscene_store_intern_picture(store, l, &picture);
+  gshscene_list_destroy(l);
+  const GSHSCENE_Resource * mask = known_mask(store, picture, which);
+  gshscene_resource_release(picture);
+  return mask;
+}
+
+}  // namespace
+
+TEST(DamageMask, AChangedMaskDamagesTheGroupsContentAndNothingElse) {
+  GSHSCENE_Node g = group_node();
+  Doc d;
+  Ref m0(mask_over(d.s.store(), d.sq.get(), 0, 900.0));  // a mask whose picture lies far from the content
+  Ref m5(mask_over(d.s.store(), d.sq.get(), 5, 900.0));
+  uint64_t group;
+  VersionRef v0, v1, v2, v3, v4;
+  {
+    EditHolder e(d.s);
+    GSHSCENE_Node n = group_node();
+    n.soft_mask = m0.get();
+    group = add(e.edit, GSHSCENE_ROOT_ID, n);
+    d.shape(e, group, 0, 0);
+    d.shape(e, group, 20, 0);
+    d.shape(e, GSHSCENE_ROOT_ID, 200, 200);
+    v0 = d.publish_edit(e);
+  }
+  auto set_group = [&](const VersionRef & from, const GSHSCENE_Node & n) {
+    EditHolder e(d.s, from.get());
+    EXPECT_EQ(gshscene_edit_set(e.edit, group, &n), GSHSCENE_OK);
+    return d.publish_edit(e);
+  };
+  // A different handle.
+  GSHSCENE_Node n = group_node();
+  n.soft_mask = m5.get();
+  v1 = set_group(v0, n);
+  Result r = diff_of(v0.get(), v1.get());
+  expect_rect(r.damage, -1, -1, 25, 5, "both shapes of the group, whatever the mask's picture holds; not the one at 200");
+  EXPECT_EQ(r.changes.size(), 1u);
+  // The same handle, a different placement.
+  n.soft_mask_map = translate(7.0, 3.0);
+  v2 = set_group(v1, n);
+  r = diff_of(v1.get(), v2.get());
+  expect_rect(r.damage, -1, -1, 25, 5, "a moved mask damages the content in both versions, not the mask's own place");
+  EXPECT_EQ(r.changes.size(), 1u);
+  // Removing the mask and adding it are changes of the group too.
+  v3 = set_group(v2, g);
+  expect_rect(diff_of(v2.get(), v3.get()).damage, -1, -1, 25, 5, "a mask removed");
+  n.soft_mask = m0.get();
+  n.soft_mask_map = translate(0.0, 0.0);
+  v4 = set_group(v3, n);
+  expect_rect(diff_of(v3.get(), v4.get()).damage, -1, -1, 25, 5, "a mask added");
+  // Nothing changed: nothing damaged.
+  r = diff_of(v4.get(), v4.get());
+  EXPECT_EQ(r.damage.empty, 1);
+  EXPECT_EQ(r.damage.unbounded, 0);
+  EXPECT_TRUE(r.changes.empty());
+}
+
+TEST(DamageMask, ANodeWhoseMaskIsUnchangedIsNotDamagedByASiblingsEdit) {
+  Doc d;
+  Ref m0(mask_over(d.s.store(), d.sq.get(), 0));
+  uint64_t group, sibling;
+  VersionRef v0, v1;
+  {
+    EditHolder e(d.s);
+    GSHSCENE_Node n = group_node();
+    n.soft_mask = m0.get();
+    n.soft_mask_map = translate(2.0, 2.0);
+    group = add(e.edit, GSHSCENE_ROOT_ID, n);
+    d.shape(e, group, 0, 0);
+    sibling = d.shape(e, GSHSCENE_ROOT_ID, 200, 200);
+    v0 = d.publish_edit(e);
+  }
+  {
+    EditHolder e(d.s, v0.get());
+    GSHSCENE_Node moved = shape_node(d.sq.get());
+    moved.map = translate(300, 200);
+    ASSERT_EQ(gshscene_edit_set(e.edit, sibling, &moved), GSHSCENE_OK);
+    v1 = d.publish_edit(e);
+  }
+  Result r = diff_of(v0.get(), v1.get());
+  expect_rect(r.damage, 199, 199, 305, 205, "the sibling's old and new places only");
+  EXPECT_EQ(r.changes.size(), 1u);
+  (void)group;
+}
+
+TEST(DamageMask, TheContentsEditsInsideAMaskedGroupDamageTheirOwnBounds) {
+  // The mask does not shrink what is damaged either: a child moved inside a masked group is damaged where it was and is.
+  Doc d;
+  Ref m0(mask_over(d.s.store(), d.sq.get(), 0));
+  uint64_t group, child;
+  VersionRef v0, v1;
+  {
+    EditHolder e(d.s);
+    GSHSCENE_Node n = group_node();
+    n.soft_mask = m0.get();
+    group = add(e.edit, GSHSCENE_ROOT_ID, n);
+    child = d.shape(e, group, 0, 0);
+    d.shape(e, group, 50, 0);
+    v0 = d.publish_edit(e);
+  }
+  {
+    EditHolder e(d.s, v0.get());
+    GSHSCENE_Node moved = shape_node(d.sq.get());
+    moved.map = translate(0, 30);
+    ASSERT_EQ(gshscene_edit_set(e.edit, child, &moved), GSHSCENE_OK);
+    v1 = d.publish_edit(e);
+  }
+  expect_rect(diff_of(v0.get(), v1.get()).damage, -1, -1, 5, 35, "the child's two places, not the mask's");
+  (void)group;
+}
+
+TEST(DamageMask, AnUnboundedOperatorWithAChangedMaskDamagesTheWholeTarget) {
+  for (uint32_t op : {(uint32_t)GSHSCENE_COMPOSITE_SRC_OVER, (uint32_t)GSHSCENE_COMPOSITE_DEST_IN, (uint32_t)GSHSCENE_COMPOSITE_SRC}) {
+    Doc d;
+    Ref m0(mask_over(d.s.store(), d.sq.get(), 0));
+    Ref m5(mask_over(d.s.store(), d.sq.get(), 5));
+    uint64_t group;
+    VersionRef v0, v1;
+    {
+      EditHolder e(d.s);
+      GSHSCENE_Node n = group_node();
+      n.composite = op;
+      n.soft_mask = m0.get();
+      group = add(e.edit, GSHSCENE_ROOT_ID, n);
+      d.shape(e, group, 0, 0);
+      v0 = d.publish_edit(e);
+    }
+    {
+      EditHolder e(d.s, v0.get());
+      GSHSCENE_Node n = group_node();
+      n.composite = op;
+      n.soft_mask = m5.get();
+      ASSERT_EQ(gshscene_edit_set(e.edit, group, &n), GSHSCENE_OK);
+      v1 = d.publish_edit(e);
+    }
+    Result r = diff_of(v0.get(), v1.get());
+    if (gshscene_composite_is_unbounded((GSHSCENE_Composite)op)) {
+      EXPECT_EQ(r.damage.unbounded, 1) << "operator " << op << " reaches past the group's bounds (N13)";
+    } else {
+      expect_rect(r.damage, -1, -1, 5, 5, "a bounded operator damages the content only");
+    }
+  }
+}
+
 int main(int argc, char ** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

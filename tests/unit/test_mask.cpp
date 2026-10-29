@@ -1095,6 +1095,103 @@ TEST(MaskRequired, EachFeatureIsItsOwnBit) {
           GSHSCENE_MASK_NATIVE_TRANSFER_EXPONENTIAL | GSHSCENE_MASK_NATIVE_SPACES | GSHSCENE_MASK_NATIVE_ACTS_ON_SHAPE));
 }
 
+// --- MK12: the picture depth counts a mask exactly as it counts an instance ---------------------------------------------
+
+namespace {
+
+/** The picture at the top of a chain @p levels deep, each level holding the one below as an instance or as a mask; or 0 at the first refusal. */
+GSHSCENE_Result chain_of(GSHSCENE_Store * store, const GSHSCENE_Resource * sq, int levels, bool through_mask,
+    const GSHSCENE_Resource ** out) {
+  const GSHSCENE_Resource * below = nullptr;
+  for (int level = 0; level < levels; level++) {
+    GSHSCENE_List * l = nullptr;
+    EXPECT_EQ(gshscene_list_create(nullptr, nullptr, store, &l), GSHSCENE_OK);
+    if (below) {
+      if (through_mask) {
+        GSHSCENE_Mask m;
+        std::memset(&m, 0, sizeof m);
+        m.picture = below;
+        m.mode = GSHSCENE_MASK_ALPHA;
+        const GSHSCENE_Resource * mask = nullptr;
+        EXPECT_EQ(gshscene_store_intern_mask(store, &m, &mask), GSHSCENE_OK);
+        GSHSCENE_Group g = make_group(1.0);
+        g.soft_mask = mask;
+        EXPECT_EQ(gshscene_list_group_push(l, &g, 0, 0), GSHSCENE_OK) << "the list holds a group of any mask depth";
+        gshscene_list_fill(l, sq, nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0);
+        gshscene_list_group_pop(l);
+        gshscene_resource_release(mask);
+      } else {
+        EXPECT_EQ(gshscene_list_instance(l, below, nullptr, 0, 0), GSHSCENE_OK);
+      }
+    } else {
+      gshscene_list_fill(l, sq, nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0);
+    }
+    gshscene_list_close(l);
+    const GSHSCENE_Resource * picture = nullptr;
+    GSHSCENE_Result r = gshscene_store_intern_picture(store, l, &picture);
+    gshscene_list_destroy(l);
+    gshscene_resource_release(below);
+    if (r != GSHSCENE_OK) {
+      return r;
+    }
+    below = picture;
+  }
+  *out = below;
+  return GSHSCENE_OK;
+}
+
+}  // namespace
+
+TEST(MaskLimits, ThePictureDepthCountsAMaskExactlyAsAnInstanceAtTheBoundAndOnePast) {
+  for (size_t bound : {1u, 2u, 3u}) {
+    GSHSCENE_Limits limits;
+    gshscene_limits_default(&limits);
+    limits.max_picture_depth = bound;
+    for (bool through_mask : {false, true}) {
+      StoreHolder s(&limits);
+      Ref sq(intern_square(s.store));
+      const GSHSCENE_Resource * top = nullptr;
+      // A chain of `bound` pictures is `bound` deep: allowed; one more is past the bound.
+      ASSERT_EQ(chain_of(s.store, sq.get(), (int)bound, through_mask, &top), GSHSCENE_OK) << bound << " " << through_mask;
+      Ref hold(top);
+      EXPECT_EQ(gshscene_resource_picture_depth(top), bound) << "a mask is one level, as an instance is";
+      const GSHSCENE_Resource * past = nullptr;
+      EXPECT_EQ(chain_of(s.store, sq.get(), (int)bound + 1, through_mask, &past), GSHSCENE_ERR_LIMIT)
+          << bound << (through_mask ? " through masks" : " through instances") << ": one past the bound";
+      EXPECT_EQ(past, nullptr);
+    }
+  }
+}
+
+TEST(MaskLimits, AMaskOfAMaskCountsBothLevelsInTheListThatHoldsIt) {
+  // A list holding a group whose mask's picture holds a group with a mask, and so on three deep: its picture is one level
+  // more, counted through every mask (the planning pass sizes its walk from it).
+  StoreHolder s;
+  Ref sq(intern_square(s.store));
+  const GSHSCENE_Resource * top = nullptr;
+  ASSERT_EQ(chain_of(s.store, sq.get(), 3, true, &top), GSHSCENE_OK);
+  Ref hold(top);
+  GSHSCENE_List * l = nullptr;
+  ASSERT_EQ(gshscene_list_create(nullptr, nullptr, s.store, &l), GSHSCENE_OK);
+  GSHSCENE_Mask m;
+  std::memset(&m, 0, sizeof m);
+  m.picture = top;
+  m.mode = GSHSCENE_MASK_ALPHA;
+  const GSHSCENE_Resource * mask = nullptr;
+  ASSERT_EQ(gshscene_store_intern_mask(s.store, &m, &mask), GSHSCENE_OK);
+  Ref mask_hold(mask);
+  GSHSCENE_Group g = make_group(1.0);
+  g.soft_mask = mask;
+  ASSERT_EQ(gshscene_list_group_push(l, &g, 0, 0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  const GSHSCENE_Resource * picture = nullptr;
+  ASSERT_EQ(gshscene_store_intern_picture(s.store, l, &picture), GSHSCENE_OK);
+  Ref picture_hold(picture);
+  EXPECT_EQ(gshscene_resource_picture_depth(picture), 4u) << "the list holds a mask of depth 3: it is one level more";
+  gshscene_list_destroy(l);
+}
+
 int main(int argc, char ** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
