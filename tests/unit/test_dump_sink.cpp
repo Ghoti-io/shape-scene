@@ -2536,6 +2536,8 @@ TEST(DumpSink, AMaskRecordIsExactlyItsFieldsAndTheGroupLineNamesItsMaskAndPlacem
     ASSERT_EQ(gshscene_list_fill(unmasked, s.sq(2, 2, 8), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0.0), GSHSCENE_OK);
     ASSERT_EQ(gshscene_list_group_pop(unmasked), GSHSCENE_OK);
   }
+  // An instance of the mask's picture, so that the two lists nest pictures alike and only the mask records differ.
+  ASSERT_EQ(gshscene_list_instance(unmasked, pic, nullptr, 0, 0.0), GSHSCENE_OK);
   ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
   ASSERT_EQ(gshscene_list_close(unmasked), GSHSCENE_OK);
   SinkRef sink(make_full(nullptr, nullptr));
