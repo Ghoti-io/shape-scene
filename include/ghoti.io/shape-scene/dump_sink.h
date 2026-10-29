@@ -92,7 +92,8 @@
  * gradient fill has ` grad=<id>`, the gradient's resource id, before `box=`),
  * `C res=<kind>:<hash> map=<hash> rule=N box=<x0> <y0> <x1> <y1>` (a clip push),
  * `c` (a clip pop), `G opacity=<hex> composite=N` (a group push; with ` isolation=N knockout=N mask=<hash>` when a
- * configuration claims PDF's group fields and the group sets one, T1), `g` (a group pop),
+ * configuration claims PDF's group fields and the group sets one, T1, and ` maskmap=<hash>`, the hash of the mask's
+ * placement, when it names a mask, MK13), `g` (a group pop),
  * `I res=picture:<hash>` (an instance),
  * `P class=N reason=N source=N code=N approx=N map=<hash> box=<x0> <y0> <x1> <y1>` (a placeholder, list.h PH1: the
  * class and reason the planning pass wrote for it, PH3, in every configuration whatever its caps claim; `map` the
@@ -117,7 +118,11 @@
  * render, by id, as a writer emits one; after a stroke's record, the first time the render meets its style, its record
  * `Q <id> <hash> width=<hex> space=N join=N miter=<hex> cap=N degenerate=N align=N rule=N scope=N offset=<hex>
  * dashes=N profile=<hash>` (the style's dump fields) and a line `d <hex>` per dash, once per style per render, as a
- * writer emits a style once, then the gradient's record as for a fill; for a fill or clip of a run from a
+ * writer emits a style once, then the gradient's record as for a fill; after a group's record, when it names a mask the
+ * render has not yet met, `W <id> <hash> picture=<hash> mode=N coeff=N acts=N rspace=<space> lspace=<space> backdrop=<hex> <hex>
+ * <hex> bspace=<space>` (MK14: once per render by id, as a writer emits an `SMask` once; never the picture's items), `w kind=N
+ * c0=<hex> c1=<hex> n=<hex> samples=N pieces=N`, an `s <hex>` per top-level sample and a `p lo=<hex> hi=<hex> e0=<hex> e1=<hex>
+ * leaf=N c0=<hex> c1=<hex> n=<hex> samples=N` per piece with an `s <hex>` per sample of its own; for a fill or clip of a run from a
  * font, after its record, one line per glyph, `Y <index> f <hash> status=N` (the
  * fast tier: `gshgeom_device_path_hash` of the device path, the whole pixel
  * added, and the provider's hint status), `Y <index> g <hash> status=0` (the

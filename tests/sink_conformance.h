@@ -2525,6 +2525,389 @@ TEST_P(SinkConformance, S19_PdfGroupFieldsAreRefusedWithoutTheirCaps) {
   }
 }
 
+/* --- M1: masks (mask.h, MK9, MK14; masks-images-patterns story M1) ---------------------------------------------- */
+
+namespace sinkconf {
+
+/** A mask over @p picture with the given mode, acting on and transfer kind (a three-sample table for TABLE). */
+inline const GSHSCENE_Resource * make_mask(Scene & s, const GSHSCENE_Resource * picture, uint32_t mode = GSHSCENE_MASK_ALPHA,
+    uint32_t acts_on = GSHSCENE_MASK_ACTS_ON_OPACITY, uint32_t transfer = GSHSCENE_TRANSFER_IDENTITY) {
+  static const double samples[3] = {0.0, 0.5, 1.0};
+  GSHSCENE_Mask m{};
+  m.picture = picture;
+  m.mode = mode;
+  m.acts_on = acts_on;
+  m.transfer.kind = transfer;
+  if (transfer == GSHSCENE_TRANSFER_TABLE) {
+    m.transfer.sample_count = 3;
+    m.transfer.samples = samples;
+  }
+  const GSHSCENE_Resource * r = nullptr;
+  EXPECT_EQ(gshscene_store_intern_mask(s.store, &m, &r), GSHSCENE_OK);
+  s.held.push_back(r);
+  return r;
+}
+
+/** A picture of the list @p l (closed here), held by the scene. */
+inline const GSHSCENE_Resource * picture_of(Scene & s, GSHSCENE_List * l) {
+  EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  const GSHSCENE_Resource * r = nullptr;
+  EXPECT_EQ(gshscene_store_intern_picture(s.store, l, &r), GSHSCENE_OK);
+  s.held.push_back(r);
+  return r;
+}
+
+/** A placeholder no sink draws and none approximates: `REFUSED` `PLACEHOLDER` wherever it is planned (PH3). */
+inline void refused_placeholder(GSHSCENE_List * l) {
+  const double box[4] = {1.0, 2.0, 9.0, 8.0};
+  EXPECT_EQ(gshscene_list_placeholder(
+                l, GSHSCENE_PLACEHOLDER_SOURCE_COLR, GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED, 0, box, nullptr, 0, 0.0),
+      GSHSCENE_OK);
+}
+
+/** Whether a sink with @p caps applies an alpha mask at all. */
+inline bool applies_alpha_masks(const GSHSCENE_Sink_Caps & caps) {
+  return (caps.flags & GSHSCENE_CAP_GROUP_SOFT_MASK) && (caps.mask_native & GSHSCENE_MASK_NATIVE_ALPHA) &&
+      (caps.item_kinds & (1u << GSHSCENE_ITEM_GROUP_PUSH)) && (caps.composites & 1u);
+}
+
+/** A masked source-over group of one fill after a fill: items 0 fill, 1 group push, 2 fill, 3 pop. */
+inline GSHSCENE_List * masked_list(Scene & s, const GSHSCENE_Resource * mask, const GSHGEOM_Map * placement = nullptr,
+    const GSHSCENE_Group * base = nullptr) {
+  GSHSCENE_Paint red = solid(1, 0, 0), blue = solid(0, 0, 1, 0.5);
+  GSHSCENE_List * l = s.open();
+  EXPECT_EQ(gshscene_list_fill(l, s.sq(2, 2, 12), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0), GSHSCENE_OK);
+  GSHSCENE_Group g{};
+  if (base) {
+    g = *base;
+  }
+  g.opacity = 1.0;
+  g.soft_mask = mask;
+  if (placement) {
+    g.soft_mask_map = *placement;
+  }
+  EXPECT_EQ(gshscene_list_group_push(l, &g, 0, 0.0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_fill(l, s.sq(6, 6, 12), nullptr, GSHGEOM_FILL_NONZERO, &blue, 0, 0.0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  return l;
+}
+
+} // namespace sinkconf
+
+// MK9, MK14: a masked group is refused without the flag (`SOFT_MASK`) and, with it, for each feature its mask needs that
+// `mask_native` lacks (`MASK_FEATURE`, the missing bits in `second`), found by the plan so that strict leaves the target alone.
+TEST_P(SinkConformance, MK9_AMaskedGroupIsRefusedForTheFlagThenForTheFeaturesItNeeds) {
+  int checked = 0;
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    if (!(caps.item_kinds & (1u << GSHSCENE_ITEM_GROUP_PUSH)) || !(caps.composites & 1u)) {
+      continue;
+    }
+    GSHSCENE_List * pl = s.open();
+    GSHSCENE_Paint white = solid(1, 1, 1);
+    EXPECT_EQ(gshscene_list_fill(pl, s.sq(0, 0, 30), nullptr, GSHGEOM_FILL_NONZERO, &white, 0, 0.0), GSHSCENE_OK);
+    const GSHSCENE_Resource * picture = picture_of(s, pl);
+    struct Variant {
+      const char * name;
+      const GSHSCENE_Resource * mask;
+    };
+    const Variant variants[] = {
+        {"alpha", make_mask(s, picture)},
+        {"alpha, table transfer", make_mask(s, picture, GSHSCENE_MASK_ALPHA, GSHSCENE_MASK_ACTS_ON_OPACITY, GSHSCENE_TRANSFER_TABLE)},
+        {"alpha, acting on the shape", make_mask(s, picture, GSHSCENE_MASK_ALPHA, GSHSCENE_MASK_ACTS_ON_SHAPE)},
+        {"luminance", make_mask(s, picture, GSHSCENE_MASK_LUMINANCE)},
+        {"luminance, shape, table", make_mask(s, picture, GSHSCENE_MASK_LUMINANCE, GSHSCENE_MASK_ACTS_ON_SHAPE, GSHSCENE_TRANSFER_TABLE)},
+    };
+    for (const Variant & v : variants) {
+      GSHSCENE_List * l = masked_list(s, v.mask);
+      auto out = make_surface(kind);
+      ReportRef r;
+      EXPECT_EQ(run(f(), sink.sink, request_for(l, *out, r.report)).result, GSHSCENE_OK) << v.name;
+      uint32_t missing = gshscene_mask_required(v.mask) & ~caps.mask_native;
+      bool claims = (caps.flags & GSHSCENE_CAP_GROUP_SOFT_MASK) != 0;
+      auto got = entries(r.report);
+      if (!claims || missing) {
+        ASSERT_EQ(got.size(), 1u) << v.name << ": the group's push alone, the block skipped with it";
+        EXPECT_EQ(got[0].entry_class, GSHSCENE_ENTRY_REFUSED) << v.name;
+        EXPECT_EQ(got[0].reason, claims ? GSHSCENE_REASON_MASK_FEATURE : GSHSCENE_REASON_SOFT_MASK) << v.name;
+        EXPECT_EQ(got[0].second, claims ? (size_t)missing : 0u) << v.name << ": the missing bits, or none";
+        ASSERT_EQ(got[0].chain_count, 1u);
+        EXPECT_EQ(got[0].chain[0], 1u) << v.name;
+        auto strict = make_surface(kind);
+        uint64_t before = strict->snapshot();
+        ReportRef sr;
+        GSHSCENE_Render_Request req = request_for(l, *strict, sr.report);
+        req.flags = GSHSCENE_RENDER_STRICT;
+        EXPECT_EQ(run(f(), sink.sink, req).result, GSHSCENE_ERR_REFUSED) << v.name;
+        EXPECT_EQ(strict->snapshot(), before) << v.name << ": strict touched the target";
+      } else {
+        for (const auto & e : got) {
+          EXPECT_NE(e.entry_class, GSHSCENE_ENTRY_REFUSED) << v.name << ": a sink with every feature the mask needs draws it";
+        }
+      }
+      checked++;
+    }
+  }
+  if (checked == 0) {
+    GTEST_SKIP() << "the sink draws no source-over group";
+  }
+}
+
+// MK9: the reasons of a masked group come in the stated order, whatever else it sets, and never draw it as another mode.
+TEST_P(SinkConformance, MK9_TheReasonsOfAMaskedGroupComeInTheStatedOrder) {
+  int checked = 0;
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    if (!(caps.item_kinds & (1u << GSHSCENE_ITEM_GROUP_PUSH))) {
+      continue;
+    }
+    GSHSCENE_List * pl = s.open();
+    GSHSCENE_Paint white = solid(1, 1, 1);
+    EXPECT_EQ(gshscene_list_fill(pl, s.sq(0, 0, 30), nullptr, GSHGEOM_FILL_NONZERO, &white, 0, 0.0), GSHSCENE_OK);
+    const GSHSCENE_Resource * mask =
+        make_mask(s, picture_of(s, pl), GSHSCENE_MASK_LUMINANCE, GSHSCENE_MASK_ACTS_ON_SHAPE, GSHSCENE_TRANSFER_TABLE);
+    uint32_t missing = gshscene_mask_required(mask) & ~caps.mask_native;
+    for (uint32_t composite : {(uint32_t)GSHSCENE_COMPOSITE_SRC_OVER, (uint32_t)GSHSCENE_COMPOSITE_XOR}) {
+      for (uint32_t isolation : {(uint32_t)GSHSCENE_ISOLATION_ISOLATED, (uint32_t)GSHSCENE_ISOLATION_NON_ISOLATED}) {
+        for (uint32_t knockout : {0u, 1u}) {
+          GSHSCENE_Group base{};
+          base.composite = composite;
+          base.isolation = isolation;
+          base.knockout = knockout;
+          GSHSCENE_List * l = masked_list(s, mask, nullptr, &base);
+          GSHSCENE_Reason want = (GSHSCENE_Reason)0;
+          if (!(caps.composites & (1u << composite))) {
+            want = GSHSCENE_REASON_COMPOSITE;
+          } else if (isolation != GSHSCENE_ISOLATION_ISOLATED && !(caps.flags & GSHSCENE_CAP_GROUP_NON_ISOLATED)) {
+            want = GSHSCENE_REASON_GROUP_ISOLATION;
+          } else if (knockout && !(caps.flags & GSHSCENE_CAP_GROUP_KNOCKOUT)) {
+            want = GSHSCENE_REASON_GROUP_KNOCKOUT;
+          } else if (!(caps.flags & GSHSCENE_CAP_GROUP_SOFT_MASK)) {
+            want = GSHSCENE_REASON_SOFT_MASK;
+          } else if (missing) {
+            want = GSHSCENE_REASON_MASK_FEATURE;
+          }
+          auto out = make_surface(kind);
+          ReportRef r;
+          EXPECT_EQ(run(f(), sink.sink, request_for(l, *out, r.report)).result, GSHSCENE_OK);
+          std::vector<GSHSCENE_Report_Entry> refused;
+          for (const auto & e : entries(r.report)) {
+            if (e.entry_class == GSHSCENE_ENTRY_REFUSED) {
+              refused.push_back(e);
+            }
+          }
+          if (want) {
+            ASSERT_EQ(refused.size(), 1u) << "composite " << composite << " isolation " << isolation << " knockout " << knockout;
+            EXPECT_EQ(refused[0].reason, want) << "composite " << composite << " isolation " << isolation << " knockout " << knockout;
+          } else {
+            EXPECT_TRUE(refused.empty());
+          }
+          checked++;
+        }
+      }
+    }
+  }
+  if (checked == 0) {
+    GTEST_SKIP() << "the sink draws no group";
+  }
+}
+
+// MK9: the plan enters a mask's picture. An item refused inside it is reported with the chain [group push, item] (and
+// deeper through an instance in it), its entries sort before the group's content's, strict fails before the target is
+// touched, and the expansion's units are the list's own.
+TEST_P(SinkConformance, MK9_ARefusedItemInsideAMaskPictureIsReportedWithItsChain) {
+  int checked = 0;
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    if (!applies_alpha_masks(caps)) {
+      continue;
+    }
+    GSHSCENE_Paint white = solid(1, 1, 1);
+    GSHSCENE_List * inner = s.open();
+    refused_placeholder(inner);
+    const GSHSCENE_Resource * inner_picture = picture_of(s, inner);
+    GSHSCENE_List * pl = s.open();
+    EXPECT_EQ(gshscene_list_fill(pl, s.sq(0, 0, 30), nullptr, GSHGEOM_FILL_NONZERO, &white, 0, 0.0), GSHSCENE_OK);  // 0
+    refused_placeholder(pl);                                                                                      // 1
+    EXPECT_EQ(gshscene_list_instance(pl, inner_picture, nullptr, 0, 0.0), GSHSCENE_OK);                          // 2
+    const GSHSCENE_Resource * mask = make_mask(s, picture_of(s, pl));
+    // The group's content holds a refused placeholder of its own, after the group's push.
+    GSHSCENE_Paint red = solid(1, 0, 0);
+    GSHSCENE_List * l = s.open();
+    EXPECT_EQ(gshscene_list_fill(l, s.sq(2, 2, 12), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0), GSHSCENE_OK);  // 0
+    GSHSCENE_Group g{};
+    g.opacity = 1.0;
+    g.soft_mask = mask;
+    EXPECT_EQ(gshscene_list_group_push(l, &g, 0, 0.0), GSHSCENE_OK);                                              // 1
+    refused_placeholder(l);                                                                                       // 2
+    EXPECT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);                                                           // 3
+    EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+    auto out = make_surface(kind);
+    ReportRef r;
+    Outcome o = run(f(), sink.sink, request_for(l, *out, r.report));
+    EXPECT_EQ(o.result, GSHSCENE_OK);
+    EXPECT_EQ(o.status.units_total, gshscene_list_count(l)) << "a mask's items are not units of the render (MK9)";
+    std::vector<std::vector<size_t>> chains;
+    for (const auto & e : entries(r.report)) {
+      if (e.entry_class == GSHSCENE_ENTRY_REFUSED && e.reason == GSHSCENE_REASON_PLACEHOLDER) {
+        chains.emplace_back(e.chain, e.chain + e.chain_count);
+      }
+    }
+    // The mask's items first ([1, 1], then through the instance [1, 2, 0]), then the group's content ([2]).
+    const std::vector<std::vector<size_t>> want = {{1, 1}, {1, 2, 0}, {2}};
+    EXPECT_EQ(chains, want);
+    auto strict = make_surface(kind);
+    uint64_t before = strict->snapshot();
+    ReportRef sr;
+    GSHSCENE_Render_Request req = request_for(l, *strict, sr.report);
+    req.flags = GSHSCENE_RENDER_STRICT;
+    EXPECT_EQ(run(f(), sink.sink, req).result, GSHSCENE_ERR_REFUSED);
+    EXPECT_EQ(strict->snapshot(), before) << "strict touched the target";
+    // The same list with the mask's picture clean has no entry for it: the entries above are the mask's items'.
+    checked++;
+  }
+  if (checked == 0) {
+    GTEST_SKIP() << "the sink applies no alpha mask";
+  }
+}
+
+// MK9: a masked group inside a mask picture is planned to the depth, with a chain of one more element per level.
+TEST_P(SinkConformance, MK9_AMaskOfAMaskIsPlannedToTheDepth) {
+  int checked = 0;
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    if (!applies_alpha_masks(caps)) {
+      continue;
+    }
+    GSHSCENE_Paint white = solid(1, 1, 1);
+    GSHSCENE_List * bottom = s.open();
+    refused_placeholder(bottom);
+    const GSHSCENE_Resource * picture = picture_of(s, bottom);
+    for (int level = 0; level < 3; level++) {  // three masks one inside the other
+      const GSHSCENE_Resource * mask = make_mask(s, picture);
+      GSHSCENE_List * up = s.open();
+      GSHSCENE_Group g{};
+      g.opacity = 1.0;
+      g.soft_mask = mask;
+      EXPECT_EQ(gshscene_list_group_push(up, &g, 0, 0.0), GSHSCENE_OK);
+      EXPECT_EQ(gshscene_list_fill(up, s.sq(0, 0, 30), nullptr, GSHGEOM_FILL_NONZERO, &white, 0, 0.0), GSHSCENE_OK);
+      EXPECT_EQ(gshscene_list_group_pop(up), GSHSCENE_OK);
+      picture = picture_of(s, up);
+    }
+    GSHSCENE_List * l = masked_list(s, make_mask(s, picture));  // the fourth, outermost
+    auto out = make_surface(kind);
+    ReportRef r;
+    EXPECT_EQ(run(f(), sink.sink, request_for(l, *out, r.report)).result, GSHSCENE_OK);
+    std::vector<std::vector<size_t>> chains;
+    for (const auto & e : entries(r.report)) {
+      if (e.entry_class == GSHSCENE_ENTRY_REFUSED) {
+        chains.emplace_back(e.chain, e.chain + e.chain_count);
+      }
+    }
+    const std::vector<std::vector<size_t>> want = {{1, 0, 0, 0, 0}};
+    EXPECT_EQ(chains, want) << "outer push 1, then each mask's group at 0, the placeholder at 0";
+    checked++;
+  }
+  if (checked == 0) {
+    GTEST_SKIP() << "the sink applies no alpha mask";
+  }
+}
+
+// MK9, MK6: the chain of maps a mask's items are planned under ends in the group's placement, so a gradient in the
+// picture is noticed when the placement is singular, and not otherwise.
+TEST_P(SinkConformance, MK9_TheMasksItemsArePlannedUnderThePlacement) {
+  int checked = 0;
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    if (!applies_alpha_masks(caps) || !(caps.gradient_kinds & (1u << GSHSCENE_GRADIENT_LINEAR))) {
+      continue;
+    }
+    GSHSCENE_Color_Space linear{};
+    linear.primaries = GCOL_PRIMARIES_SRGB;
+    linear.transfer = GCOL_TRANSFER_LINEAR;
+    GSHSCENE_Paint a = solid(1, 0, 0), b = solid(0, 0, 1);
+    a.space = linear;
+    b.space = linear;
+    GSHSCENE_Gradient_Stop stops[2] = {{0.0, a}, {1.0, b}};
+    GSHSCENE_Gradient grad{};
+    grad.kind = GSHSCENE_GRADIENT_LINEAR;
+    gshgeom_map_identity(2, &grad.map);
+    grad.space = linear;
+    grad.p0[0] = 4;
+    grad.p1[0] = 12;
+    grad.stop_count = 2;
+    grad.stops = stops;
+    const GSHSCENE_Resource * gradient = nullptr;
+    ASSERT_EQ(gshscene_store_intern_gradient(s.store, &grad, &gradient), GSHSCENE_OK);
+    s.held.push_back(gradient);
+    GSHSCENE_Paint gp{};
+    gp.kind = GSHSCENE_PAINT_GRADIENT;
+    gp.resource = gradient;
+    gp.rgba[3] = 1.0;
+    GSHSCENE_List * pl = s.open();
+    EXPECT_EQ(gshscene_list_fill(pl, s.sq(0, 0, 30), nullptr, GSHGEOM_FILL_NONZERO, &gp, 0, 0.0), GSHSCENE_OK);
+    const GSHSCENE_Resource * mask = make_mask(s, picture_of(s, pl));
+    GSHGEOM_Map singular;
+    ASSERT_EQ(gshgeom_map_scale(2, 0.0, 1.0, 1.0, &singular), GSHGEOM_OK);
+    GSHGEOM_Map moved;
+    ASSERT_EQ(gshgeom_map_translate(2, 3.0, 4.0, 0.0, &moved), GSHGEOM_OK);
+    for (int placed = 0; placed < 3; placed++) {
+      GSHSCENE_List * l = masked_list(s, mask, placed == 1 ? &singular : placed == 2 ? &moved : nullptr);
+      auto out = make_surface(kind);
+      ReportRef r;
+      EXPECT_EQ(run(f(), sink.sink, request_for(l, *out, r.report)).result, GSHSCENE_OK) << placed;
+      size_t notices = 0;
+      for (const auto & e : entries(r.report)) {
+        if (e.entry_class == GSHSCENE_ENTRY_NOTICE) {
+          notices++;
+          EXPECT_EQ(e.reason, GSHSCENE_REASON_MAP_NOT_INVERTIBLE);
+          ASSERT_EQ(e.chain_count, 2u);
+          EXPECT_EQ(e.chain[0], 1u);
+          EXPECT_EQ(e.chain[1], 0u);
+        }
+      }
+      EXPECT_EQ(notices, placed == 1 ? 1u : 0u) << "placement " << placed << ": only the singular one draws nothing";
+    }
+    checked++;
+  }
+  if (checked == 0) {
+    GTEST_SKIP() << "the sink applies no alpha mask or draws no linear gradient";
+  }
+}
+
+// MK14: a sink that claims no mask refuses every masked group, whatever the mask; one that claims the flag claims
+// features too, and a mask feature it lacks is named.
+TEST_P(SinkConformance, MK14_TheCapsAreConsistent) {
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    EXPECT_EQ(caps.mask_native & ~(uint32_t)GSHSCENE_MASK_NATIVE_ALL, 0u) << "only bits that are defined";
+    if (!(caps.flags & GSHSCENE_CAP_GROUP_SOFT_MASK)) {
+      EXPECT_EQ(caps.mask_native, 0u) << "a sink that applies no mask names no mask feature";
+    } else {
+      EXPECT_NE(caps.mask_native & (GSHSCENE_MASK_NATIVE_ALPHA | GSHSCENE_MASK_NATIVE_LUMINANCE), 0u)
+          << "a sink that applies masks applies at least one mode";
+    }
+  }
+}
+
 /* --- S20: strokes (stroke.h, SK1 to SK14; strokes story S1) ------------------------------------------------------ */
 
 namespace sinkconf {
@@ -2921,10 +3304,16 @@ inline const GSHSCENE_List * with_placeholders(Scene & s, const GSHSCENE_Sink_Ca
   GSHSCENE_Group masked{};
   masked.opacity = 1.0;
   masked.soft_mask = mask;
+  // MK9: the plan enters the mask's picture, so the placeholder in it is reported at [push, item] by a sink that applies the mask.
+  bool applies_mask = (caps.flags & GSHSCENE_CAP_GROUP_SOFT_MASK) && (caps.mask_native & GSHSCENE_MASK_NATIVE_ALPHA);
+  if (with && applies_mask) {
+    want->push_back({{gshscene_list_count(l), in_picture}, GSHSCENE_ENTRY_APPROXIMATED,
+        pair_of(colr, GSHSCENE_PLACEHOLDER_COLR_WALK_LIMIT)});
+  }
   gshscene_list_group_push(l, &masked, 0, 0.0);
   gshscene_list_fill(l, s.sq(40, 40, 6), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0);
   if (with) {
-    if (caps.flags & GSHSCENE_CAP_GROUP_SOFT_MASK) {
+    if (applies_mask) {
       want->push_back({{gshscene_list_count(l)}, GSHSCENE_ENTRY_REFUSED, pair_of(colr, GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED)});
     }
     gshscene_list_placeholder(l, colr, GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED, 0, box, nullptr, 0, 0.0);
@@ -2932,7 +3321,7 @@ inline const GSHSCENE_List * with_placeholders(Scene & s, const GSHSCENE_Sink_Ca
     stand_in(l);
   }
   gshscene_list_group_pop(l);
-  *blocks_refused = (caps.flags & GSHSCENE_CAP_GROUP_SOFT_MASK) ? 0 : 1;
+  *blocks_refused = applies_mask ? 0 : 1;
   if (with) {
     want->push_back({{gshscene_list_count(l)}, GSHSCENE_ENTRY_REFUSED, pair_of(colr, GSHSCENE_PLACEHOLDER_COLR_NO_RECORD)});
     gshscene_list_placeholder(l, colr, GSHSCENE_PLACEHOLDER_COLR_NO_RECORD, 0, nullptr, nullptr, 0, 0.0);

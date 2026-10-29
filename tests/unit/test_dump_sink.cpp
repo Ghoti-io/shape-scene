@@ -49,6 +49,7 @@ GSHSCENE_Dump_Sink_Config config_narrow() {
   GSHSCENE_Dump_Sink_Config c = config_default();
   for (GSHSCENE_Sink_Caps * caps : {&c.raster_caps, &c.stream_caps}) {
     caps->flags = GSHSCENE_CAP_CAN_BLOCK;
+    caps->mask_native = 0; /* no GROUP_SOFT_MASK: it applies no mask (MK14) */
     caps->composites &= ~(1u << GSHSCENE_COMPOSITE_XOR);
     for (uint32_t mode = GSHSCENE_COMPOSITE_HUE; mode <= GSHSCENE_COMPOSITE_LUMINOSITY; mode++) {
       caps->composites &= ~(1u << mode); /* B13: a sink of the separable modes only refuses the other four */
@@ -137,6 +138,10 @@ GSHSCENE_Dump_Sink_Config config_writer_like() {
     caps->image_filters = (1u << GSHSCENE_IMAGE_FILTER_NEAREST) | (1u << GSHSCENE_IMAGE_FILTER_LINEAR);
     caps->image_extends = (1u << GSHSCENE_IMAGE_EXTEND_PAD) | (1u << GSHSCENE_IMAGE_EXTEND_REPEAT) | (1u << GSHSCENE_IMAGE_EXTEND_NONE);
     caps->flags &= ~GSHSCENE_CAP_IMAGE_FILTER_SPACES;
+    // A mask (MK14): kept by handle and emitted once, as SVG's <mask> is: an alpha and a luminance mask in the two web
+    // coefficient sets and in a stated space, no transfer function, no backdrop, no acting on the shape.
+    caps->mask_native = GSHSCENE_MASK_NATIVE_ALPHA | GSHSCENE_MASK_NATIVE_LUMINANCE | GSHSCENE_MASK_NATIVE_COEFF_W3C |
+        GSHSCENE_MASK_NATIVE_COEFF_REC709 | GSHSCENE_MASK_NATIVE_SPACES;
   }
   return c;
 }
@@ -160,6 +165,10 @@ GSHSCENE_Dump_Sink_Config config_toolpath_like() {
     caps->image_extends = 0;
     caps->image_formats = 0;
     caps->flags &= ~GSHSCENE_CAP_IMAGE_FILTER_SPACES;
+    // A pen has no pixels to read a mask from (AD-8, MK14): it claims neither the flag nor a feature, so a masked group is
+    // refused, `SOFT_MASK`.
+    caps->flags &= ~GSHSCENE_CAP_GROUP_SOFT_MASK;
+    caps->mask_native = 0;
   }
   return c;
 }
@@ -1689,13 +1698,14 @@ TEST(DumpSink, TheConfigurationIsValidated) {
     EXPECT_EQ(caps->image_filters, 0xfu) << "every image filter (S21)";
     EXPECT_EQ(caps->image_extends, 0xfu) << "every edge mode";
     EXPECT_EQ(caps->image_formats, 0xffu) << "every sample type, layout and the alpha-only mark";
+    EXPECT_EQ(caps->mask_native, (uint32_t)GSHSCENE_MASK_NATIVE_ALL) << "every mask feature, kept by handle (MK14)";
     for (unsigned char b : caps->_reserved) {
       EXPECT_EQ(b, 0);
     }
   }
   uint32_t common = GSHSCENE_CAP_CAN_BLOCK | GSHSCENE_CAP_CALLER_MEMORY | GSHSCENE_CAP_GLYPHS_FROM_FONT |
       GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_BLEND_SPACES | GSHSCENE_CAP_GRADIENT_SPACES | GSHSCENE_CAP_PREPARE |
-      GSHSCENE_CAP_STROKE_RUNS | GSHSCENE_CAP_IMAGE_FILTER_SPACES;
+      GSHSCENE_CAP_STROKE_RUNS | GSHSCENE_CAP_IMAGE_FILTER_SPACES | GSHSCENE_CAP_GROUP_SOFT_MASK;
   EXPECT_EQ(d.raster_caps.flags, common | GSHSCENE_CAP_READBACK);
   EXPECT_EQ(d.stream_caps.flags, common);
   // Not a test sink, not a test sink's job.
@@ -2330,6 +2340,105 @@ TEST(DumpSink, ARefusedImageFillWritesNoRecordOfItsImage) {
     size_t everything = reflect | (1u << GSHSCENE_IMAGE_EXTEND_PAD) |
         ((size_t)(GSHSCENE_IMAGE_FORMAT_UNORM8 | GSHSCENE_IMAGE_FORMAT_RGBA) << GSHSCENE_IMAGE_REQUIRED_FORMAT_SHIFT);
     EXPECT_EQ(refused[0].second, configuration ? everything : reflect) << "the writer lacks only reflection; the pen lacks all";
+  }
+}
+
+// MK14: a sink that applies masks records each mask once per handle, with its picture's hash and never its items, and the
+// group's record names it and its placement; one that applies none refuses the group.
+TEST(DumpSink, AMaskIsRecordedOncePerHandleAndTheGroupNamesItAndItsPlacement) {
+  Scene s;
+  auto picture_with = [&](double at) {
+    GSHSCENE_List * pl = s.open();
+    GSHSCENE_Paint white = solid(1, 1, 1);
+    EXPECT_EQ(gshscene_list_fill(pl, s.sq(at, at, 8), nullptr, GSHGEOM_FILL_NONZERO, &white, 0, 0.0), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_close(pl), GSHSCENE_OK);
+    const GSHSCENE_Resource * pic = nullptr;
+    EXPECT_EQ(gshscene_store_intern_picture(s.store, pl, &pic), GSHSCENE_OK);
+    s.held.push_back(pic);
+    return pic;
+  };
+  const GSHSCENE_Resource * pic_a = picture_with(1.0);
+  const GSHSCENE_Resource * pic_b = picture_with(3.0);
+  static const double table[3] = {0.0, 0.5, 1.0};
+  GSHSCENE_Mask ma{};
+  ma.picture = pic_a;
+  ma.mode = GSHSCENE_MASK_ALPHA;
+  GSHSCENE_Mask mb{};
+  mb.picture = pic_b;
+  mb.mode = GSHSCENE_MASK_ALPHA;
+  mb.transfer.kind = GSHSCENE_TRANSFER_TABLE;
+  mb.transfer.sample_count = 3;
+  mb.transfer.samples = table;
+  const GSHSCENE_Resource * a = nullptr;
+  const GSHSCENE_Resource * b = nullptr;
+  ASSERT_EQ(gshscene_store_intern_mask(s.store, &ma, &a), GSHSCENE_OK);
+  s.held.push_back(a);
+  ASSERT_EQ(gshscene_store_intern_mask(s.store, &mb, &b), GSHSCENE_OK);
+  s.held.push_back(b);
+  GSHSCENE_List * l = s.open();
+  GSHGEOM_Map moved;
+  ASSERT_EQ(gshgeom_map_translate(2, 5.0, 6.0, 0.0, &moved), GSHGEOM_OK);
+  for (const GSHSCENE_Resource * mask : {a, b, a, a}) {
+    GSHSCENE_Group g{};
+    g.opacity = 1.0;
+    g.soft_mask = mask;
+    if (mask == b) {
+      g.soft_mask_map = moved;
+    }
+    ASSERT_EQ(gshscene_list_group_push(l, &g, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_fill(l, s.sq(2, 2, 8), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);
+  }
+  ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  struct Want {
+    const char * name;
+    size_t records, groups, soft_mask_refusals, feature_refusals;
+  };
+  // Raster-like: every feature, so both masks are recorded; writer-like: no transfer, so the table mask is refused and its
+  // group's block skipped; toolpath-like: no mask at all.
+  const Want wants[3] = {{"raster-like", 2, 4, 0, 0}, {"writer-like", 1, 3, 0, 1}, {"toolpath-like", 0, 0, 4, 0}};
+  for (int configuration = 0; configuration < 3; configuration++) {
+    SinkRef sink(configuration == 0 ? make_full(nullptr, nullptr)
+                                    : configuration == 1 ? make_writer_like(nullptr, nullptr) : make_toolpath_like(nullptr, nullptr));
+    auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+    ReportRef report;
+    Rendered r = render_job(sink.sink, request_for(l, *stream, report.report));
+    ASSERT_EQ(r.result, GSHSCENE_OK) << wants[configuration].name;
+    size_t records = 0, groups = 0, transfers = 0;
+    std::string text = stream->bytes;
+    for (size_t at = 0; at < text.size();) {
+      size_t end = text.find('\n', at);
+      std::string line = text.substr(at, end - at);
+      at = end + 1;
+      if (line.rfind("W ", 0) == 0) {
+        records++;
+      } else if (line.rfind("w kind=", 0) == 0) {
+        transfers++;
+      } else if (line.find(" G ") != std::string::npos && line.find(" mask=") != std::string::npos) {
+        groups++;
+        EXPECT_NE(line.find(" maskmap="), std::string::npos) << line;
+      }
+    }
+    size_t soft = 0, features = 0;
+    for (const auto & e : sinkconf::entries(report.report)) {
+      if (e.reason == GSHSCENE_REASON_SOFT_MASK) {
+        soft++;
+      } else if (e.reason == GSHSCENE_REASON_MASK_FEATURE) {
+        features++;
+        EXPECT_EQ(e.second, (size_t)GSHSCENE_MASK_NATIVE_TRANSFER_TABLE);
+        EXPECT_EQ(e.chain_count, 1u);
+      }
+    }
+    const Want & w = wants[configuration];
+    EXPECT_EQ(records, w.records) << w.name << ": one record per handle, however many groups name it";
+    EXPECT_EQ(transfers, w.records) << w.name;
+    EXPECT_EQ(groups, w.groups) << w.name;
+    EXPECT_EQ(soft, w.soft_mask_refusals) << w.name;
+    EXPECT_EQ(features, w.feature_refusals) << w.name;
+    // The record names the picture by hash and holds none of its items.
+    char want[64];
+    std::snprintf(want, sizeof want, " picture=%016llx ", (unsigned long long)gshscene_resource_hash(pic_a));
+    EXPECT_EQ(text.find(want) != std::string::npos, w.records > 0) << w.name;
   }
 }
 

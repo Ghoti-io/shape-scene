@@ -186,6 +186,9 @@ static void caps_full(GSHSCENE_Sink_Caps * caps, int readback) {
   caps->image_extends = (UINT32_C(1) << GSHSCENE_IMAGE_EXTEND_COUNT) - 1u;
   caps->image_formats = GSHSCENE_IMAGE_FORMAT_ALL;
   caps->flags |= GSHSCENE_CAP_IMAGE_FILTER_SPACES;
+  /* Every mask feature, recorded by handle (MK14); a configuration clears them for a writer that lacks some. */
+  caps->flags |= GSHSCENE_CAP_GROUP_SOFT_MASK;
+  caps->mask_native = GSHSCENE_MASK_NATIVE_ALL;
   caps->cancel_unit = GSHSCENE_CANCEL_BETWEEN_UNITS;
   caps->cancel_work_bound = 1;
   caps->work_measure = "units";
@@ -213,7 +216,7 @@ static int caps_valid(const GSHSCENE_Sink_Caps * caps) {
       !(caps->image_filters & ~((UINT32_C(1) << GSHSCENE_IMAGE_FILTER_COUNT) - 1u)) &&
       !(caps->image_extends & ~((UINT32_C(1) << GSHSCENE_IMAGE_EXTEND_COUNT) - 1u)) &&
       !(caps->image_formats & ~GSHSCENE_IMAGE_FORMAT_ALL) &&
-      !(caps->stroke_native & ~GSHSCENE_STROKE_NATIVE_ALL) &&
+      !(caps->stroke_native & ~GSHSCENE_STROKE_NATIVE_ALL) && !(caps->mask_native & ~GSHSCENE_MASK_NATIVE_ALL) &&
       caps->cancel_unit >= GSHSCENE_CANCEL_BETWEEN_UNITS &&
       caps->cancel_unit < GSHSCENE_CANCEL_UNIT_COUNT && caps->work_measure != NULL;
 }
@@ -280,6 +283,9 @@ static void gradient_need(const GSHSCENE_List * list, size_t * fills, size_t * s
     }
     if (item->kind == GSHSCENE_ITEM_STROKE) {
       *strokes = gshscene_sat_add(*strokes, 1);
+    }
+    if (item->kind == GSHSCENE_ITEM_GROUP_PUSH && item->group.soft_mask) {
+      *fills = gshscene_sat_add(*fills, 1); /* its mask's record, once per render, by id */
     }
     if ((item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE) &&
         item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
@@ -824,6 +830,53 @@ static GSHSCENE_Result gradient_record(Run * run, const GSHSCENE_Resource * grad
 }
 
 /**
+ * A mask's records (dump_sink.h, MK14), the first time a render meets its id: the mask's own dump with the id and the picture's
+ * hash, never the picture's items, as a writer emits an `SMask` once and names it by handle.
+ */
+static GSHSCENE_Result mask_record(Run * run, const GSHSCENE_Resource * mask, GSHSCENE_Result * failed) {
+  uint64_t id = gshscene_resource_id(mask);
+  for (size_t i = 0; i < run->gradient_count; i++) {
+    if (run->gradients[i] == id) {
+      return GSHSCENE_OK;
+    }
+  }
+  run->gradients[run->gradient_count++] = id;
+  const GSHSCENE_Mask * m = &mask->u.mask.m;
+  const GSHSCENE_Transfer * t = &m->transfer;
+  snprintf(run->line, LINE_BYTES,
+      "W %" PRIu64 " %016" PRIx64 " picture=%016" PRIx64 " mode=%u coeff=%u acts=%u rspace=%u:%u:%016" PRIx64
+      " lspace=%u:%u:%016" PRIx64 " backdrop=%016" PRIx64 " %016" PRIx64 " %016" PRIx64 " bspace=%u:%u:%016" PRIx64 "\n",
+      id, gshscene_resource_hash(mask), gshscene_resource_hash(m->picture), m->mode, m->coefficients, m->acts_on,
+      (unsigned)m->render_space.primaries, (unsigned)m->render_space.transfer, gshgeom_f64_bits(m->render_space.gamma),
+      (unsigned)m->space.primaries, (unsigned)m->space.transfer, gshgeom_f64_bits(m->space.gamma),
+      gshgeom_f64_bits(m->backdrop[0]), gshgeom_f64_bits(m->backdrop[1]), gshgeom_f64_bits(m->backdrop[2]),
+      (unsigned)m->backdrop_space.primaries, (unsigned)m->backdrop_space.transfer, gshgeom_f64_bits(m->backdrop_space.gamma));
+  emit_text(run, run->line, failed);
+  snprintf(run->line, LINE_BYTES, "w kind=%u c0=%016" PRIx64 " c1=%016" PRIx64 " n=%016" PRIx64 " samples=%" PRIu64 " pieces=%" PRIu64 "\n",
+      t->kind, gshgeom_f64_bits(t->c0), gshgeom_f64_bits(t->c1), gshgeom_f64_bits(t->n), (uint64_t)t->sample_count,
+      (uint64_t)t->piece_count);
+  emit_text(run, run->line, failed);
+  for (size_t i = 0; i < t->sample_count; i++) {
+    snprintf(run->line, LINE_BYTES, "s %016" PRIx64 "\n", gshgeom_f64_bits(t->samples[i]));
+    emit_text(run, run->line, failed);
+  }
+  for (size_t i = 0; i < t->piece_count; i++) {
+    const GSHSCENE_Transfer_Piece * p = &t->pieces[i];
+    snprintf(run->line, LINE_BYTES,
+        "p lo=%016" PRIx64 " hi=%016" PRIx64 " e0=%016" PRIx64 " e1=%016" PRIx64 " leaf=%u c0=%016" PRIx64 " c1=%016" PRIx64
+        " n=%016" PRIx64 " samples=%" PRIu64 "\n",
+        gshgeom_f64_bits(p->lo), gshgeom_f64_bits(p->hi), gshgeom_f64_bits(p->e0), gshgeom_f64_bits(p->e1), p->leaf_kind,
+        gshgeom_f64_bits(p->c0), gshgeom_f64_bits(p->c1), gshgeom_f64_bits(p->n), (uint64_t)p->sample_count);
+    emit_text(run, run->line, failed);
+    for (size_t j = 0; j < p->sample_count; j++) {
+      snprintf(run->line, LINE_BYTES, "s %016" PRIx64 "\n", gshgeom_f64_bits(p->samples[j]));
+      emit_text(run, run->line, failed);
+    }
+  }
+  return GSHSCENE_OK;
+}
+
+/**
  * An image paint's records (dump_sink.h, S21), the first time a render meets each id: the image,
  * `M <id> <hash> w=N h=N layout=L type=T bits=B alpha=A alphaonly=N space=<space>`, then the paint,
  * `J <id> <hash> image=<id> window=x0 y0 x1 y1 map=<hash> extend=X,Y filter=MAG,MIN space=<space> tint=<-|kind r g b a space entry>`,
@@ -1301,8 +1354,19 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
         snprintf(run->line, LINE_BYTES, " G opacity=%016" PRIx64 " composite=%u isolation=%u knockout=%u mask=%016" PRIx64 "\n",
             gshgeom_f64_bits(item->group.opacity), (unsigned)item->group.composite, (unsigned)item->group.isolation,
             (unsigned)item->group.knockout, item->group.soft_mask ? gshscene_resource_hash(item->group.soft_mask) : 0);
+        if (item->group.soft_mask) {
+          /* MK13, MK14: the placement follows the mask's hash, before the line's end. */
+          size_t at = strlen(run->line) - 1;
+          snprintf(run->line + at, LINE_BYTES - at, " maskmap=%016" PRIx64 "\n", gshgeom_map_hash(&item->group.soft_mask_map));
+        }
       }
       emit_text(run, run->line, &failed);
+      if (item->group.soft_mask) {
+        GSHSCENE_Result mr = mask_record(run, item->group.soft_mask, &failed);
+        if (mr != GSHSCENE_OK) {
+          return mr;
+        }
+      }
       GSHSCENE_Rect outer = clip_now(run);
       Block * b = &run->blocks[run->block_count++];
       memset(b, 0, sizeof *b);
