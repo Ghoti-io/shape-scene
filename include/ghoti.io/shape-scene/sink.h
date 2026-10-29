@@ -390,6 +390,28 @@ typedef struct GSHSCENE_Target {
 #define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 15) - 1) ///< Every flag defined.
 /** @} */
 
+/**
+ * @name Mask features (MK9)
+ *
+ * The features of a mask (mask.h) a sink composites, which `gshscene_mask_required` reports a mask as needing.  The values are
+ * pinned.
+ * @{
+ */
+#define GSHSCENE_MASK_NATIVE_ALPHA (UINT32_C(1) << 0)               ///< An alpha mask.
+#define GSHSCENE_MASK_NATIVE_LUMINANCE (UINT32_C(1) << 1)           ///< A luminance mask.
+#define GSHSCENE_MASK_NATIVE_BACKDROP (UINT32_C(1) << 2)            ///< A backdrop other than black.
+#define GSHSCENE_MASK_NATIVE_TRANSFER_EXPONENTIAL (UINT32_C(1) << 3) ///< An exponential transfer.
+#define GSHSCENE_MASK_NATIVE_TRANSFER_TABLE (UINT32_C(1) << 4)      ///< A table transfer.
+#define GSHSCENE_MASK_NATIVE_TRANSFER_STITCHING (UINT32_C(1) << 5)  ///< A stitching transfer.
+#define GSHSCENE_MASK_NATIVE_COEFF_W3C (UINT32_C(1) << 6)           ///< The `W3C` coefficients.
+#define GSHSCENE_MASK_NATIVE_COEFF_REC709 (UINT32_C(1) << 7)        ///< The `REC709` coefficients.
+#define GSHSCENE_MASK_NATIVE_COEFF_LUM (UINT32_C(1) << 8)           ///< The `LUM` coefficients.
+#define GSHSCENE_MASK_NATIVE_COEFF_SPACE_Y (UINT32_C(1) << 9)       ///< The `SPACE_Y` coefficients.
+#define GSHSCENE_MASK_NATIVE_SPACES (UINT32_C(1) << 10)             ///< A luminance, render or backdrop space other than the enclosing one.
+#define GSHSCENE_MASK_NATIVE_ACTS_ON_SHAPE (UINT32_C(1) << 11)      ///< A mask acting on the shape rather than the opacity.
+#define GSHSCENE_MASK_NATIVE_ALL ((UINT32_C(1) << 12) - 1)          ///< Every feature defined.
+/** @} */
+
 /** @brief Where a sink checks its cancel token (S7).  The values are pinned. */
 typedef enum GSHSCENE_Cancel_Unit {
   GSHSCENE_CANCEL_BETWEEN_UNITS = 1, ///< Before the first unit and after each unit's progress call.

@@ -142,7 +142,9 @@ TEST(ResourceKind, EveryKindHasItsPinnedValueAndName) {
   EXPECT_EQ((int)GSHSCENE_RESOURCE_STROKE_STYLE, 8);
   EXPECT_EQ((int)GSHSCENE_RESOURCE_PLANE, 9);
   EXPECT_EQ((int)GSHSCENE_RESOURCE_IMAGE_PAINT, 10);
-  EXPECT_EQ((int)GSHSCENE_RESOURCE_KIND_COUNT, 11);
+  EXPECT_EQ((int)GSHSCENE_RESOURCE_MASK, 11);
+  EXPECT_EQ((int)GSHSCENE_RESOURCE_KIND_COUNT, 12);
+  EXPECT_STREQ(gshscene_resource_kind_string(GSHSCENE_RESOURCE_MASK), "mask");
   EXPECT_STREQ(gshscene_resource_kind_string(GSHSCENE_RESOURCE_IMAGE_PAINT), "image-paint");
   EXPECT_STREQ(gshscene_resource_kind_string(GSHSCENE_RESOURCE_PLANE), "plane");
   EXPECT_STREQ(gshscene_resource_kind_string(GSHSCENE_RESOURCE_STROKE_STYLE), "stroke-style");

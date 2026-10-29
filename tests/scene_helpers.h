@@ -247,6 +247,68 @@ inline GSHSCENE_Color_Space linear_srgb_space() {
   return space_of(GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_LINEAR);
 }
 
+/**
+ * The six masks of tools/gen-scene-vectors.py (known::kMaskHashes), over @p picture: 0 the default alpha mask; 1 a
+ * luminance mask over two spaces with a backdrop, acting on shape, through an exponential; 2 a luminance mask with the
+ * LUM coefficients through a table; 3 an alpha mask in linear sRGB through a three-piece stitching; 4 SPACE_Y in a gamma
+ * space with a white backdrop; 5 REC709.  The caller owns the reference; nullptr on failure.
+ */
+inline const GSHSCENE_Resource * known_mask(GSHSCENE_Store * store, const GSHSCENE_Resource * picture, int which) {
+  static const double table[3] = {0.0, 0.25, 1.0};
+  static const double half[3] = {0.0, 0.5, 1.0};
+  static const GSHSCENE_Transfer_Piece pieces[3] = {
+      {0.0, 0.25, 0.0, 1.0, GSHSCENE_TRANSFER_IDENTITY, 0.0, 0.0, 0.0, 0, nullptr},
+      {0.25, 0.75, 1.0, 0.0, GSHSCENE_TRANSFER_EXPONENTIAL, 0.1, 0.9, 2.0, 0, nullptr},
+      {0.75, 1.0, 0.0, 1.0, GSHSCENE_TRANSFER_TABLE, 0.0, 0.0, 0.0, 3, half}};
+  GSHSCENE_Mask m;
+  std::memset(&m, 0, sizeof m);
+  m.picture = picture;
+  m.mode = GSHSCENE_MASK_ALPHA;
+  switch (which) {
+    case 1:
+      m.mode = GSHSCENE_MASK_LUMINANCE;
+      m.space = linear_srgb_space();
+      m.render_space = srgb_space();
+      m.backdrop[0] = 0.25;
+      m.backdrop[1] = 0.5;
+      m.backdrop[2] = 1.0;
+      m.backdrop_space = space_of(GCOL_PRIMARIES_DISPLAY_P3, GCOL_TRANSFER_GAMMA, 2.2);
+      m.acts_on = GSHSCENE_MASK_ACTS_ON_SHAPE;
+      m.transfer.kind = GSHSCENE_TRANSFER_EXPONENTIAL;
+      m.transfer.c1 = 1.0;
+      m.transfer.n = 2.5;
+      break;
+    case 2:
+      m.mode = GSHSCENE_MASK_LUMINANCE;
+      m.coefficients = GSHSCENE_MASK_COEFF_LUM;
+      m.transfer.kind = GSHSCENE_TRANSFER_TABLE;
+      m.transfer.sample_count = 3;
+      m.transfer.samples = table;
+      break;
+    case 3:
+      m.render_space = linear_srgb_space();
+      m.transfer.kind = GSHSCENE_TRANSFER_STITCHING;
+      m.transfer.piece_count = 3;
+      m.transfer.pieces = pieces;
+      break;
+    case 4:
+      m.mode = GSHSCENE_MASK_LUMINANCE;
+      m.coefficients = GSHSCENE_MASK_COEFF_SPACE_Y;
+      m.space = space_of(GCOL_PRIMARIES_ADOBE_RGB, GCOL_TRANSFER_GAMMA, 2.19921875);
+      m.backdrop[0] = m.backdrop[1] = m.backdrop[2] = 1.0;
+      m.backdrop_space = m.space;
+      break;
+    case 5:
+      m.mode = GSHSCENE_MASK_LUMINANCE;
+      m.coefficients = GSHSCENE_MASK_COEFF_REC709;
+      break;
+    default:
+      break;
+  }
+  const GSHSCENE_Resource * r = nullptr;
+  return gshscene_store_intern_mask(store, &m, &r) == GSHSCENE_OK ? r : nullptr;
+}
+
 /** What a dump function writes, read back from a temporary file. */
 template <typename Dump, typename Object>
 std::string dump_of(Dump dump, const Object * object) {

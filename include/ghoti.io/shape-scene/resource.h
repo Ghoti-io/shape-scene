@@ -34,7 +34,7 @@
  * centerline is stroked: its width, joins, caps, dashes; stroke.h) or the plane
  * (the shape of a fill that has no outline: every point the clips in force
  * allow) or an image (a raster's samples as imported, with the descriptor that says what they are;
- * image.h).  A
+ * image.h) or a mask (a picture read as alpha or luminance, through a transfer; mask.h).  A
  * **store** interns resources: asking it for content it already holds, while a
  * handle to that content is held, returns that handle, so equality of content
  * is equality of pointers within one store.  The store decides by the index
@@ -93,6 +93,7 @@
  * - **plane** (1): nothing after the format and the kind: there is one plane.
  * - **image paint** (1): `u64` the image's content hash, the window, the map's hash, the extends, the filters, the filter space and
  *   the tint, as image_paint.h spells it (IP13).
+ * - **mask** (1): `u64` the picture's content hash, the mode, coefficients, spaces, backdrop, acts-on and canonical transfer, as mask.h spells them (MK13).
  * - **image** (1): `u32` width, `u32` height, `u8` layout, `u8` sample type, `u8` bits, `u8` alpha form, `u8` alpha-only, the
  *   space (`u8` primaries, `u8` transfer, `f64` gamma), `u32` the tile edge, `u64` the tile count, then `u64` the hash of
  *   each tile in tile order; a tile's hash is of its dimensions and its samples as values (image.h, IM7).
@@ -121,7 +122,7 @@
  * line `stroke width=<hex> space=N join=N miter=<hex> cap=N degenerate=N align=N
  * rule=N scope=N offset=<hex> dashes=N profile=<hash>` and a line `d <hex>` per
  * dash; a plane is the line and no other; an image is a line `image w=N h=N layout=L type=T bits=B alpha=A alphaonly=N
- * space=<space> tile=N tiles=XxY` and a line `t <row> <hash> ...` per tile row, never the samples (image.h, IM12).
+ * space=<space> tile=N tiles=XxY` and a line `t <row> <hash> ...` per tile row, never the samples (image.h, IM12); a mask is the lines mask.h spells, never its picture's items.
  *
  * ### The plane (color-paint story P4, C2; PL1 to PL10)
  *
@@ -169,6 +170,7 @@ typedef enum GSHSCENE_Resource_Kind {
   GSHSCENE_RESOURCE_STROKE_STYLE = 8, ///< How a centerline is stroked (stroke.h, SK1 to SK3).
   GSHSCENE_RESOURCE_PLANE = 9,     ///< The plane: what a fill covers where no shape bounds it, every point the clips allow (PL1 to PL10).
   GSHSCENE_RESOURCE_IMAGE_PAINT = 10, ///< How a fill samples an image: its window, map, edges, filters, space and tint (image_paint.h, IP1).
+  GSHSCENE_RESOURCE_MASK = 11,     ///< A mask: what a group's soft-mask slot names, a picture read as alpha or luminance through a transfer (mask.h, MK1).
   GSHSCENE_RESOURCE_KIND_COUNT     ///< Closes the enum.
 } GSHSCENE_Resource_Kind;
 
@@ -177,7 +179,7 @@ typedef enum GSHSCENE_Resource_Kind {
  *
  * @param kind The kind, including a value outside the enum.
  * @return A static string, never NULL: "path", "glyph-run", "picture",
- *   "gradient", "image", "face", "palette", "stroke-style", "plane", "image-paint", or "unknown resource kind".
+ *   "gradient", "image", "face", "palette", "stroke-style", "plane", "image-paint", "mask", or "unknown resource kind".
  */
 GSHSCENE_API const char * gshscene_resource_kind_string(GSHSCENE_Resource_Kind kind);
 
@@ -247,6 +249,8 @@ typedef struct GSHSCENE_Glyph_Run {
 #define GSHSCENE_BYTES_PER_COLOR ((size_t)48)    ///< Added for each entry of a palette.
 #define GSHSCENE_BYTES_PER_STOP ((size_t)96)     ///< Added for each stop of a gradient.
 #define GSHSCENE_BYTES_PER_DASH ((size_t)16)     ///< Added for each dash of a stroke style's canonical array (SK12).
+#define GSHSCENE_BYTES_PER_TRANSFER_PIECE ((size_t)112) ///< Added for each piece of a mask's stitching transfer (MK4).
+#define GSHSCENE_BYTES_PER_TRANSFER_SAMPLE ((size_t)8)  ///< Added for each sample of a mask's tables (MK4).
 /** @} */
 
 /** @brief Counters of a store, for tests and diagnostics. */

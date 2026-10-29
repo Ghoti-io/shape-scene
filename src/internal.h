@@ -131,6 +131,11 @@ struct GSHSCENE_Resource {
       int owns_raster;            /* the raster is the store's to destroy (set once the intern has linked it) */
       uint64_t * tiles;           /* tiles_x * tiles_y hashes in tile order */
     } image;
+    struct {
+      GSHSCENE_Mask m;                    /* canonical (MK1); the picture and the transfer's arrays point at the copies below */
+      GSHSCENE_Transfer_Piece * pieces;   /* the stitching's pieces, NULL for none */
+      double * samples;                   /* every table's samples, the top level's first, then each piece's; NULL for none */
+    } mask;
   } u;
 };
 
@@ -321,7 +326,21 @@ void gshscene_image_free(GSHSCENE_Resource * resource);
 /** The payload of an image's dump (image.h, IM12); negative on failure. */
 int gshscene_image_dump(const GSHSCENE_Resource * resource, FILE * out);
 
+/* --- mask.c ----------------------------------------------------------------- */
+
+/** Whether a mask resource has the canonical content @p source (a GSHSCENE_Mask, `-0` allowed). */
+int gshscene_mask_matches(const GSHSCENE_Resource * resource, const void * source);
+
+/** Release the picture a mask holds and free its transfer's arrays. */
+void gshscene_mask_free(GSHSCENE_Resource * resource);
+
+/** The payload of a mask's dump (mask.h, MK13); negative on failure. */
+int gshscene_mask_dump(const GSHSCENE_Resource * resource, FILE * out);
+
 /* --- convert.c -------------------------------------------------------------- */
+
+/** MK3: the Y row of N3's RGB-to-XYZ matrix of a concrete space: the luminance coefficients `SPACE_Y` names. */
+void gshscene_space_luminance_row(const GSHSCENE_Color_Space * space, double out[3]);
 
 /** N2, N3: a straight color from space @p from to space @p to, both concrete (not zero); exact when they are equal. */
 void gshscene_convert_straight(const GSHSCENE_Color_Space * from, const GSHSCENE_Color_Space * to, const double in[3],

@@ -120,6 +120,14 @@ static void rgb_to_xyz(GCOL_Primaries primaries, double out[3][3]) {
   }
 }
 
+void gshscene_space_luminance_row(const GSHSCENE_Color_Space * space, double out[3]) {
+  double m[3][3];
+  rgb_to_xyz(space->primaries, m);
+  for (int c = 0; c < 3; c++) {
+    out[c] = m[1][c];
+  }
+}
+
 /** `sign(x) |x|^e`, zero for zero. */
 static double signed_pow(double x, double e) {
   if (x == 0.0) {

@@ -606,6 +606,76 @@ PICTURE_ITEMS = [
 PICTURE_LIST_HASH = list_hash(PICTURE_ITEMS)
 PICTURE_RES = fnv(u32(1) + u32(KIND_PICTURE) + u64(PICTURE_LIST_HASH))
 
+# --- masks (mask.h, MK1 to MK4, MK13; masks-images-patterns story M1) ---------------------------------------------------
+KIND_MASK = 11
+MODE_ALPHA, MODE_LUMINANCE = 1, 2
+COEFF_W3C, COEFF_REC709, COEFF_LUM, COEFF_SPACE_Y = 0, 1, 2, 3
+ACTS_OPACITY, ACTS_SHAPE = 0, 1
+TR_IDENTITY, TR_EXPONENTIAL, TR_TABLE, TR_STITCHING = 0, 1, 2, 3
+
+
+def leaf_bytes(leaf):
+    """A transfer leaf: ("id",), ("exp", c0, c1, n) or ("table", [samples])."""
+    if leaf[0] == "id":
+        return u8(TR_IDENTITY)
+    if leaf[0] == "exp":
+        return u8(TR_EXPONENTIAL) + f64(leaf[1]) + f64(leaf[2]) + f64(leaf[3])
+    return u8(TR_TABLE) + u64(len(leaf[1])) + b"".join(f64(v) for v in leaf[1])
+
+
+def leaf_fields(leaf):
+    """(kind, c0, c1, n, samples) of a leaf, the fields of another kind zero."""
+    if leaf[0] == "id":
+        return TR_IDENTITY, 0.0, 0.0, 0.0, []
+    if leaf[0] == "exp":
+        return TR_EXPONENTIAL, leaf[1], leaf[2], leaf[3], []
+    return TR_TABLE, 0.0, 0.0, 0.0, leaf[1]
+
+
+def mask_res(picture, mode, coeff=COEFF_W3C, lspace=TARGET, rspace=TARGET, backdrop=(0.0, 0.0, 0.0), bspace=TARGET,
+             acts=ACTS_OPACITY, tr=("id",)):
+    """A mask's content hash and dump as mask.h spells them; tr is a leaf or ("stitch", [(lo, hi, e0, e1, leaf)])."""
+    out = u32(1) + u32(KIND_MASK) + u64(picture) + u8(mode) + u8(coeff) + space_bytes(lspace) + space_bytes(rspace)
+    out += b"".join(f64(v) for v in backdrop) + space_bytes(bspace) + u8(acts)
+    if tr[0] == "stitch":
+        out += u8(TR_STITCHING) + u64(len(tr[1]))
+        for lo, hi, e0, e1, leaf in tr[1]:
+            out += f64(lo) + f64(hi) + f64(e0) + f64(e1) + leaf_bytes(leaf)
+        top = (TR_STITCHING, 0.0, 0.0, 0.0, [])
+        pieces = tr[1]
+    else:
+        out += leaf_bytes(tr)
+        top = leaf_fields(tr)
+        pieces = []
+    digest = fnv(out)
+    lines = ["gshscene.resource 1 kind=mask hash=%016x" % digest,
+             "mask picture=%016x mode=%d coeff=%d acts=%d rspace=%s lspace=%s backdrop=%016x %016x %016x bspace=%s" % (
+                 picture, mode, coeff, acts, space_text(rspace), space_text(lspace), bits(backdrop[0]), bits(backdrop[1]),
+                 bits(backdrop[2]), space_text(bspace)),
+             "tr kind=%d c0=%016x c1=%016x n=%016x samples=%d pieces=%d" % (top[0], bits(top[1]), bits(top[2]), bits(top[3]),
+                                                                           len(top[4]), len(pieces))]
+    lines += ["s %016x" % bits(v) for v in top[4]]
+    for lo, hi, e0, e1, leaf in pieces:
+        k, c0, c1, n, samples = leaf_fields(leaf)
+        lines.append("p lo=%016x hi=%016x e0=%016x e1=%016x leaf=%d c0=%016x c1=%016x n=%016x samples=%d" % (
+            bits(lo), bits(hi), bits(e0), bits(e1), k, bits(c0), bits(c1), bits(n), len(samples)))
+        lines += ["s %016x" % bits(v) for v in samples]
+    return dict(hash=digest, dump="\n".join(lines) + "\n")
+
+
+MASKS = [
+    mask_res(PICTURE_RES, MODE_ALPHA),
+    mask_res(PICTURE_RES, MODE_LUMINANCE, COEFF_W3C, lspace=SRGB_LINEAR, rspace=SRGB_SRGB, backdrop=(0.25, 0.5, 1.0),
+             bspace=P3_GAMMA, acts=ACTS_SHAPE, tr=("exp", 0.0, 1.0, 2.5)),
+    mask_res(PICTURE_RES, MODE_LUMINANCE, COEFF_LUM, tr=("table", [0.0, 0.25, 1.0])),
+    mask_res(PICTURE_RES, MODE_ALPHA, rspace=SRGB_LINEAR,
+             tr=("stitch", [(0.0, 0.25, 0.0, 1.0, ("id",)), (0.25, 0.75, 1.0, 0.0, ("exp", 0.1, 0.9, 2.0)),
+                            (0.75, 1.0, 0.0, 1.0, ("table", [0.0, 0.5, 1.0]))])),
+    mask_res(PICTURE_RES, MODE_LUMINANCE, COEFF_SPACE_Y, lspace=ADOBE_GAMMA, backdrop=(1.0, 1.0, 1.0), bspace=ADOBE_GAMMA),
+    mask_res(PICTURE_RES, MODE_LUMINANCE, COEFF_REC709),
+]
+MASK_RES = MASKS[0]["hash"]
+
 LIST_FG = ((0.1, 0.2, 0.3, 0.5), SRGB_LINEAR)
 LIST_ITEMS = [
     fill(KIND_PATH, SQ_RES, DESIGN, 0, (0.25, 0.5, 0.75, 1.0), space=ADOBE_GAMMA, layer=-3, depth=0.5),
@@ -1111,6 +1181,9 @@ def render():
     o.append(cxx_string("kGradientListDump", list_dump(GRAD_LIST_ITEMS)))
     o.append(cxx_string("kGradientSceneDump", version_dump(GRAD_SCENE_NODES)))
     o.append(cxx_string("kBlendListDump", list_dump(BLEND_LIST_ITEMS)))
+    o.append("static const std::uint64_t kMaskHashes[] = {%s};\n" % ", ".join("UINT64_C(0x%016x)" % m["hash"] for m in MASKS))
+    for i, m in enumerate(MASKS):
+        o.append(cxx_string("kMaskDump%d" % i, m["dump"]))
     o.append(cxx_string("kPdfGroupListDump", list_dump(PDF_LIST_ITEMS)))
     o.append(cxx_string("kPdfGroupSceneDump", version_dump(PDF_SCENE_NODES)))
     o.append(cxx_string("kStrokeDefaultDump", style_dump(STYLE_DEFAULT)))
