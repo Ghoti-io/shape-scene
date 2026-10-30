@@ -52,15 +52,17 @@
  * - **ELLIPSE** `{cx, cy, rx, ry}`, both radii positive: six elements. A circle is an ellipse with equal radii.
  *
  * `flip_x` and `flip_y` (each 0 or 1) are Canvas's four sign cases (see shapes.h). The direction is derived (negative iff exactly
- * one flip is set) and not stored. SVG uses no flip. **A flipped rounded rectangle is not defined yet** and is
- * ::GSHSCENE_ERR_UNSUPPORTED (the engines disagree on what Canvas `roundRect` does with a negative size; see shapes.h).
+ * one flip is set) and not stored. SVG uses no flip. **A rounded rectangle's flips are not the rect's**: Canvas `roundRect` with a
+ * negative size sends the radii to the mirrored corners but starts after the box's top-left radius and runs the other way round for one
+ * flip (shapes.h gives the rule, as Chromium draws it; Firefox differs for one flip). The radii `r` are then in the order the sign case
+ * visits the corners. A flipped rounded rectangle with no round corner stays a rounded rectangle (it is not a `RECT`).
  *
  * ### Validity and the order of refusals (PR2)
  *
  * ::GSHSCENE_ERR_INVALID for a NULL, a kind that is `NONE` or unknown, a flip that is not 0 or 1, a non-finite number, a negative
  * width, height or radius component, an ellipse radius that is not positive, and radii that overlap on a side (decided exactly), in that
- * order; then ::GSHSCENE_ERR_UNSUPPORTED for a flipped rounded rectangle; then ::GSHSCENE_ERR_LIMIT for a coordinate the build would derive
- * past ::GSHGEOM_COORD_LIMIT, the store's element limit or its byte limit; then ::GSHSCENE_ERR_OOM.
+ * order; then ::GSHSCENE_ERR_LIMIT for a coordinate the build would derive past ::GSHGEOM_COORD_LIMIT, the store's element limit or its byte
+ * limit; then ::GSHSCENE_ERR_OOM.
  *
  * ### Content (PR7, PR12)
  *
@@ -129,7 +131,7 @@ GSHSCENE_API const char * gshscene_primitive_kind_string(GSHSCENE_Primitive_Kind
  * @param store The store.
  * @param prim The primitive; not kept.
  * @param out The handle (a reference the caller releases); written only on success.
- * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID, ::GSHSCENE_ERR_UNSUPPORTED, ::GSHSCENE_ERR_LIMIT or ::GSHSCENE_ERR_OOM as above.
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID, ::GSHSCENE_ERR_LIMIT or ::GSHSCENE_ERR_OOM as above.
  */
 GSHSCENE_API GSHSCENE_Result gshscene_store_intern_primitive(
     GSHSCENE_Store * store, const GSHSCENE_Primitive * prim, const GSHSCENE_Resource ** out);

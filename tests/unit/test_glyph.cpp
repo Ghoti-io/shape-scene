@@ -1553,7 +1553,7 @@ GSHSCENE_Result arc_outline(void *, const GSHSCENE_Face *, uint32_t glyph, GSHGE
     return GSHSCENE_OK;
   }
   const GSHGEOM_Corner c[4] = {{100, 100}, {50, 50}, {100, 100}, {50, 50}};
-  return gshgeom_path_add_rounded_rect(out, 0, 0, 1000, 600, c) == GSHGEOM_OK ? GSHSCENE_OK : GSHSCENE_ERR_INVALID;
+  return gshgeom_path_add_rounded_rect(out, 0, 0, 1000, 600, c, 0, 0) == GSHGEOM_OK ? GSHSCENE_OK : GSHSCENE_ERR_INVALID;
 }
 
 GSHSCENE_Result arc_box(void *, const GSHSCENE_Face *, uint32_t, GSHSCENE_Glyph_Box * out) {

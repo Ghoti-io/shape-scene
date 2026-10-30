@@ -273,6 +273,39 @@ def prim_rrect(x, y, w, h, r):
     return (2, els), ("rounded-rect", 0, 0, [x, y, w, h] + [v for c in r for v in c])
 
 
+def prim_rrect_flipped(x, y, w, h, r, fx, fy):
+    """Canvas roundRect with a negative size, as Chromium draws it (shapes.h): the radii r (in the order the sign case visits the corners) go to
+    the mirrored corners, and the path is the clockwise path from after the box's top-left radius, or its reversal for one flip."""
+    to_box = {(0, 0): (0, 1, 2, 3), (1, 0): (1, 0, 3, 2), (0, 1): (3, 2, 1, 0), (1, 1): (2, 3, 0, 1)}[(fx, fy)]
+    c = [None] * 4
+    for k in range(4):
+        c[to_box[k]] = r[k]
+    (tlx, tly), (trx, try_), (brx, bry), (blx, bly) = c
+    circ = lambda a, b: 1 if a == b else 0
+    start = (x + tlx, y)
+    els = [("M", [start], None)]
+    if fx != fy:
+        els.append(arc(circ(tlx, tly), DEG, start, (x, y + tly), (x + tlx, y + tly), (tlx, 0.0), (0.0, tly), 270.0, -90.0))
+        els.append(("L", [(x, y + h - bly)], None))
+        els.append(arc(circ(blx, bly), DEG, (x, y + h - bly), (x + blx, y + h), (x + blx, y + h - bly), (blx, 0.0), (0.0, bly), 180.0, -90.0))
+        els.append(("L", [(x + w - brx, y + h)], None))
+        els.append(arc(circ(brx, bry), DEG, (x + w - brx, y + h), (x + w, y + h - bry), (x + w - brx, y + h - bry), (brx, 0.0), (0.0, bry), 90.0, -90.0))
+        els.append(("L", [(x + w, y + try_)], None))
+        els.append(arc(circ(trx, try_), DEG, (x + w, y + try_), (x + w - trx, y), (x + w - trx, y + try_), (trx, 0.0), (0.0, try_), 0.0, -90.0))
+        els.append(("L", [start], None))
+    else:
+        els.append(("L", [(x + w - trx, y)], None))
+        els.append(arc(circ(trx, try_), DEG, (x + w - trx, y), (x + w, y + try_), (x + w - trx, y + try_), (trx, 0.0), (0.0, try_), -90.0, 90.0))
+        els.append(("L", [(x + w, y + h - bry)], None))
+        els.append(arc(circ(brx, bry), DEG, (x + w, y + h - bry), (x + w - brx, y + h), (x + w - brx, y + h - bry), (brx, 0.0), (0.0, bry), 0.0, 90.0))
+        els.append(("L", [(x + blx, y + h)], None))
+        els.append(arc(circ(blx, bly), DEG, (x + blx, y + h), (x, y + h - bly), (x + blx, y + h - bly), (blx, 0.0), (0.0, bly), 90.0, 90.0))
+        els.append(("L", [(x, y + tly)], None))
+        els.append(arc(circ(tlx, tly), DEG, (x, y + tly), start, (x + tlx, y + tly), (tlx, 0.0), (0.0, tly), 180.0, 90.0))
+    els.append(("Z", [], None))
+    return (2, els), ("rounded-rect", fx, fy, [x, y, w, h] + [v for k in r for v in k])
+
+
 def prim_ellipse(cx, cy, rx, ry, flip_x=0, flip_y=0):
     sx = -rx if flip_x else rx
     sy = -ry if flip_y else ry
@@ -287,6 +320,10 @@ def prim_ellipse(cx, cy, rx, ry, flip_x=0, flip_y=0):
 
 PRIM_RECT_FLIP_X, TAG_RECT_FLIP_X = pq("rect", 10.0, 20.0, 100.0, 50.0, 1, 0)
 PRIM_RRECT, TAG_RRECT = prim_rrect(0.0, 0.0, 100.0, 60.0, [(10.0, 12.0), (6.0, 5.0), (4.0, 4.0), (8.0, 9.0)])
+RR4 = [(10.0, 12.0), (6.0, 5.0), (4.0, 4.0), (8.0, 9.0)]
+PRIM_RRECT_FLIP_X, TAG_RRECT_FLIP_X = prim_rrect_flipped(0.0, 0.0, 100.0, 60.0, RR4, 1, 0)
+PRIM_RRECT_FLIP_Y, TAG_RRECT_FLIP_Y = prim_rrect_flipped(0.0, 0.0, 100.0, 60.0, RR4, 0, 1)
+PRIM_RRECT_BOTH, TAG_RRECT_BOTH = prim_rrect_flipped(0.0, 0.0, 100.0, 60.0, RR4, 1, 1)
 PRIM_ELLIPSE_FLIP_Y, TAG_ELLIPSE_FLIP_Y = prim_ellipse(100.0, 100.0, 50.0, 20.0, 0, 1)
 PRIM_CIRCLE, TAG_CIRCLE = prim_ellipse(50.0, 30.0, 20.0, 20.0)
 # A path of arcs that is not a primitive: every unit, a negative sweep, a circular flag, an elliptical arc and a closing line.
@@ -1275,6 +1312,9 @@ def render():
     o.append(cxx_string("kRectFlipXResourceDump", resource_dump(PRIM_RECT_FLIP_X, TAG_RECT_FLIP_X)))
     o.append(cxx_string("kRectFlipXUntaggedResourceDump", resource_dump(PRIM_RECT_FLIP_X)))
     o.append(cxx_string("kRoundedRectResourceDump", resource_dump(PRIM_RRECT, TAG_RRECT)))
+    o.append(cxx_string("kRoundedRectFlipXResourceDump", resource_dump(PRIM_RRECT_FLIP_X, TAG_RRECT_FLIP_X)))
+    o.append(cxx_string("kRoundedRectFlipYResourceDump", resource_dump(PRIM_RRECT_FLIP_Y, TAG_RRECT_FLIP_Y)))
+    o.append(cxx_string("kRoundedRectBothFlipsResourceDump", resource_dump(PRIM_RRECT_BOTH, TAG_RRECT_BOTH)))
     o.append(cxx_string("kEllipseFlipYResourceDump", resource_dump(PRIM_ELLIPSE_FLIP_Y, TAG_ELLIPSE_FLIP_Y)))
     o.append(cxx_string("kCircleResourceDump", resource_dump(PRIM_CIRCLE, TAG_CIRCLE)))
     o.append(cxx_string("kArcPathResourceDump", resource_dump(ARC_PATH)))

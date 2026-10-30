@@ -126,7 +126,7 @@ enum {
   OUT_MASK_LUMINANCE, OUT_MASK_TRANSFER, OUT_MASK_INVALID, OUT_MASK_UNSUPPORTED, OUT_MASK_LIMIT, OUT_MASK_HIT, OUT_MASK_NEAR,
   OUT_MASK_GROUP, OUT_MASK_GROUP_INVALID, OUT_MASK_GROUP_UNSUPPORTED, OUT_MASK_LIST_EQUAL, OUT_MASK_DEPTH, OUT_MASK_DEPTH_LIMIT,
   OUT_MASK_NODE, OUT_MASK_NODE_INVALID, OUT_MASK_DAMAGE, OUT_MASK_NO_DAMAGE, OUT_MASK_EMITTED,
-  OUT_PRIMITIVE_INTERNED, OUT_PRIMITIVE_FLIPPED, OUT_PRIMITIVE_CANONICAL, OUT_PRIMITIVE_INVALID, OUT_PRIMITIVE_UNSUPPORTED,
+  OUT_PRIMITIVE_INTERNED, OUT_PRIMITIVE_FLIPPED, OUT_PRIMITIVE_CANONICAL, OUT_PRIMITIVE_INVALID, OUT_PRIMITIVE_REVERSED,
   OUT_PRIMITIVE_LIMIT, OUT_PRIMITIVE_HIT, OUT_PRIMITIVE_UNTAGGED, OUT_ARC_PATH, OUT_COUNT
 };
 
@@ -153,7 +153,7 @@ static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limi
     "a changed mask or placement damaging the group's content", "an unchanged mask damaging nothing",
     "an emitted list with a masked group", "a primitive interned", "a flipped primitive interned",
     "a rounded rectangle made a rectangle by its square corners", "a primitive refused as invalid",
-    "a flipped rounded rectangle refused as unsupported", "a primitive past the store's limits refused",
+    "a rounded rectangle run the other way round interned", "a primitive past the store's limits refused",
     "a primitive found again", "the same geometry untagged, another handle", "a path with an arc interned"};
 
 static unsigned long outcomes[OUT_COUNT];
@@ -304,7 +304,7 @@ static GSHGEOM_Path * make_path(S * s, unsigned recipe) {
     }
     case 7: { /* a rounded rectangle built by shape-geometry, untagged */
       const GSHGEOM_Corner c[4] = {{1, 1}, {0.5, 1}, {1, 0.5}, {0, 0}};
-      gshgeom_path_add_rounded_rect(path, 0, 0, 8, 6, c);
+      gshgeom_path_add_rounded_rect(path, 0, 0, 8, 6, c, 0, 0);
       break;
     }
     default: /* 3D */
@@ -1950,17 +1950,14 @@ static void op(S * s, unsigned code) {
       CHECK(gshscene_store_stats(store, &before) == GSHSCENE_OK);
       const GSHSCENE_Resource * x = NULL;
       r = gshscene_store_intern_primitive(store, &want, &x);
-      CHECK(r == GSHSCENE_OK || r == GSHSCENE_ERR_INVALID || r == GSHSCENE_ERR_UNSUPPORTED || r == GSHSCENE_ERR_LIMIT);
+      CHECK(r == GSHSCENE_OK || r == GSHSCENE_ERR_INVALID || r == GSHSCENE_ERR_LIMIT);
       if (r != GSHSCENE_OK) {
         CHECK(x == NULL);
         GSHSCENE_Store_Stats after;
         CHECK(gshscene_store_stats(store, &after) == GSHSCENE_OK);
         CHECK(after.live == before.live && after.bytes == before.bytes && after.created == before.created);
         outcomes[OUT_PRIMITIVE_INVALID] += r == GSHSCENE_ERR_INVALID;
-        outcomes[OUT_PRIMITIVE_UNSUPPORTED] += r == GSHSCENE_ERR_UNSUPPORTED;
         outcomes[OUT_PRIMITIVE_LIMIT] += r == GSHSCENE_ERR_LIMIT;
-        /* a flipped rounded rectangle is unsupported only once its numbers are valid */
-        CHECK(r != GSHSCENE_ERR_UNSUPPORTED || (want.kind == GSHSCENE_PRIMITIVE_ROUNDED_RECT && (want.flip_x || want.flip_y)));
         break;
       }
       GSHSCENE_Primitive got;
@@ -1970,10 +1967,12 @@ static void op(S * s, unsigned code) {
       CHECK(got.flip_x == want.flip_x && got.flip_y == want.flip_y);
       CHECK(want.kind == got.kind || (want.kind == GSHSCENE_PRIMITIVE_ROUNDED_RECT && got.kind == GSHSCENE_PRIMITIVE_RECT));
       outcomes[OUT_PRIMITIVE_CANONICAL] += want.kind != got.kind;
+      CHECK(want.kind == got.kind || (!want.flip_x && !want.flip_y)); /* a flipped rounded rectangle never becomes a rect */
+      outcomes[OUT_PRIMITIVE_REVERSED] += got.kind == GSHSCENE_PRIMITIVE_ROUNDED_RECT && got.flip_x != got.flip_y;
       outcomes[OUT_PRIMITIVE_FLIPPED] += got.flip_x || got.flip_y;
       const GSHGEOM_Path * path = gshscene_resource_path(x);
       const size_t elements = gshgeom_path_element_count(path);
-      CHECK(got.kind == GSHSCENE_PRIMITIVE_RECT ? elements == 5 : (got.kind == GSHSCENE_PRIMITIVE_ELLIPSE ? elements == 6 : (elements >= 7 && elements <= 10)));
+      CHECK(got.kind == GSHSCENE_PRIMITIVE_RECT ? elements == 5 : (got.kind == GSHSCENE_PRIMITIVE_ELLIPSE ? elements == 6 : (elements >= 6 && elements <= 10)));
       /* found again: the same handle */
       const GSHSCENE_Resource * again = NULL;
       CHECK(gshscene_store_intern_primitive(store, &got, &again) == GSHSCENE_OK);

@@ -434,6 +434,28 @@ TEST(Primitive, EqualContentIsOneHandleAndNearlyEqualIsAnother) {
   add("rounded rect, a corner differs in one component", rrect(0, 0, 100, 60, other));
   GSHGEOM_Corner swapped[4] = {{6, 5}, {10, 12}, {4, 4}, {8, 9}};
   add("rounded rect, two corners exchanged", rrect(0, 0, 100, 60, swapped));
+  for (int f = 1; f < 4; f++) {
+    GSHSCENE_Primitive fp = rrect(0, 0, 100, 60, kCorners);
+    fp.flip_x = f & 1;
+    fp.flip_y = f >> 1;
+    add("rounded rect under a flip pair", fp);
+  }
+  {
+    // flipped, a box with no round corner is a rounded rect with its four lines, one handle per pair and none the rect's
+    const GSHGEOM_Corner none[4] = {{0, 0}, {0, 0}, {0, 0}, {0, 0}};
+    for (int f = 0; f < 4; f++) {
+      GSHSCENE_Primitive fp = rrect(0, 0, 100, 60, none);
+      fp.flip_x = f & 1;
+      fp.flip_y = f >> 1;
+      held.emplace_back(prim(s.store, fp));
+      ASSERT_NE(held.back().get(), nullptr);
+      EXPECT_TRUE(distinct.insert(held.back().get()).second) << f;
+      GSHSCENE_Primitive back;
+      ASSERT_EQ(gshscene_resource_primitive(held.back().get(), &back), GSHSCENE_OK);
+      EXPECT_EQ(back.kind, f == 0 ? GSHSCENE_PRIMITIVE_RECT : GSHSCENE_PRIMITIVE_ROUNDED_RECT) << f;
+      EXPECT_EQ(gshgeom_path_element_count(gshscene_resource_path(held.back().get())), f == 0 ? 5u : 6u) << f;
+    }
+  }
   const size_t n = held.size();
   // the pairs above are two handles, two hashes, and (for the last two) one path
   EXPECT_TRUE(gshgeom_path_equal(gshscene_resource_path(held[7].get()), gshscene_resource_path(held[8].get())));
@@ -493,6 +515,17 @@ TEST(Primitive, TheHashAndDumpAreRestatedByTheGenerator) {
   EXPECT_EQ(dump_resource(rf.get()), known::kRectFlipXResourceDump);
   Ref q(prim(s.store, rrect(0, 0, 100, 60, kCorners)));
   EXPECT_EQ(dump_resource(q.get()), known::kRoundedRectResourceDump);
+  // Canvas roundRect with a negative size: the reversal for one flip (the radii at the mirrored corners), the clockwise path for two
+  for (int f = 1; f < 4; f++) {
+    GSHSCENE_Primitive fp = rrect(0, 0, 100, 60, kCorners);
+    fp.flip_x = f & 1;
+    fp.flip_y = f >> 1;
+    Ref fr(prim(s.store, fp));
+    EXPECT_EQ(dump_resource(fr.get()), f == 1 ? known::kRoundedRectFlipXResourceDump
+                                       : f == 2 ? known::kRoundedRectFlipYResourceDump
+                                                : known::kRoundedRectBothFlipsResourceDump)
+        << f;
+  }
   Ref e(prim(s.store, ellipse(100, 100, 50, 20, 0, 1)));
   EXPECT_EQ(dump_resource(e.get()), known::kEllipseFlipYResourceDump);
   Ref c(prim(s.store, ellipse(50, 30, 20, 20)));
@@ -549,42 +582,42 @@ TEST(Primitive, TheRefusalsComeInTheOrderOfTheRule) {
   EXPECT_EQ(result(rrect(0, 0, 10, 10, overlap)), GSHSCENE_ERR_INVALID);
   const GSHGEOM_Corner fits[4] = {{5, 1}, {5, 1}, {5, 1}, {5, 1}};
   EXPECT_EQ(result(rrect(0, 0, 10, 10, fits)), GSHSCENE_OK) << "equality is allowed";
-  /* the order: INVALID before UNSUPPORTED before LIMIT */
+  /* the order: INVALID before LIMIT, whatever the flips */
   GSHSCENE_Primitive f = rrect(0, 0, 10, 10, fits);
   f.flip_x = 1;
-  EXPECT_EQ(result(f), GSHSCENE_ERR_UNSUPPORTED) << "a flipped rounded rect is not defined yet";
+  EXPECT_EQ(result(f), GSHSCENE_OK) << "a flipped rounded rect is Canvas roundRect with a negative size";
   f.flip_x = 0;
   f.flip_y = 1;
-  EXPECT_EQ(result(f), GSHSCENE_ERR_UNSUPPORTED);
+  EXPECT_EQ(result(f), GSHSCENE_OK);
   f.flip_y = 2;
   EXPECT_EQ(result(f), GSHSCENE_ERR_INVALID);
   f.flip_y = 0;
   f.flip_x = 2;
-  EXPECT_EQ(result(f), GSHSCENE_ERR_INVALID) << "a flip that is not 0 or 1 is invalid, not unsupported, on either axis";
+  EXPECT_EQ(result(f), GSHSCENE_ERR_INVALID) << "a flip that is not 0 or 1 is invalid on either axis";
   f.flip_x = -1;
   EXPECT_EQ(result(f), GSHSCENE_ERR_INVALID);
   f.flip_x = 1;
   f.flip_y = 1;
   f.x = kNaN;
-  EXPECT_EQ(result(f), GSHSCENE_ERR_INVALID) << "a number that is not one is reported before the flips";
+  EXPECT_EQ(result(f), GSHSCENE_ERR_INVALID) << "a number that is not one is invalid under any flips";
   f.x = 0;
   f.y = kInf;
   EXPECT_EQ(result(f), GSHSCENE_ERR_INVALID);
   f.y = 0;
   f.flip_y = 1;
   f.w = -1;
-  EXPECT_EQ(result(f), GSHSCENE_ERR_INVALID) << "a bad number is reported before the flip";
+  EXPECT_EQ(result(f), GSHSCENE_ERR_INVALID) << "a negative size is invalid under any flips";
   f.w = 10;
   f.r[0].rx = 6;
   EXPECT_EQ(result(f), GSHSCENE_ERR_INVALID) << "and so is an overlap";
   f = rrect(1e300, 0, 1e300, 10, fits);
   EXPECT_EQ(result(f), GSHSCENE_ERR_LIMIT) << "unflipped, the coordinate limit";
   f.flip_x = 1;
-  EXPECT_EQ(result(f), GSHSCENE_ERR_UNSUPPORTED) << "flipped, UNSUPPORTED comes before the limit";
+  EXPECT_EQ(result(f), GSHSCENE_ERR_LIMIT) << "and flipped";
   const GSHGEOM_Corner square[4] = {{0, 0}, {0, 0}, {0, 0}, {0, 0}};
   f = rrect(0, 0, 10, 10, square);
   f.flip_x = 1;
-  EXPECT_EQ(result(f), GSHSCENE_ERR_UNSUPPORTED) << "even with every corner square";
+  EXPECT_EQ(result(f), GSHSCENE_OK) << "every corner square, flipped";
   /* the coordinate limit: LIMIT, after the validity */
   EXPECT_EQ(result(rect(0x1p99, 0, 0x1p99, 1)), GSHSCENE_OK);
   EXPECT_EQ(result(rect(0x1p99, 0, 0x1p99 + 0x1p48, 1)), GSHSCENE_ERR_LIMIT);

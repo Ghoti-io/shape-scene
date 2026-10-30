@@ -142,10 +142,14 @@ int main(void) {
   expect(plain != circle, "a tagged path and its untagged copy are two resources");
   expect(gshscene_resource_primitive(plain, &back) == GSHSCENE_OK && back.kind == GSHSCENE_PRIMITIVE_NONE, "and the copy has no tag");
 
-  /* A flipped rounded rectangle is not defined yet; the refusal is loud. */
+  /* Canvas roundRect(x + w, y, -w, h, radii): the radii go to the mirrored corners and the path runs the other way round. */
   card.flip_x = 1;
-  const GSHSCENE_Resource * none = NULL;
-  expect(gshscene_store_intern_primitive(store, &card, &none) == GSHSCENE_ERR_UNSUPPORTED && none == NULL, "a flipped rounded rect is refused");
+  const GSHSCENE_Resource * mirrored = NULL;
+  expect(gshscene_store_intern_primitive(store, &card, &mirrored) == GSHSCENE_OK && mirrored != NULL, "a flipped rounded rect interns");
+  expect(gshscene_resource_primitive(mirrored, &back) == GSHSCENE_OK && back.kind == GSHSCENE_PRIMITIVE_ROUNDED_RECT && back.flip_x == 1,
+      "and keeps its flip");
+  expect(mirrored != rounded, "and is not the unflipped card");
+  gshscene_resource_release(mirrored);
 
   GSHSCENE_List * list = NULL;
   expect(gshscene_list_create(NULL, NULL, store, &list) == GSHSCENE_OK, "the list");

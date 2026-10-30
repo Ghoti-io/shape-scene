@@ -93,9 +93,9 @@ parameters it was built from. **PR1** The tag is set there and nowhere else: a r
 outlive an edit, and no function attaches one to an existing path or infers one from geometry (**PR8**): the same geometry interned as
 a path is an untagged handle, another resource. **PR2** The refusals come in this order: `INVALID` (a NULL, a kind that is `NONE` or past
 the enum, a flip that is not 0 or 1, a non-finite number, a negative size or radius, an ellipse radius that is not positive, radii that
-overlap on a side), `UNSUPPORTED` (a flipped rounded rectangle: see below), `LIMIT` (a coordinate past `GSHGEOM_COORD_LIMIT`, the element
+overlap on a side), `LIMIT` (a coordinate past `GSHGEOM_COORD_LIMIT`, the element
 limit, the byte limit), `OOM`. **PR4** A corner with a zero component is square and canonical `{0, 0}`, and a rounded rectangle with no
-round corner is a `RECT` (equal geometry is equal content). **PR7** The tag is content: the path resource's hash, for a tagged path
+round corner and no flip is a `RECT` (equal geometry is equal content; a flipped one stays a rounded rectangle, below). **PR7** The tag is content: the path resource's hash, for a tagged path
 only, follows the path's own hash with `u8` the kind, `u8` the flips (bit 0 `flip_x`, bit 1 `flip_y`) and the canonical parameters as
 `f64`; equality compares them bit for bit; the dump gains a line `primitive kind=<name> flip_x=N flip_y=N` and the parameters as 16
 hexadecimal digits each. **PR12** So equal content is one handle, a parameter that differs in one bit, a kind or a flip is another, and
@@ -109,11 +109,12 @@ that a writer can emit `<circle>`, `<ellipse>`, `<rect>` or `re`; `ARCS` follows
 radius, sense) of a circular arc under a map that keeps it one, which is what G2 or G3 needs, and `circular=0` for any other, never the chord.
 No capability bit and no report reason is added: a sink that does not read the tag does not know it exists.
 
-**A flipped rounded rectangle is `UNSUPPORTED`.** Canvas `roundRect` with a negative size does not follow the cases of `rect`: checked in
-headless Chrome 156, the radii go to the mirrored corners but the path starts after the top-left radius and runs clockwise for an even number
-of negative sizes and counter-clockwise for an odd one, whatever the signs (a reversal of the unmirrored path), and the HTML Standard's
-steps, read literally, start outside the box. Which of the two the waist means is open, so the builder takes no flips and the tag refuses a
-flipped rounded rectangle instead of choosing; the rect and the ellipse have all four flip pairs, verified against the same run.
+**A rounded rectangle's flips are Canvas `roundRect`'s, not `rect`'s.** With a negative width or height Chromium sends the radii to the
+mirrored corners (so `r` is in the order the sign case visits the corners) but starts the path after the normalized box's top-left radius,
+clockwise for an even number of negative sizes and counter-clockwise (the reversal of that path) for an odd number; the HTML Standard says
+nothing about it, and Firefox starts an odd number at the other end of the top edge. The geometry library follows Chromium (its `shapes.h`
+has the rule and the measurements) and the tag carries the flips, so a writer can say `roundRect` with the signs; a flipped rounded
+rectangle with no round corner is still a rounded rectangle, because the same box is a different path from the rect's.
 
 ## Hash and dump
 

@@ -54,10 +54,6 @@ static int bits_equal(double a, double b) {
   return gshgeom_f64_bits(a) == gshgeom_f64_bits(b);
 }
 
-static int is_number(double v) {
-  return v - v == 0.0;
-}
-
 /** The eight radius components of a rounded rectangle, canonical: a corner with a zero component is `{+0, +0}`. */
 static GSHGEOM_Corner canonical_corner(GSHGEOM_Corner c) {
   if (c.rx == 0.0 || c.ry == 0.0) {
@@ -84,9 +80,8 @@ static GSHSCENE_Result from_geometry(GSHGEOM_Result r) {
 
 GSHSCENE_Result gshscene_primitive_build(
     GSHSCENE_Store * store, const GSHSCENE_Primitive * in, GSHGEOM_Path ** path, GSHSCENE_Primitive * canon) {
-  if (!in || !path || !canon || in->kind <= GSHSCENE_PRIMITIVE_NONE || in->kind >= GSHSCENE_PRIMITIVE_KIND_COUNT ||
-      (in->flip_x != 0 && in->flip_x != 1) || (in->flip_y != 0 && in->flip_y != 1)) {
-    return GSHSCENE_ERR_INVALID;
+  if (!in || !path || !canon || in->kind <= GSHSCENE_PRIMITIVE_NONE || in->kind >= GSHSCENE_PRIMITIVE_KIND_COUNT) {
+    return GSHSCENE_ERR_INVALID; /* a flip that is not 0 or 1 is refused by the builder below, as INVALID, before any limit */
   }
   GSHSCENE_Primitive c;
   memset(&c, 0, sizeof c);
@@ -94,14 +89,8 @@ GSHSCENE_Result gshscene_primitive_build(
   c.flip_x = in->flip_x;
   c.flip_y = in->flip_y;
   GSHGEOM_Path * p = NULL;
-  /* The numbers and the overlap come first, so that a bad number is INVALID before a flip is UNSUPPORTED before a limit. */
+  /* The builder refuses a number that is not one, a negative size or radius and an overlap, as INVALID, before any limit. */
   if (in->kind == GSHSCENE_PRIMITIVE_ROUNDED_RECT) {
-    if (!is_number(in->x) || !is_number(in->y) || gshgeom_rounded_rect_check(in->w, in->h, in->r) != GSHGEOM_OK) {
-      return GSHSCENE_ERR_INVALID;
-    }
-    if (in->flip_x || in->flip_y) {
-      return GSHSCENE_ERR_UNSUPPORTED;
-    }
     c.x = in->x;
     c.y = in->y;
     c.w = in->w;
@@ -111,8 +100,10 @@ GSHSCENE_Result gshscene_primitive_build(
       c.r[i] = canonical_corner(in->r[i]);
       round |= c.r[i].rx != 0.0;
     }
-    if (!round) {
-      c.kind = GSHSCENE_PRIMITIVE_RECT; /* A2-D2: a rounded rectangle with no round corner is a rectangle (its corners are {0, 0} already) */
+    if (!round && !in->flip_x && !in->flip_y) {
+      /* A2-D2: a rounded rectangle with no round corner is a rectangle (its corners are {0, 0} already).  Not a flipped one: Canvas
+       * roundRect with a negative size does not start where rect does, so the same box is a different path. */
+      c.kind = GSHSCENE_PRIMITIVE_RECT;
     }
   } else if (in->kind == GSHSCENE_PRIMITIVE_RECT) {
     /* the builder refuses a number that is not one and a negative size, as INVALID */
@@ -131,7 +122,7 @@ GSHSCENE_Result gshscene_primitive_build(
     if (c.kind == GSHSCENE_PRIMITIVE_RECT) {
       g = gshgeom_path_add_rect(p, c.x, c.y, c.w, c.h, c.flip_x, c.flip_y);
     } else if (c.kind == GSHSCENE_PRIMITIVE_ROUNDED_RECT) {
-      g = gshgeom_path_add_rounded_rect(p, c.x, c.y, c.w, c.h, c.r);
+      g = gshgeom_path_add_rounded_rect(p, c.x, c.y, c.w, c.h, c.r, c.flip_x, c.flip_y);
     } else {
       g = gshgeom_path_add_ellipse(p, c.cx, c.cy, c.rx, c.ry, c.flip_x, c.flip_y);
     }

@@ -53,7 +53,7 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
   `tools/gradient-oracle.py`) and committed known answers define what two sinks must agree on.
 - **Arcs and named primitives** (`primitive.h`; PS1 to PS4 and PR1 to PR13 in `documentation/design.md`). A path resource holds, copies,
   compares, hashes and dumps arcs as the geometry library does, and `gshscene_store_intern_primitive` makes a rect, a rounded rect or an
-  ellipse (the four Canvas sign cases of `rect` as two flips) as a tagged path: the tag is content, set only there and never inferred, and
+  ellipse (the four Canvas sign cases of `rect` and of `roundRect` as two flips) as a tagged path: the tag is content, set only there and never inferred, and
   never changes what a sink draws. The test sink can record the tag (for a writer) and each arc's circle (for a toolpath). `examples/primitive.c`.
 - **Masks** (`mask.h`; MK1 to MK14 in `documentation/design.md`). The value of a mask at a pixel is a
   function of the rendered mask picture: its alpha or its luminance over a backdrop, through a transfer
