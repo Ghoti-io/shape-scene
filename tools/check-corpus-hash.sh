@@ -12,7 +12,7 @@
 # plane section's (color-paint story P4), another, and whose `placeholder-hash` and `placeholder-count` lines are the
 # placeholder section's, a fourth, and whose `image-hash` and `image-count` lines are the image section's (masks-images-patterns
 # story I1), a fifth, and whose `image-paint-hash` and `image-paint-count` lines are the image-paint section's (story I2), a
-# sixth, and whose `mask-hash` and `mask-count` lines are the mask section's (story M1), a seventh.  No value may be empty, so a probe that crashed, or a
+# sixth, and whose `mask-hash` and `mask-count` lines are the mask section's (story M1), a seventh, and whose `primitive-hash` and `primitive-count` lines are the primitives section's (story A2), an eighth.  No value may be empty, so a probe that crashed, or a
 # hash file that was emptied, fails rather than comparing nothing with nothing.
 probe="${1:?usage: check-corpus-hash.sh PROBE HASH_FILE}"
 file="${2:?usage: check-corpus-hash.sh PROBE HASH_FILE}"
@@ -42,6 +42,10 @@ got_khash=$(printf '%s\n' "$got" | awk '$1=="shape-scene.mask-hash"{print $2}')
 got_kcount=$(printf '%s\n' "$got" | awk '$1=="shape-scene.mask-count"{print $2}')
 want_khash=$(awk '$1=="mask-hash"{print $2}' "$file" 2>/dev/null)
 want_kcount=$(awk '$1=="mask-count"{print $2}' "$file" 2>/dev/null)
+got_rhash=$(printf '%s\n' "$got" | awk '$1=="shape-scene.primitive-hash"{print $2}')
+got_rcount=$(printf '%s\n' "$got" | awk '$1=="shape-scene.primitive-count"{print $2}')
+want_rhash=$(awk '$1=="primitive-hash"{print $2}' "$file" 2>/dev/null)
+want_rcount=$(awk '$1=="primitive-count"{print $2}' "$file" 2>/dev/null)
 want_hash=$(awk '$1=="hash"{print $2}' "$file" 2>/dev/null)
 want_count=$(awk '$1=="count"{print $2}' "$file" 2>/dev/null)
 want_shash=$(awk '$1=="stroke-hash"{print $2}' "$file" 2>/dev/null)
@@ -52,7 +56,8 @@ if [ -z "$want_hash" ] || [ -z "$want_count" ] || [ -z "$got_hash" ] || [ -z "$g
    [ -z "$want_hhash" ] || [ -z "$want_hcount" ] || [ -z "$got_hhash" ] || [ -z "$got_hcount" ] ||
    [ -z "$want_ihash" ] || [ -z "$want_icount" ] || [ -z "$got_ihash" ] || [ -z "$got_icount" ] ||
    [ -z "$want_mhash" ] || [ -z "$want_mcount" ] || [ -z "$got_mhash" ] || [ -z "$got_mcount" ] ||
-   [ -z "$want_khash" ] || [ -z "$want_kcount" ] || [ -z "$got_khash" ] || [ -z "$got_kcount" ]; then
+   [ -z "$want_khash" ] || [ -z "$want_kcount" ] || [ -z "$got_khash" ] || [ -z "$got_kcount" ] ||
+   [ -z "$want_rhash" ] || [ -z "$want_rcount" ] || [ -z "$got_rhash" ] || [ -z "$got_rcount" ]; then
   printf 'check-corpus-hash: nothing to compare (probe %s/%s, strokes %s/%s, planes %s/%s, placeholders %s/%s, images %s/%s, image paints %s/%s and masks %s/%s; committed %s/%s, %s/%s, %s/%s, %s/%s, %s/%s, %s/%s and %s/%s in %s)\n' \
     "$got_hash" "$got_count" "$got_shash" "$got_scount" "$got_phash" "$got_pcount" "$got_hhash" "$got_hcount" "$got_ihash" "$got_icount" "$got_mhash" "$got_mcount" "$got_khash" "$got_kcount" \
     "$want_hash" "$want_count" "$want_shash" "$want_scount" "$want_phash" "$want_pcount" "$want_hhash" "$want_hcount" "$want_ihash" "$want_icount" "$want_mhash" "$want_mcount" "$want_khash" "$want_kcount" "$file" >&2
@@ -93,4 +98,9 @@ if [ "$got_khash" != "$want_khash" ] || [ "$got_kcount" != "$want_kcount" ]; the
     "$got_khash" "$got_kcount" "$want_khash" "$want_kcount" >&2
   exit 1
 fi
-printf 'check-corpus-hash: ok, %s over %s results; strokes %s over %s; planes %s over %s; placeholders %s over %s; images %s over %s; image paints %s over %s; masks %s over %s\n' "$got_hash" "$got_count" "$got_shash" "$got_scount" "$got_phash" "$got_pcount" "$got_hhash" "$got_hcount" "$got_ihash" "$got_icount" "$got_mhash" "$got_mcount" "$got_khash" "$got_kcount"
+if [ "$got_rhash" != "$want_rhash" ] || [ "$got_rcount" != "$want_rcount" ]; then
+  printf 'check-corpus-hash: FAIL: primitives %s over %s results, committed %s over %s\n' \
+    "$got_rhash" "$got_rcount" "$want_rhash" "$want_rcount" >&2
+  exit 1
+fi
+printf 'check-corpus-hash: ok, %s over %s results; strokes %s over %s; planes %s over %s; placeholders %s over %s; images %s over %s; image paints %s over %s; masks %s over %s; primitives %s over %s\n' "$got_hash" "$got_count" "$got_shash" "$got_scount" "$got_phash" "$got_pcount" "$got_hhash" "$got_hcount" "$got_ihash" "$got_icount" "$got_mhash" "$got_mcount" "$got_khash" "$got_kcount" "$got_rhash" "$got_rcount"

@@ -131,6 +131,8 @@ static GSHGEOM_Hash image_paint_total; /* masks-images-patterns story I2: its ow
 static unsigned long image_paint_count;
 static GSHGEOM_Hash mask_total; /* masks-images-patterns story M1: its own hash, so the six above are unchanged */
 static unsigned long mask_count;
+static GSHGEOM_Hash primitive_total; /* named primitives (primitive.h): its own hash, so the seven above are unchanged */
+static unsigned long primitive_count;
 static GSHGEOM_Hash * acc = &total; /* where feed folds */
 static unsigned long * acc_count = &count;
 
@@ -2815,6 +2817,112 @@ static void mask_section(void) {
   gshscene_store_destroy(store);
 }
 
+/* The primitives section (primitive.h; PR1 to PR12, PS1): random primitives of every kind and flip pair through the store, the result code
+ * and, for what interns, the resource's content hash, its element count and its tag read back; the same geometry interned untagged
+ * (another hash); paths of arcs from the three builders and the centre form.  Refusals are in it: a bad flip, a negative size, an overlap,
+ * a flipped rounded rectangle, a coordinate past the limit.  Its own pair after the others, so they never move. */
+static double prim_value(void) {
+  const uint64_t pick = next();
+  static const double special[8] = {0.0, -0.0, 1.0, 0.5, 1e300, 0x1p100, -1.0, 3.0};
+  if ((pick & 15u) == 0u) {
+    return special[(pick >> 4) & 7u];
+  }
+  return (double)((pick >> 8) & 0xFFFFu) / 64.0;
+}
+
+static void primitive_section(void) {
+  acc = &primitive_total;
+  acc_count = &primitive_count;
+  gshgeom_hash_init(&primitive_total);
+  GSHSCENE_Store * store = NULL;
+  check(gshscene_store_create(NULL, NULL, &store), "primitive store");
+  for (unsigned round = 0; round < 900; round++) {
+    GSHSCENE_Primitive p;
+    memset(&p, 0, sizeof p);
+    const uint64_t pick = next();
+    p.kind = (GSHSCENE_Primitive_Kind)(1u + round % 3u);
+    if ((pick & 31u) == 0u) {
+      p.kind = (GSHSCENE_Primitive_Kind)((pick >> 5) % 5u);
+    }
+    p.flip_x = (int)(pick >> 40) & 1;
+    p.flip_y = (int)(pick >> 41) & 1;
+    if ((pick & 63u) == 1u) {
+      p.flip_x = 2;
+    }
+    p.x = prim_value();
+    p.y = prim_value();
+    p.w = prim_value();
+    p.h = prim_value();
+    p.cx = p.x;
+    p.cy = p.y;
+    p.rx = p.w < 1.0 ? p.w + 0.25 : p.w;
+    p.ry = p.h < 1.0 ? p.h + 0.25 : p.h;
+    for (int i = 0; i < 4; i++) {
+      const uint64_t q = next();
+      p.r[i].rx = (q & 3u) == 0u ? 0.0 : p.w * (double)((q >> 8) & 127u) / 512.0;
+      p.r[i].ry = (q & 7u) == 1u ? 0.0 : p.h * (double)((q >> 20) & 127u) / 512.0;
+    }
+    if (p.kind != GSHSCENE_PRIMITIVE_ROUNDED_RECT) {
+      memset(p.r, 0, sizeof p.r);
+    }
+    const GSHSCENE_Resource * r = NULL;
+    GSHSCENE_Result result = gshscene_store_intern_primitive(store, &p, &r);
+    feed((uint64_t)result);
+    if (result != GSHSCENE_OK) {
+      continue;
+    }
+    feed(gshscene_resource_hash(r));
+    feed((uint64_t)gshgeom_path_element_count(gshscene_resource_path(r)));
+    GSHSCENE_Primitive back;
+    check(gshscene_resource_primitive(r, &back), "primitive back");
+    feed((uint64_t)back.kind);
+    feed((uint64_t)(back.flip_x | (back.flip_y << 1)));
+    feed(gshgeom_f64_bits(back.kind == GSHSCENE_PRIMITIVE_ELLIPSE ? back.rx : back.w));
+    feed(gshgeom_f64_bits(back.kind == GSHSCENE_PRIMITIVE_ELLIPSE ? back.ry : back.h));
+    feed(gshgeom_f64_bits(back.r[1].rx));
+    GSHGEOM_Path * copy = NULL;
+    check(gshgeom_path_copy(gshscene_resource_path(r), NULL, NULL, &copy) == GSHGEOM_OK ? GSHSCENE_OK : GSHSCENE_ERR_INTERNAL, "primitive copy");
+    const GSHSCENE_Resource * plain = NULL;
+    check(gshscene_store_intern_path(store, copy, &plain), "primitive untagged");
+    gshgeom_path_destroy(copy);
+    feed(gshscene_resource_hash(plain));
+    gshscene_resource_release(plain);
+    gshscene_resource_release(r);
+  }
+  for (unsigned round = 0; round < 80; round++) {
+    GSHGEOM_Path * path = NULL;
+    check(gshgeom_path_create(NULL, NULL, 2, &path) == GSHGEOM_OK ? GSHSCENE_OK : GSHSCENE_ERR_INTERNAL, "arc path");
+    const double cx = prim_value(), cy = prim_value(), rx = prim_value() + 0.5, ry = prim_value() + 0.5;
+    const GSHGEOM_Result built = gshgeom_path_add_ellipse(path, cx, cy, rx, ry, (int)(round & 1u), (int)((round >> 1) & 1u));
+    feed((uint64_t)built); /* a radius or a coordinate past the limit is refused, and the path stays empty */
+    GSHGEOM_Arc_Form f = {{cx + 1.0, cy, 0.0}, {rx, 0.0, 0.0}, {0.0, ry, 0.0}, (GSHGEOM_Angle_Unit)(round % 4u),
+        0.0, round % 4u == 1u ? 90.0 : (round % 4u == 2u ? 100.0 : 0.25), (rx == ry) ? GSHGEOM_ARC_CIRCULAR : 0u};
+    if (round % 4u == 0u) {
+      f.sweep = 1.5;
+    }
+    f.center = (GSHGEOM_Point){cx + 1.0, cy + 2.0, 0.0};
+    (void)gshgeom_path_arc_conjugate_to(path, &f, NULL);
+    const GSHSCENE_Resource * r = NULL;
+    GSHSCENE_Result result = gshscene_store_intern_path(store, path, &r);
+    feed((uint64_t)result);
+    if (result == GSHSCENE_OK) {
+      feed(gshscene_resource_hash(r));
+      feed((uint64_t)gshgeom_path_element_count(gshscene_resource_path(r)));
+      gshscene_resource_release(r);
+    }
+    gshgeom_path_destroy(path);
+  }
+  GSHSCENE_Store_Stats stats;
+  check(gshscene_store_stats(store, &stats), "primitive stats");
+  feed(stats.live);
+  feed(stats.created);
+  feed(stats.hits);
+  if (stats.live != 0) {
+    fail("a primitive resource is still live after every handle was released");
+  }
+  gshscene_store_destroy(store);
+}
+
 int main(void) {
   gshgeom_hash_init(&total);
   GSHSCENE_Store * store = NULL;
@@ -3007,5 +3115,8 @@ int main(void) {
   mask_section();
   printf("shape-scene.mask-hash %016" PRIx64 "\n", gshgeom_hash_value(&mask_total));
   printf("shape-scene.mask-count %lu\n", mask_count);
+  primitive_section();
+  printf("shape-scene.primitive-hash %016" PRIx64 "\n", gshgeom_hash_value(&primitive_total));
+  printf("shape-scene.primitive-count %lu\n", primitive_count);
   return 0;
 }

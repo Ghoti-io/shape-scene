@@ -36,7 +36,7 @@ OPS = ["LIST_CREATE", "FILL", "CLIP_PUSH", "CLIP_POP", "GROUP_PUSH", "GROUP_POP"
        "FILL_EX", "CLIP_PUSH_EX", "GROUP_PUSH_EX", "LIST_FOREGROUND", "NODE_PROPS", "EDIT_FOREGROUND", "LIST_PALETTE",
        "FILL_FIXED", "TRUNCATE", "EDIT_PALETTE", "INTERN_GRADIENT", "FILL_GRADIENT", "SCENE_GRADIENT", "GRADIENT_NODE",
        "COLOR_BOUND", "GROUP_PDF", "NODE_PDF", "INTERN_STYLE", "STROKE", "STROKE_NODE", "PLACEHOLDER", "PLACEHOLDER_NODE", "INTERN_IMAGE", "IMAGE_NOT_SHAPE", "IMAGE_PAINT",
-       "INTERN_MASK", "GROUP_MASK", "NODE_MASK"]
+       "INTERN_MASK", "GROUP_MASK", "NODE_MASK", "INTERN_PRIMITIVE"]
 OP = {name: i for i, name in enumerate(OPS)}
 
 BIASED = {
@@ -48,6 +48,7 @@ BIASED = {
     "LIST_PALETTE": 2, "FILL_FIXED": 4, "TRUNCATE": 2, "EDIT_PALETTE": 2, "INTERN_GRADIENT": 4, "FILL_GRADIENT": 4,
     "SCENE_GRADIENT": 4, "GRADIENT_NODE": 5, "INTERN_STYLE": 5, "STROKE": 4, "STROKE_NODE": 4,
     "INTERN_IMAGE": 6, "IMAGE_NOT_SHAPE": 2, "IMAGE_PAINT": 6, "INTERN_MASK": 8, "GROUP_MASK": 6, "NODE_MASK": 3,
+    "INTERN_PRIMITIVE": 5,
 }
 
 BIASED_FILES = 160
@@ -156,6 +157,26 @@ def scripted():
     seq = (bytearray([0xFF, 0xFF]) + open_edit() + add_group(0) + bytes([OP["NODE_PROPS"], 0, 2, 0, 1, 0, 0, 2])
            + add_shape(2) + add_shape(2) + publish() + bytes([OP["EMIT"], 0]))
     out["scripted-emit-ties.bin"] = bytes(seq)
+    # Named primitives (primitive.h).  INTERN_PRIMITIVE reads: the slot, the kind pick (3 a rect, 1 a rounded rect, 2 an ellipse, 0x50 past
+    # the enum), the flips (bit 0 flip_x, bit 1 flip_y, 0x10 a flip that is not 0 or 1), then twelve value bytes (a byte below 8 is
+    # 0, -0, 1, 2, 0.5, 1e300, 2^100, -1; else (b - 8) / 4): x y w h, the four corners' rx, the four corners' ry (or cx cy rx ry).
+    ip = OP["INTERN_PRIMITIVE"]
+    box = bytes([12, 12, 20, 24])         # 1, 1, 3, 4
+    wide = bytes([12, 12, 88, 88])        # 1, 1, 20, 20
+    two = bytes([16, 16, 16, 16])         # 2.0 each
+    none = bytes([0, 0, 0, 0])
+    out["scripted-primitive-rect.bin"] = bytes([0xFF, 0xFF, ip, 0, 3, 0]) + box + none + none
+    out["scripted-primitive-rect-flipped.bin"] = bytes([0xFF, 0xFF, ip, 0, 3, 3]) + box + none + none
+    out["scripted-primitive-ellipse.bin"] = bytes([0xFF, 0xFF, ip, 1, 2, 1]) + box + none + none
+    out["scripted-primitive-rounded.bin"] = bytes([0xFF, 0xFF, ip, 2, 1, 0]) + wide + two + two
+    out["scripted-primitive-canonical.bin"] = bytes([0xFF, 0xFF, ip, 2, 1, 0]) + wide + none + none
+    out["scripted-primitive-rounded-flipped.bin"] = bytes([0xFF, 0xFF, ip, 2, 1, 2]) + wide + two + two
+    out["scripted-primitive-invalid.bin"] = bytes([0xFF, 0xFF, ip, 0, 0x50, 0]) + box + none + none + bytes([ip, 0, 3, 0x10]) + box + none + none
+    out["scripted-primitive-overlap.bin"] = bytes([0xFF, 0xFF, ip, 3, 1, 0]) + wide + bytes([88, 88, 0, 0]) + two
+    # b1 = 0xFC: max_resource_elements 3, so the five elements of a rectangle are past it
+    out["scripted-primitive-limit.bin"] = bytes([0xFF, 0xFC, ip, 0, 3, 0]) + box + none + none
+    # a path of arcs by INTERN_PATH (recipe 6)
+    out["scripted-arc-path.bin"] = bytes([0xFF, 0xFF, OP["INTERN_PATH"], 0, 6, OP["INTERN_PATH"], 1, 7])
     # Color-paint story P2: a linear gradient in the scene's store (p0 (1, 1), p1 (10, 1); a solid stop and a
     # foreground stop), a shape node painted with it, published and emitted.  SCENE_GRADIENT reads the slot, then
     # fuzz_gradient's bytes: kind, six values, the isoline pick, extend, premultiplied, space, map, the stop count and

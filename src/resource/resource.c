@@ -86,10 +86,17 @@ static void hash_begin(GSHGEOM_Hash * h, GSHSCENE_Resource_Kind kind) {
   gshgeom_hash_u32(h, (uint32_t)kind);
 }
 
-static uint64_t path_content_hash(const GSHGEOM_Path * path) {
+/** What a path is interned from: its geometry and its tag (kind NONE for an untagged path). */
+typedef struct Path_Source {
+  const GSHGEOM_Path * path;
+  const GSHSCENE_Primitive * prim;
+} Path_Source;
+
+static uint64_t path_content_hash(const GSHGEOM_Path * path, const GSHSCENE_Primitive * prim) {
   GSHGEOM_Hash h;
   hash_begin(&h, GSHSCENE_RESOURCE_PATH);
   gshgeom_hash_u64(&h, gshgeom_path_hash(path));
+  gshscene_primitive_hash(&h, prim);
   return gshgeom_hash_value(&h);
 }
 
@@ -149,69 +156,6 @@ static uint64_t picture_content_hash(const GSHSCENE_List * list) {
   return gshgeom_hash_value(&h);
 }
 
-/* --- path equality --------------------------------------------------------- */
-
-static int point_equal(const GSHGEOM_Point * a, const GSHGEOM_Point * b) {
-  return gshgeom_f64_bits(a->x) == gshgeom_f64_bits(b->x) && gshgeom_f64_bits(a->y) == gshgeom_f64_bits(b->y) &&
-         gshgeom_f64_bits(a->z) == gshgeom_f64_bits(b->z);
-}
-
-/* How many points after the start a verb stores, and how many weights. */
-static size_t verb_points(GSHGEOM_Verb verb) {
-  switch (verb) {
-    case GSHGEOM_VERB_MOVE:
-    case GSHGEOM_VERB_LINE:
-      return 1;
-    case GSHGEOM_VERB_QUADRATIC:
-    case GSHGEOM_VERB_RATIONAL_QUADRATIC:
-      return 2;
-    case GSHGEOM_VERB_CUBIC:
-    case GSHGEOM_VERB_RATIONAL_CUBIC:
-      return 3;
-    default:
-      return 0;
-  }
-}
-
-static size_t verb_weights(GSHGEOM_Verb verb) {
-  if (verb == GSHGEOM_VERB_RATIONAL_QUADRATIC) {
-    return 3;
-  }
-  return verb == GSHGEOM_VERB_RATIONAL_CUBIC ? 4 : 0;
-}
-
-int gshscene_path_equal(const GSHGEOM_Path * a, const GSHGEOM_Path * b) {
-  if (gshgeom_path_dimension(a) != gshgeom_path_dimension(b)) {
-    return 0;
-  }
-  size_t count = gshgeom_path_element_count(a);
-  if (count != gshgeom_path_element_count(b)) {
-    return 0;
-  }
-  for (size_t i = 0; i < count; i++) {
-    GSHGEOM_Element ea, eb;
-    if (gshgeom_path_element(a, i, &ea) != GSHGEOM_OK || gshgeom_path_element(b, i, &eb) != GSHGEOM_OK) {
-      return 0;
-    }
-    if (ea.verb != eb.verb) {
-      return 0;
-    }
-    /* The start of a segment is the end of the one before, and a close's line is
-     * derived from the subpath, so the points after the start are what differs. */
-    for (size_t k = 1; k <= verb_points(ea.verb); k++) {
-      if (!point_equal(&ea.curve.p[k], &eb.curve.p[k])) {
-        return 0;
-      }
-    }
-    for (size_t k = 0; k < verb_weights(ea.verb); k++) {
-      if (gshgeom_f64_bits(ea.curve.w[k]) != gshgeom_f64_bits(eb.curve.w[k])) {
-        return 0;
-      }
-    }
-  }
-  return 1;
-}
-
 /* --- glyph run equality ---------------------------------------------------- */
 
 static int run_equal(const GSHSCENE_Glyph_Run * a, const GSHSCENE_Glyph * ga, const GSHSCENE_Glyph_Run * b,
@@ -240,7 +184,10 @@ typedef struct Palette_Source {
 int gshscene_resource_matches(const GSHSCENE_Resource * resource, const GSHSCENE_Probe * probe) {
   switch (probe->kind) {
     case GSHSCENE_RESOURCE_PATH:
-      return gshscene_path_equal(resource->u.path, (const GSHGEOM_Path *)probe->source);
+    {
+      const Path_Source * want = (const Path_Source *)probe->source;
+      return gshgeom_path_equal(resource->u.path, want->path) && gshscene_primitive_equal(&resource->primitive, want->prim);
+    }
     case GSHSCENE_RESOURCE_GLYPH_RUN: {
       const GSHSCENE_Glyph_Run * run = (const GSHSCENE_Glyph_Run *)probe->source;
       return run_equal(&resource->u.glyphs.run, resource->u.glyphs.glyphs, run, run->glyphs);
@@ -353,31 +300,8 @@ static GSHSCENE_Result from_geometry(GSHGEOM_Result result) {
   }
 }
 
-/* Replay one element of a source path into the copy. */
-static GSHGEOM_Result replay(GSHGEOM_Path * copy, const GSHGEOM_Element * e) {
-  const GSHGEOM_Curve * c = &e->curve;
-  switch (e->verb) {
-    case GSHGEOM_VERB_MOVE:
-      return gshgeom_path_move_to(copy, c->p[1]);
-    case GSHGEOM_VERB_LINE:
-      return gshgeom_path_line_to(copy, c->p[1]);
-    case GSHGEOM_VERB_QUADRATIC:
-      return gshgeom_path_quadratic_to(copy, c->p[1], c->p[2]);
-    case GSHGEOM_VERB_CUBIC:
-      return gshgeom_path_cubic_to(copy, c->p[1], c->p[2], c->p[3]);
-    case GSHGEOM_VERB_RATIONAL_QUADRATIC:
-      return gshgeom_path_rational_quadratic_to(copy, c->p[1], c->p[2], c->w);
-    case GSHGEOM_VERB_RATIONAL_CUBIC:
-      return gshgeom_path_rational_cubic_to(copy, c->p[1], c->p[2], c->p[3], c->w);
-    case GSHGEOM_VERB_CLOSE:
-      return gshgeom_path_close(copy);
-    default:
-      return GSHGEOM_ERR_INTERNAL;
-  }
-}
-
 static GSHSCENE_Result build_path(GSHSCENE_Store * store, const void * source, GSHSCENE_Resource ** out) {
-  const GSHGEOM_Path * path = (const GSHGEOM_Path *)source;
+  const Path_Source * from = (const Path_Source *)source;
   GSHSCENE_Resource * resource = gshscene_store_new_resource(store, GSHSCENE_RESOURCE_PATH);
   if (!resource) {
     return GSHSCENE_ERR_OOM;
@@ -385,34 +309,34 @@ static GSHSCENE_Result build_path(GSHSCENE_Store * store, const void * source, G
   GSHGEOM_Limits limits;
   gshgeom_limits_default(&limits);
   limits.max_elements = store->limits.max_resource_elements;
-  GSHGEOM_Result result =
-      gshgeom_path_create(&store->alloc, &limits, gshgeom_path_dimension(path), &resource->u.path);
-  size_t count = gshgeom_path_element_count(path);
-  for (size_t i = 0; result == GSHGEOM_OK && i < count; i++) {
-    GSHGEOM_Element element;
-    result = gshgeom_path_element(path, i, &element);
-    if (result == GSHGEOM_OK) {
-      result = replay(resource->u.path, &element);
-    }
-  }
+  /* The copy is the geometry library's (PS1): bit for bit, and a verb it learns later needs no case here. */
+  GSHGEOM_Result result = gshgeom_path_copy(from->path, &store->alloc, &limits, &resource->u.path);
   if (result != GSHGEOM_OK) {
     gshscene_store_discard_resource(resource);
     return from_geometry(result);
   }
+  resource->primitive = *from->prim;
   *out = resource;
   return GSHSCENE_OK;
 }
 
-GSHSCENE_Result gshscene_store_intern_path(
-    GSHSCENE_Store * store, const GSHGEOM_Path * path, const GSHSCENE_Resource ** out) {
+GSHSCENE_Result gshscene_store_intern_path_tagged(GSHSCENE_Store * store, const GSHGEOM_Path * path,
+    const GSHSCENE_Primitive * prim, const GSHSCENE_Resource ** out) {
   if (!store || !path || !out) {
-    return GSHSCENE_ERR_INVALID;
+    return GSHSCENE_ERR_INVALID; /* @p prim is the caller's, never NULL */
   }
-  GSHSCENE_Probe probe = {GSHSCENE_RESOURCE_PATH, path_content_hash(path),
+  Path_Source source = {path, prim};
+  GSHSCENE_Probe probe = {GSHSCENE_RESOURCE_PATH, path_content_hash(path, prim),
       gshscene_sat_add(GSHSCENE_BYTES_BASE,
           gshscene_sat_mul(gshgeom_path_element_count(path), GSHSCENE_BYTES_PER_PATH_ELEMENT)),
-      path, build_path};
+      &source, build_path};
   return gshscene_store_intern(store, &probe, out);
+}
+
+GSHSCENE_Result gshscene_store_intern_path(
+    GSHSCENE_Store * store, const GSHGEOM_Path * path, const GSHSCENE_Resource ** out) {
+  static const GSHSCENE_Primitive untagged;
+  return gshscene_store_intern_path_tagged(store, path, &untagged, out);
 }
 
 /* --- glyph run -------------------------------------------------------------- */
@@ -844,6 +768,9 @@ GSHSCENE_Result gshscene_resource_dump(const GSHSCENE_Resource * resource, FILE 
   switch (resource->kind) {
     case GSHSCENE_RESOURCE_PATH:
       result = gshgeom_path_dump(resource->u.path, out) == GSHGEOM_OK ? GSHSCENE_OK : GSHSCENE_ERR_IO;
+      if (result == GSHSCENE_OK) {
+        gshscene_primitive_dump(&resource->primitive, out);
+      }
       break;
     case GSHSCENE_RESOURCE_GLYPH_RUN: {
       const GSHSCENE_Glyph_Run * run = &resource->u.glyphs.run;

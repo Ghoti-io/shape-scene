@@ -107,7 +107,7 @@ enum {
   OP_FILL_FIXED, OP_TRUNCATE, OP_EDIT_PALETTE, OP_INTERN_GRADIENT, OP_FILL_GRADIENT, OP_SCENE_GRADIENT,
   OP_GRADIENT_NODE, OP_COLOR_BOUND, OP_GROUP_PDF, OP_NODE_PDF, OP_INTERN_STYLE, OP_STROKE, OP_STROKE_NODE, OP_PLACEHOLDER,
   OP_PLACEHOLDER_NODE, OP_INTERN_IMAGE, OP_IMAGE_NOT_SHAPE, OP_IMAGE_PAINT, OP_INTERN_MASK,
-  OP_GROUP_MASK, OP_NODE_MASK, OP_COUNT
+  OP_GROUP_MASK, OP_NODE_MASK, OP_INTERN_PRIMITIVE, OP_COUNT
 };
 
 /* --- the outcomes the corpus must reach ------------------------------------------------------------ */
@@ -125,7 +125,9 @@ enum {
   OUT_IMAGE_PAINT_STENCIL, OUT_IMAGE_PAINT_INVALID, OUT_IMAGE_PAINT_LIMIT, OUT_IMAGE_PAINT_FILL, OUT_MASK_INTERNED,
   OUT_MASK_LUMINANCE, OUT_MASK_TRANSFER, OUT_MASK_INVALID, OUT_MASK_UNSUPPORTED, OUT_MASK_LIMIT, OUT_MASK_HIT, OUT_MASK_NEAR,
   OUT_MASK_GROUP, OUT_MASK_GROUP_INVALID, OUT_MASK_GROUP_UNSUPPORTED, OUT_MASK_LIST_EQUAL, OUT_MASK_DEPTH, OUT_MASK_DEPTH_LIMIT,
-  OUT_MASK_NODE, OUT_MASK_NODE_INVALID, OUT_MASK_DAMAGE, OUT_MASK_NO_DAMAGE, OUT_MASK_EMITTED, OUT_COUNT
+  OUT_MASK_NODE, OUT_MASK_NODE_INVALID, OUT_MASK_DAMAGE, OUT_MASK_NO_DAMAGE, OUT_MASK_EMITTED,
+  OUT_PRIMITIVE_INTERNED, OUT_PRIMITIVE_FLIPPED, OUT_PRIMITIVE_CANONICAL, OUT_PRIMITIVE_INVALID, OUT_PRIMITIVE_UNSUPPORTED,
+  OUT_PRIMITIVE_LIMIT, OUT_PRIMITIVE_HIT, OUT_PRIMITIVE_UNTAGGED, OUT_ARC_PATH, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limit", "edit limit", "publish limit",
@@ -149,7 +151,10 @@ static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limi
     "a group with a placement refused as unsupported", "two lists with a masked group, equal", "a picture holding a mask, one level deeper",
     "a masked group past the picture depth, refused at the freeze", "a group node with a mask", "a group node with a mask refused as invalid",
     "a changed mask or placement damaging the group's content", "an unchanged mask damaging nothing",
-    "an emitted list with a masked group"};
+    "an emitted list with a masked group", "a primitive interned", "a flipped primitive interned",
+    "a rounded rectangle made a rectangle by its square corners", "a primitive refused as invalid",
+    "a flipped rounded rectangle refused as unsupported", "a primitive past the store's limits refused",
+    "a primitive found again", "the same geometry untagged, another handle", "a path with an arc interned"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -265,7 +270,7 @@ static GSHGEOM_Path * make_path(S * s, unsigned recipe) {
   if (gshgeom_path_create(&s->alloc, NULL, dim, &path) != GSHGEOM_OK) {
     return NULL;
   }
-  switch (recipe % 6) {
+  switch (recipe % 8) {
     case 0: /* empty */
       break;
     case 1: /* a line */
@@ -290,6 +295,18 @@ static GSHGEOM_Path * make_path(S * s, unsigned recipe) {
         gshgeom_path_line_to(path, P(i, i % 3));
       }
       break;
+    case 6: { /* arcs: a circle by its centre form, then a chord */
+      gshgeom_path_move_to(path, P(0, 0));
+      GSHGEOM_Arc_Form f = {P(0, 4), P(4, 0), P(0, 4), GSHGEOM_ANGLE_DEGREES, -90.0, 270.0, GSHGEOM_ARC_CIRCULAR};
+      gshgeom_path_arc_conjugate_to(path, &f, NULL);
+      gshgeom_path_line_to(path, P(0, 0));
+      break;
+    }
+    case 7: { /* a rounded rectangle built by shape-geometry, untagged */
+      const GSHGEOM_Corner c[4] = {{1, 1}, {0.5, 1}, {1, 0.5}, {0, 0}};
+      gshgeom_path_add_rounded_rect(path, 0, 0, 8, 6, c);
+      break;
+    }
     default: /* 3D */
       gshgeom_path_move_to(path, P(0, 0));
       gshgeom_path_line_to(path, P(1, 1));
@@ -1820,6 +1837,14 @@ static void op(S * s, unsigned code) {
       const GSHSCENE_Resource * x = intern_recipe(s, store, arg(s), &r);
       CHECK(r == GSHSCENE_OK || r == GSHSCENE_ERR_LIMIT);
       if (r == GSHSCENE_OK) {
+        for (size_t e = 0; e < gshgeom_path_element_count(gshscene_resource_path(x)); e++) {
+          GSHGEOM_Verb verb;
+          CHECK(gshgeom_path_verb(gshscene_resource_path(x), e, &verb) == GSHGEOM_OK);
+          if (verb == GSHGEOM_VERB_ARC) {
+            outcomes[OUT_ARC_PATH]++;
+            break;
+          }
+        }
         gshscene_resource_release(pool[slot]);
         pool[slot] = x;
       } else {
@@ -1880,6 +1905,98 @@ static void op(S * s, unsigned code) {
         CHECK(x == NULL);
         outcomes[OUT_INTERN_LIMIT] += r == GSHSCENE_ERR_LIMIT;
       }
+      break;
+    }
+    case OP_INTERN_PRIMITIVE: {
+      /* The tag (primitive.h): a primitive from the input interns, reads back, is found again, differs from its untagged copy, and a
+       * refusal leaves the store as it was. */
+      GSHSCENE_Store * store = s->store;
+      unsigned slot = pick(s, POOL);
+      GSHSCENE_Primitive want;
+      memset(&want, 0, sizeof want);
+      const unsigned kind_pick = arg(s);
+      want.kind = (GSHSCENE_Primitive_Kind)(kind_pick % 16 == 0 ? (kind_pick >> 4) % 6 : 1 + kind_pick % 3);
+      const unsigned flip_pick = arg(s);
+      want.flip_x = flip_pick & 1;
+      want.flip_y = (flip_pick >> 1) & 1;
+      if (flip_pick & 0x10) {
+        want.flip_x = (flip_pick & 0x20) ? -1 : 2;
+      }
+      double v[12];
+      for (int i = 0; i < 12; i++) {
+        const unsigned b = arg(s);
+        static const double table[8] = {0.0, -0.0, 1.0, 2.0, 0.5, 1e300, 0x1p100, -1.0};
+        v[i] = b < 8 ? table[b] : (double)(b - 8) / 4.0;
+      }
+      if ((flip_pick & 0x80) && kind_pick % 5 == 0) {
+        v[0] = (double)NAN;
+      }
+      want.x = v[0];
+      want.y = v[1];
+      want.w = v[2];
+      want.h = v[3];
+      for (int i = 0; i < 4; i++) {
+        want.r[i].rx = v[4 + i];
+        want.r[i].ry = v[8 + i];
+      }
+      want.cx = v[0];
+      want.cy = v[1];
+      want.rx = v[2];
+      want.ry = v[3];
+      if (want.kind == GSHSCENE_PRIMITIVE_RECT || want.kind == GSHSCENE_PRIMITIVE_ELLIPSE) {
+        memset(want.r, 0, sizeof want.r);
+      }
+      GSHSCENE_Store_Stats before;
+      CHECK(gshscene_store_stats(store, &before) == GSHSCENE_OK);
+      const GSHSCENE_Resource * x = NULL;
+      r = gshscene_store_intern_primitive(store, &want, &x);
+      CHECK(r == GSHSCENE_OK || r == GSHSCENE_ERR_INVALID || r == GSHSCENE_ERR_UNSUPPORTED || r == GSHSCENE_ERR_LIMIT);
+      if (r != GSHSCENE_OK) {
+        CHECK(x == NULL);
+        GSHSCENE_Store_Stats after;
+        CHECK(gshscene_store_stats(store, &after) == GSHSCENE_OK);
+        CHECK(after.live == before.live && after.bytes == before.bytes && after.created == before.created);
+        outcomes[OUT_PRIMITIVE_INVALID] += r == GSHSCENE_ERR_INVALID;
+        outcomes[OUT_PRIMITIVE_UNSUPPORTED] += r == GSHSCENE_ERR_UNSUPPORTED;
+        outcomes[OUT_PRIMITIVE_LIMIT] += r == GSHSCENE_ERR_LIMIT;
+        /* a flipped rounded rectangle is unsupported only once its numbers are valid */
+        CHECK(r != GSHSCENE_ERR_UNSUPPORTED || (want.kind == GSHSCENE_PRIMITIVE_ROUNDED_RECT && (want.flip_x || want.flip_y)));
+        break;
+      }
+      GSHSCENE_Primitive got;
+      CHECK(gshscene_resource_primitive(x, &got) == GSHSCENE_OK);
+      CHECK(gshscene_resource_kind(x) == GSHSCENE_RESOURCE_PATH);
+      CHECK(got.kind != GSHSCENE_PRIMITIVE_NONE && got.kind < GSHSCENE_PRIMITIVE_KIND_COUNT);
+      CHECK(got.flip_x == want.flip_x && got.flip_y == want.flip_y);
+      CHECK(want.kind == got.kind || (want.kind == GSHSCENE_PRIMITIVE_ROUNDED_RECT && got.kind == GSHSCENE_PRIMITIVE_RECT));
+      outcomes[OUT_PRIMITIVE_CANONICAL] += want.kind != got.kind;
+      outcomes[OUT_PRIMITIVE_FLIPPED] += got.flip_x || got.flip_y;
+      const GSHGEOM_Path * path = gshscene_resource_path(x);
+      const size_t elements = gshgeom_path_element_count(path);
+      CHECK(got.kind == GSHSCENE_PRIMITIVE_RECT ? elements == 5 : (got.kind == GSHSCENE_PRIMITIVE_ELLIPSE ? elements == 6 : (elements >= 7 && elements <= 10)));
+      /* found again: the same handle */
+      const GSHSCENE_Resource * again = NULL;
+      CHECK(gshscene_store_intern_primitive(store, &got, &again) == GSHSCENE_OK);
+      CHECK(again == x);
+      gshscene_resource_release(again);
+      outcomes[OUT_PRIMITIVE_HIT]++;
+      /* the same geometry untagged is another handle with another hash and no tag */
+      GSHGEOM_Path * copy = NULL;
+      CHECK(gshgeom_path_copy(path, &s->alloc, NULL, &copy) == GSHGEOM_OK);
+      const GSHSCENE_Resource * plain = NULL;
+      GSHSCENE_Result pr = gshscene_store_intern_path(store, copy, &plain);
+      gshgeom_path_destroy(copy);
+      CHECK(pr == GSHSCENE_OK || pr == GSHSCENE_ERR_LIMIT); /* the store may hold room for the tagged one only */
+      if (pr == GSHSCENE_OK) {
+        CHECK(plain != x && gshscene_resource_hash(plain) != gshscene_resource_hash(x));
+        GSHSCENE_Primitive none;
+        CHECK(gshscene_resource_primitive(plain, &none) == GSHSCENE_OK && none.kind == GSHSCENE_PRIMITIVE_NONE);
+        gshscene_resource_release(plain);
+        outcomes[OUT_PRIMITIVE_UNTAGGED]++;
+      }
+      outcomes[OUT_PRIMITIVE_INTERNED]++;
+      gshscene_resource_release(s->res[slot]);
+      s->res[slot] = x;
       break;
     }
     case OP_RELEASE_RES: {

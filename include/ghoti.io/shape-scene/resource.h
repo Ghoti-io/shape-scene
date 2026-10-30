@@ -66,7 +66,8 @@
  * format is per kind, and every kind's is 1 until the suite's first release
  * (a change before it changes format 1 in place).  It goes on:
  *
- * - **path** (1): `u64` the path's own hash (`gshgeom_path_hash`).
+ * - **path** (1): `u64` the path's own hash (`gshgeom_path_hash`; an arc is in it, geometry's spelling), and, for a path built by
+ *   ::gshscene_store_intern_primitive only, `u8` the primitive kind, `u8` the flips and the canonical parameters as `f64` (primitive.h, PR7).
  * - **glyph run** (1): `u32` the source, `u64` the content hash of the face
  *   (0 for a run from outlines), `f64` size, `u32` hint mode, `u32` hint
  *   version, `u64` glyph count; then for each glyph `u32` id, `f64` x, `f64` y
@@ -107,7 +108,7 @@
  * `gshscene.resource F kind=<name> hash=<16 hex digits>`, F the kind's format,
  * and then the payload as text, every `double` as the 16 hexadecimal digits of
  * its bit pattern and every hash as 16 digits: a path is `gshgeom_path_dump`'s
- * own text; a glyph run is a line `run source=S face=<hex> size=<hex> hint=N
+ * own text, and a tagged path then a line `primitive kind=<name> flip_x=N flip_y=N` and its parameters (primitive.h); a glyph run is a line `run source=S face=<hex> size=<hex> hint=N
  * version=N glyphs=N` and a line `g id=N x=<hex> y=<hex> outline=<hex>` per
  * glyph; a picture is `gshscene_list_dump`'s text; a face is a line `face
  * font=<hex> index=N coords=N` followed, on the same line, by ` C` for each
@@ -242,7 +243,7 @@ typedef struct GSHSCENE_Glyph_Run {
  * @{
  */
 #define GSHSCENE_BYTES_BASE ((size_t)128)        ///< Accounted bytes of any resource.
-#define GSHSCENE_BYTES_PER_PATH_ELEMENT ((size_t)160) ///< Added for each element of a path.
+#define GSHSCENE_BYTES_PER_PATH_ELEMENT ((size_t)160) ///< Added for each element of a path (an arc takes 136 in a copy sized to its contents).
 #define GSHSCENE_BYTES_PER_GLYPH ((size_t)32)    ///< Added for each glyph of a run.
 #define GSHSCENE_BYTES_PER_ITEM ((size_t)256)    ///< Added for each item of a picture's list.
 #define GSHSCENE_BYTES_PER_AXIS ((size_t)8)      ///< Added for each variation coordinate of a face.

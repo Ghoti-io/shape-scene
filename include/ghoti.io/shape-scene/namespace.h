@@ -377,6 +377,11 @@
 #define gshscene_version_serial GHOTIIO_SHAPE_SCENE(gshscene_version_serial)
 #define gshscene_version_string GHOTIIO_SHAPE_SCENE(gshscene_version_string)
 #define gshscene_version_visit GHOTIIO_SHAPE_SCENE(gshscene_version_visit)
+#define GSHSCENE_Primitive GHOTIIO_SHAPE_SCENE(GSHSCENE_Primitive)
+#define GSHSCENE_Primitive_Kind GHOTIIO_SHAPE_SCENE(GSHSCENE_Primitive_Kind)
+#define gshscene_primitive_kind_string GHOTIIO_SHAPE_SCENE(gshscene_primitive_kind_string)
+#define gshscene_store_intern_primitive GHOTIIO_SHAPE_SCENE(gshscene_store_intern_primitive)
+#define gshscene_resource_primitive GHOTIIO_SHAPE_SCENE(gshscene_resource_primitive)
 
 /// @endcond
 

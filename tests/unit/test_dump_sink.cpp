@@ -127,6 +127,7 @@ GSHSCENE_Sink * make_writer(const GSHSCENE_Allocator * alloc, const GSHSCENE_Lim
  */
 GSHSCENE_Dump_Sink_Config config_writer_like() {
   GSHSCENE_Dump_Sink_Config c = config_default();
+  c.records = GSHSCENE_DUMP_RECORD_PRIMITIVES; // PR10: a writer emits <circle>, <ellipse>, <rect> or re from the tag
   for (GSHSCENE_Sink_Caps * caps : {&c.raster_caps, &c.stream_caps}) {
     caps->flags |= GSHSCENE_CAP_STROKE_EXPAND;
     caps->stroke_native = GSHSCENE_STROKE_NATIVE_JOIN_MITER | GSHSCENE_STROKE_NATIVE_JOIN_ROUND |
@@ -155,6 +156,7 @@ GSHSCENE_Sink * make_writer_like(const GSHSCENE_Allocator * alloc, const GSHSCEN
  */
 GSHSCENE_Dump_Sink_Config config_toolpath_like() {
   GSHSCENE_Dump_Sink_Config c = config_default();
+  c.records = GSHSCENE_DUMP_RECORD_ARCS; // PR10: a pen follows an arc as G2 or G3, never its chord
   for (GSHSCENE_Sink_Caps * caps : {&c.raster_caps, &c.stream_caps}) {
     // A pen follows a run's centerline (ST1's path): it claims STROKE_RUNS like every configuration here (ST10).
     caps->stroke_native = GSHSCENE_STROKE_NATIVE_JOIN_ROUND | GSHSCENE_STROKE_NATIVE_CAP_ROUND |
@@ -226,6 +228,7 @@ INSTANTIATE_TEST_SUITE_P(DumpSink, SinkConformance,
 
 #include "../sink_answers.h"
 
+#include <cmath>
 #include <cstdio>
 #include <functional>
 #include <thread>
@@ -1659,6 +1662,8 @@ TEST(DumpSink, TheConfigurationIsValidated) {
       [](GSHSCENE_Dump_Sink_Config & c) { c.max_extent = -1.0; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.max_extent = 1e300 * 1e300; },
       [](GSHSCENE_Dump_Sink_Config & c) { c._reserved[0] = 1; },
+      [](GSHSCENE_Dump_Sink_Config & c) { c.records = 4; },
+      [](GSHSCENE_Dump_Sink_Config & c) { c.records = 0x80000000u; },
       [](GSHSCENE_Dump_Sink_Config & c) {
         c.raster_caps.flags &= ~GSHSCENE_CAP_CAN_BLOCK;
         c.stream_caps.flags &= ~GSHSCENE_CAP_CAN_BLOCK; // an in-line sink completes in begin: it can block
@@ -2591,6 +2596,210 @@ TEST(DumpSink, AMaskRecordIsExactlyItsFieldsAndTheGroupLineNamesItsMaskAndPlacem
   GSHSCENE_Render_Request plain_request = request_for(unmasked, *stream, report.report);
   ASSERT_EQ(gshscene_sink_workspace_bytes(sink.sink, &plain_request, &without_masks), GSHSCENE_OK);
   EXPECT_GE(with_masks, without_masks + 3 * sizeof(uint64_t)) << "three masks are three ids to remember";
+}
+
+
+namespace {
+
+/** The primitive and arc scene of PR10: tagged and untagged paths under maps that keep a circle, mirror it, stretch it and collapse it. */
+const GSHSCENE_List * primitive_list(Scene & s) {
+  auto hold = [&](const GSHSCENE_Resource * r) {
+    EXPECT_NE(r, nullptr);
+    s.held.push_back(r);
+    return r;
+  };
+  auto tag = [&](const GSHSCENE_Primitive & p) {
+    const GSHSCENE_Resource * r = nullptr;
+    EXPECT_EQ(gshscene_store_intern_primitive(s.store, &p, &r), GSHSCENE_OK);
+    return hold(r);
+  };
+  GSHSCENE_Primitive circle;
+  std::memset(&circle, 0, sizeof circle);
+  circle.kind = GSHSCENE_PRIMITIVE_ELLIPSE;
+  circle.cx = 50;
+  circle.cy = 30;
+  circle.rx = 20;
+  circle.ry = 20;
+  GSHSCENE_Primitive ell = circle;
+  ell.cx = 10;
+  ell.cy = 20;
+  ell.rx = 8;
+  ell.ry = 4;
+  ell.flip_x = 1;
+  GSHSCENE_Primitive rr;
+  std::memset(&rr, 0, sizeof rr);
+  rr.kind = GSHSCENE_PRIMITIVE_ROUNDED_RECT;
+  rr.w = 100;
+  rr.h = 60;
+  const GSHGEOM_Corner corners[4] = {{10, 12}, {6, 5}, {4, 4}, {8, 9}};
+  for (int i = 0; i < 4; i++) {
+    rr.r[i] = corners[i];
+  }
+  GSHSCENE_Primitive rc;
+  std::memset(&rc, 0, sizeof rc);
+  rc.kind = GSHSCENE_PRIMITIVE_RECT;
+  rc.x = 1;
+  rc.y = 2;
+  rc.w = 3;
+  rc.h = 4;
+  rc.flip_y = 1;
+  const GSHSCENE_Resource * circle_res = tag(circle);
+  GSHGEOM_Path * plain = nullptr;
+  EXPECT_EQ(gshgeom_path_create(nullptr, nullptr, 2, &plain), GSHGEOM_OK);
+  EXPECT_EQ(gshgeom_path_add_ellipse(plain, 50, 30, 20, 20, 0, 0), GSHGEOM_OK);
+  const GSHSCENE_Resource * untagged = nullptr;
+  EXPECT_EQ(gshscene_store_intern_path(s.store, plain, &untagged), GSHSCENE_OK);
+  hold(untagged);
+  gshgeom_path_destroy(plain);
+  GSHSCENE_Paint red = solid(1, 0, 0);
+  GSHGEOM_Map rot, stretch, mirror, flat;
+  EXPECT_EQ(gshgeom_map_rotate(GSHGEOM_ANGLE_DEGREES, 30.0, &rot), GSHGEOM_OK);
+  EXPECT_EQ(gshgeom_map_scale(2, 2.0, 1.0, 1.0, &stretch), GSHGEOM_OK);
+  EXPECT_EQ(gshgeom_map_scale(2, -1.0, 1.0, 1.0, &mirror), GSHGEOM_OK);
+  EXPECT_EQ(gshgeom_map_scale(2, 0.0, 1.0, 1.0, &flat), GSHGEOM_OK);
+  GSHSCENE_List * l = s.open();
+  auto fill = [&](const GSHSCENE_Resource * r, const GSHGEOM_Map * m) {
+    EXPECT_EQ(gshscene_list_fill(l, r, m, GSHGEOM_FILL_NONZERO, &red, 0, 0.0), GSHSCENE_OK);
+  };
+  fill(circle_res, nullptr);
+  fill(circle_res, &rot);
+  fill(circle_res, &stretch);
+  fill(circle_res, &mirror);
+  fill(circle_res, &flat);
+  fill(untagged, nullptr);
+  fill(tag(ell), nullptr);
+  fill(tag(rr), nullptr);
+  fill(tag(rc), nullptr);
+  fill(s.sq(0, 0, 4), nullptr);
+  GSHSCENE_Stroke_Style st;
+  gshscene_stroke_style_init(&st);
+  const GSHSCENE_Resource * style = nullptr;
+  EXPECT_EQ(gshscene_store_intern_stroke_style(s.store, &st, &style), GSHSCENE_OK);
+  hold(style);
+  EXPECT_EQ(gshscene_list_stroke(l, circle_res, style, nullptr, &red, 0, 0.0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  return l;
+}
+
+std::string records_dump(const GSHSCENE_Dump_Sink_Config & config, Scene & s, const GSHSCENE_List * list) {
+  SinkRef sink(make_with(config, nullptr, nullptr));
+  auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+  ReportRef report;
+  Rendered r = render_job(sink.sink, request_for(list, *stream, report.report));
+  EXPECT_EQ(r.result, GSHSCENE_OK);
+  (void)s;
+  return stream->bytes;
+}
+
+/** The lines of unit @p unit's block of a dump (without the unit's own record), in order. */
+std::vector<std::string> block_of(const std::string & text, int unit) {
+  std::vector<std::string> out;
+  const std::string head = "U " + std::to_string(unit) + " ";
+  size_t at = 0;
+  bool inside = false;
+  while (at < text.size()) {
+    size_t end = text.find('\n', at);
+    if (end == std::string::npos) {
+      end = text.size();
+    }
+    const std::string line = text.substr(at, end - at);
+    at = end + 1;
+    if (line.compare(0, 2, "U ") == 0) {
+      inside = line.compare(0, head.size(), head) == 0;
+      continue;
+    }
+    if (line.compare(0, 2, "E ") == 0 || line.compare(0, 2, "Q ") == 0) {
+      inside = false;
+    }
+    if (inside) {
+      out.push_back(line);
+    }
+  }
+  return out;
+}
+
+size_t lines_starting(const std::string & text, const char * prefix) {
+  size_t n = 0;
+  const std::string needle = std::string("\n") + prefix;
+  for (size_t at = text.find(needle); at != std::string::npos; at = text.find(needle, at + 1)) {
+    n++;
+  }
+  return n;
+}
+
+double bits_to_double(const std::string & hex) {
+  uint64_t v = std::stoull(hex, nullptr, 16);
+  double d;
+  std::memcpy(&d, &v, sizeof d);
+  return d;
+}
+
+}  // namespace
+
+TEST(DumpSink, ThePrimitiveRecordsAreTheWriterLikeConfigurationsAndNoOthers) {
+  Scene s;
+  const GSHSCENE_List * list = primitive_list(s);
+  const std::string plain = records_dump(config_default(), s, list);
+  const std::string writer = records_dump(config_writer_like(), s, list);
+  const std::string pen = records_dump(config_toolpath_like(), s, list);
+  EXPECT_EQ(lines_starting(plain, "T "), 0u) << "without the configuration's records the dump is what it was";
+  EXPECT_EQ(lines_starting(plain, "a "), 0u);
+  EXPECT_EQ(lines_starting(pen, "T "), 0u);
+  EXPECT_EQ(lines_starting(writer, "a "), 0u);
+  EXPECT_EQ(lines_starting(writer, "T "), 9u) << "a tagged path in six fills and the stroke; never the untagged ones";
+  const std::string circle =
+      "T prim=ellipse flip_x=0 flip_y=0 cx=4049000000000000 cy=403e000000000000 rx=4034000000000000 ry=4034000000000000";
+  for (int u : {0, 1, 2, 3, 4, 10}) {
+    EXPECT_EQ(block_of(writer, u), (std::vector<std::string>{circle})) << u;
+  }
+  EXPECT_EQ(block_of(writer, 5), (std::vector<std::string>{})) << "the same geometry untagged is a path: nothing is recorded";
+  EXPECT_EQ(block_of(writer, 6), (std::vector<std::string>{"T prim=ellipse flip_x=1 flip_y=0 cx=4024000000000000 cy=4034000000000000 "
+                                                           "rx=4020000000000000 ry=4010000000000000"}));
+  EXPECT_EQ(block_of(writer, 7),
+      (std::vector<std::string>{"T prim=rounded-rect flip_x=0 flip_y=0 x=0000000000000000 y=0000000000000000 w=4059000000000000 "
+                                "h=404e000000000000 rtlx=4024000000000000 rtly=4028000000000000 rtrx=4018000000000000 "
+                                "rtry=4014000000000000 rbrx=4010000000000000 rbry=4010000000000000 rblx=4020000000000000 "
+                                "rbly=4022000000000000"}));
+  EXPECT_EQ(block_of(writer, 8), (std::vector<std::string>{"T prim=rect flip_x=0 flip_y=1 x=3ff0000000000000 y=4000000000000000 "
+                                                           "w=4008000000000000 h=4010000000000000"}));
+  EXPECT_EQ(block_of(writer, 9), (std::vector<std::string>{}));
+}
+
+TEST(DumpSink, TheArcRecordsAreTheToolpathLikeConfigurationAndNeverTheChord) {
+  Scene s;
+  const GSHSCENE_List * list = primitive_list(s);
+  const std::string pen = records_dump(config_toolpath_like(), s, list);
+  auto four = [](const char * tail) {
+    std::vector<std::string> v;
+    for (int i = 1; i <= 4; i++) {
+      v.push_back("a " + std::to_string(i) + " " + tail);
+    }
+    return v;
+  };
+  const char * const same = "circular=1 centre=4049000000000000 403e000000000000 radius=4034000000000000 positive=1";
+  EXPECT_EQ(block_of(pen, 0), four(same)) << "a circle is four arcs a pen can follow as G2";
+  EXPECT_EQ(block_of(pen, 5), four(same)) << "an untagged circle's arcs are the same: the arcs need no tag";
+  EXPECT_EQ(block_of(pen, 2), four("circular=0")) << "a stretch makes an ellipse";
+  EXPECT_EQ(block_of(pen, 4), four("circular=0")) << "a map that collapses the plane has no circle";
+  EXPECT_EQ(block_of(pen, 3), four("circular=1 centre=c049000000000000 403e000000000000 radius=4034000000000000 positive=0"))
+      << "a mirror keeps the circle and turns it the other way (G3)";
+  EXPECT_EQ(block_of(pen, 6), four("circular=0")) << "an elliptical arc is not a circle";
+  EXPECT_EQ(block_of(pen, 7), (std::vector<std::string>{
+      "a 2 circular=0", "a 4 circular=1 centre=4058000000000000 404c000000000000 radius=4010000000000000 positive=1",
+      "a 6 circular=0", "a 8 circular=0"})) << "a rounded rect's corners: only the equal-radii one is a circle";
+  EXPECT_EQ(block_of(pen, 8), (std::vector<std::string>{}));
+  EXPECT_EQ(block_of(pen, 9), (std::vector<std::string>{}));
+  /* a rotation by 30 degrees keeps it a circle; the centre is the rotated one, to rounding */
+  const std::vector<std::string> turned = block_of(pen, 1);
+  ASSERT_EQ(turned.size(), 4u);
+  for (const std::string & line : turned) {
+    ASSERT_NE(line.find("circular=1"), std::string::npos) << line;
+    const size_t c = line.find("centre=");
+    EXPECT_NEAR(bits_to_double(line.substr(c + 7, 16)), 50.0 * std::sqrt(3.0) / 2.0 - 15.0, 1e-12);
+    EXPECT_NEAR(bits_to_double(line.substr(c + 24, 16)), 25.0 + 15.0 * std::sqrt(3.0), 1e-12);
+    EXPECT_NE(line.find("radius=4034000000000000 positive=1"), std::string::npos) << line;
+  }
+  EXPECT_EQ(pen.find("circular=0 centre"), std::string::npos);
 }
 
 int main(int argc, char ** argv) {

@@ -1534,6 +1534,155 @@ TEST(GlyphCenterline, EveryAllocationCanFailAndNothingIsLeftBehind) {
   }
 }
 
+
+// --- PS2: an outline with arcs is mapped as arcs and never read as its chord ----------------------------------------
+
+namespace {
+
+/** A provider whose one glyph is a rounded rectangle 1000 by 600 design units with corners of radius 100 and 50 (arcs). */
+GSHSCENE_Result arc_info(void *, const GSHSCENE_Face *, GSHSCENE_Face_Info * out) {
+  std::memset(out, 0, sizeof *out);
+  out->upem = 2048;
+  out->axis_count = 0;
+  out->glyph_count = 2;
+  return GSHSCENE_OK;
+}
+
+GSHSCENE_Result arc_outline(void *, const GSHSCENE_Face *, uint32_t glyph, GSHGEOM_Path * out) {
+  if (glyph != 1) {
+    return GSHSCENE_OK;
+  }
+  const GSHGEOM_Corner c[4] = {{100, 100}, {50, 50}, {100, 100}, {50, 50}};
+  return gshgeom_path_add_rounded_rect(out, 0, 0, 1000, 600, c) == GSHGEOM_OK ? GSHSCENE_OK : GSHSCENE_ERR_INVALID;
+}
+
+GSHSCENE_Result arc_box(void *, const GSHSCENE_Face *, uint32_t, GSHSCENE_Glyph_Box * out) {
+  std::memset(out, 0, sizeof *out);
+  return GSHSCENE_OK;
+}
+
+const GSHSCENE_Resource * arc_font_run(GSHSCENE_Store * store, double size, double x, double y,
+    std::vector<const GSHSCENE_Resource *> * held) {
+  static const GSHSCENE_Glyph_Provider ops = {GSHSCENE_GLYPH_PROVIDER_VERSION, arc_info, arc_outline, nullptr, arc_box, nullptr, nullptr, nullptr};
+  GSHSCENE_Face_Desc desc;
+  std::memset(&desc, 0, sizeof desc);
+  desc.font_key = 0xA2;
+  desc.provider = &ops;
+  const GSHSCENE_Resource * face = nullptr;
+  EXPECT_EQ(gshscene_store_intern_face(store, &desc, &face), GSHSCENE_OK);
+  held->push_back(face);
+  const std::vector<GSHSCENE_Glyph> glyphs = {{1, x, y, nullptr}};
+  const GSHSCENE_Resource * run = intern_font_run(store, face, size, glyphs);
+  held->push_back(run);
+  return run;
+}
+
+}  // namespace
+
+TEST(GlyphCenterline, AnArcOutlineIsMappedAsArcsUnderTheMirrorThePlacementMakes) {
+  StoreHolder s;
+  std::vector<const GSHSCENE_Resource *> held;
+  const GSHSCENE_Resource * run = arc_font_run(s.store, 16.0, 10.5, -3.25, &held);
+  Centerline c;
+  centerline_of(run, &c);
+  ASSERT_EQ(c.result, GSHSCENE_OK);
+  ASSERT_NE(c.path, nullptr);
+  // 16 / 2048 is a power of two and 10.5 and -3.25 are dyadic, so every mapped number is exact: the corners are on the grid
+  // below.  The design y axis points up and the model's down, so the rectangle is mirrored: its arcs run the other way.
+  ASSERT_EQ(gshgeom_path_element_count(c.path), 10u);
+  size_t arcs = 0;
+  size_t lines = 0;
+  for (size_t i = 0; i < 10; i++) {
+    GSHGEOM_Verb v;
+    ASSERT_EQ(gshgeom_path_verb(c.path, i, &v), GSHGEOM_OK);
+    arcs += v == GSHGEOM_VERB_ARC;
+    lines += v == GSHGEOM_VERB_LINE;
+  }
+  EXPECT_EQ(arcs, 4u) << "the corners stay arcs";
+  EXPECT_EQ(lines, 4u) << "and nothing became a chord";
+  GSHGEOM_Arc a;
+  ASSERT_EQ(gshgeom_path_arc(c.path, 2, &a), GSHGEOM_OK);
+  const double scale = 16.0 / 2048.0;
+  // the first corner arc (top-right in design space, radius 50) goes from (1000 - 50, 0) to (1000, 50) in design units
+  EXPECT_EQ(a.start.x, 10.5 + 950.0 * scale);
+  EXPECT_EQ(a.start.y, -3.25 - 0.0 * scale);
+  EXPECT_EQ(a.end.x, 10.5 + 1000.0 * scale);
+  EXPECT_EQ(a.end.y, -3.25 - 50.0 * scale);
+  EXPECT_LT(a.u.x * a.v.y - a.u.y * a.v.x, 0.0) << "the y flip turns the arc the other way";
+  EXPECT_NE(a.flags & GSHGEOM_ARC_CIRCULAR, 0u) << "a mirror keeps a circle";
+  GSHGEOM_Curve pieces[GSHGEOM_ARC_MAX_PIECES];
+  int n = 0;
+  ASSERT_EQ(gshgeom_arc_pieces(&a, pieces, &n), GSHGEOM_OK);
+  EXPECT_EQ(n, 1);
+  EXPECT_EQ(pieces[0].p[1].x, 10.5 + 1000.0 * scale) << "the control point is the corner of the box";
+  EXPECT_EQ(pieces[0].p[1].y, -3.25 - 0.0 * scale);
+  for (GSHSCENE_Resource_Kind k : {GSHSCENE_RESOURCE_GLYPH_RUN}) {
+    EXPECT_EQ(gshscene_resource_kind(run), k);
+  }
+  for (const GSHSCENE_Resource * r : held) {
+    gshscene_resource_release(r);
+  }
+}
+
+extern "C" GSHGEOM_Result gshscene_glyph_append_outline(
+    GSHGEOM_Path * path, const GSHGEOM_Path * outline, const GSHGEOM_Map * map, int * refused);
+
+TEST(GlyphOutline, AnArcUnderASingularMapIsMappedAsItsPiecesNotItsChord) {
+  // A map that collapses the plane has no arc image (its image is a segment): the arc map refuses it as invalid, and the exact
+  // pieces are mapped instead, each a rational quadratic with the mapped ends.  A line between the ends would be the chord.
+  GSHGEOM_Path * outline = new_path();
+  ASSERT_EQ(gshgeom_path_move_to(outline, P(0, 0)), GSHGEOM_OK);
+  GSHGEOM_Arc_Form f = {P(0, 10), P(10, 0), P(0, 10), GSHGEOM_ANGLE_DEGREES, -90.0, 270.0, GSHGEOM_ARC_CIRCULAR};
+  ASSERT_EQ(gshgeom_path_arc_conjugate_to(outline, &f, nullptr), GSHGEOM_OK);
+  GSHGEOM_Map flat;
+  ASSERT_EQ(gshgeom_map_scale(2, 0.0, 1.0, 1.0, &flat), GSHGEOM_OK);
+  GSHGEOM_Arc a;
+  ASSERT_EQ(gshgeom_path_arc(outline, 1, &a), GSHGEOM_OK);
+  GSHGEOM_Arc image;
+  ASSERT_EQ(gshgeom_arc_map(&flat, &a, &image), GSHGEOM_ERR_INVALID) << "the premise: the arc map refuses a singular map";
+  GSHGEOM_Curve pieces[GSHGEOM_ARC_MAX_PIECES];
+  int n = 0;
+  ASSERT_EQ(gshgeom_arc_pieces(&a, pieces, &n), GSHGEOM_OK);
+  ASSERT_EQ(n, 3);
+  GSHGEOM_Path * out = new_path();
+  int refused = 7;
+  ASSERT_EQ(gshscene_glyph_append_outline(out, outline, &flat, &refused), GSHGEOM_OK);
+  EXPECT_EQ(refused, 0);
+  ASSERT_EQ(gshgeom_path_element_count(out), 1u + (size_t)n);
+  for (int k = 0; k < n; k++) {
+    GSHGEOM_Element e;
+    ASSERT_EQ(gshgeom_path_element(out, 1 + (size_t)k, &e), GSHGEOM_OK);
+    EXPECT_EQ(e.verb, GSHGEOM_VERB_RATIONAL_QUADRATIC) << k << ": a piece, not a line";
+    GSHGEOM_Curve want;
+    ASSERT_EQ(gshgeom_map_apply_curve(&flat, &pieces[k], &want), GSHGEOM_OK);
+    for (int q = 0; q < 3; q++) {
+      EXPECT_EQ(e.curve.p[q].x, want.p[q].x) << k << "," << q;
+      EXPECT_EQ(e.curve.p[q].y, want.p[q].y) << k << "," << q;
+      EXPECT_EQ(e.curve.w[q], want.w[q]) << k << "," << q;
+    }
+  }
+  gshgeom_path_destroy(out);
+  // The same outline under a map that keeps arcs arcs: one arc element, the ends the map's images.
+  GSHGEOM_Map shift;
+  ASSERT_EQ(gshgeom_map_translate(2, 3.0, -4.0, 0.0, &shift), GSHGEOM_OK);
+  out = new_path();
+  ASSERT_EQ(gshscene_glyph_append_outline(out, outline, &shift, &refused), GSHGEOM_OK);
+  ASSERT_EQ(gshgeom_path_element_count(out), 2u);
+  GSHGEOM_Verb v;
+  ASSERT_EQ(gshgeom_path_verb(out, 1, &v), GSHGEOM_OK);
+  EXPECT_EQ(v, GSHGEOM_VERB_ARC);
+  gshgeom_path_destroy(out);
+  // A map that takes a point out of range refuses the outline whole: nothing is appended.
+  GSHGEOM_Map huge;
+  ASSERT_EQ(gshgeom_map_scale(2, 0x1p99, 0x1p99, 1.0, &huge), GSHGEOM_OK);
+  out = new_path();
+  ASSERT_EQ(gshscene_glyph_append_outline(out, outline, &huge, &refused), GSHGEOM_OK);
+  EXPECT_EQ(refused, 1);
+  EXPECT_EQ(gshgeom_path_element_count(out), 0u);
+  gshgeom_path_destroy(out);
+  gshgeom_path_destroy(outline);
+}
+
 int main(int argc, char ** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

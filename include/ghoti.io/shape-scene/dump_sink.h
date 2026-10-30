@@ -137,6 +137,15 @@
  * dump's bytes: the test sink's output is a text document, so its spelling is its
  * text.
  *
+ * ### Primitive and arc records (PR10)
+ *
+ * Only when the configuration's `records` asks (default none).  After the record of a fill, clip or stroke of a path resource: with
+ * `PRIMITIVES`, for a tagged path, a line `T prim=<kind> flip_x=N flip_y=N` followed by the parameters, each as `name=<16 hex digits>`:
+ * `rect` and `rounded-rect` have `x y w h`, `rounded-rect` then `rtlx rtly rtrx rtry rbrx rbry rblx rbly` (the radii top-left, top-right, bottom-right,
+ * bottom-left), `ellipse` has `cx cy rx ry`; with `ARCS`, for each arc element of the path, a line `a <index> circular=1 centre=<x> <y>
+ * radius=<r> positive=N` (a circular arc under a similarity, the centre and radius in target units, `positive` 1 for the positive sense on the
+ * target) or `a <index> circular=0` (an elliptical arc, or an arc under a map that is not a similarity, or whose map is singular).
+ *
  * ### Units and cancel
  *
  * Each unit is one unit of work (`work_measure` "units").  In-line, a render
@@ -168,6 +177,21 @@ typedef enum GSHSCENE_Dump_Sink_Completion {
   GSHSCENE_DUMP_SINK_COMPLETION_COUNT
 } GSHSCENE_Dump_Sink_Completion;
 
+/**
+ * @brief Records a configuration asks the test sink for (PR10); the dump's spelling is in the file comment.
+ *
+ * `PRIMITIVES` is the writer-like configuration: a fill, clip or stroke of a tagged path resource is followed by a line `T` that
+ * names the tag and its parameters, so that a writer can emit `<circle>`, `<ellipse>`, `<rect>` or `re`; a circle is an ellipse with equal
+ * radii and "circular" the writer's predicate over the recorded parameters, not a tag.  `ARCS` is the toolpath-like configuration: every
+ * arc element of the item's path is followed by a line `a` that says what a G2 or G3 needs under the item's composed map (the circle
+ * for a circular arc under a similarity, otherwise `circular=0`), never the chord and never a refusal.  A raster-like sink needs neither.
+ */
+typedef enum GSHSCENE_Dump_Sink_Records {
+  GSHSCENE_DUMP_RECORD_PRIMITIVES = 1, ///< The `T` line of a tagged path.
+  GSHSCENE_DUMP_RECORD_ARCS = 2,       ///< An `a` line for each arc of a path.
+  GSHSCENE_DUMP_RECORDS_ALL = 3        ///< Both.
+} GSHSCENE_Dump_Sink_Records;
+
 /** @brief The test sink's configuration.  Start from ::gshscene_dump_sink_config_default. */
 typedef struct GSHSCENE_Dump_Sink_Config {
   GSHSCENE_Sink_Caps raster_caps; ///< Its caps for an RGBA 8-bit raster target.
@@ -186,7 +210,13 @@ typedef struct GSHSCENE_Dump_Sink_Config {
   size_t max_stroke_points;
   /** For a raster target, where the dump goes; NULL for nowhere (the output hash is still kept).  Not owned. */
   const GSHSCENE_Writer * log;
-  uint8_t _reserved[16];          ///< Zero.
+  /**
+   * Which records a writer or a toolpath sink would need beyond the drawing, a bit set of ::GSHSCENE_Dump_Sink_Records (primitive.h, PR10).  0, the
+   * default, is none, and the dump is exactly what it was without them.  The bits are the configuration's, not capabilities: no
+   * capability bit or report reason is added for a primitive, and a sink that does not read the tag does not know it exists.
+   */
+  uint32_t records;
+  uint8_t _reserved[12];          ///< Zero.
 } GSHSCENE_Dump_Sink_Config;
 
 /**

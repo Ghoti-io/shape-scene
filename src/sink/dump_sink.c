@@ -713,6 +713,73 @@ static void hex(Run * run, const char * prefix, uint64_t value, GSHSCENE_Result 
   emit_text(run, run->line, failed);
 }
 
+/** The primitive and arc records of a path resource (dump_sink.h, PR10), when the configuration asks for them. */
+static void path_records(Run * run, const GSHSCENE_Resource * resource, const GSHGEOM_Map * map, GSHSCENE_Result * failed) {
+  const uint32_t records = run->sink->config.records;
+  if (!records || !resource) { /* a resource that is not a path has no tag and no arcs: the accessor and the path say so */
+    return;
+  }
+  GSHSCENE_Primitive prim;
+  if ((records & GSHSCENE_DUMP_RECORD_PRIMITIVES) && gshscene_resource_primitive(resource, &prim) == GSHSCENE_OK &&
+      prim.kind != GSHSCENE_PRIMITIVE_NONE) {
+    snprintf(run->line, LINE_BYTES, "T prim=%s flip_x=%d flip_y=%d", gshscene_primitive_kind_string(prim.kind), prim.flip_x,
+        prim.flip_y);
+    emit_text(run, run->line, failed);
+    static const char * const names[2][12] = {
+        {"x", "y", "w", "h", "rtlx", "rtly", "rtrx", "rtry", "rbrx", "rbry", "rblx", "rbly"}, /* a rect takes the first four */
+        {"cx", "cy", "rx", "ry"}};
+    double v[12];
+    size_t n = 4;
+    if (prim.kind == GSHSCENE_PRIMITIVE_ELLIPSE) {
+      v[0] = prim.cx;
+      v[1] = prim.cy;
+      v[2] = prim.rx;
+      v[3] = prim.ry;
+    } else {
+      v[0] = prim.x;
+      v[1] = prim.y;
+      v[2] = prim.w;
+      v[3] = prim.h;
+      if (prim.kind == GSHSCENE_PRIMITIVE_ROUNDED_RECT) {
+        n = 12;
+        for (int i = 0; i < 4; i++) {
+          v[4 + 2 * i] = prim.r[i].rx;
+          v[5 + 2 * i] = prim.r[i].ry;
+        }
+      }
+    }
+    const char * const * label = names[prim.kind == GSHSCENE_PRIMITIVE_ELLIPSE ? 1 : 0];
+    for (size_t i = 0; i < n; i++) {
+      snprintf(run->line, LINE_BYTES, " %s=%016" PRIx64, label[i], gshgeom_f64_bits(v[i]));
+      emit_text(run, run->line, failed);
+    }
+    emit_text(run, "\n", failed);
+  }
+  if (records & GSHSCENE_DUMP_RECORD_ARCS) {
+    const GSHGEOM_Path * path = gshscene_resource_path(resource);
+    const size_t count = gshgeom_path_element_count(path);
+    for (size_t i = 0; i < count; i++) {
+      GSHGEOM_Verb verb;
+      GSHGEOM_Arc arc, mapped;
+      if (gshgeom_path_verb(path, i, &verb) != GSHGEOM_OK || verb != GSHGEOM_VERB_ARC) {
+        continue;
+      }
+      GSHGEOM_Point centre;
+      double radius = 0.0;
+      int positive = 0;
+      /* gshgeom_arc_circle refuses an arc without the circular flag, which the map keeps only under a similarity */
+      if (gshgeom_path_arc(path, i, &arc) == GSHGEOM_OK && gshgeom_arc_map(map, &arc, &mapped) == GSHGEOM_OK &&
+          gshgeom_arc_circle(&mapped, &centre, &radius, &positive) == GSHGEOM_OK) {
+        snprintf(run->line, LINE_BYTES, "a %" PRIu64 " circular=1 centre=%016" PRIx64 " %016" PRIx64 " radius=%016" PRIx64 " positive=%d\n",
+            (uint64_t)i, gshgeom_f64_bits(centre.x), gshgeom_f64_bits(centre.y), gshgeom_f64_bits(radius), positive ? 1 : 0);
+      } else {
+        snprintf(run->line, LINE_BYTES, "a %" PRIu64 " circular=0\n", (uint64_t)i);
+      }
+      emit_text(run, run->line, failed);
+    }
+  }
+}
+
 /** A refusal while drawing (S6): the entry is the caller's; under strict the render stops at this unit. */
 static GSHSCENE_Result stop_here(Run * run, const size_t * chain, size_t count, GSHSCENE_Result failed) {
   memcpy(run->stop, chain, count * sizeof *chain);
@@ -1155,6 +1222,7 @@ static GSHSCENE_Result stroke_unit(Run * run, const GSHSCENE_Item * item, const 
         (unsigned)expand, outline_text);
   }
   emit_text(run, run->line, &failed);
+  path_records(run, item->resource, &map, &failed);
   GSHSCENE_Result r = style_record(run, item->style, &failed);
   if (r == GSHSCENE_OK && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
     r = gradient_record(run, item->paint.resource, &failed);
@@ -1326,6 +1394,7 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
           return r;
         }
       }
+      path_records(run, item->resource, &map, &failed);
       if (routed) {
         GSHSCENE_Result r = glyph_records(run, item, &map, &route, chain, count, &failed);
         if (r != GSHSCENE_OK) {
@@ -1742,6 +1811,9 @@ GSHSCENE_Result gshscene_dump_sink_create(const GSHSCENE_Allocator * alloc, cons
     if (c._reserved[i]) {
       return GSHSCENE_ERR_INVALID;
     }
+  }
+  if (c.records & ~(uint32_t)GSHSCENE_DUMP_RECORDS_ALL) {
+    return GSHSCENE_ERR_INVALID;
   }
   if (!caps_valid(&c.raster_caps) || !caps_valid(&c.stream_caps) ||
       affine != (c.stream_caps.flags & GSHSCENE_CAP_THREAD_AFFINE) ||

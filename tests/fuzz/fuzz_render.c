@@ -325,6 +325,63 @@ static const GSHSCENE_Resource * square(Scene * s, double x, double y, double si
 }
 
 /**
+ * A shape for a fill or a clip: the square above, a tagged rectangle, ellipse or rounded rectangle (primitive.h), or the same
+ * ellipse as an untagged path of arcs.  The tag changes no coverage, so the renders below must be as good for these as for the square.
+ */
+static const GSHSCENE_Resource * shape(Scene * s, double x, double y, double size, unsigned pick) {
+  GSHSCENE_Primitive p;
+  memset(&p, 0, sizeof p);
+  const GSHGEOM_Corner corners[4] = {{size / 4, size / 4}, {size / 2, size / 4}, {size / 8, size / 8}, {0, 0}};
+  switch (pick % 6) {
+    case 1:
+    case 2:
+      p.kind = GSHSCENE_PRIMITIVE_RECT;
+      p.flip_x = (pick >> 3) & 1;
+      p.flip_y = (pick >> 4) & 1;
+      p.x = x;
+      p.y = y;
+      p.w = size;
+      p.h = size / 2;
+      break;
+    case 3:
+      p.kind = GSHSCENE_PRIMITIVE_ELLIPSE;
+      p.flip_x = (pick >> 3) & 1;
+      p.flip_y = (pick >> 4) & 1;
+      p.cx = x + size;
+      p.cy = y + size;
+      p.rx = size;
+      p.ry = size / 2 + 0.5;
+      break;
+    case 4:
+      p.kind = GSHSCENE_PRIMITIVE_ROUNDED_RECT;
+      p.x = x;
+      p.y = y;
+      p.w = size + 1;
+      p.h = size + 1;
+      for (int i = 0; i < 4; i++) {
+        p.r[i] = corners[i];
+      }
+      break;
+    case 5: {
+      GSHGEOM_Path * path = NULL;
+      if (gshgeom_path_create(NULL, NULL, 2, &path) != GSHGEOM_OK) {
+        return NULL;
+      }
+      gshgeom_path_add_ellipse(path, x + size, y + size, size, size, 0, 0);
+      const GSHSCENE_Resource * r = NULL;
+      gshscene_store_intern_path(s->store, path, &r);
+      gshgeom_path_destroy(path);
+      return keep(s, r);
+    }
+    default:
+      return square(s, x, y, size);
+  }
+  const GSHSCENE_Resource * r = NULL;
+  gshscene_store_intern_primitive(s->store, &p, &r);
+  return keep(s, r);
+}
+
+/**
  * The faces a run from a font names (story 14a): unbound, or bound to one of two test providers (a 2048-unit face
  * with a program, a 1000-unit one without), with the fast tier or without it, at one of three instances.  The
  * providers live for the process; their counters are not read.
@@ -688,7 +745,7 @@ static GSHSCENE_List * build(Scene * s, Input * in, int * ties) {
           past = w >= 2;
           at_bound = !past;
         }
-        const GSHSCENE_Resource * r = square(s, a % SIDE, b % SIDE, 1 + c % 20);
+        const GSHSCENE_Resource * r = shape(s, a % SIDE, b % SIDE, 1 + c % 20, c >> 4);
         if (r && (paint.kind != GSHSCENE_PAINT_GRADIENT || paint.resource)) {
           GSHSCENE_Result fr = gshscene_list_fill(list, r, singular ? &flat : NULL, (GSHGEOM_Fill_Rule)(a & 1), &paint,
               layer, d);
@@ -701,7 +758,7 @@ static GSHSCENE_List * build(Scene * s, Input * in, int * ties) {
         break;
       }
       case 1: {
-        const GSHSCENE_Resource * r = square(s, a % SIDE, b % SIDE, 4 + c % 40);
+        const GSHSCENE_Resource * r = shape(s, a % SIDE, b % SIDE, 4 + c % 40, c >> 4);
         if (depth < sizeof stack && r && gshscene_list_clip_push(list, r, NULL, GSHGEOM_FILL_NONZERO, layer, d) == GSHSCENE_OK) {
           stack[depth++] = 1;
         }

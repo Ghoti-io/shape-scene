@@ -467,32 +467,87 @@ static GSHGEOM_Result append_element(GSHGEOM_Path * path, GSHGEOM_Verb verb, con
 }
 
 /**
+ * One element of an outline under a map (PS2).  An arc is mapped as an arc (`gshgeom_arc_map`: an arc under an affine map is an
+ * arc); when that is refused as invalid (a singular map, whose image is a segment, or a record the rounding of the map left
+ * disagreeing with its ends) the arc's exact pieces are mapped instead, each a rational quadratic.  An arc is never read as its chord.
+ */
+typedef struct Mapped_Element {
+  GSHGEOM_Verb verb;                        ///< The element's verb (an arc's is ARC).
+  GSHGEOM_Curve curve;                      ///< Every verb but an arc: the mapped segment.
+  int as_arc;                               ///< An arc mapped as an arc: `arc` is it.
+  GSHGEOM_Arc arc;
+  int pieces;                               ///< An arc mapped as its pieces: how many, in `piece`.
+  GSHGEOM_Curve piece[GSHGEOM_ARC_MAX_PIECES];
+} Mapped_Element;
+
+/** Element @p i of @p outline mapped; a failure is a point the map takes out of range, or an element that cannot be read. */
+static GSHGEOM_Result map_outline_element(
+    const GSHGEOM_Map * map, const GSHGEOM_Path * outline, size_t i, Mapped_Element * out) {
+  memset(out, 0, sizeof *out);
+  GSHGEOM_Result r = gshgeom_path_verb(outline, i, &out->verb);
+  if (r != GSHGEOM_OK) {
+    return r;
+  }
+  if (out->verb != GSHGEOM_VERB_ARC) {
+    GSHGEOM_Element e;
+    r = gshgeom_path_element(outline, i, &e);
+    return r == GSHGEOM_OK ? map_element(map, &e, &out->curve) : r;
+  }
+  GSHGEOM_Arc arc;
+  r = gshgeom_path_arc(outline, i, &arc);
+  if (r != GSHGEOM_OK) {
+    return r;
+  }
+  r = gshgeom_arc_map(map, &arc, &out->arc);
+  if (r == GSHGEOM_OK) {
+    out->as_arc = 1;
+    return GSHGEOM_OK;
+  }
+  if (r != GSHGEOM_ERR_INVALID) {
+    return r;
+  }
+  GSHGEOM_Curve exact[GSHGEOM_ARC_MAX_PIECES];
+  int n = 0;
+  r = gshgeom_arc_pieces(&arc, exact, &n);
+  for (int k = 0; r == GSHGEOM_OK && k < n; k++) {
+    r = gshgeom_map_apply_curve(map, &exact[k], &out->piece[k]);
+  }
+  out->pieces = n;
+  return r;
+}
+
+/**
  * Append every element of @p outline under @p map to @p path, all or none of them: the mapping is checked over the
  * whole outline first, so that a glyph with a point past the range adds nothing.
  *
  * @param refused Set to 1 when the map takes a point out of range (nothing is appended).
  */
-static GSHGEOM_Result append_outline(
+GSHGEOM_Result gshscene_glyph_append_outline(
     GSHGEOM_Path * path, const GSHGEOM_Path * outline, const GSHGEOM_Map * map, int * refused) {
   size_t n = gshgeom_path_element_count(outline);
-  GSHGEOM_Element e;
-  GSHGEOM_Curve mapped;
+  Mapped_Element m;
   *refused = 0;
   for (size_t i = 0; i < n; i++) {
-    GSHGEOM_Result r = gshgeom_path_element(outline, i, &e);
-    if (r != GSHGEOM_OK) {
-      return GSHGEOM_ERR_INTERNAL;
-    }
-    if (map_element(map, &e, &mapped) != GSHGEOM_OK) {
+    if (map_outline_element(map, outline, i, &m) != GSHGEOM_OK) {
       *refused = 1;
       return GSHGEOM_OK;
     }
   }
   for (size_t i = 0; i < n; i++) {
-    if (gshgeom_path_element(outline, i, &e) != GSHGEOM_OK || map_element(map, &e, &mapped) != GSHGEOM_OK) {
+    if (map_outline_element(map, outline, i, &m) != GSHGEOM_OK) {
       return GSHGEOM_ERR_INTERNAL;
     }
-    GSHGEOM_Result r = append_element(path, e.verb, &mapped);
+    GSHGEOM_Result r;
+    if (m.verb != GSHGEOM_VERB_ARC) {
+      r = append_element(path, m.verb, &m.curve);
+    } else if (m.as_arc) {
+      r = gshgeom_path_append_arc(path, &m.arc);
+    } else {
+      r = GSHGEOM_OK;
+      for (int k = 0; r == GSHGEOM_OK && k < m.pieces; k++) {
+        r = append_element(path, GSHGEOM_VERB_RATIONAL_QUADRATIC, &m.piece[k]);
+      }
+    }
     if (r != GSHGEOM_OK) {
       return r;
     }
@@ -555,7 +610,7 @@ GSHSCENE_Result gshscene_glyph_run_centerline(const GSHSCENE_Resource * run, con
       result = GSHSCENE_ERR_UNSUPPORTED;
     } else if (outline && !note.entry_class) {
       int refused = 0;
-      g = append_outline(centerline, outline, &glyph_map, &refused);
+      g = gshscene_glyph_append_outline(centerline, outline, &glyph_map, &refused);
       if (g != GSHGEOM_OK) {
         result = g == GSHGEOM_ERR_INTERNAL ? GSHSCENE_ERR_INTERNAL : from_geometry(g);
       } else if (refused) {

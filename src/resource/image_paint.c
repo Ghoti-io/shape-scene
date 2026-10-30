@@ -387,7 +387,11 @@ static int window_quad(const GSHSCENE_Image_Paint * p, double quad[8]) {
   return 1;
 }
 
-/** The four points of the path's one closed subpath of four line segments; 0 for any other path. */
+/**
+ * The four points of the path's one closed subpath of four line segments; 0 for any other path.  A path with an arc is any other
+ * path: the readback refuses an arc element, so the predicate is false for it, as for a curve (PS2).  A tagged `RECT` is five
+ * elements `M L L L Z` and passes by its geometry, under any flips; the tag is not consulted.
+ */
 static int path_quad(const GSHGEOM_Path * path, double pts[8]) {
   if (!path || gshgeom_path_dimension(path) != 2 || gshgeom_path_element_count(path) != 5) {
     return 0;

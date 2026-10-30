@@ -1040,6 +1040,69 @@ const GSHSCENE_Resource * quad_path(GSHSCENE_Store * store, const double p[8], b
 
 }  // namespace
 
+TEST(ImagePaintDraw, ATaggedRectIsADestinationRectangleByItsGeometryUnderAnyFlipsAndAnArcPathIsNot) {
+  // PS2: the predicate reads five elements `M L L L Z`; a RECT is exactly that, so it holds for a tagged rectangle whatever its flips
+  // (the tag is not consulted), and a path with an arc, which the element readback refuses, is not a rectangle.
+  Fixture f;
+  GSHSCENE_Image_Paint p = paint_of(f.color.get());
+  p.window[0] = 3;
+  p.window[1] = 5;
+  p.window[2] = 60;
+  p.window[3] = 50;
+  Ref paint;
+  ASSERT_EQ(intern_paint(f.store.store, p, &paint), GSHSCENE_OK);
+  for (int flips = 0; flips < 4; flips++) {
+    GSHSCENE_Primitive prim;
+    std::memset(&prim, 0, sizeof prim);
+    prim.kind = GSHSCENE_PRIMITIVE_RECT;
+    prim.flip_x = flips & 1;
+    prim.flip_y = flips >> 1;
+    prim.x = 3;
+    prim.y = 5;
+    prim.w = 57;
+    prim.h = 45;
+    Ref rect;
+    ASSERT_EQ(gshscene_store_intern_primitive(f.store.store, &prim, &rect.resource), GSHSCENE_OK);
+    Unit u(f.store.store, rect.get(), nullptr, paint.get());
+    double quad[8] = {0};
+    EXPECT_EQ(gshscene_image_fill_is_draw(u.item, quad), 1) << "flips " << flips;
+    // the corners are the window's, in the paint's order, whichever corner the path starts at
+    EXPECT_EQ(quad[0], 3.0) << flips;
+    EXPECT_EQ(quad[1], 5.0) << flips;
+    EXPECT_EQ(quad[4], 60.0) << flips;
+    EXPECT_EQ(quad[5], 50.0) << flips;
+  }
+  GSHSCENE_Primitive rounded;
+  std::memset(&rounded, 0, sizeof rounded);
+  rounded.kind = GSHSCENE_PRIMITIVE_ROUNDED_RECT;
+  rounded.x = 3;
+  rounded.y = 5;
+  rounded.w = 57;
+  rounded.h = 45;
+  for (int i = 0; i < 4; i++) {
+    rounded.r[i].rx = 4;
+    rounded.r[i].ry = 4;
+  }
+  Ref arcs;
+  ASSERT_EQ(gshscene_store_intern_primitive(f.store.store, &rounded, &arcs.resource), GSHSCENE_OK);
+  Unit u(f.store.store, arcs.get(), nullptr, paint.get());
+  EXPECT_EQ(gshscene_image_fill_is_draw(u.item, nullptr), 0) << "a rounded rectangle is not a destination rectangle";
+  // five elements with an arc among them: the readback refuses the arc and the predicate is false
+  GSHGEOM_Path * five = new_path();
+  gshgeom_path_move_to(five, P(0, 0));
+  gshgeom_path_line_to(five, P(10, 0));
+  GSHGEOM_Arc_Form form = {P(10, 5), P(5, 0), P(0, 5), GSHGEOM_ANGLE_DEGREES, -90.0, 90.0, GSHGEOM_ARC_CIRCULAR};
+  ASSERT_EQ(gshgeom_path_arc_conjugate_to(five, &form, nullptr), GSHGEOM_OK);
+  gshgeom_path_line_to(five, P(0, 10));
+  gshgeom_path_close(five);
+  ASSERT_EQ(gshgeom_path_element_count(five), 5u);
+  Ref with_arc(intern(f.store.store, five));
+  gshgeom_path_destroy(five);
+  ASSERT_NE(with_arc.get(), nullptr);
+  Unit v(f.store.store, with_arc.get(), nullptr, paint.get());
+  EXPECT_EQ(gshscene_image_fill_is_draw(v.item, nullptr), 0) << "an arc is not a line";
+}
+
 TEST(ImagePaintDraw, TheHelperPathAlwaysSatisfiesThePredicateAndTheStatedShapesOnlyDo) {
   Fixture f;
   GSHSCENE_Image_Paint p = paint_of(f.color.get());

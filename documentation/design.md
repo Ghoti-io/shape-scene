@@ -32,7 +32,7 @@ release has begun cannot be resurrected. The id of a resource comes from a per-s
 never reused; a sink's cache is keyed by it (a pointer can be reused by the allocator), and drops an
 entry from the release listener. The store lives until its last resource is released.
 
-Content is copied in: a path is replayed into a path of the store's allocator, a glyph run's array is
+Content is copied in: a path is copied, arcs included, into a path of the store's allocator, a glyph run's array is
 copied, a picture is a closed copy of a list. A resource that names others (a run of outlines, a
 picture) holds a reference on each, so equality compares them by handle.
 
@@ -72,6 +72,49 @@ nest and are checked at the record call; `close` checks that none is open and se
 limit is checked where its quantity grows (`ERR_LIMIT`, the list as it was), including the expansion
 count that bounds a picture of instances of pictures.
 
+## Arcs in a path resource and named primitives (normative; shapes story A2)
+
+**PS1 Arcs in a path resource.** `gshscene_store_intern_path` copies a path with `gshgeom_path_copy` and compares with
+`gshgeom_path_equal`, the geometry library's own, so an arc is interned, copied, compared and hashed (`gshgeom_path_hash`) as a path
+of lines is, and a verb the geometry library learns later needs no case here. A path with no arc hashes as it always did. A 3D
+path with an arc cannot be built. **PS2 No arc is read as its chord.** The outline of a glyph with an arc is mapped as an arc
+(`gshgeom_arc_map`: an arc under an affine map is an arc, circular only under a similarity) and, when that map refuses the arc as
+invalid (a map that collapses the plane has no arc image), as the arc's exact pieces, each a rational quadratic; the image-paint
+rectangle predicate reads `M L L L Z` and is false for a path with an arc, as for a curve. **PS3 Accounting.** An element is accounted
+`GSHSCENE_BYTES_PER_PATH_ELEMENT` (160) whatever it is. An arc takes an element (24 bytes), four points (96) and two scalars (16), 136 bytes, in a
+copy that is sized to its contents (`gshgeom_path_copy` reserves once, so no capacity doubling adds to it); a test counts the bytes the store
+allocates for a path of arcs and holds the difference per arc to the figure. The fixed costs (the resource, the path's header, the
+table) are the formula's base, not a measurement. **PS4 Dump.** A path resource dumps as `gshgeom_path_dump`'s text, whose arc line is the geometry library's.
+
+**A primitive** is a tag on a path resource: the resource kind stays `PATH`, and `gshscene_store_intern_primitive` builds the path
+with the geometry library's builders (`shapes.h`: lines and quarter arcs, SVG 2's start point and the positive direction, the
+four Canvas `rect` sign cases as two flips, radii that overlap refused on an exact sum) and tags it with the kind, the flips and the
+parameters it was built from. **PR1** The tag is set there and nowhere else: a resource is immutable and held by handle, so a tag cannot
+outlive an edit, and no function attaches one to an existing path or infers one from geometry (**PR8**): the same geometry interned as
+a path is an untagged handle, another resource. **PR2** The refusals come in this order: `INVALID` (a NULL, a kind that is `NONE` or past
+the enum, a flip that is not 0 or 1, a non-finite number, a negative size or radius, an ellipse radius that is not positive, radii that
+overlap on a side), `UNSUPPORTED` (a flipped rounded rectangle: see below), `LIMIT` (a coordinate past `GSHGEOM_COORD_LIMIT`, the element
+limit, the byte limit), `OOM`. **PR4** A corner with a zero component is square and canonical `{0, 0}`, and a rounded rectangle with no
+round corner is a `RECT` (equal geometry is equal content). **PR7** The tag is content: the path resource's hash, for a tagged path
+only, follows the path's own hash with `u8` the kind, `u8` the flips (bit 0 `flip_x`, bit 1 `flip_y`) and the canonical parameters as
+`f64`; equality compares them bit for bit; the dump gains a line `primitive kind=<name> flip_x=N flip_y=N` and the parameters as 16
+hexadecimal digits each. **PR12** So equal content is one handle, a parameter that differs in one bit, a kind or a flip is another, and
+a tagged path and its untagged copy are two. `tools/gen-scene-vectors.py` states the hash and the dump a second time, writing
+the elements of the rounded rectangle, the ellipse and the flipped rectangle with plain arithmetic.
+
+**PR9 The tag never changes coverage.** A sink draws a path resource by its path; the tagged path and its untagged copy render bit for
+bit alike, under any flips, fill rule, map and stroke. **PR10** The test sink's configuration has a `records` field (default none,
+and then its dumps are what they were): `PRIMITIVES` follows a fill, clip or stroke of a tagged path with the tag and its parameters, so
+that a writer can emit `<circle>`, `<ellipse>`, `<rect>` or `re`; `ARCS` follows it with a line for each arc element, naming the circle (centre,
+radius, sense) of a circular arc under a map that keeps it one, which is what G2 or G3 needs, and `circular=0` for any other, never the chord.
+No capability bit and no report reason is added: a sink that does not read the tag does not know it exists.
+
+**A flipped rounded rectangle is `UNSUPPORTED`.** Canvas `roundRect` with a negative size does not follow the cases of `rect`: checked in
+headless Chrome 156, the radii go to the mirrored corners but the path starts after the top-left radius and runs clockwise for an even number
+of negative sizes and counter-clockwise for an odd one, whatever the signs (a reversal of the unmirrored path), and the HTML Standard's
+steps, read literally, start outside the box. Which of the two the waist means is open, so the builder takes no flips and the tag refuses a
+flipped rounded rectangle instead of choosing; the rect and the ellipse have all four flip pairs, verified against the same run.
+
 ## Hash and dump
 
 The spellings are in `resource.h` and `list.h`, field by field, in `shape-geometry`'s hash
@@ -83,7 +126,8 @@ their renders by sinks that draw, expand and refuse them, a retained scene's dif
 second hash and count, `stroke-hash` and `stroke-count` in `tests/corpus/scene.hash`, so that adding it left the
 first unchanged; both pairs are checked. The image section (store-level interns of images of every layout, sample
 type and alpha form, with partial edge tiles, padded strides, takes and collisions) is a third pair, `image-hash` and
-`image-count`, for the same reason. The stroke section's value moved once with
+`image-count`, for the same reason. The primitives section (random primitives of every kind and flip pair through the store, the tag
+read back, the same geometry untagged, paths of arcs) is a pair of its own, `primitive-hash` and `primitive-count`. The stroke section's value moved once with
 `shape-geometry`'s flattener revision 3: a stroke's clip region flattens rational curves, which the new conic
 route holds to a proved bound instead of a fixed two units, so the vertices of every conic in a clip moved and the
 stroke fold with them; no other pair did.

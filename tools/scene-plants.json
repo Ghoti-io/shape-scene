@@ -41977,7 +41977,7 @@
 "br-889-lt",
 "srcl",
 "src/resource/resource.c",
-"889:<",
+"816:<",
 "<=",
 [
 "testBytes",
@@ -45999,7 +45999,7 @@
 "br-130-del",
 "srcl",
 "src/resource/resource.c",
-"130:hash_begin(&h, GSHSCENE_RESOURCE_PALETTE);",
+"137:hash_begin(&h, GSHSCENE_RESOURCE_PALETTE);",
 ";",
 [
 "testBytes",
@@ -46026,7 +46026,7 @@
 "br-266-ne",
 "srcl",
 "src/resource/resource.c",
-"266:!=",
+"213:!=",
 "==",
 [
 "testBytes",
@@ -46053,7 +46053,7 @@
 "br-266-neg",
 "srcl",
 "src/resource/resource.c",
-"266:(resource->u.palette.count != want->count)",
+"213:(resource->u.palette.count != want->count)",
 "(!(resource->u.palette.count != want->count))",
 [
 "testBytes",
@@ -46080,7 +46080,7 @@
 "br-270-neg",
 "srcl",
 "src/resource/resource.c",
-"270:(!gshscene_color_equal(&resource->u.palette.colors[i], &want->colors[i]))",
+"217:(!gshscene_color_equal(&resource->u.palette.colors[i], &want->colors[i]))",
 "(!(!gshscene_color_equal(&resource->u.palette.colors[i], &want->colors[i])))",
 [
 "testBytes",
@@ -46107,7 +46107,7 @@
 "br-319-del",
 "srcl",
 "src/resource/resource.c",
-"319:gshscene_free(alloc, resource->u.palette.colors);",
+"266:gshscene_free(alloc, resource->u.palette.colors);",
 ";",
 [
 "testBytes",
@@ -46134,7 +46134,7 @@
 "br-322-del",
 "srcl",
 "src/resource/resource.c",
-"322:gshscene_gradient_free(resource);",
+"269:gshscene_gradient_free(resource);",
 ";",
 [
 "testBytes",
@@ -46161,7 +46161,7 @@
 "br-325-del",
 "srcl",
 "src/resource/resource.c",
-"325:gshscene_stroke_free(resource);",
+"272:gshscene_stroke_free(resource);",
 ";",
 [
 "testBytes",
@@ -46188,7 +46188,7 @@
 "br-670-del",
 "srcl",
 "src/resource/resource.c",
-"670:resource->u.palette.colors = gshscene_alloc(&store->alloc, src->count * sizeof(GSHSCENE_Color));",
+"594:resource->u.palette.colors = gshscene_alloc(&store->alloc, src->count * sizeof(GSHSCENE_Color));",
 ";",
 [
 "testBytes",
@@ -46215,7 +46215,7 @@
 "br-675-del",
 "srcl",
 "src/resource/resource.c",
-"675:memcpy(resource->u.palette.colors, src->colors, src->count * sizeof(GSHSCENE_Color));",
+"599:memcpy(resource->u.palette.colors, src->colors, src->count * sizeof(GSHSCENE_Color));",
 ";",
 [
 "testBytes",
@@ -46242,7 +46242,7 @@
 "br-677-del",
 "srcl",
 "src/resource/resource.c",
-"677:resource->u.palette.count = src->count;",
+"601:resource->u.palette.count = src->count;",
 ";",
 [
 "testBytes",
@@ -46269,7 +46269,7 @@
 "br-684-and",
 "srcl",
 "src/resource/resource.c",
-"684:&&",
+"608:&&",
 "||",
 [
 "testBytes",
@@ -46296,7 +46296,7 @@
 "br-684-neg",
 "srcl",
 "src/resource/resource.c",
-"684:(!store || !out || (count && !colors))",
+"608:(!store || !out || (count && !colors))",
 "(!(!store || !out || (count && !colors)))",
 [
 "testBytes",
@@ -46323,7 +46323,7 @@
 "br-687-gt",
 "srcl",
 "src/resource/resource.c",
-"687:>",
+"611:>",
 ">=",
 [
 "testBytes",
@@ -46350,7 +46350,7 @@
 "br-687-neg",
 "srcl",
 "src/resource/resource.c",
-"687:(count > GSHSCENE_PALETTE_MAX_ENTRIES)",
+"611:(count > GSHSCENE_PALETTE_MAX_ENTRIES)",
 "(!(count > GSHSCENE_PALETTE_MAX_ENTRIES))",
 [
 "testBytes",
@@ -46377,7 +46377,7 @@
 "br-698-neg",
 "srcl",
 "src/resource/resource.c",
-"698:(!gshscene_color_bounded(colors[i].rgba))",
+"622:(!gshscene_color_bounded(colors[i].rgba))",
 "(!(!gshscene_color_bounded(colors[i].rgba)))",
 [
 "testBytes",
@@ -46404,7 +46404,7 @@
 "br-710-and",
 "srcl",
 "src/resource/resource.c",
-"710:&&",
+"634:&&",
 "||",
 [
 "testBytes",
@@ -46431,7 +46431,7 @@
 "br-710-neg",
 "srcl",
 "src/resource/resource.c",
-"710:(!store || !out || (count && !rgba))",
+"634:(!store || !out || (count && !rgba))",
 "(!(!store || !out || (count && !rgba)))",
 [
 "testBytes",
@@ -46458,7 +46458,7 @@
 "br-713-gt",
 "srcl",
 "src/resource/resource.c",
-"713:>",
+"637:>",
 ">=",
 [
 "testBytes",
@@ -46485,7 +46485,7 @@
 "br-713-neg",
 "srcl",
 "src/resource/resource.c",
-"713:(count > GSHSCENE_PALETTE_MAX_ENTRIES)",
+"637:(count > GSHSCENE_PALETTE_MAX_ENTRIES)",
 "(!(count > GSHSCENE_PALETTE_MAX_ENTRIES))",
 [
 "testBytes",
@@ -46512,7 +46512,7 @@
 "br-718-del",
 "srcl",
 "src/resource/resource.c",
-"718:colors = gshscene_alloc(&store->alloc, count * sizeof *colors);",
+"642:colors = gshscene_alloc(&store->alloc, count * sizeof *colors);",
 ";",
 [
 "testBytes",
@@ -46539,7 +46539,7 @@
 "br-719-neg",
 "srcl",
 "src/resource/resource.c",
-"719:(!colors)",
+"643:(!colors)",
 "(!(!colors))",
 [
 "testBytes",
@@ -46566,7 +46566,7 @@
 "br-724-del",
 "srcl",
 "src/resource/resource.c",
-"724:memset(&colors[i], 0, sizeof colors[i]);",
+"648:memset(&colors[i], 0, sizeof colors[i]);",
 ";",
 [
 "testBytes",
@@ -46593,7 +46593,7 @@
 "br-727-del",
 "srcl",
 "src/resource/resource.c",
-"727:colors[i].rgba[k] = (double)(int32_t)rgba[4u * i + (size_t)k] / 255.0;",
+"651:colors[i].rgba[k] = (double)(int32_t)rgba[4u * i + (size_t)k] / 255.0;",
 ";",
 [
 "testBytes",
@@ -46620,7 +46620,7 @@
 "br-729-del",
 "srcl",
 "src/resource/resource.c",
-"729:colors[i].space.primaries = GCOL_PRIMARIES_SRGB;",
+"653:colors[i].space.primaries = GCOL_PRIMARIES_SRGB;",
 ";",
 [
 "testBytes",
@@ -46647,7 +46647,7 @@
 "br-730-del",
 "srcl",
 "src/resource/resource.c",
-"730:colors[i].space.transfer = GCOL_TRANSFER_SRGB;",
+"654:colors[i].space.transfer = GCOL_TRANSFER_SRGB;",
 ";",
 [
 "testBytes",
@@ -46674,7 +46674,7 @@
 "br-733-del",
 "srcl",
 "src/resource/resource.c",
-"733:gshscene_free(&store->alloc, colors);",
+"657:gshscene_free(&store->alloc, colors);",
 ";",
 [
 "testBytes",
@@ -46701,7 +46701,7 @@
 "br-758-and",
 "srcl",
 "src/resource/resource.c",
-"758:&&",
+"682:&&",
 "||",
 [
 "testBytes",
@@ -46728,7 +46728,7 @@
 "br-758-eq",
 "srcl",
 "src/resource/resource.c",
-"758:==",
+"682:==",
 "!=",
 [
 "testBytes",
@@ -46755,7 +46755,7 @@
 "br-763-ne",
 "srcl",
 "src/resource/resource.c",
-"763:!=",
+"687:!=",
 "==",
 [
 "testBytes",
@@ -46782,7 +46782,7 @@
 "br-763-ge",
 "srcl",
 "src/resource/resource.c",
-"763:>=",
+"687:>=",
 ">",
 [
 "testBytes",
@@ -46809,7 +46809,7 @@
 "br-763-neg",
 "srcl",
 "src/resource/resource.c",
-"763:(!resource || !out || resource->kind != GSHSCENE_RESOURCE_PALETTE || index >= resource->u.palette.count)",
+"687:(!resource || !out || resource->kind != GSHSCENE_RESOURCE_PALETTE || index >= resource->u.palette.count)",
 "(!(!resource || !out || resource->kind != GSHSCENE_RESOURCE_PALETTE || index >= resource->u.palette.count))",
 [
 "testBytes",
@@ -46836,7 +46836,7 @@
 "br-795-or",
 "srcl",
 "src/resource/resource.c",
-"795:||",
+"719:||",
 "&&",
 [
 "testBytes",
@@ -46863,7 +46863,7 @@
 "br-795-neg",
 "srcl",
 "src/resource/resource.c",
-"795:(!gshscene_color_is_default(&list->foreground) || list->palette)",
+"719:(!gshscene_color_is_default(&list->foreground) || list->palette)",
 "(!(!gshscene_color_is_default(&list->foreground) || list->palette))",
 [
 "testBytes",
@@ -46890,7 +46890,7 @@
 "br-886-neg",
 "srcl",
 "src/resource/resource.c",
-"886:(fprintf(out, \"palette entries=%llu\\n\", HEX(count)) < 0)",
+"813:(fprintf(out, \"palette entries=%llu\\n\", HEX(count)) < 0)",
 "(!(fprintf(out, \"palette entries=%llu\\n\", HEX(count)) < 0))",
 [
 "testBytes",
@@ -46917,7 +46917,7 @@
 "br-901-lt",
 "srcl",
 "src/resource/resource.c",
-"901:<",
+"828:<",
 "<=",
 [
 "testBytes",
@@ -46944,7 +46944,7 @@
 "br-901-neg",
 "srcl",
 "src/resource/resource.c",
-"901:(gshscene_gradient_dump(resource, out) < 0)",
+"828:(gshscene_gradient_dump(resource, out) < 0)",
 "(!(gshscene_gradient_dump(resource, out) < 0))",
 [
 "testBytes",
@@ -46971,7 +46971,7 @@
 "br-906-lt",
 "srcl",
 "src/resource/resource.c",
-"906:<",
+"833:<",
 "<=",
 [
 "testBytes",
@@ -46998,7 +46998,7 @@
 "br-906-neg",
 "srcl",
 "src/resource/resource.c",
-"906:(gshscene_stroke_dump(resource, out) < 0)",
+"833:(gshscene_stroke_dump(resource, out) < 0)",
 "(!(gshscene_stroke_dump(resource, out) < 0))",
 [
 "testBytes",
@@ -58394,7 +58394,7 @@
 "br-334-del",
 "srcl",
 "src/resource/resource.c",
-"334:gshscene_mask_free(resource);",
+"281:gshscene_mask_free(resource);",
 ";",
 [
 "testBytes",
@@ -58423,7 +58423,7 @@
 "br-921-lt",
 "srcl",
 "src/resource/resource.c",
-"921:<",
+"848:<",
 "<=",
 [
 "testBytes",
@@ -58452,7 +58452,7 @@
 "br-921-neg",
 "srcl",
 "src/resource/resource.c",
-"921:(gshscene_mask_dump(resource, out) < 0)",
+"848:(gshscene_mask_dump(resource, out) < 0)",
 "(!(gshscene_mask_dump(resource, out) < 0))",
 [
 "testBytes",

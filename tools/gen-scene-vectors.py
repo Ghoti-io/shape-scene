@@ -81,7 +81,7 @@ def bits(v):
 
 
 # --- paths (shape-geometry's spelling, path.h) -------------------------------
-VERB = {"M": 0, "L": 1, "Q": 2, "C": 3, "RQ": 4, "RC": 5, "Z": 6}
+VERB = {"M": 0, "L": 1, "Q": 2, "C": 3, "RQ": 4, "RC": 5, "Z": 6, "A": 7}
 
 
 def square():
@@ -101,11 +101,29 @@ def fixture2():
     ]
 
 
+def arc(flags, unit, start, end, c, u, v, t0, sweep):
+    """An arc element (arc.h, AR15): the record the hash and the dump spell."""
+    return ("A", (flags, unit, start, end, c, u, v, t0, sweep), None)
+
+
+def arc_fields(a):
+    flags, unit, start, end, c, u, v, t0, sweep = a
+    return flags, unit, [start, end, c, u, v], [t0, sweep]
+
+
 def path_hash(path):
     dim, els = path
     out = u32(1) + u32(dim) + u64(len(els))
     for name, pts, w in els:
         out += u8(VERB[name])
+        if name == "A":
+            flags, unit, points, scalars = arc_fields(pts)
+            out += u8(flags) + u8(unit)
+            for p in points:
+                out += f64(p[0]) + f64(p[1])
+            for x in scalars:
+                out += f64(x)
+            continue
         for p in pts:
             out += f64(p[0]) + f64(p[1])
         for x in (w or []):
@@ -118,6 +136,15 @@ def path_dump(path):
     lines = ["gshgeom.path 1 dim=%d elements=%d hash=%016x" % (dim, len(els), path_hash(path))]
     for name, pts, w in els:
         s = name
+        if name == "A":
+            flags, unit, points, scalars = arc_fields(pts)
+            s += " %d %d" % (flags, unit)
+            for p in points:
+                s += " %016x %016x" % (bits(p[0]), bits(p[1]))
+            for x in scalars:
+                s += " %016x" % bits(x)
+            lines.append(s)
+            continue
         for x in (w or []):
             s += " %016x" % bits(x)
         for p in pts:
@@ -148,8 +175,30 @@ KIND_NAME = {KIND_PATH: "path", KIND_RUN: "glyph-run", KIND_PICTURE: "picture", 
 RUN_FORMAT = 1
 
 
-def path_resource_hash(path):
-    return fnv(u32(1) + u32(KIND_PATH) + u64(path_hash(path)))
+# The primitive tag (primitive.h, PR7): u8 kind, u8 flips (bit 0 flip_x, bit 1 flip_y), then the parameters as f64.
+PRIM_KIND = {"rect": 1, "rounded-rect": 2, "ellipse": 3}
+
+
+def tag_bytes(tag):
+    if tag is None:
+        return b""
+    kind, fx, fy, params = tag
+    return u8(PRIM_KIND[kind]) + u8(fx | (fy << 1)) + b"".join(f64(x) for x in params)
+
+
+def tag_dump(tag):
+    if tag is None:
+        return ""
+    kind, fx, fy, params = tag
+    return "primitive kind=%s flip_x=%d flip_y=%d%s\n" % (kind, fx, fy, "".join(" %016x" % bits(x) for x in params))
+
+
+def path_resource_hash(path, tag=None):
+    return fnv(u32(1) + u32(KIND_PATH) + u64(path_hash(path)) + tag_bytes(tag))
+
+
+def resource_dump(path, tag=None):
+    return "gshscene.resource 1 kind=path hash=%016x\n" % path_resource_hash(path, tag) + path_dump(path) + tag_dump(tag)
 
 
 def face_hash(key, index, coords):
@@ -195,6 +244,57 @@ SQ = square()
 P2 = fixture2()
 SQ_RES = path_resource_hash(SQ)
 P2_RES = path_resource_hash(P2)
+
+# Primitives (primitive.h): written out with plain arithmetic on values that are exact in double, without the geometry library's
+# builders, so that they restate its rules (PR3 to PR5, PR13) and its path spelling from the text.
+DEG = 1
+
+
+def pq(kind, x, y, w, h, flip_x=0, flip_y=0):
+    """RECT as the rule's four points, the flips as one exchange of edges."""
+    xs = [x + w if flip_x else x, x if flip_x else x + w]
+    ys = [y + h if flip_y else y, y if flip_y else y + h]
+    p = [(xs[0], ys[0]), (xs[1], ys[0]), (xs[1], ys[1]), (xs[0], ys[1])]
+    return (2, [("M", [p[0]], None)] + [("L", [q], None) for q in p[1:]] + [("Z", [], None)]), ("rect", flip_x, flip_y, [x, y, w, h])
+
+
+def prim_rrect(x, y, w, h, r):
+    (tlx, tly), (trx, try_), (brx, bry), (blx, bly) = r
+    start = (x + tlx, y)
+    els = [("M", [start], None), ("L", [(x + w - trx, y)], None)]
+    els.append(arc(1 if trx == try_ else 0, DEG, (x + w - trx, y), (x + w, y + try_), (x + w - trx, y + try_), (trx, 0.0), (0.0, try_), -90.0, 90.0))
+    els.append(("L", [(x + w, y + h - bry)], None))
+    els.append(arc(1 if brx == bry else 0, DEG, (x + w, y + h - bry), (x + w - brx, y + h), (x + w - brx, y + h - bry), (brx, 0.0), (0.0, bry), 0.0, 90.0))
+    els.append(("L", [(x + blx, y + h)], None))
+    els.append(arc(1 if blx == bly else 0, DEG, (x + blx, y + h), (x, y + h - bly), (x + blx, y + h - bly), (blx, 0.0), (0.0, bly), 90.0, 90.0))
+    els.append(("L", [(x, y + tly)], None))
+    els.append(arc(1 if tlx == tly else 0, DEG, (x, y + tly), start, (x + tlx, y + tly), (tlx, 0.0), (0.0, tly), 180.0, 90.0))
+    els.append(("Z", [], None))
+    return (2, els), ("rounded-rect", 0, 0, [x, y, w, h] + [v for c in r for v in c])
+
+
+def prim_ellipse(cx, cy, rx, ry, flip_x=0, flip_y=0):
+    sx = -rx if flip_x else rx
+    sy = -ry if flip_y else ry
+    ends = [(cx + sx, cy), (cx, cy + sy), (cx - sx, cy), (cx, cy - sy)]
+    circ = 1 if rx == ry else 0
+    els = [("M", [ends[0]], None)]
+    for k in range(4):
+        els.append(arc(circ, DEG, ends[k], ends[(k + 1) % 4], (cx, cy), (sx, 0.0), (0.0, sy), 90.0 * k, 90.0))
+    els.append(("Z", [], None))
+    return (2, els), ("ellipse", flip_x, flip_y, [cx, cy, rx, ry])
+
+
+PRIM_RECT_FLIP_X, TAG_RECT_FLIP_X = pq("rect", 10.0, 20.0, 100.0, 50.0, 1, 0)
+PRIM_RRECT, TAG_RRECT = prim_rrect(0.0, 0.0, 100.0, 60.0, [(10.0, 12.0), (6.0, 5.0), (4.0, 4.0), (8.0, 9.0)])
+PRIM_ELLIPSE_FLIP_Y, TAG_ELLIPSE_FLIP_Y = prim_ellipse(100.0, 100.0, 50.0, 20.0, 0, 1)
+PRIM_CIRCLE, TAG_CIRCLE = prim_ellipse(50.0, 30.0, 20.0, 20.0)
+# A path of arcs that is not a primitive: every unit, a negative sweep, a circular flag, an elliptical arc and a closing line.
+ARC_PATH = (2, [("M", [(0.0, 0.0)], None),
+                arc(1, 1, (0.0, 0.0), (10.0, 10.0), (0.0, 10.0), (10.0, 0.0), (0.0, 10.0), -90.0, 90.0),
+                arc(0, 3, (10.0, 10.0), (10.0, 20.0), (10.0, 15.0), (8.0, 0.0), (0.0, 5.0), -0.25, 0.5),
+                arc(0, 2, (10.0, 20.0), (0.0, 20.0), (5.0, 20.0), (5.0, 0.0), (0.0, 3.0), 0.0, 200.0),
+                ("L", [(0.0, 0.0)], None), ("Z", [], None)])
 
 # The face (story 14a): key, face index 2, coordinates 8192 and -4096, unbound.
 FACE = (0x1122334455667788, 2, [8192, -4096])
@@ -1172,6 +1272,12 @@ def render():
     o.append("\n")
     o.append(cxx_string("kSquareResourceDump", "gshscene.resource 1 kind=path hash=%016x\n" % SQ_RES + path_dump(SQ)))
     o.append(cxx_string("kFixturePathResourceDump", "gshscene.resource 1 kind=path hash=%016x\n" % P2_RES + path_dump(P2)))
+    o.append(cxx_string("kRectFlipXResourceDump", resource_dump(PRIM_RECT_FLIP_X, TAG_RECT_FLIP_X)))
+    o.append(cxx_string("kRectFlipXUntaggedResourceDump", resource_dump(PRIM_RECT_FLIP_X)))
+    o.append(cxx_string("kRoundedRectResourceDump", resource_dump(PRIM_RRECT, TAG_RRECT)))
+    o.append(cxx_string("kEllipseFlipYResourceDump", resource_dump(PRIM_ELLIPSE_FLIP_Y, TAG_ELLIPSE_FLIP_Y)))
+    o.append(cxx_string("kCircleResourceDump", resource_dump(PRIM_CIRCLE, TAG_CIRCLE)))
+    o.append(cxx_string("kArcPathResourceDump", resource_dump(ARC_PATH)))
     o.append(cxx_string("kFaceDump", face_dump(*FACE)))
     o.append(cxx_string("kFontRunDump", run_dump(*FONT_RUN)))
     o.append(cxx_string("kOutlineRunDump", run_dump(*OUTLINE_RUN)))

@@ -82,6 +82,7 @@ struct GSHSCENE_Resource {
   uint64_t index; /* what the table is indexed by */
   size_t bytes;   /* accounted bytes (resource.h) */
   GSHSCENE_Resource_Kind kind;
+  GSHSCENE_Primitive primitive; /* a path's tag (primitive.h); kind NONE and zero for every other resource */
   union {
     GSHGEOM_Path * path;
     struct {
@@ -262,8 +263,33 @@ int gshscene_resource_matches(const GSHSCENE_Resource * resource, const GSHSCENE
 /** Release what the resource's content holds and frees its arrays. */
 void gshscene_resource_free_content(GSHSCENE_Resource * resource);
 
-/** Whether two paths are the same content, bit for bit. */
-int gshscene_path_equal(const GSHGEOM_Path * a, const GSHGEOM_Path * b);
+/** Intern @p path with the tag @p prim (kind NONE for none); the path is copied.  The only place a tag is attached. */
+GSHSCENE_Result gshscene_store_intern_path_tagged(GSHSCENE_Store * store, const GSHGEOM_Path * path,
+    const GSHSCENE_Primitive * prim, const GSHSCENE_Resource ** out);
+
+/* --- glyph.c --------------------------------------------------------------- */
+
+/**
+ * Append every element of @p outline under @p map to @p path, all or none (glyph.c): an arc is mapped as an arc, or, when the arc map
+ * refuses it as invalid (a singular map), as its exact pieces; never as its chord.  @p refused is set when the map takes a point out of range.
+ */
+GSHGEOM_Result gshscene_glyph_append_outline(
+    GSHGEOM_Path * path, const GSHGEOM_Path * outline, const GSHGEOM_Map * map, int * refused);
+
+/* --- primitive.c ----------------------------------------------------------- */
+
+/** Validate @p in (PR2) and build its path in the store's allocator, with the canonical tag (PR4's square corners, A2-D2). */
+GSHSCENE_Result gshscene_primitive_build(
+    GSHSCENE_Store * store, const GSHSCENE_Primitive * in, GSHGEOM_Path ** path, GSHSCENE_Primitive * canon);
+
+/** Add a tag to a path resource's content hash (PR7); nothing for kind NONE. */
+void gshscene_primitive_hash(GSHGEOM_Hash * h, const GSHSCENE_Primitive * p);
+
+/** Whether two tags are the same content, bit for bit (PR7). */
+int gshscene_primitive_equal(const GSHSCENE_Primitive * a, const GSHSCENE_Primitive * b);
+
+/** The dump line of a tag (PR7), none for kind NONE.  A write failure is the stream's error flag, which the caller reads. */
+void gshscene_primitive_dump(const GSHSCENE_Primitive * p, FILE * out);
 
 /* --- gradient.c ------------------------------------------------------------- */
 
