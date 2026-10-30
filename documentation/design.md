@@ -83,7 +83,10 @@ their renders by sinks that draw, expand and refuse them, a retained scene's dif
 second hash and count, `stroke-hash` and `stroke-count` in `tests/corpus/scene.hash`, so that adding it left the
 first unchanged; both pairs are checked. The image section (store-level interns of images of every layout, sample
 type and alpha form, with partial edge tiles, padded strides, takes and collisions) is a third pair, `image-hash` and
-`image-count`, for the same reason.
+`image-count`, for the same reason. The stroke section's value moved once with
+`shape-geometry`'s flattener revision 3: a stroke's clip region flattens rational curves, which the new conic
+route holds to a proved bound instead of a fixed two units, so the vertices of every conic in a clip moved and the
+stroke fold with them; no other pair did.
 
 ## Recording without floats (fixed.h; story 14c)
 
