@@ -975,7 +975,16 @@ static void fuzz_mask(S * s) {
     outcomes[OUT_MASK_LIMIT] += want == GSHSCENE_ERR_LIMIT;
   } else if (r != GSHSCENE_OK) {
     CHECK(r == GSHSCENE_ERR_LIMIT); /* only the store's own limits refuse what MK1 accepts */
-    CHECK(before.live >= lim->max_resources || before.bytes + GSHSCENE_BYTES_BASE > lim->max_bytes);
+    /* A mask is accounted at the base plus its stitching pieces and its table's samples (MK4), so one whose transfer
+     * has any costs more than the base: the bound is that cost, not the base alone.  (The samples of a piece's own
+     * table are left out, which can only make the bound lower than the cost.) */
+    size_t cost = GSHSCENE_BYTES_BASE;
+    if (t->kind == GSHSCENE_TRANSFER_STITCHING) {
+      cost += t->piece_count * GSHSCENE_BYTES_PER_TRANSFER_PIECE;
+    } else if (t->kind == GSHSCENE_TRANSFER_TABLE) {
+      cost += t->sample_count * GSHSCENE_BYTES_PER_TRANSFER_SAMPLE;
+    }
+    CHECK(before.live >= lim->max_resources || before.bytes + cost > lim->max_bytes);
     outcomes[OUT_MASK_LIMIT]++;
   }
   if (r != GSHSCENE_OK) {
@@ -1058,8 +1067,8 @@ static GSHSCENE_List * masked_pair(S * s, const GSHSCENE_Group * g, const GSHSCE
 /** MK6, MK12, MK13: a group recorded with a mask of the pool and a placement; a list of it equal to another alike. */
 static void fuzz_mask_group(S * s) {
   unsigned msel = pick(s, 5), psel = pick(s, 8), isol = pick(s, 2), ko = pick(s, 2), op = pick(s, 5);
-  if (!s->list) {
-    return;
+  if (!s->list || gshscene_list_is_closed(s->list)) {
+    return; /* a closed list refuses every push first, whatever the group (checked where lists close) */
   }
   const GSHSCENE_Resource * mask = msel < 4 ? s->masks[msel] : NULL;
   GSHSCENE_Group g;
