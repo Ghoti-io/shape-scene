@@ -1173,7 +1173,8 @@ def mask_case_exact(c, got, inexact):
 def check_distinguished():
     """The vectors distinguish OPACITY from SHAPE where MK7 says they differ, and only there: under a knockout parent for
     source-over and the blend modes, and under every parent for an unbounded operator; a bounded Porter-Duff operator
-    is affine in the source, so it agrees under a parent that is not knockout."""
+    that is affine in the source agrees under a parent that is not knockout.  `PLUS` is affine only below its clamp, and
+    the vectors' PLUS cases do not tell the two apart (a sink's render-level tests hold the side where the clamp binds)."""
     pdf_ops = oracle.PDF_OPS
     differs = 0
     for (mname, op, i, k, an), n in ACT_RESULTS.items():

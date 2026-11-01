@@ -1065,12 +1065,18 @@ those multiply once, at the pop) nor the group's content.
 The clip product `m`, `v` and `o` are multiplied with no clamp or rounding between them, so the order "clip, mask,
 opacity, then blend and composite" (CSS Compositing's and PDF's) is a product followed by T5's composite. Nothing merges
 shape and opacity (T2): the two cases differ only in which of T3's inputs gets `v`. **When they differ:** a *bounded*
-operator (source-over, the blend modes and every Porter-Duff operator that is zero where the source is zero) is affine
-in the source, so weighting the whole operator by the shape and scaling the source by the opacity give the same answer;
-the two differ **only when the parent layer is a knockout group** (T3: the backdrop `Bk` is not the layer `L`). An
+operator that is affine in the source (source-over, the blend modes and every Porter-Duff operator that is zero where
+the source is zero) gives the same answer whether the whole operator is weighted by the shape or the source is scaled by
+the opacity; the two differ **only when the parent layer is a knockout group** (T3: the backdrop `Bk` is not the layer
+`L`). **`PLUS` is affine in the source only below its clamp.** With `S = o G` the source before `v` and `Bk` the backdrop,
+the shape gives `(1 - v) Bk + v min(1, S + Bk)` and the opacity `min(1, v S + Bk)` in each premultiplied component. They
+are equal wherever no component has `S + Bk > 1` (and for `v` of 0 or 1, or a component of `Bk` that is 1), and they
+differ under **every** parent wherever the clamp binds in a component with `0 < v < 1` and that component of `Bk` below 1:
+the shape gives `Bk + v (1 - Bk)` and the opacity `min(1, Bk + v S)`, which is larger. An
 *unbounded* operator (`DEST_IN`, `SRC`, `SRC_IN`, `SRC_OUT`, `CLEAR`: those that change the backdrop where the source is
 zero) takes the shape as a weight on the whole operator, `(1 - f) L + f op(S, Bk)`, and the two **differ under every
-parent**. The vectors cover both. A masked group may be non-isolated or knockout (T4, T5 compute `G` first; the mask
+parent**. The vectors cover the unbounded operators and the bounded ones below their clamp; the clamped side of `PLUS` is
+held by each sink's own tests. A masked group may be non-isolated or knockout (T4, T5 compute `G` first; the mask
 then acts on `G`). A mask on one fill is a group of one. The group's `opacity`, `composite` and `blend_space` keep their
 meanings.
 

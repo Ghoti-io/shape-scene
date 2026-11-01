@@ -25,7 +25,8 @@
  * This header defines the resource, the coefficient sets, the transfer and the hash and dump (MK1, MK3, MK4, MK13); the
  * mask's value, the frame, the order at the group's pop and the planning pass (MK2, MK5 to MK7, MK9) are in
  * `documentation/design.md` and are used by the sinks and the planner.  Shape and opacity differ under every parent only
- * for an unbounded operator (`DEST_IN`, `SRC`, `SRC_IN`, `SRC_OUT`, `CLEAR`); for a bounded one only under a knockout parent (MK7).
+ * for an unbounded operator (`DEST_IN`, `SRC`, `SRC_IN`, `SRC_OUT`, `CLEAR`); for a bounded one that is affine in the source
+ * only under a knockout parent, and for `PLUS` also under any parent wherever its sum clamps (MK7).
  *
  * ### The resource (MK1)
  *

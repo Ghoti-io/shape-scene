@@ -697,7 +697,8 @@ TEST(Masks, TheResolvedCoefficientsAndSpacesAreTheOraclesAnswer) {
 
 TEST(Masks, OpacityAndShapeDifferWhereMK7SaysAndOnlyThere) {
   // MK7: a mask acting on opacity multiplies the opacity, one acting on shape multiplies the shape; the two give the same answer
-  // for source-over, the blend modes and a bounded Porter-Duff operator under a parent that is not a knockout group, and
+  // for source-over, the blend modes and a bounded Porter-Duff operator (PLUS below its clamp, which these sums do not reach) under
+  // a parent that is not a knockout group, and
   // different answers under a knockout parent and for an unbounded operator under every parent.  The evaluator's answers
   // (not the table's) are compared, so the evaluator is the one tested.
   StoreHolder s;

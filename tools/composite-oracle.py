@@ -1072,13 +1072,15 @@ def selftest_masks(check):
         check(scene(pi, pk, op, opacity, dict(mask=dict(m, acts=ACTS_SHAPE)), body) == want_sh,
               "MK7: SHAPE is a clip of coverage v around the group (%s, %d, %d)" % (op, pi, pk))
     # ... and the two differ where T3 makes them: under a knockout parent for every operator, and under any parent for an
-    # unbounded one (a bounded operator is affine in S with op(0, D) = D, so v op(S, D) + (1 - v) D is the same either way).
+    # unbounded one (a bounded operator that is affine in S has op(0, D) = D, so v op(S, D) + (1 - v) D is the same either
+    # way).  PLUS is affine in S only below its clamp; the operators here are the ones that are affine, and PLUS's clamped
+    # side is held by the render-level tests of the sinks.
     m = mk([fill_((1, 1, 1, F(3, 4)))])
     for op in ("src-over", "multiply", "hue", "dest-in", "src", "src-in", "xor", "dest-over", "src-atop", "clear"):
         for pi, pk in ((0, 0), (1, 0), (0, 1), (1, 1)):
             o_ = scene(pi, pk, op, F(3, 4), dict(mask=dict(m, acts=ACTS_OPACITY)), content)
             s_ = scene(pi, pk, op, F(3, 4), dict(mask=dict(m, acts=ACTS_SHAPE)), content)
-            expected_differ = pk == 1 or is_unbounded(op)   # a bounded operator is affine in S: v op(S, D) + (1 - v) D
+            expected_differ = pk == 1 or is_unbounded(op)   # affine in S (no clamp): v op(S, D) + (1 - v) D
             check((o_ != s_) == expected_differ, "MK7: OPACITY and SHAPE %s for %s, parent (%d, %d)" % (
                 "differ" if expected_differ else "agree", op, pi, pk))
 
