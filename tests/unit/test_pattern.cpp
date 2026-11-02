@@ -297,6 +297,26 @@ TEST(Pattern, EachFieldIsCheckedAndInvalidComesBeforeUnsupportedBeforeLimit) {
       {"infinite y", [](GSHSCENE_Pattern & p, const World &) { p.y = kInf; }, GSHSCENE_ERR_INVALID},
       {"NaN w", [](GSHSCENE_Pattern & p, const World &) { p.w = kNaN; }, GSHSCENE_ERR_INVALID},
       {"infinite h", [](GSHSCENE_Pattern & p, const World &) { p.h = -kInf; }, GSHSCENE_ERR_INVALID},
+      {"NaN h", [](GSHSCENE_Pattern & p, const World &) { p.h = kNaN; }, GSHSCENE_ERR_INVALID},
+      {"positive infinite h", [](GSHSCENE_Pattern & p, const World &) { p.h = kInf; }, GSHSCENE_ERR_INVALID},
+      {"positive infinite w", [](GSHSCENE_Pattern & p, const World &) { p.w = kInf; }, GSHSCENE_ERR_INVALID},
+      {"positive infinite x", [](GSHSCENE_Pattern & p, const World &) { p.x = kInf; }, GSHSCENE_ERR_INVALID},
+      {"positive infinite y", [](GSHSCENE_Pattern & p, const World &) { p.y = kInf; }, GSHSCENE_ERR_INVALID},
+      {"NaN y", [](GSHSCENE_Pattern & p, const World &) { p.y = kNaN; }, GSHSCENE_ERR_INVALID},
+      {"positive infinite x step", [](GSHSCENE_Pattern & p, const World &) { p.x_step = kInf; }, GSHSCENE_ERR_INVALID},
+      {"NaN y step", [](GSHSCENE_Pattern & p, const World &) { p.y_step = kNaN; }, GSHSCENE_ERR_INVALID},
+      {"a colored pattern with a tint space", [](GSHSCENE_Pattern & p, const World &) { p.tint.space = srgb_space(); }, GSHSCENE_ERR_INVALID},
+      {"a colored pattern with a tint entry", [](GSHSCENE_Pattern & p, const World &) { p.tint.entry = 3; }, GSHSCENE_ERR_INVALID},
+      {"a colored pattern with a tint resource", [](GSHSCENE_Pattern & p, const World & w) { p.tint.resource = w.pic.get(); }, GSHSCENE_ERR_INVALID},
+      {"a colored pattern with a tint alpha", [](GSHSCENE_Pattern & p, const World &) { p.tint.rgba[3] = 1.0; }, GSHSCENE_ERR_INVALID},
+      {"a colored pattern with a tint red", [](GSHSCENE_Pattern & p, const World &) { p.tint.rgba[0] = 0.5; }, GSHSCENE_ERR_INVALID},
+      {"a colored pattern with a tint green", [](GSHSCENE_Pattern & p, const World &) { p.tint.rgba[1] = 0.5; }, GSHSCENE_ERR_INVALID},
+      {"a colored pattern with a tint blue", [](GSHSCENE_Pattern & p, const World &) { p.tint.rgba[2] = 0.5; }, GSHSCENE_ERR_INVALID},
+      {"a map m00 past 2^64", [](GSHSCENE_Pattern & p, const World &) { p.map.m[0][0] = std::nextafter(std::ldexp(1.0, 64), kInf); }, GSHSCENE_ERR_LIMIT},
+      {"a map m01 past 2^64", [](GSHSCENE_Pattern & p, const World &) { p.map.m[0][1] = std::nextafter(std::ldexp(1.0, 64), kInf); }, GSHSCENE_ERR_LIMIT},
+      {"a map m11 past 2^64", [](GSHSCENE_Pattern & p, const World &) { p.map.m[1][1] = std::nextafter(std::ldexp(1.0, 64), kInf); }, GSHSCENE_ERR_LIMIT},
+      {"a map m01 below 2^-64", [](GSHSCENE_Pattern & p, const World &) { p.map.m[0][1] = std::ldexp(1.0, -70); }, GSHSCENE_ERR_LIMIT},
+      {"a map m11 below 2^-64", [](GSHSCENE_Pattern & p, const World &) { p.map.m[1][1] = std::ldexp(1.0, -70); }, GSHSCENE_ERR_LIMIT},
       {"NaN x step", [](GSHSCENE_Pattern & p, const World &) { p.x_step = kNaN; }, GSHSCENE_ERR_INVALID},
       {"infinite y step", [](GSHSCENE_Pattern & p, const World &) { p.y_step = kInf; }, GSHSCENE_ERR_INVALID},
       {"negative w", [](GSHSCENE_Pattern & p, const World &) { p.w = -1.0; }, GSHSCENE_ERR_INVALID},
@@ -505,6 +525,149 @@ TEST(Pattern, EqualContentIsOneHandleAndNearlyEqualContentIsNot) {
   EXPECT_EQ(x1.get(), x3.get());
 }
 
+TEST(Pattern, EveryNegativeZeroIsStoredAsAPositiveOne) {
+  World w;
+  GSHSCENE_Pattern plus = w.base();
+  plus.x = plus.y = 0.0;
+  plus.w = plus.h = plus.x_step = plus.y_step = 0.0;
+  plus.map.m[0][1] = plus.map.m[1][0] = 0.0;
+  plus.map.t[0] = plus.map.t[1] = 0.0;
+  plus.has_tint = 1;
+  plus.tint = solid(0.0, 0.0, 0.0, 0.0);
+  GSHSCENE_Pattern minus = plus;
+  minus.x = minus.y = -0.0;
+  minus.w = minus.h = minus.x_step = minus.y_step = -0.0;
+  minus.map.m[0][1] = minus.map.m[1][0] = -0.0;
+  minus.map.t[0] = minus.map.t[1] = -0.0;
+  minus.tint = solid(-0.0, -0.0, -0.0, -0.0);
+  Ref a, b;
+  ASSERT_EQ(w.intern(plus, &a), GSHSCENE_OK);
+  ASSERT_EQ(w.intern(minus, &b), GSHSCENE_OK);
+  EXPECT_EQ(a.get(), b.get()) << "-0 and +0 are one number";
+  GSHSCENE_Pattern back;
+  ASSERT_EQ(gshscene_resource_pattern(b.get(), &back), GSHSCENE_OK);
+  for (double v : {back.x, back.y, back.w, back.h, back.x_step, back.y_step, back.map.m[0][1], back.map.m[1][0], back.map.t[0],
+           back.map.t[1], back.tint.rgba[0], back.tint.rgba[1], back.tint.rgba[2], back.tint.rgba[3]}) {
+    EXPECT_FALSE(std::signbit(v));
+  }
+  // One field at a time: each negative zero is stored as its positive one on its own.
+  double * fields[] = {&minus.x, &minus.y, &minus.w, &minus.h, &minus.x_step, &minus.y_step, &minus.map.m[0][1],
+      &minus.map.m[1][0], &minus.map.t[0], &minus.map.t[1], &minus.tint.rgba[0], &minus.tint.rgba[1], &minus.tint.rgba[2],
+      &minus.tint.rgba[3]};
+  for (size_t i = 0; i < sizeof fields / sizeof fields[0]; i++) {
+    GSHSCENE_Pattern single = plus;
+    double * target = fields[i];
+    ptrdiff_t offset = (char *)target - (char *)&minus;
+    *(double *)((char *)&single + offset) = -0.0;
+    Ref r;
+    ASSERT_EQ(w.intern(single, &r), GSHSCENE_OK) << i;
+    EXPECT_EQ(r.get(), a.get()) << "field " << i;
+  }
+}
+
+TEST(Pattern, OnlyTheContentDecidesWhenEveryHashCollides) {
+  // Every pattern in one bucket: equality alone tells a pattern from each of its neighbors, field by field.
+  StoreHolder shared(nullptr, nullptr, all_zero);
+  Ref sq(intern_square(shared.store));
+  auto tile_with = [&](int32_t layer) {
+    return Ref(make_picture(shared.store, [&](GSHSCENE_List * l) {
+      EXPECT_EQ(gshscene_list_fill(l, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, layer, 0), GSHSCENE_OK);
+    }));
+  };
+  Ref tile_a = tile_with(0);
+  Ref tile_b = tile_with(1);
+  auto base = [&]() {
+    GSHSCENE_Pattern p;
+    gshscene_pattern_init(&p);
+    p.tile = tile_a.get();
+    p.x = 0.5;
+    p.y = 0.75;
+    p.w = 2.0;
+    p.h = 3.0;
+    p.x_step = 4.0;
+    p.y_step = 5.0;
+    p.map = translate(1.0, 2.0);
+    p.map.m[0][0] = 2.0;
+    p.map.m[0][1] = 0.25;
+    p.map.m[1][0] = 0.5;
+    p.map.m[1][1] = 3.0;
+    p.has_tint = 1;
+    p.tint = solid(0.25, 0.5, 0.75, 1.0);
+    p.tint.space = space_of(GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_SRGB);
+    return p;
+  };
+  struct Variant {
+    const char * name;
+    void (*mutate)(GSHSCENE_Pattern &, const GSHSCENE_Resource *);
+  };
+  const Variant variants[] = {
+      {"tile", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource * other) { p.tile = other; }},
+      {"x", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.x = 0.625; }},
+      {"y", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.y = 0.875; }},
+      {"w", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.w = 2.5; }},
+      {"h", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.h = 3.5; }},
+      {"x step", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.x_step = 4.5; }},
+      {"y step", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.y_step = 5.5; }},
+      {"repeat x", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.repeat_x = 0; }},
+      {"repeat y", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.repeat_y = 0; }},
+      {"map m00", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.map.m[0][0] = 2.5; }},
+      {"map m01", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.map.m[0][1] = 0.5; }},
+      {"map m10", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.map.m[1][0] = 0.75; }},
+      {"map m11", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.map.m[1][1] = 3.5; }},
+      {"map t0", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.map.t[0] = 1.5; }},
+      {"map t1", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.map.t[1] = 2.5; }},
+      {"no tint", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.has_tint = 0; p.tint = solid(0, 0, 0, 0); }},
+      {"tint r", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.tint.rgba[0] = 0.125; }},
+      {"tint g", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.tint.rgba[1] = 0.125; }},
+      {"tint b", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.tint.rgba[2] = 0.125; }},
+      {"tint a", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.tint.rgba[3] = 0.5; }},
+      {"tint space", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.tint.space = space_of(GCOL_PRIMARIES_SRGB, GCOL_TRANSFER_LINEAR); }},
+      {"tint kind", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.tint = tint_of(GSHSCENE_PAINT_FOREGROUND, 0, 0, 0, 1.0); }},
+      {"tint entry", [](GSHSCENE_Pattern & p, const GSHSCENE_Resource *) { p.tint = tint_of(GSHSCENE_PAINT_PALETTE, 0, 0, 0, 1.0, 1); }},
+  };
+  GSHSCENE_Pattern b = base();
+  Ref first, again;
+  ASSERT_EQ(gshscene_store_intern_pattern(shared.store, &b, (const GSHSCENE_Resource **)&first.resource), GSHSCENE_OK);
+  std::vector<Ref> held;
+  for (const Variant & v : variants) {
+    GSHSCENE_Pattern p = base();
+    v.mutate(p, tile_b.get());
+    held.emplace_back();
+    ASSERT_EQ(gshscene_store_intern_pattern(shared.store, &p, (const GSHSCENE_Resource **)&held.back().resource), GSHSCENE_OK) << v.name;
+    EXPECT_NE(held.back().get(), first.get()) << v.name;
+    for (size_t i = 0; i + 1 < held.size(); i++) {
+      EXPECT_NE(held.back().get(), held[i].get()) << v.name << " against variant " << i;
+    }
+  }
+  ASSERT_EQ(gshscene_store_intern_pattern(shared.store, &b, (const GSHSCENE_Resource **)&again.resource), GSHSCENE_OK);
+  EXPECT_EQ(again.get(), first.get());
+  // A second base whose tint is a palette entry: a variant that differs in its kind only, one in its entry only, and a map
+  // with the numbers of the identity under another kind.
+  GSHSCENE_Pattern pal = base();
+  pal.tint = tint_of(GSHSCENE_PAINT_PALETTE, 0, 0, 0, 1.0, 1);
+  gshgeom_map_identity(2, &pal.map);
+  Ref pal_first;
+  ASSERT_EQ(gshscene_store_intern_pattern(shared.store, &pal, (const GSHSCENE_Resource **)&pal_first.resource), GSHSCENE_OK);
+  std::vector<Ref> more;
+  auto variant_of = [&](GSHSCENE_Pattern v, const char * name) {
+    more.emplace_back();
+    ASSERT_EQ(gshscene_store_intern_pattern(shared.store, &v, (const GSHSCENE_Resource **)&more.back().resource), GSHSCENE_OK) << name;
+    EXPECT_NE(more.back().get(), pal_first.get()) << name;
+    for (size_t i = 0; i + 1 < more.size(); i++) {
+      EXPECT_NE(more.back().get(), more[i].get()) << name << " against variant " << i;
+    }
+  };
+  GSHSCENE_Pattern v = pal;
+  v.tint = tint_of(GSHSCENE_PAINT_FOREGROUND, 0, 0, 0, 1.0);
+  variant_of(v, "tint kind: foreground for palette");
+  v = pal;
+  v.tint = solid(0, 0, 0, 1.0);
+  variant_of(v, "tint kind: solid for palette");
+  v = pal;
+  v.tint.entry = 2;
+  variant_of(v, "tint entry");
+}
+
 TEST(Pattern, ThePatternRetainsItsTileUntilItIsReleased) {
   World w;
   const GSHSCENE_Resource * tile = w.pic.get();
@@ -598,6 +761,11 @@ TEST(PatternLattice, TheCellOfACopyIsTheStepTimesItsIndexAndNothingAccumulates) 
   EXPECT_EQ(gshscene_pattern_cell(&p, GSHSCENE_PATTERN_INDEX_MAX + 1, 0, cell), GSHSCENE_ERR_INVALID);
   EXPECT_EQ(gshscene_pattern_cell(&p, 0, -GSHSCENE_PATTERN_INDEX_MAX - 1, cell), GSHSCENE_ERR_INVALID);
   EXPECT_EQ(gshscene_pattern_cell(&p, GSHSCENE_PATTERN_INDEX_MAX, -GSHSCENE_PATTERN_INDEX_MAX, cell), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_pattern_cell(&p, -GSHSCENE_PATTERN_INDEX_MAX, GSHSCENE_PATTERN_INDEX_MAX, cell), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_pattern_cell(&p, -GSHSCENE_PATTERN_INDEX_MAX, 0, cell), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_pattern_cell(&p, 0, GSHSCENE_PATTERN_INDEX_MAX, cell), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_pattern_cell(&p, -GSHSCENE_PATTERN_INDEX_MAX - 1, 0, cell), GSHSCENE_ERR_INVALID);
+  EXPECT_EQ(gshscene_pattern_cell(&p, 0, GSHSCENE_PATTERN_INDEX_MAX + 1, cell), GSHSCENE_ERR_INVALID);
   EXPECT_EQ(gshscene_pattern_cell(nullptr, 0, 0, cell), GSHSCENE_ERR_INVALID);
   EXPECT_EQ(gshscene_pattern_cell(&p, 0, 0, nullptr), GSHSCENE_ERR_INVALID);
 }
@@ -724,6 +892,11 @@ TEST(PatternNotice, EachMapOfTheChainIsTestedOnItsOwnDoubles) {
     ASSERT_EQ(w.intern(sp, &spat), GSHSCENE_OK);
     Unit paint_singular(w.s.store, w.sq.get(), &fine, spat.get(), 1.0, stroke);
     EXPECT_EQ(gshscene_pattern_notice(paint_singular.item, nullptr, 0, nullptr), GSHSCENE_REASON_MAP_NOT_INVERTIBLE) << "the pattern's";
+    EXPECT_EQ(gshscene_pattern_notice(u.item, nullptr, 1, nullptr), (GSHSCENE_Reason)0) << "instance maps given as none are none";
+    if (stroke) {
+      EXPECT_EQ(gshscene_stroke_notice(paint_singular.item, nullptr, 0, nullptr), GSHSCENE_REASON_MAP_NOT_INVERTIBLE)
+          << "the stroke notice tests the pattern's map too";
+    }
     // Degenerate: a size or a step of zero, after the maps.
     for (int field = 0; field < 4; field++) {
       GSHSCENE_Pattern d = w.base();
@@ -894,6 +1067,22 @@ TEST(PatternPaint, AGradientStopAndAnImageTintAreNeverAPattern) {
   p.has_tint = 1;
   p.tint = pattern_paint(pat.get());
   EXPECT_EQ(w.intern(p), GSHSCENE_ERR_INVALID);
+}
+
+TEST(PatternPaint, AStrokePaintedWithAPatternCountsItsTilesDepthToo) {
+  World w;
+  Ref pat;
+  ASSERT_EQ(w.intern(w.base(), &pat), GSHSCENE_OK);
+  GSHSCENE_Stroke_Style st;
+  gshscene_stroke_style_init(&st);
+  const GSHSCENE_Resource * style = nullptr;
+  ASSERT_EQ(gshscene_store_intern_stroke_style(w.s.store, &st, &style), GSHSCENE_OK);
+  Ref style_ref(style);
+  ListHolder l(w.s.store);
+  GSHSCENE_Paint p = pattern_paint(pat.get());
+  ASSERT_EQ(gshscene_list_stroke(l.list, w.sq.get(), style, nullptr, &p, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(l.list), GSHSCENE_OK);
+  EXPECT_EQ(list_depth(w.s.store, l.list), gshscene_resource_picture_depth(w.pic.get()));
 }
 
 TEST(PatternPaint, ATilePicturesDepthCountsInTheListThatNamesThePattern) {
@@ -1133,6 +1322,183 @@ TEST(PatternSink, TheTilesUnitsSeeTheMapsOfTheChainIncludingThePatternsOwn) {
       << "the pattern's map makes the tile's stroke anisotropic: the check saw the chain";
 }
 
+TEST(PatternSink, ASolidTintNeedsNoPaletteAndAMissingPaletteEntryComesBeforeATileThatIsRefused) {
+  World w;
+  GSHGEOM_Map fine = scale_map(2.0, 3.0);
+  GSHSCENE_Pattern solid_tinted = w.base();
+  solid_tinted.has_tint = 1;
+  solid_tinted.tint = solid(1, 0, 0, 1);
+  GSHSCENE_Pattern fg_tinted = w.base();
+  fg_tinted.has_tint = 1;
+  fg_tinted.tint = tint_of(GSHSCENE_PAINT_FOREGROUND, 0, 0, 0, 1.0);
+  for (const GSHSCENE_Pattern & p : {solid_tinted, fg_tinted}) {
+    Ref pat;
+    ASSERT_EQ(w.intern(p, &pat), GSHSCENE_OK);
+    Unit u(w.s.store, w.sq.get(), &fine, pat.get());
+    EXPECT_EQ(dispose(all_caps(true), u.item, nullptr, 0, nullptr).entry_class, (GSHSCENE_Entry_Class)0)
+        << "only a palette tint reads the palette";
+  }
+  // The first refusal wins: a palette entry the list lacks is reported as such, whatever the tile holds.
+  GSHSCENE_Group knockout = make_group(1.0);
+  knockout.knockout = 1;
+  Ref ko_tile(make_picture(w.s.store, [&](GSHSCENE_List * l) {
+    EXPECT_EQ(gshscene_list_group_push(l, &knockout, 0, 0.0), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_fill(l, w.sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);
+  }));
+  GSHSCENE_Pattern p = w.base(ko_tile.get());
+  p.has_tint = 1;
+  p.tint = tint_of(GSHSCENE_PAINT_PALETTE, 0, 0, 0, 1.0, 2);
+  Ref pat;
+  ASSERT_EQ(w.intern(p, &pat), GSHSCENE_OK);
+  Unit u(w.s.store, w.sq.get(), &fine, pat.get());
+  GSHSCENE_Sink_Caps caps = all_caps(true);
+  caps.flags &= ~GSHSCENE_CAP_GROUP_KNOCKOUT;
+  EXPECT_EQ(dispose(caps, u.item, nullptr, 0, nullptr).reason, GSHSCENE_REASON_PALETTE_ENTRY);
+}
+
+TEST(PatternSink, AStrokePaintedWithAPatternIsRefusedForItsTileToo) {
+  World w;
+  GSHSCENE_Group knockout = make_group(1.0);
+  knockout.knockout = 1;
+  Ref ko_tile(make_picture(w.s.store, [&](GSHSCENE_List * l) {
+    EXPECT_EQ(gshscene_list_group_push(l, &knockout, 0, 0.0), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_fill(l, w.sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);
+  }));
+  Ref pat;
+  ASSERT_EQ(w.intern(w.base(ko_tile.get()), &pat), GSHSCENE_OK);
+  GSHGEOM_Map fine = scale_map(2.0, 3.0);
+  Unit stroke(w.s.store, w.sq.get(), &fine, pat.get(), 1.0, true);
+  GSHSCENE_Sink_Caps caps = all_caps(true);
+  EXPECT_EQ(dispose(caps, stroke.item).entry_class, (GSHSCENE_Entry_Class)0);
+  caps.flags &= ~GSHSCENE_CAP_GROUP_KNOCKOUT;
+  GSHSCENE_Disposition d = dispose(caps, stroke.item);
+  EXPECT_EQ(d.entry_class, GSHSCENE_ENTRY_REFUSED);
+  EXPECT_EQ(d.reason, GSHSCENE_REASON_PATTERN);
+}
+
+namespace {
+
+/** A picture of one stroke of the square with the default style, whose width needs the map of the chain to be a similarity. */
+struct StrokeTiles {
+  Ref style;
+  Ref stroke_picture;
+  StrokeTiles(World & w) {
+    GSHSCENE_Stroke_Style st;
+    gshscene_stroke_style_init(&st);
+    const GSHSCENE_Resource * r = nullptr;
+    EXPECT_EQ(gshscene_store_intern_stroke_style(w.s.store, &st, &r), GSHSCENE_OK);
+    style = Ref(r);
+    stroke_picture = Ref(make_picture(w.s.store, [&](GSHSCENE_List * l) {
+      EXPECT_EQ(gshscene_list_stroke(l, w.sq.get(), style.get(), nullptr, nullptr, 0, 0), GSHSCENE_OK);
+    }));
+  }
+};
+
+/** Caps that stroke a similarity natively and neither an anisotropic stretch nor an expansion. */
+GSHSCENE_Sink_Caps similarity_caps() {
+  GSHSCENE_Sink_Caps caps = all_caps(true);
+  caps.flags &= ~GSHSCENE_CAP_STROKE_EXPAND;
+  caps.stroke_native = GSHSCENE_STROKE_NATIVE_ALL & ~GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL_ANISOTROPIC;
+  return caps;
+}
+
+}  // namespace
+
+TEST(PatternSink, TheTilesUnitsSeeEveryMapOfTheirChainInOrder) {
+  // A stroke in a tile needs a native anisotropic width when the maps of its chain do not compose to a similarity.  The tile
+  // check passes the chain: the enclosing instances', the item's, the pattern's, then the tile's own (an instance's, a mask's
+  // placement, a nested pattern's map); so each one anisotropic, alone, refuses the unit painted with the pattern, and two that
+  // compose to a similarity in one order and not in the other tell the order.
+  World w;
+  StrokeTiles t(w);
+  GSHSCENE_Sink_Caps caps = similarity_caps();
+  GSHGEOM_Map identity;
+  gshgeom_map_identity(2, &identity);
+  GSHGEOM_Map stretch = scale_map(1.0, 4.0);
+  auto refused = [&](const GSHSCENE_Resource * tile, const GSHGEOM_Map & item_map, const GSHGEOM_Map & pattern_map,
+                     const GSHGEOM_Map * instances = nullptr, size_t n = 0) {
+    GSHSCENE_Pattern p = w.base(tile);
+    p.map = pattern_map;
+    Ref pat;
+    EXPECT_EQ(w.intern(p, &pat), GSHSCENE_OK);
+    Unit u(w.s.store, w.sq.get(), &item_map, pat.get());
+    GSHSCENE_Disposition d = dispose(caps, u.item, instances, n);
+    EXPECT_TRUE(d.entry_class == 0 || (d.entry_class == GSHSCENE_ENTRY_REFUSED && d.reason == GSHSCENE_REASON_PATTERN));
+    return d.entry_class == GSHSCENE_ENTRY_REFUSED;
+  };
+  EXPECT_FALSE(refused(t.stroke_picture.get(), identity, identity));
+  EXPECT_TRUE(refused(t.stroke_picture.get(), stretch, identity)) << "the item's map";
+  EXPECT_TRUE(refused(t.stroke_picture.get(), identity, stretch)) << "the pattern's map";
+  EXPECT_FALSE(refused(t.stroke_picture.get(), identity, identity, &identity, 1));
+  EXPECT_TRUE(refused(t.stroke_picture.get(), identity, identity, &stretch, 1)) << "an enclosing instance's map";
+  GSHGEOM_Map two[2] = {identity, stretch};
+  EXPECT_TRUE(refused(t.stroke_picture.get(), identity, identity, two, 2)) << "the last of two";
+  // The order of the item's map and the pattern's: diag(1, 2) then diag(2, 1) rotated by 90 degrees is a similarity, and the
+  // other order is not.
+  GSHGEOM_Map item = scale_map(1.0, 2.0);
+  const double rotated[4] = {0.0, -2.0, 1.0, 0.0};  // diag(2, 1) times a quarter turn
+  const double zero[2] = {0.0, 0.0};
+  GSHGEOM_Map pattern_map;
+  ASSERT_EQ(gshgeom_map_from_matrix(2, rotated, zero, &pattern_map), GSHGEOM_OK);
+  GSHGEOM_Map composed;
+  ASSERT_EQ(gshgeom_map_compose(&item, &pattern_map, &composed), GSHGEOM_OK);
+  double a = composed.m[0][0] * composed.m[0][0] + composed.m[1][0] * composed.m[1][0];
+  double b = composed.m[0][1] * composed.m[0][1] + composed.m[1][1] * composed.m[1][1];
+  ASSERT_EQ(a, b) << "the premise: the item's map and then the pattern's is a similarity";
+  EXPECT_FALSE(refused(t.stroke_picture.get(), item, pattern_map)) << "composed in the order of the chain";
+  EXPECT_TRUE(refused(t.stroke_picture.get(), pattern_map, item)) << "the other order is not a similarity";
+  // An instance in the tile: its map is in the chain of the stroke in the picture it instances.
+  for (bool anisotropic : {false, true}) {
+    Ref tile(make_picture(w.s.store, [&](GSHSCENE_List * l) {
+      GSHGEOM_Map m = anisotropic ? stretch : identity;
+      EXPECT_EQ(gshscene_list_instance(l, t.stroke_picture.get(), &m, 0, 0.0), GSHSCENE_OK);
+    }));
+    EXPECT_EQ(refused(tile.get(), identity, identity), anisotropic) << "an instance in the tile";
+  }
+  // A masked group in the tile: the mask's placement is in the chain of a stroke in the mask's picture.
+  Ref mask(known_mask(w.s.store, t.stroke_picture.get(), 0));
+  ASSERT_NE(mask.get(), nullptr);
+  for (bool anisotropic : {false, true}) {
+    GSHSCENE_Group masked = make_group(1.0);
+    masked.soft_mask = mask.get();
+    masked.soft_mask_map = anisotropic ? stretch : identity;
+    Ref tile(make_picture(w.s.store, [&](GSHSCENE_List * l) {
+      EXPECT_EQ(gshscene_list_group_push(l, &masked, 0, 0.0), GSHSCENE_OK);
+      EXPECT_EQ(gshscene_list_fill(l, w.sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
+      EXPECT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);
+    }));
+    EXPECT_EQ(refused(tile.get(), identity, identity), anisotropic) << "a mask's placement";
+  }
+  // A pattern in the tile: its item map and its own map are in the chain of a stroke in its tile; and two of them nest.
+  for (int which = 0; which < 3; which++) {
+    GSHSCENE_Pattern inner = w.base(t.stroke_picture.get());
+    if (which == 1) {
+      inner.map = stretch;
+    }
+    Ref inner_pat;
+    ASSERT_EQ(w.intern(inner, &inner_pat), GSHSCENE_OK);
+    GSHSCENE_Paint paint = pattern_paint(inner_pat.get());
+    GSHGEOM_Map m = which == 2 ? stretch : identity;
+    Ref tile(make_picture(w.s.store, [&](GSHSCENE_List * l) {
+      EXPECT_EQ(gshscene_list_fill(l, w.sq.get(), &m, GSHGEOM_FILL_NONZERO, &paint, 0, 0), GSHSCENE_OK);
+    }));
+    EXPECT_EQ(refused(tile.get(), identity, identity), which != 0) << "a pattern in the tile, case " << which;
+    // And one level further down.
+    GSHSCENE_Paint outer_paint = pattern_paint(inner_pat.get());
+    (void)outer_paint;
+    GSHSCENE_Pattern middle = w.base(tile.get());
+    Ref middle_pat;
+    ASSERT_EQ(w.intern(middle, &middle_pat), GSHSCENE_OK);
+    GSHSCENE_Paint mp = pattern_paint(middle_pat.get());
+    Ref tile2(make_picture(w.s.store, [&](GSHSCENE_List * l) {
+      EXPECT_EQ(gshscene_list_fill(l, w.sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &mp, 0, 0), GSHSCENE_OK);
+    }));
+    EXPECT_EQ(refused(tile2.get(), identity, identity), which != 0) << "two patterns deep, case " << which;
+  }
+}
+
 // --- the retained scene: validation, diff and damage ----------------------------------------------------------------------
 
 namespace {
@@ -1240,6 +1606,49 @@ TEST(PatternScene, ANodeThatPaintsWithAPatternIsDiffedAndDamagedByHandleAndNothi
   EXPECT_NE(gshscene_version_hash(v1.get()), gshscene_version_hash(v2.get()));
 }
 
+namespace {
+
+/** Whether editing the foreground (or the palette, with @p palette) damages a shape painted with @p pattern, by itself in a scene. */
+bool damages(PatternDoc & d, const GSHSCENE_Resource * pattern, bool palette) {
+  GSHSCENE_Color a[2] = {{{1, 0, 0, 1}, {}}, {{0, 1, 0, 1}, {}}};
+  GSHSCENE_Color b[2] = {{{1, 0, 0, 1}, {}}, {{0, 0, 1, 1}, {}}};
+  const GSHSCENE_Resource * pa = nullptr;
+  const GSHSCENE_Resource * pb = nullptr;
+  EXPECT_EQ(gshscene_store_intern_palette(d.s.store(), 2, a, &pa), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_store_intern_palette(d.s.store(), 2, b, &pb), GSHSCENE_OK);
+  Ref ra(pa), rb(pb);
+  // A scene of its own over d's store, so that the shapes of the calls before do not stand in this one.
+  SceneHolder sh(nullptr, nullptr, d.s.store());
+  VersionRef v1;
+  {
+    EditHolder e(sh);
+    add(e.edit, GSHSCENE_ROOT_ID, d.shape(10, 10, pattern));
+    EXPECT_EQ(gshscene_edit_set_palette(e.edit, pa), GSHSCENE_OK);
+    GSHSCENE_Color black = {{0, 0, 0, 1}, {}};
+    EXPECT_EQ(gshscene_edit_set_foreground(e.edit, &black), GSHSCENE_OK);
+    publish(sh, e, &v1);
+  }
+  VersionRef v2;
+  {
+    EditHolder e(sh, v1.get());
+    if (palette) {
+      EXPECT_EQ(gshscene_edit_set_palette(e.edit, pb), GSHSCENE_OK);
+    } else {
+      GSHSCENE_Color red = {{1, 0, 0, 1}, {}};
+      EXPECT_EQ(gshscene_edit_set_foreground(e.edit, &red), GSHSCENE_OK);
+    }
+    publish(sh, e, &v2);
+  }
+  GSHSCENE_Diff * diff = nullptr;
+  EXPECT_EQ(gshscene_diff(v1.get(), v2.get(), nullptr, nullptr, &diff), GSHSCENE_OK);
+  GSHSCENE_Damage damage;
+  EXPECT_EQ(gshscene_diff_damage(diff, &damage), GSHSCENE_OK);
+  gshscene_diff_destroy(diff);
+  return !damage.empty;
+}
+
+}  // namespace
+
 TEST(PatternScene, AChangedForegroundDamagesTheFillsWhoseTileOrTintReadsItAndNoOthers) {
   PatternDoc d;
   GSHSCENE_Paint fg = tint_of(GSHSCENE_PAINT_FOREGROUND, 0, 0, 0, 1.0);
@@ -1249,88 +1658,131 @@ TEST(PatternScene, AChangedForegroundDamagesTheFillsWhoseTileOrTintReadsItAndNoO
   Ref nested_tile(make_picture(d.s.store(), [&](GSHSCENE_List * l) {
     EXPECT_EQ(gshscene_list_instance(l, fg_tile.get(), nullptr, 0, 0.0), GSHSCENE_OK);
   }));
+  GSHSCENE_Stroke_Style st;
+  gshscene_stroke_style_init(&st);
+  const GSHSCENE_Resource * style = nullptr;
+  ASSERT_EQ(gshscene_store_intern_stroke_style(d.s.store(), &st, &style), GSHSCENE_OK);
+  Ref style_ref(style);
+  Ref stroke_tile(make_picture(d.s.store(), [&](GSHSCENE_List * l) {
+    EXPECT_EQ(gshscene_list_stroke(l, d.sq.get(), style, nullptr, &fg, 0, 0.0), GSHSCENE_OK);
+  }));
   Ref plain = d.pattern(nullptr);
   Ref reads_tile = d.pattern(fg_tile.get());
   Ref reads_nested = d.pattern(nested_tile.get());
   Ref reads_tint = d.pattern(nullptr, 1.0, true);
-  Ref via_outer;
+  Ref reads_stroke = d.pattern(stroke_tile.get());
+  Ref via_mask, via_gradient, via_outer;
   {
-    // A pattern whose tile holds a fill painted with a pattern that reads the foreground.
+    // A tile whose group is masked by a picture that reads the foreground.
+    Ref mask(known_mask(d.s.store(), fg_tile.get(), 0));
+    GSHSCENE_Group masked = make_group(1.0);
+    masked.soft_mask = mask.get();
     Ref tile(make_picture(d.s.store(), [&](GSHSCENE_List * l) {
+      EXPECT_EQ(gshscene_list_group_push(l, &masked, 0, 0.0), GSHSCENE_OK);
+      EXPECT_EQ(gshscene_list_fill(l, d.sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
+      EXPECT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);
+    }));
+    via_mask = d.pattern(tile.get());
+    // A tile whose fill is painted with a gradient that has a foreground stop.
+    GSHSCENE_Gradient_Stop stops[2];
+    stops[0].offset = 0.0;
+    stops[0].color = solid(1, 0, 0, 1);
+    stops[1].offset = 1.0;
+    stops[1].color = fg;
+    GSHSCENE_Gradient g;
+    std::memset(&g, 0, sizeof g);
+    g.kind = GSHSCENE_GRADIENT_LINEAR;
+    g.p1[0] = 4.0;
+    gshgeom_map_identity(2, &g.map);
+    g.stop_count = 2;
+    g.stops = stops;
+    const GSHSCENE_Resource * gradient = nullptr;
+    EXPECT_EQ(gshscene_store_intern_gradient(d.s.store(), &g, &gradient), GSHSCENE_OK);
+    Ref gref(gradient);
+    GSHSCENE_Paint gp = solid(0, 0, 0, 1);
+    gp.kind = GSHSCENE_PAINT_GRADIENT;
+    gp.resource = gradient;
+    Ref gtile(make_picture(d.s.store(), [&](GSHSCENE_List * l) {
+      EXPECT_EQ(gshscene_list_fill(l, d.sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &gp, 0, 0), GSHSCENE_OK);
+    }));
+    via_gradient = d.pattern(gtile.get());
+    // A pattern whose tile holds a fill painted with a pattern that reads the foreground.
+    Ref outer_tile(make_picture(d.s.store(), [&](GSHSCENE_List * l) {
       GSHSCENE_Paint paint = pattern_paint(reads_tile.get());
       EXPECT_EQ(gshscene_list_fill(l, d.sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &paint, 0, 0), GSHSCENE_OK);
     }));
-    via_outer = d.pattern(tile.get());
+    via_outer = d.pattern(outer_tile.get());
   }
-  VersionRef v1;
-  {
-    EditHolder e(d.s);
-    add(e.edit, GSHSCENE_ROOT_ID, d.shape(0, 0, plain.get()));         // reads nothing
-    add(e.edit, GSHSCENE_ROOT_ID, d.shape(100, 0, reads_tile.get()));   // 100: the tile
-    add(e.edit, GSHSCENE_ROOT_ID, d.shape(200, 0, reads_nested.get())); // 200: through an instance in the tile
-    add(e.edit, GSHSCENE_ROOT_ID, d.shape(300, 0, reads_tint.get()));   // 300: the tint
-    add(e.edit, GSHSCENE_ROOT_ID, d.shape(400, 0, via_outer.get()));    // 400: through a pattern in the tile
-    add(e.edit, GSHSCENE_ROOT_ID, d.shape(500, 0, nullptr));            // solid
-    publish(d.s, e, &v1);
-  }
-  VersionRef v2;
-  {
-    EditHolder e(d.s, v1.get());
-    GSHSCENE_Color red = {{1, 0, 0, 1}, {}};
-    ASSERT_EQ(gshscene_edit_set_foreground(e.edit, &red), GSHSCENE_OK);
-    publish(d.s, e, &v2);
-  }
-  GSHSCENE_Diff * diff = nullptr;
-  ASSERT_EQ(gshscene_diff(v1.get(), v2.get(), nullptr, nullptr, &diff), GSHSCENE_OK);
-  EXPECT_EQ(gshscene_diff_foreground_changed(diff), 1);
-  GSHSCENE_Damage damage;
-  ASSERT_EQ(gshscene_diff_damage(diff, &damage), GSHSCENE_OK);
-  gshscene_diff_destroy(diff);
-  EXPECT_EQ(damage.unbounded, 0);
-  EXPECT_EQ(damage.empty, 0);
-  // From the tile at 100 to the shape at 400 (each 4 wide, one pixel of antialiasing around): x in [99, 405); not the plain
-  // shape at 0 and not the solid at 500.
-  EXPECT_EQ(damage.rect.x0, 99);
-  EXPECT_EQ(damage.rect.x1, 405);
-}
-
-TEST(PatternScene, AChangedPaletteDamagesTheFillsWhoseTileOrTintNamesAnEntry) {
-  PatternDoc d;
+  EXPECT_FALSE(damages(d, plain.get(), false)) << "a tile that reads nothing";
+  EXPECT_TRUE(damages(d, reads_tile.get(), false)) << "a foreground paint in the tile";
+  EXPECT_TRUE(damages(d, reads_nested.get(), false)) << "through an instance in the tile";
+  EXPECT_TRUE(damages(d, reads_tint.get(), false)) << "the tint";
+  EXPECT_TRUE(damages(d, reads_stroke.get(), false)) << "a stroke's paint in the tile";
+  EXPECT_TRUE(damages(d, via_mask.get(), false)) << "through a mask's picture in the tile";
+  EXPECT_TRUE(damages(d, via_gradient.get(), false)) << "through a gradient's stop in the tile";
+  EXPECT_TRUE(damages(d, via_outer.get(), false)) << "through a pattern in the tile";
+  // A foreground change does not touch the palette's readers: the pattern whose tile reads the palette is not damaged by it.
   GSHSCENE_Paint pal = tint_of(GSHSCENE_PAINT_PALETTE, 0, 0, 0, 1.0, 1);
   Ref pal_tile(make_picture(d.s.store(), [&](GSHSCENE_List * l) {
     EXPECT_EQ(gshscene_list_fill(l, d.sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &pal, 0, 0), GSHSCENE_OK);
   }));
+  Ref reads_palette = d.pattern(pal_tile.get());
+  EXPECT_FALSE(damages(d, reads_palette.get(), false));
+  EXPECT_FALSE(damages(d, reads_tile.get(), true)) << "nor does a palette change touch the foreground's";
+}
+
+TEST(PatternScene, AChangedPaletteDamagesTheFillsWhoseTileOrTintNamesAnEntry) {
+  PatternDoc d;
+  GSHSCENE_Paint pal1 = tint_of(GSHSCENE_PAINT_PALETTE, 0, 0, 0, 1.0, 1);
+  GSHSCENE_Paint pal0 = tint_of(GSHSCENE_PAINT_PALETTE, 0, 0, 0, 1.0, 0);
+  Ref tile1(make_picture(d.s.store(), [&](GSHSCENE_List * l) {
+    EXPECT_EQ(gshscene_list_fill(l, d.sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &pal1, 0, 0), GSHSCENE_OK);
+  }));
+  Ref tile_two(make_picture(d.s.store(), [&](GSHSCENE_List * l) {
+    EXPECT_EQ(gshscene_list_fill(l, d.sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &pal0, 0, 0), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_fill(l, d.sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &pal1, 1, 0), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_fill(l, d.sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &pal0, 2, 0), GSHSCENE_OK);
+  }));
+  Ref nested(make_picture(d.s.store(), [&](GSHSCENE_List * l) {
+    EXPECT_EQ(gshscene_list_instance(l, tile1.get(), nullptr, 0, 0.0), GSHSCENE_OK);
+  }));
   Ref plain = d.pattern(nullptr);
-  Ref reads = d.pattern(pal_tile.get());
-  GSHSCENE_Color a[2] = {{{1, 0, 0, 1}, {}}, {{0, 1, 0, 1}, {}}};
-  GSHSCENE_Color b[2] = {{{1, 0, 0, 1}, {}}, {{0, 0, 1, 1}, {}}};
-  const GSHSCENE_Resource * pa = nullptr;
-  const GSHSCENE_Resource * pb = nullptr;
-  ASSERT_EQ(gshscene_store_intern_palette(d.s.store(), 2, a, &pa), GSHSCENE_OK);
-  ASSERT_EQ(gshscene_store_intern_palette(d.s.store(), 2, b, &pb), GSHSCENE_OK);
-  Ref ra(pa), rb(pb);
-  VersionRef v1;
+  Ref reads = d.pattern(tile1.get());
+  Ref reads_two = d.pattern(tile_two.get());
+  Ref reads_nested = d.pattern(nested.get());
+  GSHSCENE_Pattern tinted;
+  gshscene_pattern_init(&tinted);
+  tinted.tile = d.pic.get();
+  tinted.has_tint = 1;
+  tinted.tint = pal1;
+  Ref reads_tint;
+  const GSHSCENE_Resource * rt = nullptr;
+  ASSERT_EQ(gshscene_store_intern_pattern(d.s.store(), &tinted, &rt), GSHSCENE_OK);
+  reads_tint = Ref(rt);
+  Ref via_outer;
   {
-    EditHolder e(d.s);
-    add(e.edit, GSHSCENE_ROOT_ID, d.shape(0, 0, plain.get()));
-    add(e.edit, GSHSCENE_ROOT_ID, d.shape(100, 0, reads.get()));
-    ASSERT_EQ(gshscene_edit_set_palette(e.edit, pa), GSHSCENE_OK);
-    publish(d.s, e, &v1);
+    Ref outer_tile(make_picture(d.s.store(), [&](GSHSCENE_List * l) {
+      GSHSCENE_Paint paint = pattern_paint(reads.get());
+      EXPECT_EQ(gshscene_list_fill(l, d.sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &paint, 0, 0), GSHSCENE_OK);
+    }));
+    via_outer = d.pattern(outer_tile.get());
   }
-  VersionRef v2;
-  {
-    EditHolder e(d.s, v1.get());
-    ASSERT_EQ(gshscene_edit_set_palette(e.edit, pb), GSHSCENE_OK);
-    publish(d.s, e, &v2);
-  }
-  GSHSCENE_Diff * diff = nullptr;
-  ASSERT_EQ(gshscene_diff(v1.get(), v2.get(), nullptr, nullptr, &diff), GSHSCENE_OK);
-  EXPECT_EQ(gshscene_diff_palette_changed(diff), 1);
-  GSHSCENE_Damage damage;
-  ASSERT_EQ(gshscene_diff_damage(diff, &damage), GSHSCENE_OK);
-  gshscene_diff_destroy(diff);
-  EXPECT_EQ(damage.rect.x0, 99) << "the fill whose tile names an entry, and only it";
-  EXPECT_EQ(damage.rect.x1, 105);
+  // A foreground tint over a tile that names a palette entry: the tile's need is not the tint's (which is none).
+  GSHSCENE_Pattern fg_tinted;
+  gshscene_pattern_init(&fg_tinted);
+  fg_tinted.tile = tile_two.get();
+  fg_tinted.has_tint = 1;
+  fg_tinted.tint = tint_of(GSHSCENE_PAINT_FOREGROUND, 0, 0, 0, 1.0);
+  const GSHSCENE_Resource * ft = nullptr;
+  ASSERT_EQ(gshscene_store_intern_pattern(d.s.store(), &fg_tinted, &ft), GSHSCENE_OK);
+  Ref reads_under_fg_tint(ft);
+  EXPECT_TRUE(damages(d, reads_under_fg_tint.get(), true)) << "the tile's entry beside a tint that names none";
+  EXPECT_FALSE(damages(d, plain.get(), true));
+  EXPECT_TRUE(damages(d, reads.get(), true)) << "a palette paint in the tile";
+  EXPECT_TRUE(damages(d, reads_two.get(), true)) << "the largest entry of several";
+  EXPECT_TRUE(damages(d, reads_nested.get(), true)) << "through an instance in the tile";
+  EXPECT_TRUE(damages(d, reads_tint.get(), true)) << "the tint's entry";
+  EXPECT_TRUE(damages(d, via_outer.get(), true)) << "through a pattern in the tile";
 }
 
 TEST(PatternScene, TheTilesDepthCountsTowardTheNestingLimitOfAnInstanceChain) {

@@ -23,7 +23,10 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
   minify filter, a filter space and a tint for a stencil), and a mask (`mask.h`: a picture read as
   alpha or luminance, with a luminance coefficient set, the spaces it is rendered and measured in, a
   backdrop color and a transfer function, acting on a group's opacity or its shape, interned by
-  content). A stroke style's width profile is named and reserved.
+  content), and a pattern (`pattern.h`: a closed picture repeated on a lattice, with a cell, a step
+  and a repeat per axis, a map and an optional tint that makes it uncolored, whose copies are placed
+  by an exact product of the index and the step, so a million copies carry no accumulated error and
+  abutting cells share their edge). A stroke style's width profile is named and reserved.
 - **Recording without floats** (`fixed.h`). Integer-only calls, for a front end whose headers
   name no floating type: fills and clips of glyph runs under a design map of fixed-point ops,
   palette and foreground paints, groups by operator, a palette from 8-bit entries, a gradient from
@@ -109,6 +112,8 @@ sink; `examples/gradient.c` interns, resolves and renders gradients; `examples/s
 element after its fill and shows what a writer and a toolpath make of the strokes; `examples/image.c`
 imports rasters by copy and by take and shows what makes two images one; `examples/image_paint.c` paints
 a rectangle with an image, recognizes a drawn image as a writer does and shows what a sink's capabilities make of it;
+`examples/pattern.c` places the copy a million cells out, shows the edge two abutting cells share, and what a sink with and
+without the pattern capability, and a sink that cannot draw a unit in the tile, make of a pattern fill;
 `examples/mask.c` makes an SVG-style luminance mask and a PDF-style soft mask and shows the numbers every sink shares and
 the reasons a sink without a feature is refused with.
 

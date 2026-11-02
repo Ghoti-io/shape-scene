@@ -2468,10 +2468,11 @@ TEST(DumpSink, APatternAndItsTileAreRecordedOncePerHandleAndARefusedUnitWritesNe
   gshscene_pattern_init(&a);
   a.tile = tile;
   a.w = 4.0;
-  a.h = 4.0;
+  a.h = 3.0;
   a.x_step = 5.0;
-  a.y_step = 5.0;
+  a.y_step = 6.0;
   GSHSCENE_Pattern b = a;
+  b.repeat_y = 0;
   b.has_tint = 1;
   b.tint = solid(0.25, 0.5, 0.75, 1.0);
   const GSHSCENE_Resource * pa = nullptr;
@@ -2486,6 +2487,23 @@ TEST(DumpSink, APatternAndItsTileAreRecordedOncePerHandleAndARefusedUnitWritesNe
     p.kind = GSHSCENE_PAINT_PATTERN;
     p.resource = pattern;
     ASSERT_EQ(gshscene_list_fill(l, s.sq(2, 2, 20), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK);
+  }
+  // A stroke painted with a pattern is keyed and recorded as a fill is.
+  GSHSCENE_Stroke_Style stroke_style;
+  gshscene_stroke_style_init(&stroke_style);
+  const GSHSCENE_Resource * style = nullptr;
+  ASSERT_EQ(gshscene_store_intern_stroke_style(s.store, &stroke_style, &style), GSHSCENE_OK);
+  s.held.push_back(style);
+  GSHSCENE_Pattern c = a;
+  c.x = 0.5;
+  const GSHSCENE_Resource * pc = nullptr;
+  ASSERT_EQ(gshscene_store_intern_pattern(s.store, &c, &pc), GSHSCENE_OK);
+  s.held.push_back(pc);
+  {
+    GSHSCENE_Paint p = solid(0, 0, 0, 1.0);
+    p.kind = GSHSCENE_PAINT_PATTERN;
+    p.resource = pc;
+    ASSERT_EQ(gshscene_list_stroke(l, s.sq(2, 2, 20), style, nullptr, &p, 0, 0.0), GSHSCENE_OK);
   }
   ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
   for (int configuration = 0; configuration < 3; configuration++) {
@@ -2502,6 +2520,10 @@ TEST(DumpSink, APatternAndItsTileAreRecordedOncePerHandleAndARefusedUnitWritesNe
       size_t end = text.find('\n', at);
       std::string line = text.substr(at, end - at);
       at = end + 1;
+      if (line.rfind("U ", 0) == 0) {
+        // The tile's units are the planning pass's: no unit of the render has a chain that goes into one.
+        EXPECT_EQ(line.substr(2, line.find(' ', 2) - 2).find('.'), std::string::npos) << line;
+      }
       if (line.rfind("V ", 0) == 0) {
         tiles++;
         char want[96];
@@ -2511,7 +2533,8 @@ TEST(DumpSink, APatternAndItsTileAreRecordedOncePerHandleAndARefusedUnitWritesNe
       } else if (line.rfind("Z ", 0) == 0) {
         patterns++;
         z_lines += line + "\n";
-      } else if (line.find(" F res=") != std::string::npos && line.find(" pat=") != std::string::npos) {
+      } else if ((line.find(" F res=") != std::string::npos || line.find(" K res=") != std::string::npos) &&
+                 line.find(" pat=") != std::string::npos) {
         fills++;
       } else if (line.find(" X class=1 reason=36") != std::string::npos) {
         refused++;
@@ -2521,37 +2544,105 @@ TEST(DumpSink, APatternAndItsTileAreRecordedOncePerHandleAndARefusedUnitWritesNe
       EXPECT_EQ(tiles, 0u) << "a pen records no tile";
       EXPECT_EQ(patterns, 0u);
       EXPECT_EQ(fills, 0u);
-      EXPECT_EQ(refused, 5u) << "every fill painted with a pattern is refused";
+      EXPECT_EQ(refused, 6u) << "every fill and stroke painted with a pattern is refused";
       auto entries = sinkconf::entries(report.report);
-      ASSERT_EQ(entries.size(), 5u);
+      ASSERT_EQ(entries.size(), 6u);
       for (const auto & e : entries) {
         EXPECT_EQ(e.reason, GSHSCENE_REASON_PATTERN);
       }
       continue;
     }
     EXPECT_EQ(tiles, 1u) << configuration << ": the tile once however many patterns name it";
-    EXPECT_EQ(patterns, 2u) << configuration << ": each pattern once however many fills name it";
-    EXPECT_EQ(fills, 5u) << configuration;
+    EXPECT_EQ(patterns, 3u) << configuration << ": each pattern once however many fills name it, and one only a stroke names";
+    EXPECT_EQ(fills, 6u) << configuration;
     EXPECT_EQ(refused, 0u);
     char want_a[512], want_b[512];
     std::snprintf(want_a, sizeof want_a,
         "Z %llu %016llx tile=%llu cell=%016llx %016llx %016llx %016llx step=%016llx %016llx repeat=11 map=%016llx tint=-\n",
         (unsigned long long)gshscene_resource_id(pa), (unsigned long long)gshscene_resource_hash(pa),
         (unsigned long long)gshscene_resource_id(tile), 0ull, 0ull, (unsigned long long)gshgeom_f64_bits(4.0),
-        (unsigned long long)gshgeom_f64_bits(4.0), (unsigned long long)gshgeom_f64_bits(5.0),
-        (unsigned long long)gshgeom_f64_bits(5.0), (unsigned long long)gshgeom_map_hash(&a.map));
+        (unsigned long long)gshgeom_f64_bits(3.0), (unsigned long long)gshgeom_f64_bits(5.0),
+        (unsigned long long)gshgeom_f64_bits(6.0), (unsigned long long)gshgeom_map_hash(&a.map));
     std::snprintf(want_b, sizeof want_b,
-        "Z %llu %016llx tile=%llu cell=%016llx %016llx %016llx %016llx step=%016llx %016llx repeat=11 map=%016llx tint=0 "
+        "Z %llu %016llx tile=%llu cell=%016llx %016llx %016llx %016llx step=%016llx %016llx repeat=10 map=%016llx tint=0 "
         "%016llx %016llx %016llx %016llx 0:0:0000000000000000 0\n",
         (unsigned long long)gshscene_resource_id(pb), (unsigned long long)gshscene_resource_hash(pb),
         (unsigned long long)gshscene_resource_id(tile), 0ull, 0ull, (unsigned long long)gshgeom_f64_bits(4.0),
-        (unsigned long long)gshgeom_f64_bits(4.0), (unsigned long long)gshgeom_f64_bits(5.0),
-        (unsigned long long)gshgeom_f64_bits(5.0), (unsigned long long)gshgeom_map_hash(&b.map),
+        (unsigned long long)gshgeom_f64_bits(3.0), (unsigned long long)gshgeom_f64_bits(5.0),
+        (unsigned long long)gshgeom_f64_bits(6.0), (unsigned long long)gshgeom_map_hash(&b.map),
         (unsigned long long)gshgeom_f64_bits(0.25), (unsigned long long)gshgeom_f64_bits(0.5),
         (unsigned long long)gshgeom_f64_bits(0.75), (unsigned long long)gshgeom_f64_bits(1.0));
-    EXPECT_EQ(z_lines, std::string(want_a) + want_b) << configuration << ": the records are the fields, in the order the file states";
+    char want_c[512];
+    std::snprintf(want_c, sizeof want_c,
+        "Z %llu %016llx tile=%llu cell=%016llx %016llx %016llx %016llx step=%016llx %016llx repeat=11 map=%016llx tint=-\n",
+        (unsigned long long)gshscene_resource_id(pc), (unsigned long long)gshscene_resource_hash(pc),
+        (unsigned long long)gshscene_resource_id(tile), (unsigned long long)gshgeom_f64_bits(0.5), 0ull,
+        (unsigned long long)gshgeom_f64_bits(4.0), (unsigned long long)gshgeom_f64_bits(3.0),
+        (unsigned long long)gshgeom_f64_bits(5.0), (unsigned long long)gshgeom_f64_bits(6.0),
+        (unsigned long long)gshgeom_map_hash(&c.map));
+    EXPECT_EQ(z_lines, std::string(want_a) + want_b + want_c) << configuration << ": the records are the fields, in the order the file states";
     EXPECT_NE(text.find(" pat=" + std::to_string(gshscene_resource_id(pa)) + " "), std::string::npos);
     EXPECT_NE(text.find(" pat=" + std::to_string(gshscene_resource_id(pb)) + " "), std::string::npos);
+  }
+}
+
+// S22, PT10, PT13: the planning pass gives a unit in a tile the maps of its chain, the item's and the pattern's in that order: a
+// stroke whose width needs a similarity is native when the two compose to one in the order of the chain, and refused (its style)
+// when they are given the other way round.
+TEST(DumpSink, ATilesStrokeSeesTheItemsMapAndThePatternsInTheOrderOfTheChain) {
+  Scene s;
+  GSHSCENE_Stroke_Style st;
+  gshscene_stroke_style_init(&st);
+  const GSHSCENE_Resource * style = nullptr;
+  ASSERT_EQ(gshscene_store_intern_stroke_style(s.store, &st, &style), GSHSCENE_OK);
+  s.held.push_back(style);
+  GSHSCENE_List * tl = s.open();
+  ASSERT_EQ(gshscene_list_stroke(tl, s.sq(0, 0, 4), style, nullptr, nullptr, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(tl), GSHSCENE_OK);
+  const GSHSCENE_Resource * tile = nullptr;
+  ASSERT_EQ(gshscene_store_intern_picture(s.store, tl, &tile), GSHSCENE_OK);
+  s.held.push_back(tile);
+  GSHGEOM_Map item_map, pattern_map;
+  gshgeom_map_scale(2, 1.0, 2.0, 1.0, &item_map);
+  const double rotated[4] = {0.0, -2.0, 1.0, 0.0};  // diag(2, 1) times a quarter turn
+  const double zero[2] = {0.0, 0.0};
+  ASSERT_EQ(gshgeom_map_from_matrix(2, rotated, zero, &pattern_map), GSHGEOM_OK);
+  GSHSCENE_Dump_Sink_Config config;
+  gshscene_dump_sink_config_default(&config);
+  for (GSHSCENE_Sink_Caps * caps : {&config.raster_caps, &config.stream_caps}) {
+    caps->flags &= ~GSHSCENE_CAP_STROKE_EXPAND;
+    caps->stroke_native = GSHSCENE_STROKE_NATIVE_ALL & ~GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL_ANISOTROPIC;
+  }
+  for (int swapped = 0; swapped < 2; swapped++) {
+    GSHSCENE_Pattern p;
+    gshscene_pattern_init(&p);
+    p.tile = tile;
+    p.w = p.h = p.x_step = p.y_step = 4.0;
+    p.map = swapped ? item_map : pattern_map;
+    const GSHSCENE_Resource * pattern = nullptr;
+    ASSERT_EQ(gshscene_store_intern_pattern(s.store, &p, &pattern), GSHSCENE_OK);
+    s.held.push_back(pattern);
+    GSHSCENE_Paint paint = solid(0, 0, 0, 1.0);
+    paint.kind = GSHSCENE_PAINT_PATTERN;
+    paint.resource = pattern;
+    GSHSCENE_List * l = s.open();
+    const GSHGEOM_Map & mine = swapped ? pattern_map : item_map;
+    ASSERT_EQ(gshscene_list_fill(l, s.sq(2, 2, 20), &mine, GSHGEOM_FILL_NONZERO, &paint, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+    SinkRef sink(make_with(config, nullptr, nullptr));
+    auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+    ReportRef report;
+    Rendered r = render_job(sink.sink, request_for(l, *stream, report.report));
+    ASSERT_EQ(r.result, GSHSCENE_OK);
+    auto entries = sinkconf::entries(report.report);
+    if (!swapped) {
+      EXPECT_TRUE(entries.empty()) << "the item's map and then the pattern's compose to a similarity";
+    } else {
+      ASSERT_EQ(entries.size(), 2u) << "the other order does not: the stroke in the tile, then the pattern";
+      EXPECT_EQ(entries[0].reason, GSHSCENE_REASON_PATTERN);
+      EXPECT_EQ(entries[1].reason, GSHSCENE_REASON_STROKE_STYLE);
+      EXPECT_EQ(entries[1].chain_count, 2u);
+    }
   }
 }
 

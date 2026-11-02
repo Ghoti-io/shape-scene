@@ -4105,4 +4105,182 @@ TEST_P(SinkConformance, S22_APaletteEntryTheDrawingListLacksRefusesTheTilesUnitA
   }
 }
 
+
+// S22: the tile is entered only for a pattern the sink draws: where the flag is missing the unit is refused alone, however many
+// units in its tile would be refused too; and a unit refused for its tint's palette entry is refused for that alone.
+TEST_P(SinkConformance, S22_TheTileIsEnteredOnlyForAPatternTheSinkDrawsAndTheFirstRefusalWins) {
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    GSHSCENE_Paint red = solid(1, 0, 0);
+    GSHSCENE_List * tl = s.open();
+    EXPECT_EQ(gshscene_list_fill(tl, s.sq(0, 0, 4), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0), GSHSCENE_OK);
+    refused_placeholder(tl);
+    const GSHSCENE_Resource * tile = picture_of(s, tl);
+    bool draws = (caps.flags & GSHSCENE_CAP_PATTERN) != 0;
+    // (1) A tile with a refused unit: one entry without the flag, the unit's and the pattern's with it.
+    GSHSCENE_List * l = patterned_list(s, make_pattern(s, tile));
+    auto out = make_surface(kind);
+    ReportRef r;
+    EXPECT_EQ(run(f(), sink.sink, request_for(l, *out, r.report)).result, GSHSCENE_OK);
+    EXPECT_EQ(chain_entries(r.report).size(), draws ? 2u : 1u);
+    if (!draws) {
+      continue;
+    }
+    // (2) A palette tint the list lacks refuses the unit for the entry, and the tile is not entered.
+    const GSHSCENE_Resource * tinted = make_pattern(s, tile, [](GSHSCENE_Pattern & p) {
+      p.has_tint = 1;
+      p.tint.kind = GSHSCENE_PAINT_PALETTE;
+      p.tint.rgba[3] = 1.0;
+      p.tint.entry = 3;
+    });
+    GSHSCENE_List * l2 = patterned_list(s, tinted);
+    auto out2 = make_surface(kind);
+    ReportRef r2;
+    EXPECT_EQ(run(f(), sink.sink, request_for(l2, *out2, r2.report)).result, GSHSCENE_OK);
+    auto got = chain_entries(r2.report);
+    ASSERT_EQ(got.size(), 1u);
+    EXPECT_EQ(got[0].chain, std::vector<size_t>{1});
+    EXPECT_EQ(got[0].reason, GSHSCENE_REASON_PALETTE_ENTRY);
+    // (3) A pattern that draws nothing and whose tile is refused: the refusals only, no notice.
+    GSHSCENE_List * l3 = patterned_list(s, make_pattern(s, tile, [](GSHSCENE_Pattern & p) { p.w = 0.0; }));
+    auto out3 = make_surface(kind);
+    ReportRef r3;
+    EXPECT_EQ(run(f(), sink.sink, request_for(l3, *out3, r3.report)).result, GSHSCENE_OK);
+    got = chain_entries(r3.report);
+    ASSERT_EQ(got.size(), 2u);
+    for (const auto & e : got) {
+      EXPECT_EQ(e.entry_class, GSHSCENE_ENTRY_REFUSED);
+    }
+  }
+}
+
+// S22, PT11: the ties of a tile's list are reported once, with the chain of the unit painted with the pattern and the tie's first
+// item; and the maps of the chain, the pattern's among them, reach a unit in the tile: a gradient fill in the tile of a pattern
+// whose map is not invertible is noticed at its chain, as is the pattern's own unit.
+TEST_P(SinkConformance, S22_ATilesTiesAndNoticesAreReportedAtTheirChains) {
+  int checked = 0;
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    if (!(caps.flags & GSHSCENE_CAP_PATTERN) || !(caps.item_kinds & (1u << GSHSCENE_ITEM_GROUP_PUSH)) || !(caps.composites & 1u)) {
+      continue;
+    }
+    GSHSCENE_Paint red = solid(1, 0, 0);
+    GSHSCENE_Group g{};
+    g.opacity = 1.0;
+    g.ordering = GSHSCENE_ORDER_DEPTH;
+    GSHSCENE_List * tl = s.open();
+    EXPECT_EQ(gshscene_list_group_push(tl, &g, 0, 0.0), GSHSCENE_OK);                                             // 0
+    EXPECT_EQ(gshscene_list_fill(tl, s.sq(0, 0, 4), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 1.0), GSHSCENE_OK);  // 1
+    EXPECT_EQ(gshscene_list_fill(tl, s.sq(1, 1, 2), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 1.0), GSHSCENE_OK);  // 2
+    EXPECT_EQ(gshscene_list_group_pop(tl), GSHSCENE_OK);                                                           // 3
+    GSHSCENE_List * l = patterned_list(s, make_pattern(s, picture_of(s, tl)));
+    auto out = make_surface(kind);
+    ReportRef r;
+    EXPECT_EQ(run(f(), sink.sink, request_for(l, *out, r.report)).result, GSHSCENE_OK);
+    auto got = chain_entries(r.report);
+    ASSERT_EQ(got.size(), 1u);
+    EXPECT_EQ(got[0].entry_class, GSHSCENE_ENTRY_RESOLVED_AMBIGUITY);
+    EXPECT_EQ(got[0].chain, std::vector<size_t>({1, 1})) << "the unit painted with the pattern, then the tie's first item";
+    // A gradient fill in the tile of a pattern whose map is singular.
+    if (!(caps.gradient_kinds & (1u << GSHSCENE_GRADIENT_LINEAR))) {
+      continue;
+    }
+    GSHSCENE_Gradient_Stop stops[2];
+    stops[0].offset = 0.0;
+    stops[0].color = solid(1, 0, 0, 1);
+    stops[1].offset = 1.0;
+    stops[1].color = solid(0, 0, 1, 1);
+    GSHSCENE_Gradient grad;
+    std::memset(&grad, 0, sizeof grad);
+    grad.kind = GSHSCENE_GRADIENT_LINEAR;
+    grad.p1[0] = 4.0;
+    gshgeom_map_identity(2, &grad.map);
+    grad.stop_count = 2;
+    grad.stops = stops;
+    const GSHSCENE_Resource * gradient = nullptr;
+    ASSERT_EQ(gshscene_store_intern_gradient(s.store, &grad, &gradient), GSHSCENE_OK);
+    s.held.push_back(gradient);
+    GSHSCENE_Paint gp = solid(0, 0, 0, 1);
+    gp.kind = GSHSCENE_PAINT_GRADIENT;
+    gp.resource = gradient;
+    GSHSCENE_List * gl = s.open();
+    EXPECT_EQ(gshscene_list_fill(gl, s.sq(0, 0, 4), nullptr, GSHGEOM_FILL_NONZERO, &gp, 0, 0.0), GSHSCENE_OK);
+    const double flat[4] = {1, 0, 0, 0};
+    const double none[2] = {0, 0};
+    const GSHSCENE_Resource * singular = make_pattern(s, picture_of(s, gl), [&](GSHSCENE_Pattern & p) {
+      EXPECT_EQ(gshgeom_map_from_matrix(2, flat, none, &p.map), GSHGEOM_OK);
+    });
+    GSHSCENE_List * l2 = patterned_list(s, singular);
+    auto out2 = make_surface(kind);
+    ReportRef r2;
+    EXPECT_EQ(run(f(), sink.sink, request_for(l2, *out2, r2.report)).result, GSHSCENE_OK);
+    got = chain_entries(r2.report);
+    ASSERT_EQ(got.size(), 2u);
+    EXPECT_EQ(got[0].chain, std::vector<size_t>({1}));
+    EXPECT_EQ(got[0].entry_class, GSHSCENE_ENTRY_NOTICE);
+    EXPECT_EQ(got[0].reason, GSHSCENE_REASON_MAP_NOT_INVERTIBLE);
+    EXPECT_EQ(got[1].chain, std::vector<size_t>({1, 0})) << "the pattern's map is in the chain of the unit in its tile";
+    EXPECT_EQ(got[1].entry_class, GSHSCENE_ENTRY_NOTICE);
+    EXPECT_EQ(got[1].reason, GSHSCENE_REASON_MAP_NOT_INVERTIBLE);
+    checked++;
+  }
+  if (checked == 0) {
+    GTEST_SKIP() << "the sink draws no pattern, no group or no gradient";
+  }
+}
+
+// S22: a stroke painted with a pattern is planned as a fill is: its tile entered, the unit refused in it reported at its chain.
+TEST_P(SinkConformance, S22_AStrokePaintedWithAPatternHasItsTilePlannedToo) {
+  int checked = 0;
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    if (!(caps.item_kinds & (1u << GSHSCENE_ITEM_STROKE))) {
+      continue;
+    }
+    bool draws = (caps.flags & GSHSCENE_CAP_PATTERN) != 0;
+    GSHSCENE_Paint red = solid(1, 0, 0);
+    GSHSCENE_List * tl = s.open();
+    refused_placeholder(tl);
+    const GSHSCENE_Resource * pattern = make_pattern(s, picture_of(s, tl));
+    GSHSCENE_Stroke_Style st;
+    gshscene_stroke_style_init(&st);
+    const GSHSCENE_Resource * style = nullptr;
+    ASSERT_EQ(gshscene_store_intern_stroke_style(s.store, &st, &style), GSHSCENE_OK);
+    s.held.push_back(style);
+    GSHSCENE_Paint p = solid(0, 0, 0, 1);
+    p.kind = GSHSCENE_PAINT_PATTERN;
+    p.resource = pattern;
+    GSHSCENE_List * l = s.open();
+    EXPECT_EQ(gshscene_list_fill(l, s.sq(1, 1, 6), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_stroke(l, s.sq(10, 10, 30), style, nullptr, &p, 0, 0.0), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+    auto out = make_surface(kind);
+    ReportRef r;
+    EXPECT_EQ(run(f(), sink.sink, request_for(l, *out, r.report)).result, GSHSCENE_OK);
+    std::vector<std::vector<size_t>> refused;
+    for (const auto & e : chain_entries(r.report)) {
+      if (e.entry_class == GSHSCENE_ENTRY_REFUSED && (e.reason == GSHSCENE_REASON_PATTERN || e.reason == GSHSCENE_REASON_PLACEHOLDER)) {
+        refused.push_back(e.chain);
+      }
+    }
+    // The stroke may also be refused for its style by a sink that neither draws nor expands it; the pattern's own entries are these.
+    // Without the flag the stroke is refused alone and its tile is not entered.
+    const std::vector<std::vector<size_t>> want = draws ? std::vector<std::vector<size_t>>{{1}, {1, 0}} : std::vector<std::vector<size_t>>{{1}};
+    EXPECT_EQ(refused, want);
+    checked++;
+  }
+  if (checked == 0) {
+    GTEST_SKIP() << "the sink draws no stroke";
+  }
+}
+
 #endif /* GHOTI_IO_GSHSCENE_TEST_SINK_CONFORMANCE_H */
