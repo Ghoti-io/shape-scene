@@ -376,7 +376,11 @@ which is the same lattice. `-0` is stored as `+0`.
 `u8` `repeat_x`, `u8` `repeat_y`, `u64` `gshgeom_map_hash` of the map, `u8` `has_tint` and, with a tint, `u8` its kind, four `f64`,
 its space and `u32` its entry. The dump is `pattern cell=<x> <y> <w> <h> step=<xs> <ys> repeat=<rx><ry> map=<hash> tile=<hash>
 tint=<- or kind r g b a space entry>`, every double as 16 hexadecimal digits, then the tile's own list dump. The generator
-restates both, and the format stays 1.
+restates both, and the format stays 1. **One spelling:** a step on an axis whose repeat is 0 is never read (the one copy on the
+axis has no neighbour; PT7's selector and PT10's degenerate term look at repeating axes only), so the store keeps the size there
+(`x_step` is `w` when `repeat_x` is 0, `y_step` is `h` when `repeat_y` is 0). Two patterns that differ only in such a step are one
+handle with one hash and one dump, as two masks that differ only in a field their mode ignores would be; the step is still checked
+as an input (finite, not negative), and the bound of PT2 is decided on what is kept.
 
 **The paint and its chain (PT4).** A `PATTERN` paint names the resource in the paint's resource handle; its `rgba[3]` is an alpha
 multiplier, and the rest is zero. For an item with the chain `T I_1 .. I_k M` and the pattern map `G`, pattern space maps to the
@@ -1260,7 +1264,9 @@ discontinuity, and `tests/ref_composite.h`'s evaluator agrees with them, bit for
 1e-12 otherwise.
 
 **G1 The resource.** `{kind, geometry, map, stops, extend, space, premultiplied}`: `kind` linear, radial or sweep; `map`
-a valid 2D map from gradient space to the local space of the item that paints with it (before the item's map);
+a valid 2D map from gradient space to the local space of the item that paints with it (before the item's map; a valid 3D map is
+`ERR_UNSUPPORTED`, as a 3D map is everywhere at the waist, decided after every validity check and before the bounds, and a map
+that is not valid is `ERR_INVALID`; an image paint's map is held to the same);
 `space` an N1 space, the interpolation space (zero: the target's); `premultiplied` 0 or 1. Every double is finite.
 Equal content is one handle; a hash never decides equality.
 

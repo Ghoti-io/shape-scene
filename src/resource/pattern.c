@@ -134,9 +134,13 @@ static GSHSCENE_Result canonical(const GSHSCENE_Store * store, const GSHSCENE_Pa
   if (map.dim == 3 || tint_result != GSHSCENE_OK) {
     return tint_result != GSHSCENE_OK ? tint_result : GSHSCENE_ERR_UNSUPPORTED;
   }
+  /* One spelling (PT3): a step on an axis that does not repeat is never read (the one copy has no neighbour), so a field that
+   * cannot matter must not split a handle: the store keeps the size there, the step that abuts the cell. */
+  const double x_step = in->repeat_x ? in->x_step : in->w;
+  const double y_step = in->repeat_y ? in->y_step : in->h;
   /* The bounds, after every validity check (PT2, G14, N1). */
-  if (!in_band(in->x) || !in_band(in->y) || !in_band(in->w) || !in_band(in->h) || !in_band(in->x_step) ||
-      !in_band(in->y_step) || !map_in_band(&map) ||
+  if (!in_band(in->x) || !in_band(in->y) || !in_band(in->w) || !in_band(in->h) || !in_band(x_step) ||
+      !in_band(y_step) || !map_in_band(&map) ||
       (in->has_tint && tint.kind == GSHSCENE_PAINT_SOLID && !gshscene_color_bounded(tint.rgba)) ||
       tile->u.picture.depth + 1u > store->limits.max_picture_depth) {
     return GSHSCENE_ERR_LIMIT;
@@ -148,8 +152,8 @@ static GSHSCENE_Result canonical(const GSHSCENE_Store * store, const GSHSCENE_Pa
   out->y = plus_zero(in->y);
   out->w = plus_zero(in->w);
   out->h = plus_zero(in->h);
-  out->x_step = plus_zero(in->x_step);
-  out->y_step = plus_zero(in->y_step);
+  out->x_step = plus_zero(x_step);
+  out->y_step = plus_zero(y_step);
   out->repeat_x = in->repeat_x;
   out->repeat_y = in->repeat_y;
   out->map = map;

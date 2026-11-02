@@ -52,7 +52,11 @@
  *
  * ### Canonical form, hash and dump (PT3)
  *
- * Equal content is one handle; `-0` is stored as `+0`; with `has_tint` 0 the tint is the zero paint.  After resource.h's two
+ * Equal content is one handle; `-0` is stored as `+0`; with `has_tint` 0 the tint is the zero paint.  **A step on an axis whose
+ * repeat is 0 is never read (the one copy has no neighbour to overlap, and the notice and the selector look at repeating axes
+ * only), so the store keeps the size there, `w` for `x_step` and `h` for `y_step`: two patterns that differ only in such a step
+ * are one handle with one hash, and a read-back pattern shows the size.**  The step is still checked as an input (finite, not
+ * negative) and the bound is decided on what is kept.  After resource.h's two
  * leading fields the hash is: `u64` the tile's content hash, `f64` `x, y, w, h, x_step, y_step`, `u8` `repeat_x`, `u8`
  * `repeat_y`, `u64` `gshgeom_map_hash` of the map, `u8` `has_tint` and, with a tint, `u8` its kind, four `f64`, its space
  * and `u32` its entry.  The dump is `pattern cell=<x> <y> <w> <h> step=<xs> <ys> repeat=<rx><ry> map=<hash> tile=<hash>
@@ -87,7 +91,9 @@
  * ### Cells that overlap (PT7)
  *
  * Otherwise the copies are composited in lattice order, later over earlier: with every blend of the tile Normal, each copy
- * is an isolated group of the tile clipped to its cell, composited with SRC_OVER; a tile that holds another blend mode is
+ * is an isolated group of the tile clipped to its cell by the **geometric** clip of `shape-geometry` (the polygon cut, never a
+ * multiplied coverage: that would make the isolated per-copy form differ from the direct one and leave a seam), composited with
+ * SRC_OVER; a tile that holds another blend mode is
  * one non-isolated, non-knockout group over the lattice layer in which the copies are drawn in that order.  The order of
  * overlapping copies is this library's choice, not a claim about any format.
  *
@@ -150,8 +156,8 @@ typedef struct GSHSCENE_Pattern {
   double y;                       ///< The cell's top edge.
   double w;                       ///< The cell's width: finite, not negative.
   double h;                       ///< The cell's height: finite, not negative.
-  double x_step;                  ///< The lattice spacing along x: finite, not negative.
-  double y_step;                  ///< The lattice spacing along y: finite, not negative.
+  double x_step;                  ///< The lattice spacing along x: finite, not negative; kept as `w` when `repeat_x` is 0 (PT3).
+  double y_step;                  ///< The lattice spacing along y: finite, not negative; kept as `h` when `repeat_y` is 0 (PT3).
   uint32_t repeat_x;              ///< 1 repeats along x; 0 draws index 0 only.
   uint32_t repeat_y;              ///< Likewise along y.
   /** From pattern space to the item's local space: a valid 2D map (a zero-filled map is refused; use the identity). */
@@ -201,7 +207,7 @@ GSHSCENE_API GSHSCENE_Result gshscene_resource_pattern(const GSHSCENE_Resource *
 GSHSCENE_API GSHSCENE_Result gshscene_pattern_cell(const GSHSCENE_Pattern * pattern, int64_t i, int64_t j, double out[4]);
 
 /**
- * @brief Whether the cells overlap (PT7): `x_step < w` or `y_step < h`, by exact comparison of the stored doubles.  0
+ * @brief Whether the cells overlap (PT7): `x_step < w` on an axis that repeats in x, or `y_step < h` on one that repeats in y, by exact comparison of the stored doubles.  0
  *   selects PT6 and 1 PT7.  0 for NULL.
  */
 GSHSCENE_API int gshscene_pattern_overlaps(const GSHSCENE_Pattern * pattern);

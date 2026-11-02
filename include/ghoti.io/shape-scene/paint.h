@@ -126,7 +126,7 @@
  *
  * **G1 The resource.**  A gradient (::GSHSCENE_Gradient, interned as a resource:
  * resource.h) is `{kind, geometry, map, stops, extend, space, premultiplied}`.
- * `kind` is linear, radial or sweep; `map` is a valid 2D map from **gradient
+ * `kind` is linear, radial or sweep; `map` is a valid 2D map (a valid 3D map is unsupported) from **gradient
  * space** to the local space of the item that paints with it (the space its path
  * or run is in, before the item's map); `space` is an N1 space, the
  * **interpolation space** (zero: the target's); `premultiplied` is 0 or 1.  Every
@@ -412,7 +412,7 @@ typedef struct GSHSCENE_Gradient {
   uint32_t angle_unit;  ///< Sweep: a `GSHGEOM_Angle_Unit`, the source's (0, radians, for the other kinds).
   double a0;            ///< Sweep: the angle of offset 0.
   double a1;            ///< Sweep: the angle of offset 1.
-  /** From gradient space to the item's local space: a valid 2D map (a zero-filled map is refused; use the identity). */
+  /** From gradient space to the item's local space: a valid 2D map (a zero-filled map is invalid; use the identity; a valid 3D map is unsupported). */
   GSHGEOM_Map map;
   uint32_t extend;            ///< A ::GSHSCENE_Extend.
   GSHSCENE_Color_Space space; ///< The interpolation space; zero is the target's.

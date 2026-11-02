@@ -3111,8 +3111,13 @@ static void pattern_section(void) {
     near_p.x_step = p.x_step == 0.0 ? 0x1p-30 : next_up(p.x_step);
     const GSHSCENE_Resource * other = NULL;
     check(gshscene_store_intern_pattern(store, &near_p, &other), "near pattern");
-    if (other == patterns[i] || gshscene_resource_hash(other) == gshscene_resource_hash(patterns[i])) {
-      fail("two patterns one ulp apart are one");
+    if (p.repeat_x) {
+      if (other == patterns[i] || gshscene_resource_hash(other) == gshscene_resource_hash(patterns[i])) {
+        fail("two patterns one ulp apart are one");
+      }
+    } else if (other != patterns[i] || gshscene_resource_hash(other) != gshscene_resource_hash(patterns[i])) {
+      /* A step on an axis that does not repeat is never read: the store keeps the size (PT3), whatever the step was. */
+      fail("a step on an axis that does not repeat splits a handle");
     }
     feed(gshscene_resource_hash(other));
     gshscene_resource_release(other);

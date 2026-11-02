@@ -481,7 +481,17 @@ TEST(GradientResource, EveryRuleIsCheckedAndAFailureKeepsNothing) {
   EXPECT_EQ(try_intern(s.store, [] { Desc d = gen_sweep(); d.g.angle_unit = GSHGEOM_ANGLE_TURNS; return d; }()), GSHSCENE_OK);
   // The map: valid and 2D.
   bad([](Desc & d) { std::memset(&d.g.map, 0, sizeof d.g.map); }, INV, "a zero-filled map");
-  bad([](Desc & d) { gshgeom_map_identity(3, &d.g.map); }, INV, "a 3D map");
+  // A valid 3D map is a map the resource does not carry, as every 3D map of the waist is: unsupported, after every validity
+  // check and before the bounds; a 3D map that is not valid is invalid.
+  const GSHSCENE_Result UNS = GSHSCENE_ERR_UNSUPPORTED;
+  bad([](Desc & d) { gshgeom_map_identity(3, &d.g.map); }, UNS, "a 3D map");
+  bad([](Desc & d) { gshgeom_map_identity(3, &d.g.map); d.g.map.m[1][1] = kNaN; }, INV, "a 3D map with a NaN");
+  bad([](Desc & d) { gshgeom_map_identity(3, &d.g.map); d.g.extend = GSHSCENE_EXTEND_COUNT; }, INV, "a 3D map beside a bad enum");
+  bad([](Desc & d) { gshgeom_map_identity(3, &d.g.map); d.g.p1[0] = kNaN; }, INV, "a 3D map beside a non-finite field");
+  bad([](Desc & d) { gshgeom_map_identity(3, &d.g.map); d.stops[0].offset = kNaN; }, INV, "a 3D map beside a non-finite stop offset");
+  bad([](Desc & d) { gshgeom_map_identity(3, &d.g.map); d.stops[0].color.kind = GSHSCENE_PAINT_GRADIENT; }, INV, "a 3D map beside a gradient stop");
+  bad([](Desc & d) { d.g.p1[0] = std::ldexp(1.0, 70); }, GSHSCENE_ERR_LIMIT, "a value past the band (the control for the next)");
+  bad([](Desc & d) { gshgeom_map_identity(3, &d.g.map); d.g.p1[0] = std::ldexp(1.0, 70); }, UNS, "a 3D map beside a value past the band");
   bad([](Desc & d) { d.g.map.m[0][1] = kNaN; }, INV, "a map with a NaN");
   bad([](Desc & d) { d.g.map.kind = 1u << 12; }, INV, "a map with an undefined kind bit");
   // A singular map is legal (G11 is decided when drawn).

@@ -2569,7 +2569,8 @@ TEST(DumpSink, APatternAndItsTileAreRecordedOncePerHandleAndARefusedUnitWritesNe
         (unsigned long long)gshscene_resource_id(pb), (unsigned long long)gshscene_resource_hash(pb),
         (unsigned long long)gshscene_resource_id(tile), 0ull, 0ull, (unsigned long long)gshgeom_f64_bits(4.0),
         (unsigned long long)gshgeom_f64_bits(3.0), (unsigned long long)gshgeom_f64_bits(5.0),
-        (unsigned long long)gshgeom_f64_bits(6.0), (unsigned long long)gshgeom_map_hash(&b.map),
+        (unsigned long long)gshgeom_f64_bits(3.0) /* y does not repeat in b: its step is kept as the height (PT3) */,
+        (unsigned long long)gshgeom_map_hash(&b.map),
         (unsigned long long)gshgeom_f64_bits(0.25), (unsigned long long)gshgeom_f64_bits(0.5),
         (unsigned long long)gshgeom_f64_bits(0.75), (unsigned long long)gshgeom_f64_bits(1.0));
     char want_c[512];

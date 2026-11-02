@@ -95,9 +95,11 @@ static GSHSCENE_Result canonical(const GSHSCENE_Store * store, const GSHSCENE_Im
     return GSHSCENE_ERR_INVALID;
   }
   GSHGEOM_Map map;
-  if (in->map.dim != 2 || gshscene_list_canonical_map(&in->map, &map) != GSHSCENE_OK) {
+  /* A valid 3D map is UNSUPPORTED, as every 3D map of the waist is, decided after every validity check (below). */
+  if ((in->map.dim != 2 && in->map.dim != 3) || gshscene_list_canonical_map(&in->map, &map) != GSHSCENE_OK) {
     return GSHSCENE_ERR_INVALID;
   }
+  const int map_3d = in->map.dim == 3;
   if (in->extend_x >= (uint32_t)GSHSCENE_IMAGE_EXTEND_COUNT || in->extend_y >= (uint32_t)GSHSCENE_IMAGE_EXTEND_COUNT ||
       in->magnify >= (uint32_t)GSHSCENE_IMAGE_FILTER_COUNT || in->minify >= (uint32_t)GSHSCENE_IMAGE_FILTER_COUNT) {
     return GSHSCENE_ERR_INVALID;
@@ -128,6 +130,9 @@ static GSHSCENE_Result canonical(const GSHSCENE_Store * store, const GSHSCENE_Im
   }
   if (tint_result != GSHSCENE_OK) {
     return tint_result;
+  }
+  if (map_3d) {
+    return GSHSCENE_ERR_UNSUPPORTED;
   }
   /* The bounds, after every validity check (IP1, G14, N1). */
   if (!map_in_band(&map) || (in->tint && tint->kind == GSHSCENE_PAINT_SOLID && !gshscene_color_bounded(tint->rgba))) {

@@ -32,7 +32,7 @@
  * same store, which the image paint retains.  The `window` is an integer rectangle `[x0, x1) x [y0, y1)` of texels,
  * `0 <= x0 < x1 <= width` and likewise in y; the all-zero value means the whole image and the store keeps the explicit
  * rectangle, so one drawing has one spelling.  The `map` takes **image space** to the **local space** of the item that paints
- * with it (the space its path or run is in, before the item's map), valid and 2D, each entry zero or of magnitude in
+ * with it (the space its path or run is in, before the item's map), valid and 2D (a valid 3D map is unsupported), each entry zero or of magnitude in
  * `[2^-64, 2^64]`.  The two extend modes are per axis.  `magnify` and `minify` name the filter used when the map stretches every
  * direction and otherwise (IP8).  The `filter space` is an N1 space: **zero means the image's own space**.  The `tint` is a
  * paint of kind solid, foreground or palette, present exactly when the image is alpha-only.
@@ -196,9 +196,9 @@ GSHSCENE_API void gshscene_image_paint_init(GSHSCENE_Image_Paint * paint);
  * @brief Intern an image paint (IP1): its content is copied, the explicit window stored, `-0` stored as `+0`.
  *
  * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, an image that is not an image resource of this store, a window
- *   that is empty or past the image, a map that is not a valid 2D map, an enum value out of range, a non-finite double, a
+ *   that is empty or past the image, a map that is not a valid map, an enum value out of range, a non-finite double, a
  *   tint on a color image or none on an alpha-only one, a tint that is not solid, foreground or palette, or invalid as a
- *   fill's paint is); ::GSHSCENE_ERR_UNSUPPORTED (a reserved space); ::GSHSCENE_ERR_LIMIT (a map entry or a tint
+ *   fill's paint is); ::GSHSCENE_ERR_UNSUPPORTED (a valid 3D map, as every 3D map of the waist is, or a reserved space); ::GSHSCENE_ERR_LIMIT (a map entry or a tint
  *   component past its bound, decided after every validity check, or the store's limits); ::GSHSCENE_ERR_OOM.
  */
 GSHSCENE_API GSHSCENE_Result gshscene_store_intern_image_paint(GSHSCENE_Store * store, const GSHSCENE_Image_Paint * paint,

@@ -525,6 +525,92 @@ TEST(Pattern, EqualContentIsOneHandleAndNearlyEqualContentIsNot) {
   EXPECT_EQ(x1.get(), x3.get());
 }
 
+TEST(Pattern, AStepOnAnAxisThatDoesNotRepeatIsNotSpelledTwoWays) {
+  // Such a step is never read (the one copy on the axis has no neighbour), so a field that cannot matter must not split a
+  // handle: the store keeps the size there, and two patterns that differ only in it are one handle with one hash.
+  World w;
+  for (int axis = 0; axis < 2; axis++) {
+    SCOPED_TRACE(axis);
+    auto set = [&](GSHSCENE_Pattern & p, double step) { (axis == 0 ? p.x_step : p.y_step) = step; };
+    auto repeat = [&](GSHSCENE_Pattern & p, uint32_t r) { (axis == 0 ? p.repeat_x : p.repeat_y) = r; };
+    GSHSCENE_Pattern base = w.base();
+    base.w = 3.0;
+    base.h = 5.0;
+    repeat(base, 0);
+    const double size = axis == 0 ? base.w : base.h;
+    Ref first;
+    set(base, 1.0);  // smaller than the size: it would overlap on a repeating axis
+    ASSERT_EQ(w.intern(base, &first), GSHSCENE_OK);
+    GSHSCENE_Pattern read;
+    ASSERT_EQ(gshscene_resource_pattern(first.get(), &read), GSHSCENE_OK);
+    EXPECT_EQ(axis == 0 ? read.x_step : read.y_step, size) << "the step that abuts the cell is what is kept";
+    // Any other value of the unused step, valid or past the band, is the same handle and the same hash.
+    for (double step : {0.0, -0.0, size, 2.0 * size, 7.25, std::nextafter(size, 0.0), std::ldexp(1.0, 64), std::ldexp(1.0, 70),
+             std::ldexp(1.0, -70)}) {
+      GSHSCENE_Pattern p = base;
+      set(p, step);
+      Ref again;
+      ASSERT_EQ(w.intern(p, &again), GSHSCENE_OK) << step;
+      EXPECT_EQ(again.get(), first.get()) << step;
+      EXPECT_EQ(gshscene_resource_hash(again.get()), gshscene_resource_hash(first.get())) << step;
+      EXPECT_EQ(dump_resource(again.get()), dump_resource(first.get())) << step;
+    }
+    // It is only the unused one: the same step on an axis that repeats is a different pattern, and so is the size.
+    GSHSCENE_Pattern repeating = base;
+    repeat(repeating, 1);
+    Ref rep;
+    ASSERT_EQ(w.intern(repeating, &rep), GSHSCENE_OK);
+    EXPECT_NE(rep.get(), first.get());
+    GSHSCENE_Pattern other_step = repeating;
+    set(other_step, 4.0);
+    Ref rep2;
+    ASSERT_EQ(w.intern(other_step, &rep2), GSHSCENE_OK);
+    EXPECT_NE(rep2.get(), rep.get());
+    // The other axis keeps its step.
+    GSHSCENE_Pattern cross = base;
+    (axis == 0 ? cross.y_step : cross.x_step) = 9.5;
+    Ref crossed;
+    ASSERT_EQ(w.intern(cross, &crossed), GSHSCENE_OK);
+    EXPECT_NE(crossed.get(), first.get());
+    ASSERT_EQ(gshscene_resource_pattern(crossed.get(), &read), GSHSCENE_OK);
+    EXPECT_EQ(axis == 0 ? read.y_step : read.x_step, 9.5);
+    // The cell of copy 0 does not depend on the step that was given.
+    double cell[4];
+    ASSERT_EQ(gshscene_pattern_cell(&read, 0, 0, cell), GSHSCENE_OK);
+    EXPECT_EQ(cell[axis == 0 ? 2 : 3] - cell[axis == 0 ? 0 : 1], size);
+    // It is still checked as an input: negative and non-finite are invalid, whatever the repeat.
+    for (double bad : {-1.0, -std::ldexp(1.0, 70), kNaN, kInf, -kInf}) {
+      GSHSCENE_Pattern p = base;
+      set(p, bad);
+      EXPECT_EQ(w.intern(p), GSHSCENE_ERR_INVALID) << bad;
+    }
+  }
+  // A size of minus zero is stored as zero and so is the step kept beside it.
+  GSHSCENE_Pattern zero = w.base();
+  zero.w = -0.0;
+  zero.repeat_x = 0;
+  zero.x_step = 6.0;
+  Ref z;
+  ASSERT_EQ(w.intern(zero, &z), GSHSCENE_OK);
+  GSHSCENE_Pattern read;
+  ASSERT_EQ(gshscene_resource_pattern(z.get(), &read), GSHSCENE_OK);
+  EXPECT_EQ(std::signbit(read.x_step), false);
+  EXPECT_EQ(read.x_step, 0.0);
+  // Neither axis repeating: both steps are the sizes.
+  GSHSCENE_Pattern none = w.base();
+  none.w = 2.5;
+  none.h = 0.75;
+  none.x_step = 100.0;
+  none.y_step = 0.0;
+  none.repeat_x = 0;
+  none.repeat_y = 0;
+  Ref n;
+  ASSERT_EQ(w.intern(none, &n), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_resource_pattern(n.get(), &read), GSHSCENE_OK);
+  EXPECT_EQ(read.x_step, 2.5);
+  EXPECT_EQ(read.y_step, 0.75);
+}
+
 TEST(Pattern, EveryNegativeZeroIsStoredAsAPositiveOne) {
   World w;
   GSHSCENE_Pattern plus = w.base();

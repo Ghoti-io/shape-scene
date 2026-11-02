@@ -1281,7 +1281,9 @@ PAINT_PATTERN = 5
 
 def pattern(tile, cell, steps, repeat, mhash, tint=None):
     """A pattern over the picture hashed @p tile.  A tint is (paint kind, rgba, space, entry); the cell and steps as given
-    (the store keeps -0 as +0, so the cases write +0)."""
+    (the store keeps -0 as +0, so the cases write +0).  A step on an axis that does not repeat is never read, so the store
+    keeps the size there (one spelling, PT3): the case gives the step it passes and this states what is kept."""
+    steps = (steps[0] if repeat[0] else cell[2], steps[1] if repeat[1] else cell[3])
     out = u32(1) + u32(KIND_PATTERN) + u64(tile) + b"".join(f64(v) for v in tuple(cell) + tuple(steps))
     out += u8(repeat[0]) + u8(repeat[1]) + u64(mhash)
     if tint is None:

@@ -442,8 +442,8 @@ GSHSCENE_API GSHSCENE_Result gshscene_resource_palette_color(
  *   gradient; a solid stop in the target's (zero) space needs a gradient whose `space` is zero.
  * @param out The handle, with a reference for the caller; written only on success.
  * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, a kind, extend, unit or flag outside its range, a non-finite
- *   double, a nonzero field of another kind, an invalid or 3D map, an invalid stop); ::GSHSCENE_ERR_UNSUPPORTED (a
- *   reserved space); ::GSHSCENE_ERR_LIMIT (more stops than `max_resource_elements`, the store's other limits, G14's
+ *   double, a nonzero field of another kind, a map that is not a valid map, an invalid stop); ::GSHSCENE_ERR_UNSUPPORTED (a
+ *   valid 3D map, as every 3D map of the waist is, or a reserved space; decided after every validity check and before the bounds); ::GSHSCENE_ERR_LIMIT (more stops than `max_resource_elements`, the store's other limits, G14's
  *   bounds, a solid stop with a component past `2^16` (N1));
  *   ::GSHSCENE_ERR_OOM.
  */

@@ -155,9 +155,12 @@ static GSHSCENE_Result canonical(const GSHSCENE_Store * store, const GSHSCENE_Gr
   if (in->extend >= (uint32_t)GSHSCENE_EXTEND_COUNT || in->premultiplied > 1u) {
     return GSHSCENE_ERR_INVALID;
   }
-  if (in->map.dim != 2 || gshscene_list_canonical_map(&in->map, &out->map) != GSHSCENE_OK) {
+  /* A valid 3D map is a map this resource does not carry: UNSUPPORTED, as every 3D map of the waist is, but decided after every
+   * validity check, so that an invalid field beside it is still invalid. */
+  if ((in->map.dim != 2 && in->map.dim != 3) || gshscene_list_canonical_map(&in->map, &out->map) != GSHSCENE_OK) {
     return GSHSCENE_ERR_INVALID;
   }
+  const int map_3d = in->map.dim == 3;
   GSHSCENE_Result result = gshscene_color_space_check(&in->space);
   if (result != GSHSCENE_OK) {
     return result;
@@ -184,7 +187,7 @@ static GSHSCENE_Result canonical(const GSHSCENE_Store * store, const GSHSCENE_Gr
   }
   out->stop_count = in->stop_count;
   out->stops = stops;
-  return GSHSCENE_OK;
+  return map_3d ? GSHSCENE_ERR_UNSUPPORTED : GSHSCENE_OK;
 }
 
 /** G2: sort @p stops by offset, stably (a merge sort through @p scratch, room for @p count). */

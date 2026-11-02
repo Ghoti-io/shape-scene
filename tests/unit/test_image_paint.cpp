@@ -509,7 +509,16 @@ TEST(ImagePaint, TheMapIsValidTwoDimensionalAndInsideTheBand) {
   const double m3[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
   const double t3[3] = {0, 0, 0};
   ASSERT_EQ(gshgeom_map_from_matrix(3, m3, t3, &p.map), GSHGEOM_OK);
-  EXPECT_EQ(intern_paint(f.store.store, p), GSHSCENE_ERR_INVALID) << "a 3D map";
+  EXPECT_EQ(intern_paint(f.store.store, p), GSHSCENE_ERR_UNSUPPORTED) << "a valid 3D map is unsupported, as every 3D map of the waist is";
+  GSHSCENE_Image_Paint three = p;
+  three.extend_x = GSHSCENE_IMAGE_EXTEND_COUNT;
+  EXPECT_EQ(intern_paint(f.store.store, three), GSHSCENE_ERR_INVALID) << "a 3D map beside a bad enum is invalid";
+  three = p;
+  three.map.m[0][0] = kNaN;
+  EXPECT_EQ(intern_paint(f.store.store, three), GSHSCENE_ERR_INVALID) << "a 3D map with a NaN is invalid";
+  three = p;
+  three.map.m[0][0] = std::nextafter(hi, kInf);
+  EXPECT_EQ(intern_paint(f.store.store, three), GSHSCENE_ERR_UNSUPPORTED) << "a 3D map beside an entry past the band: unsupported before the limit";
   std::memset(&p.map, 0, sizeof p.map);
   EXPECT_EQ(intern_paint(f.store.store, p), GSHSCENE_ERR_INVALID) << "a zero-filled map is not an image-space map";
   // Validity is decided before the bound: a past-the-band entry beside an invalid enum is invalid.
