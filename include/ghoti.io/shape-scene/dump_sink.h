@@ -89,7 +89,7 @@
  * record: `gshscene.dump-sink 1 kind=N unit=N units=T list=<16 hex digits>`; then,
  * for each unit, `U <chain> <record>` where the record is
  * `F res=<kind>:<hash> map=<hash> rule=N box=<x0> <y0> <x1> <y1>` (a fill; a
- * gradient fill has ` grad=<id>`, the gradient's resource id, before `box=`),
+ * gradient fill has ` grad=<id>`, the gradient's resource id, before `box=`, an image fill ` img=<id>` and a pattern fill ` pat=<id>`),
  * `C res=<kind>:<hash> map=<hash> rule=N box=<x0> <y0> <x1> <y1>` (a clip push),
  * `c` (a clip pop), `G opacity=<hex> composite=N` (a group push; with ` isolation=N knockout=N mask=<hash>` when a
  * configuration claims PDF's group fields and the group sets one, T1, and ` maskmap=<hash>`, the hash of the mask's
@@ -136,6 +136,16 @@
  * `gshgeom_map_hash` of the composed map.  The **output hash** is FNV-1a 64 of the
  * dump's bytes: the test sink's output is a text document, so its spelling is its
  * text.
+ *
+ * ### Pattern records (S22)
+ *
+ * A fill or stroke painted with a pattern (pattern.h) has ` pat=<id>` before `box=`, and after its record, the first time the render
+ * meets the pattern's id, the tile `V <id> <hash> items=N` (the picture's id, content hash and item count; never its items, which the
+ * planning pass walks) when the render has not met the tile's id, then the pattern `Z <id> <hash> tile=<id> cell=<x> <y> <w> <h>
+ * step=<xs> <ys> repeat=<rx><ry> map=<hash> tint=<-|kind r g b a space entry>` with each double as 16 hexadecimal digits.  Each is
+ * written once per id, as a writer emits a tile once and refers to it by handle.  A configuration without ::GSHSCENE_CAP_PATTERN
+ * refuses the unit (`PATTERN`) and writes neither record; a pattern with a unit in its tile the caps refuse is refused as well, and the
+ * unit in the tile is the planning pass's entry, with the chain `[... , i, j]`.
  *
  * ### Primitive and arc records (PR10)
  *
@@ -223,7 +233,7 @@ typedef struct GSHSCENE_Dump_Sink_Config {
  * @brief The default configuration: both targets; for each, every item kind, operator and gradient kind, every
  *   stroke feature native (`stroke_native` ::GSHSCENE_STROKE_NATIVE_ALL), the flags
  *   `CAN_BLOCK`, `READBACK` (raster only), `CALLER_MEMORY`, `GLYPHS_FROM_FONT`, `CLIP_AA`, `BLEND_SPACES`,
- *   `GRADIENT_SPACES`, `PREPARE` and `STROKE_RUNS`; cancel
+ *   `GRADIENT_SPACES`, `PREPARE`, `STROKE_RUNS`, `IMAGE_FILTER_SPACES`, `GROUP_SOFT_MASK` and `PATTERN`; cancel
  *   between units with a work bound of 1 unit; in-line; no extent limit; no log.  NULL is ignored.
  */
 GSHSCENE_API void gshscene_dump_sink_config_default(GSHSCENE_Dump_Sink_Config * config);

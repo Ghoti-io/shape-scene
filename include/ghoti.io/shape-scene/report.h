@@ -52,7 +52,7 @@
  * | `APPROXIMATED` | the item was drawn, differently from the definition (a clip without antialiasing, a group blended in another space) |
  * | `RESOLVED_AMBIGUITY` | a depth tie of the list (N11): `second` is the first item of the unit painted after, in the same list, `depth` the depth they share |
  * | `HINT_STATUS` | a run from a font not hinted as it asked (glyph.h, D7): one entry per run for a run-level cause, `second` 0; one per glyph for a glyph-level cause, `second` the glyph's index in the run |
- * | `NOTICE` | the item was drawn as defined, and the definition draws nothing there: a gradient fill whose chain is not invertible or whose gradient is degenerate (paint.h, G10, G11); a stroke whose chain is not invertible, whose width is 0 or whose gradient paint is degenerate (stroke.h, SK8, SK9).  It never fails a render, strict or not |
+ * | `NOTICE` | the item was drawn as defined, and the definition draws nothing there: a gradient fill whose chain is not invertible or whose gradient is degenerate (paint.h, G10, G11); a fill or stroke painted with a pattern whose chain is not invertible or whose pattern has a size or step of 0 (pattern.h, PT10); a stroke whose chain is not invertible, whose width is 0 or whose gradient paint is degenerate (stroke.h, SK8, SK9).  It never fails a render, strict or not |
  *
  * A `REFUSED` entry of one glyph of a run (glyph.h) likewise has the glyph's
  * index in `second`; the rest of the run was drawn.  A `REFUSED` entry of a
@@ -167,6 +167,9 @@ typedef enum GSHSCENE_Reason {
   GSHSCENE_REASON_IMAGE_FILTER = 33,  ///< Approximated, per fill: the filter the item's map calls for is not one the sink draws (IP15).
   GSHSCENE_REASON_IMAGE_FILTER_SPACE = 34, ///< Approximated, per fill: the image paint's stated filter space is not the one the sink filters in (IP15).
   GSHSCENE_REASON_MASK_FEATURE = 35,  ///< Refused, per group: its mask needs a feature the sink lacks; `second` names the missing `GSHSCENE_MASK_NATIVE_*` bits (mask.h, MK9).
+  GSHSCENE_REASON_PATTERN = 36,       ///< Refused, per unit: a fill or stroke painted with a pattern the sink does not draw, or a pattern whose tile holds a unit the sink refuses (pattern.h, PT13, S22).
+  GSHSCENE_REASON_PATTERN_DEGENERATE = 37, ///< Notice, per unit: the pattern has a size or a step of 0, so it draws nothing (pattern.h, PT10).
+  GSHSCENE_REASON_PATTERN_RESAMPLED = 38,  ///< Approximated, per unit: the sink resamples the tile instead of drawing the lattice of copies (pattern.h, PT13).
   GSHSCENE_REASON_COUNT               ///< Closes the enum.
 } GSHSCENE_Reason;
 

@@ -133,6 +133,13 @@ struct GSHSCENE_Resource {
       uint64_t * tiles;           /* tiles_x * tiles_y hashes in tile order */
     } image;
     struct {
+      GSHSCENE_Pattern p;             /* canonical (PT1); the tile points at the retained copy below */
+      const GSHSCENE_Resource * tile; /* retained */
+      size_t depth;                   /* PT11: the tile's picture depth, which a list that names the pattern counts */
+      int foreground;                 /* the tile (or a picture nested in it) or the tint reads the foreground (PT12) */
+      uint32_t palette_need;          /* the largest palette entry the tile or the tint names, plus one; 0 for none (PT12) */
+    } pattern;
+    struct {
       GSHSCENE_Mask m;                    /* canonical (MK1); the picture and the transfer's arrays point at the copies below */
       GSHSCENE_Transfer_Piece * pieces;   /* the stitching's pieces, NULL for none */
       double * samples;                   /* every table's samples, the top level's first, then each piece's; NULL for none */
@@ -340,6 +347,48 @@ int gshscene_image_paint_dump(const GSHSCENE_Resource * resource, FILE * out);
 
 /** The distinct reasons a map of an image paint's chain makes the fill draw nothing: 1 when the paint's own map is singular. */
 int gshscene_image_paint_singular(const GSHSCENE_Resource * resource);
+
+/* --- pattern.c -------------------------------------------------------------- */
+
+/** Whether a pattern resource has the canonical content @p source (a pattern.c Source). */
+int gshscene_pattern_matches(const GSHSCENE_Resource * resource, const void * source);
+
+/** Release the tile a pattern holds. */
+void gshscene_pattern_free(GSHSCENE_Resource * resource);
+
+/** The payload of a pattern's dump (pattern.h, PT3): its line, then the tile's list; negative on failure. */
+int gshscene_pattern_dump(const GSHSCENE_Resource * resource, FILE * out);
+
+/** PT10: 1 when a map of the pattern paint's own chain (the pattern's map) is singular, for the stroke notice's list. */
+int gshscene_pattern_singular(const GSHSCENE_Resource * resource);
+
+/** PT12, N13: whether a paint reads the foreground (a foreground paint, or a gradient, image paint or pattern that names one). */
+int gshscene_paint_reads_foreground(const GSHSCENE_Paint * paint);
+
+/** PT12, N13: the palette entry a paint reads plus one, the largest over what it names; 0 for none. */
+uint32_t gshscene_paint_palette_need(const GSHSCENE_Paint * paint);
+
+/** The most maps and levels the tile check of PT13 holds; a tile nested deeper is refused (see pattern.c). */
+#define GSHSCENE_PATTERN_CHECK_LEVELS 64u
+/** The maps the tile check holds: a pattern's two for a level and an enclosing chain of at most as many levels again. */
+#define GSHSCENE_PATTERN_CHECK_MAPS (3u * GSHSCENE_PATTERN_CHECK_LEVELS + 2u)
+
+/**
+ * PT13: whether the unit @p item, painted with a pattern, has a unit in its tile (an expanded picture's or a nested tile's
+ * included) that @p caps refuse, with the chain that unit has: @p instance_maps, then the item's map and the pattern's, then
+ * the tile's own.  1 also for a tile too deeply nested for the check.
+ */
+int gshscene_pattern_tile_refused(const GSHSCENE_Sink_Caps * caps, const GSHSCENE_Item * item,
+    const GSHGEOM_Map * instance_maps, size_t instance_count, const GSHGEOM_Map * target_map,
+    const GSHSCENE_Color_Space * target_space, const GSHSCENE_Resource * palette);
+
+/**
+ * The caps' own dispositions of one unit, without the walk into a tile (PT13): what ::gshscene_caps_disposition decides
+ * before it asks for the tile.
+ */
+GSHSCENE_Disposition gshscene_caps_disposition_unit(const GSHSCENE_Sink_Caps * caps, const GSHSCENE_Item * item,
+    const GSHGEOM_Map * instance_maps, size_t instance_count, const GSHGEOM_Map * target_map,
+    const GSHSCENE_Color_Space * target_space, const GSHSCENE_Resource * palette);
 
 /* --- image.c ---------------------------------------------------------------- */
 

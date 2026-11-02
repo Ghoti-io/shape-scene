@@ -90,13 +90,18 @@ typedef struct GSHSCENE_Skip {
   int instance;  /* the refused item is an instance */
 } GSHSCENE_Skip;
 
-/** Start skipping after a refused @p item at chain length @p count (a fill or a pop skips nothing more). */
+/**
+ * Start skipping after a refused @p item at chain length @p count (a fill or a pop skips nothing more, but for the tile of a
+ * pattern the planning pass enters after a unit painted with one: that is skipped as an instance's picture is).
+ */
 static inline void gshscene_skip_begin(GSHSCENE_Skip * skip, const GSHSCENE_Item * item, size_t count) {
+  int tiled = (item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE) &&
+      item->paint.kind == GSHSCENE_PAINT_PATTERN;
   if (item->kind == GSHSCENE_ITEM_CLIP_PUSH || item->kind == GSHSCENE_ITEM_GROUP_PUSH ||
-      item->kind == GSHSCENE_ITEM_INSTANCE) {
+      item->kind == GSHSCENE_ITEM_INSTANCE || tiled) {
     skip->level = count;
     skip->depth = 0;
-    skip->instance = item->kind == GSHSCENE_ITEM_INSTANCE;
+    skip->instance = item->kind == GSHSCENE_ITEM_INSTANCE || tiled;
   }
 }
 

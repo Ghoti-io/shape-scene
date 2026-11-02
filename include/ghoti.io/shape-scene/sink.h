@@ -256,6 +256,21 @@
  * refuses what its caps lack.  A device width on a stream is in CSS pixels, 1/96
  * inch in the target's unit (::gshscene_stroke_pixel_size).
  *
+ * **S22 Patterns (pattern.h, PT1 to PT14).**  A pattern reaches a sink by handle, in a fill's or a stroke's paint, and a sink
+ * reads it with `gshscene_resource_pattern`, its cells with ::gshscene_pattern_cell and its two selectors with
+ * ::gshscene_pattern_overlaps and ::gshscene_pattern_notice.  A sink that draws patterns has ::GSHSCENE_CAP_PATTERN; without it
+ * the planning pass refuses every unit painted with one, `PATTERN`, on every sink (a writer and a toolpath included), before the
+ * target is touched, so under strict the render fails before the sink is called.  With it the sink draws every field as defined
+ * or lowers it exactly (a writer writes a step larger than the cell by enlarging the written tile and a smaller one by
+ * instancing the neighbours the lattice order puts under it); a field it cannot honor refuses the unit, `PATTERN`, or, for a
+ * sink that resamples the tile within its tolerance, is approximated, `PATTERN_RESAMPLED`.  The planning pass enters the tile
+ * (::GSHSCENE_Expansion with masks and tiles entered): a unit in the tile the sink refuses is reported with the chain
+ * `[... , i, j]`, `i` the unit painted with the pattern and `j` the unit in the tile, once per tile unit and not per
+ * copy, and refuses the unit painted with the pattern, `PATTERN`, too: ::gshscene_caps_disposition decides both, so a sink
+ * that asks it per unit gets the same answer.  A pattern's palette and foreground paints resolve against the list that draws it.
+ * A unit that draws nothing (::gshscene_pattern_notice) is noticed and skipped.  A writer keeps the pattern by handle and emits
+ * it, and its tile, once per resource id; a cache of tiles is keyed by the tile picture's id and dropped at release.
+ *
  * ### For sink implementations
  *
  * A sink library fills a ::GSHSCENE_Sink_Ops and calls ::gshscene_sink_create
@@ -392,7 +407,9 @@ typedef struct GSHSCENE_Target {
 #define GSHSCENE_CAP_STROKE_RUNS (UINT32_C(1) << 13)
 /** Image paints are filtered in their stated filter space (image_paint.h, IP5); without it a stated space is approximated, `IMAGE_FILTER_SPACE` (S21). */
 #define GSHSCENE_CAP_IMAGE_FILTER_SPACES (UINT32_C(1) << 14)
-#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 15) - 1) ///< Every flag defined.
+/** Patterns are drawn as pattern.h states them (PT13, S22); without it the planning pass refuses a unit painted with one, `PATTERN`. */
+#define GSHSCENE_CAP_PATTERN (UINT32_C(1) << 15)
+#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 16) - 1) ///< Every flag defined.
 /** @} */
 
 /**
@@ -800,12 +817,15 @@ GSHSCENE_API GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_
  * degenerate (linear with an exactly zero denominator, `gshgeom_orient3d`'s exact sign; radial with equal circles;
  * two or more stops at one offset under repeat or reflect; sweep with equal angles under repeat or reflect).
  *
- * @param item A fill; anything else, or a fill whose paint is not a gradient, draws as stated (0).
+ * A fill painted with an image paint is noticed for G11's condition alone (image_paint.h, IP11), and one painted with a
+ * pattern by ::gshscene_pattern_notice (pattern.h, PT10).
+ *
+ * @param item A fill; anything else, or a fill whose paint is not a gradient, an image paint or a pattern, draws as stated (0).
  * @param instance_maps The maps of the enclosing instances, root to leaf; may be NULL when @p instance_count is 0.
  * @param instance_count How many.
  * @param target_map The target's map, or NULL for the identity.
- * @return 0 when the fill draws as G6 to G9 say; ::GSHSCENE_REASON_MAP_NOT_INVERTIBLE; or
- *   ::GSHSCENE_REASON_GRADIENT_DEGENERATE.
+ * @return 0 when the fill draws as G6 to G9 say; ::GSHSCENE_REASON_MAP_NOT_INVERTIBLE;
+ *   ::GSHSCENE_REASON_GRADIENT_DEGENERATE; or ::GSHSCENE_REASON_PATTERN_DEGENERATE.
  */
 GSHSCENE_API GSHSCENE_Reason gshscene_paint_notice(const GSHSCENE_Item * item, const GSHGEOM_Map * instance_maps,
     size_t instance_count, const GSHGEOM_Map * target_map);
@@ -822,7 +842,7 @@ typedef struct GSHSCENE_Expansion {
   size_t capacity;              ///< Private: the levels there is room for.
   size_t level;                 ///< Private: the levels in use (0 when done).
   int pending;                  ///< Private: how the next call steps past the last unit.
-  int masks;                    ///< Private: the walk enters a masked group's mask picture (set by the planning pass only).
+  int plan;                     ///< Private: the walk enters a masked group's mask picture and the tile of a unit painted with a pattern (set by the planning pass only).
 } GSHSCENE_Expansion;
 
 /** @brief The bytes a walk of @p list needs; 0 for NULL. */

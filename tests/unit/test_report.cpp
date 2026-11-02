@@ -44,7 +44,8 @@ TEST(Report, EveryClassAndReasonHasItsOwnString) {
       "hint-no-program", "hint-program-failed", "hint-with-errors", "hint-strict-route", "glyph-unavailable",
       "face-unbound", "palette-entry", "gradient", "interpolation-space", "map-not-invertible", "gradient-degenerate",
       "group-isolation", "group-knockout", "soft-mask", "stroke-style", "stroke-zero-width",
-      "stroke-centerline", "placeholder", "image", "image-filter", "image-filter-space", "mask-feature"};
+      "stroke-centerline", "placeholder", "image", "image-filter", "image-filter-space", "mask-feature", "pattern",
+      "pattern-degenerate", "pattern-resampled"};
   ASSERT_EQ(sizeof names / sizeof names[0], (size_t)GSHSCENE_REASON_COUNT - 1);
   for (int r = GSHSCENE_REASON_ITEM_KIND; r < GSHSCENE_REASON_COUNT; r++) {
     EXPECT_STREQ(gshscene_reason_string((GSHSCENE_Reason)r), names[r - 1]) << r;
@@ -89,7 +90,10 @@ TEST(Report, ThePinnedValuesArePinned) {
   EXPECT_EQ((int)GSHSCENE_REASON_IMAGE_FILTER, 33);
   EXPECT_EQ((int)GSHSCENE_REASON_IMAGE_FILTER_SPACE, 34);
   EXPECT_EQ((int)GSHSCENE_REASON_MASK_FEATURE, 35);
-  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 36);
+  EXPECT_EQ((int)GSHSCENE_REASON_PATTERN, 36);
+  EXPECT_EQ((int)GSHSCENE_REASON_PATTERN_DEGENERATE, 37);
+  EXPECT_EQ((int)GSHSCENE_REASON_PATTERN_RESAMPLED, 38);
+  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 39);
 }
 
 TEST(Report, ThePlaceholderRegistryIsPinnedAndNamed) {

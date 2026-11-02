@@ -70,7 +70,7 @@ GSHSCENE_Result gshscene_expansion_init(GSHSCENE_Expansion * walk, const GSHSCEN
   walk->chain[0] = 0;
   walk->level = 1;
   walk->pending = 0;
-  walk->masks = 0;
+  walk->plan = 0;
   return GSHSCENE_OK;
 }
 
@@ -102,9 +102,15 @@ int gshscene_expansion_next(
     return 0;
   }
   const GSHSCENE_List * picture = item->kind == GSHSCENE_ITEM_INSTANCE ? gshscene_resource_picture(item->resource) : NULL;
-  if (walk->masks && item->kind == GSHSCENE_ITEM_GROUP_PUSH && item->group.soft_mask) {
+  if (walk->plan && item->kind == GSHSCENE_ITEM_GROUP_PUSH && item->group.soft_mask) {
     /* MK9: the planning pass alone enters a mask's picture, as the unit after the group's push; its content follows. */
     picture = gshscene_resource_picture(item->group.soft_mask->u.mask.m.picture);
+  }
+  if (walk->plan && (item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE) &&
+      item->paint.kind == GSHSCENE_PAINT_PATTERN && item->paint.resource &&
+      item->paint.resource->kind == GSHSCENE_RESOURCE_PATTERN) {
+    /* PT13: likewise a pattern's tile, as the units after the unit painted with it. */
+    picture = gshscene_resource_picture(item->paint.resource->u.pattern.tile);
   }
   if (picture && walk->level < walk->capacity) {
     walk->lists[walk->level] = picture;
@@ -151,7 +157,7 @@ static uint32_t mask_missing(const GSHSCENE_Sink_Caps * caps, const GSHSCENE_Ite
   return need & ~caps->mask_native;
 }
 
-GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps, const GSHSCENE_Item * item,
+GSHSCENE_Disposition gshscene_caps_disposition_unit(const GSHSCENE_Sink_Caps * caps, const GSHSCENE_Item * item,
     const GSHGEOM_Map * instance_maps, size_t instance_count, const GSHGEOM_Map * target_map,
     const GSHSCENE_Color_Space * target_space, const GSHSCENE_Resource * palette) {
   GSHSCENE_Disposition d = {(GSHSCENE_Entry_Class)0, (GSHSCENE_Reason)0, 0};
@@ -227,6 +233,23 @@ GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps, 
     /* N14: a palette tint whose entry the palette in force does not have refuses the fill. */
     uint32_t need = image_paint->u.imagepaint.palette_need;
     if (need && (!palette || palette->kind != GSHSCENE_RESOURCE_PALETTE || need > palette->u.palette.count)) {
+      d.entry_class = GSHSCENE_ENTRY_REFUSED;
+      d.reason = GSHSCENE_REASON_PALETTE_ENTRY;
+      return d;
+    }
+  }
+  if (painted && item->paint.kind == GSHSCENE_PAINT_PATTERN && item->paint.resource &&
+      item->paint.resource->kind == GSHSCENE_RESOURCE_PATTERN) {
+    /* S22, PT13: a sink without the flag refuses the unit, whatever else is true of it. */
+    if (!(caps->flags & GSHSCENE_CAP_PATTERN)) {
+      d.entry_class = GSHSCENE_ENTRY_REFUSED;
+      d.reason = GSHSCENE_REASON_PATTERN;
+      return d;
+    }
+    /* PT8, N14: an uncolored pattern's palette tint whose entry the palette in force does not have refuses the unit. */
+    const GSHSCENE_Pattern * p = &item->paint.resource->u.pattern.p;
+    if (p->has_tint && p->tint.kind == GSHSCENE_PAINT_PALETTE &&
+        (!palette || palette->kind != GSHSCENE_RESOURCE_PALETTE || p->tint.entry >= palette->u.palette.count)) {
       d.entry_class = GSHSCENE_ENTRY_REFUSED;
       d.reason = GSHSCENE_REASON_PALETTE_ENTRY;
       return d;
@@ -334,6 +357,23 @@ GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps, 
       d.reason = GSHSCENE_REASON_IMAGE_FILTER_SPACE;
       return d;
     }
+  }
+  return d;
+}
+
+GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps, const GSHSCENE_Item * item,
+    const GSHGEOM_Map * instance_maps, size_t instance_count, const GSHGEOM_Map * target_map,
+    const GSHSCENE_Color_Space * target_space, const GSHSCENE_Resource * palette) {
+  GSHSCENE_Disposition d =
+      gshscene_caps_disposition_unit(caps, item, instance_maps, instance_count, target_map, target_space, palette);
+  /* PT13: a pattern with a missing part is not the pattern, so a unit in the tile that the caps refuse refuses the unit
+   * painted with it (the units in the tile are reported by the planning pass, each once). */
+  if (!d.entry_class && caps && item && (item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE) &&
+      item->paint.kind == GSHSCENE_PAINT_PATTERN && item->paint.resource &&
+      item->paint.resource->kind == GSHSCENE_RESOURCE_PATTERN &&
+      gshscene_pattern_tile_refused(caps, item, instance_maps, instance_count, target_map, target_space, palette)) {
+    d.entry_class = GSHSCENE_ENTRY_REFUSED;
+    d.reason = GSHSCENE_REASON_PATTERN;
   }
   return d;
 }
@@ -808,22 +848,28 @@ static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
   const GSHSCENE_List * list = job->request.list;
   size_t walk_bytes = gshscene_expansion_bytes(list);
   size_t levels = walk_levels(list);
-  /* The walk's memory, then room for a chain to key the ties by, then a map per level (the routes'). */
+  /* The walk's memory, then room for a chain to key the ties by and the maps each level starts after, then the maps: a level
+   * adds one (an instance's or a mask's placement) or, for a unit painted with a pattern, two (its map and the pattern's, so
+   * that each is tested on its own doubles, PT10). */
   size_t key_bytes = gshscene_sat_mul(levels, sizeof(size_t));
+  size_t at_base = gshscene_sat_add(walk_bytes, key_bytes);
   /* The maps start on a 16-byte boundary of the scratch (which the allocator aligns), whatever a pointer's size. */
-  size_t at_maps = gshscene_sat_add(gshscene_sat_add(walk_bytes, key_bytes), 15u) & ~(size_t)15u;
-  unsigned char * memory = gshscene_report_scratch(report, gshscene_sat_add(at_maps, gshscene_sat_mul(levels, sizeof(GSHGEOM_Map))));
+  size_t at_maps = gshscene_sat_add(gshscene_sat_add(at_base, key_bytes), 15u) & ~(size_t)15u;
+  unsigned char * memory = gshscene_report_scratch(
+      report, gshscene_sat_add(at_maps, gshscene_sat_mul(gshscene_sat_mul(levels, 2u), sizeof(GSHGEOM_Map))));
   if (!memory) {
     return GSHSCENE_ERR_OOM;
   }
   size_t * key = (size_t *)(void *)(memory + walk_bytes);
+  size_t * base = (size_t *)(void *)(memory + at_base); /* base[l]: the maps before the items of level l + 1 */
   GSHGEOM_Map * maps = (GSHGEOM_Map *)(void *)(memory + at_maps);
   GSHSCENE_Expansion walk;
   GSHSCENE_Result result = gshscene_expansion_init(&walk, list, memory, walk_bytes);
   if (result != GSHSCENE_OK) {
     return result;
   }
-  walk.masks = 1; /* MK9: the plan alone enters a mask's picture, so a refusal inside one is not silent */
+  walk.plan = 1; /* MK9, PT13: the plan alone enters a mask's picture and a pattern's tile, so a refusal inside one is not silent */
+  base[0] = 0;
   result = plan_ties(report, list, key, 1); /* plan_ties writes key[0] */
   if (result != GSHSCENE_OK) {
     return result;
@@ -837,8 +883,9 @@ static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
     if (gshscene_skip_step(&skip, item, count)) {
       continue;
     }
+    size_t outer = base[count - 1]; /* the maps of the enclosing levels */
     GSHSCENE_Disposition d = gshscene_caps_disposition(
-        &job->caps, item, maps, count - 1, &job->target.map, &job->target_space, gshscene_list_palette(list));
+        &job->caps, item, maps, outer, &job->target.map, &job->target_space, gshscene_list_palette(list));
     if (d.entry_class) {
       /* A stroke refused for its style names the missing features (SK11), a placeholder its source and code (PH4); every
       * other entry's second is 0. */
@@ -852,10 +899,10 @@ static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
       gshscene_skip_begin(&skip, item, count);
       continue;
     }
-    /* S17, S20: a gradient fill or a stroke that draws nothing is drawn as defined, and the report says so. */
+    /* S17, S20, PT10: a gradient, image or pattern fill or a stroke that draws nothing is drawn as defined, and the report says so. */
     GSHSCENE_Reason notice = item->kind == GSHSCENE_ITEM_STROKE
-        ? gshscene_stroke_notice(item, maps, count - 1, &job->target.map)
-        : gshscene_paint_notice(item, maps, count - 1, &job->target.map);
+        ? gshscene_stroke_notice(item, maps, outer, &job->target.map)
+        : gshscene_paint_notice(item, maps, outer, &job->target.map);
     if (notice) {
       result = gshscene_report_add(report, GSHSCENE_ENTRY_NOTICE, notice, chain, count, 0, 0.0);
       if (result != GSHSCENE_OK) {
@@ -863,7 +910,8 @@ static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
       }
     }
     GSHSCENE_Glyph_Route route;
-    if (plan_route(job, item, maps, count, &route) && route.entry_class) {
+    maps[outer] = item->map; /* the item's own map, after the enclosing levels' (AD-24, as a sink composes them) */
+    if (plan_route(job, item, maps, outer + 1, &route) && route.entry_class) {
       /* A run-level entry (D6, D7): the item's chain, second 0. */
       result = gshscene_report_add(report, (GSHSCENE_Entry_Class)route.entry_class, (GSHSCENE_Reason)route.reason,
           chain, count, 0, 0.0);
@@ -876,15 +924,30 @@ static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
         continue;
       }
     }
+    int pattern = (item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE) &&
+        item->paint.kind == GSHSCENE_PAINT_PATTERN && item->paint.resource &&
+        item->paint.resource->kind == GSHSCENE_RESOURCE_PATTERN;
     if (item->kind == GSHSCENE_ITEM_INSTANCE ||
         (item->kind == GSHSCENE_ITEM_GROUP_PUSH && item->group.soft_mask)) {
       /* An instance's picture is drawn under its map, a mask's under the group's placement of it (MK6): the chain T I_1 .. I_k Q. */
       int is_mask = item->kind == GSHSCENE_ITEM_GROUP_PUSH;
-      maps[count - 1] = is_mask ? item->group.soft_mask_map : item->map;
+      maps[outer] = is_mask ? item->group.soft_mask_map : item->map;
+      base[count] = outer + 1;
       const GSHSCENE_List * picture = gshscene_resource_picture(
           is_mask ? item->group.soft_mask->u.mask.m.picture : item->resource);
       memcpy(key, chain, count * sizeof *chain); /* key[count] is written by plan_ties */
       result = plan_ties(report, picture, key, count + 1);
+      if (result != GSHSCENE_OK) {
+        return result;
+      }
+    } else if (pattern) {
+      /* PT13: the tile is drawn under the item's map and the pattern's, so its units' chain has both (T I_1 .. I_k M G), and its
+       * ties are the picture's own, keyed by the chain [... , i, j]. */
+      maps[outer] = item->map;
+      maps[outer + 1] = item->paint.resource->u.pattern.p.map;
+      base[count] = outer + 2;
+      memcpy(key, chain, count * sizeof *chain);
+      result = plan_ties(report, gshscene_resource_picture(item->paint.resource->u.pattern.tile), key, count + 1);
       if (result != GSHSCENE_OK) {
         return result;
       }

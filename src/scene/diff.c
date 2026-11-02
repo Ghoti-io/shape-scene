@@ -478,18 +478,14 @@ static GSHSCENE_Result damage_group_leave(void * ctx, const GSHSCENE_Walk * walk
   return GSHSCENE_OK;
 }
 
-/** N13: whether a paint reads the foreground: a foreground paint, or a gradient with a foreground stop (G3). */
+/** N13: whether a paint reads the foreground: a foreground paint, or a gradient, image paint or pattern that names one (G3, IP10, PT12). */
 static int paints_with_foreground(const GSHSCENE_Paint * paint) {
-  return paint->kind == GSHSCENE_PAINT_FOREGROUND ||
-      (paint->kind == GSHSCENE_PAINT_GRADIENT && paint->resource->u.gradient.foreground) ||
-      (paint->kind == GSHSCENE_PAINT_IMAGE && paint->resource->u.imagepaint.foreground); /* IP10: a foreground tint */
+  return gshscene_paint_reads_foreground(paint);
 }
 
-/** N13: whether a paint reads the palette: a palette paint, or a gradient with a palette stop (G3). */
+/** N13: whether a paint reads the palette: a palette paint, or a gradient, image paint or pattern that names an entry (G3, IP10, PT12). */
 static int paints_from_palette(const GSHSCENE_Paint * paint) {
-  return paint->kind == GSHSCENE_PAINT_PALETTE ||
-      (paint->kind == GSHSCENE_PAINT_GRADIENT && paint->resource->u.gradient.palette_need != 0) ||
-      (paint->kind == GSHSCENE_PAINT_IMAGE && paint->resource->u.imagepaint.palette_need != 0); /* IP10: a palette tint */
+  return gshscene_paint_palette_need(paint) != 0;
 }
 
 static GSHSCENE_Result damage_shape(

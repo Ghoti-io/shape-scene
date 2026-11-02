@@ -186,7 +186,7 @@
  *
  * **SK9 Not invertible.**  A stroke draws nothing, with a `NOTICE`, reason
  * `MAP_NOT_INVERTIBLE`, exactly when some map of its chain (`T`, `I_1` to `I_k`,
- * `M`, and `G` for a gradient paint) has a 2x2 linear part whose determinant is
+ * `M`, and `G` for a gradient, image or pattern paint) has a 2x2 linear part whose determinant is
  * exactly zero (G11's condition, `gshgeom_orient2d`'s exact sign), **or the
  * composed map does** (`gshgeom_map_compose_chain` of `T I_1 ... I_k M`, decided by
  * `gshgeom_stroke_map_invertible`: invertible factors can compose, by underflow, into
@@ -430,13 +430,14 @@ GSHSCENE_API GSHSCENE_Result gshscene_resource_stroke_geometry(const GSHSCENE_Re
  *
  * `MAP_NOT_INVERTIBLE` when a map of the chain (@p target_map, @p instance_maps root to leaf, the item's map, and a
  * gradient paint's map) has a 2x2 linear part of determinant exactly zero; then `STROKE_ZERO_WIDTH` for width 0; then
- * `GRADIENT_DEGENERATE` for a degenerate gradient paint (G10).
+ * `GRADIENT_DEGENERATE` for a degenerate gradient paint (G10), or `PATTERN_DEGENERATE` for a pattern paint with a size or a
+ * step of 0 (pattern.h, PT10; a pattern paint's map is in the chain of the first condition).
  *
  * @param item A stroke; anything else draws as stated (0).
  * @param instance_maps The maps of the enclosing instances, root to leaf; NULL only when @p instance_count is 0.
  * @param target_map The target's map, or NULL for the identity (a zero-filled map is the identity too).
- * @return 0, ::GSHSCENE_REASON_MAP_NOT_INVERTIBLE, ::GSHSCENE_REASON_STROKE_ZERO_WIDTH or
- *   ::GSHSCENE_REASON_GRADIENT_DEGENERATE.
+ * @return 0, ::GSHSCENE_REASON_MAP_NOT_INVERTIBLE, ::GSHSCENE_REASON_STROKE_ZERO_WIDTH,
+ *   ::GSHSCENE_REASON_GRADIENT_DEGENERATE or ::GSHSCENE_REASON_PATTERN_DEGENERATE.
  */
 GSHSCENE_API GSHSCENE_Reason gshscene_stroke_notice(const GSHSCENE_Item * item, const GSHGEOM_Map * instance_maps,
     size_t instance_count, const GSHGEOM_Map * target_map);

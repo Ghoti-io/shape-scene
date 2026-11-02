@@ -278,6 +278,10 @@ static GSHSCENE_Result visit(Check * c, size_t index, size_t level) {
       m->items = 1;
       m->occ = 1;
       m->exp = 1;
+      /* PT11: the tile of the pattern it is painted with is a picture the emitted list draws, as an instance's is. */
+      if (c->nodes[index]->p.kind != GSHSCENE_NODE_PLACEHOLDER && c->nodes[index]->p.paint.kind == GSHSCENE_PAINT_PATTERN) {
+        m->pic = c->nodes[index]->p.paint.resource->u.pattern.depth;
+      }
       result = GSHSCENE_OK;
       break;
     default:

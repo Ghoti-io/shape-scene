@@ -586,7 +586,8 @@ GSHSCENE_Reason gshscene_stroke_notice(const GSHSCENE_Item * item, const GSHGEOM
           item->paint.resource->kind == GSHSCENE_RESOURCE_IMAGE_PAINT ? item->paint.resource : NULL;
   /* SK9: G11's condition on each map of the chain, for both width spaces ... */
   int not_invertible = (target_map && gshscene_map_singular(target_map)) || gshscene_map_singular(&item->map) ||
-      (gradient && gshscene_map_singular(&gradient->u.gradient.g.map)) || gshscene_image_paint_singular(image_paint);
+      (gradient && gshscene_map_singular(&gradient->u.gradient.g.map)) || gshscene_image_paint_singular(image_paint) ||
+      gshscene_pattern_singular(item->paint.kind == GSHSCENE_PAINT_PATTERN ? item->paint.resource : NULL);
   for (size_t i = 0; i < instance_count && !not_invertible; i++) {
     not_invertible = gshscene_map_singular(&instance_maps[i]);
   }
@@ -605,6 +606,10 @@ GSHSCENE_Reason gshscene_stroke_notice(const GSHSCENE_Item * item, const GSHGEOM
   }
   if (item->style->u.stroke.s.width == 0.0) {
     return GSHSCENE_REASON_STROKE_ZERO_WIDTH; /* SK8 */
+  }
+  if (item->paint.kind == GSHSCENE_PAINT_PATTERN) {
+    return gshscene_pattern_notice(item, instance_maps, instance_count, target_map) == GSHSCENE_REASON_PATTERN_DEGENERATE
+        ? GSHSCENE_REASON_PATTERN_DEGENERATE : (GSHSCENE_Reason)0; /* PT10: its maps were tested above, with the stroke's own */
   }
   return gradient && gshscene_gradient_degenerate(&gradient->u.gradient.g) ? GSHSCENE_REASON_GRADIENT_DEGENERATE
                                                                          : (GSHSCENE_Reason)0;

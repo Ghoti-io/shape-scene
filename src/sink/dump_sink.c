@@ -189,6 +189,8 @@ static void caps_full(GSHSCENE_Sink_Caps * caps, int readback) {
   /* Every mask feature, recorded by handle (MK14); a configuration clears them for a writer that lacks some. */
   caps->flags |= GSHSCENE_CAP_GROUP_SOFT_MASK;
   caps->mask_native = GSHSCENE_MASK_NATIVE_ALL;
+  /* Every pattern, recorded by handle (S22). */
+  caps->flags |= GSHSCENE_CAP_PATTERN;
   caps->cancel_unit = GSHSCENE_CANCEL_BETWEEN_UNITS;
   caps->cancel_work_bound = 1;
   caps->work_measure = "units";
@@ -295,6 +297,9 @@ static void gradient_need(const GSHSCENE_List * list, size_t * fills, size_t * s
     } else if ((item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE) &&
                item->paint.kind == GSHSCENE_PAINT_IMAGE) {
       *fills = gshscene_sat_add(*fills, 2); /* its image paint and its image: each recorded once per render, by id */
+    } else if ((item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE) &&
+               item->paint.kind == GSHSCENE_PAINT_PATTERN) {
+      *fills = gshscene_sat_add(*fills, 2); /* its pattern and its tile: each recorded once per render, by id */
     } else if (item->kind == GSHSCENE_ITEM_INSTANCE) {
       gradient_need(gshscene_resource_picture(item->resource), fills, stops, strokes);
     }
@@ -1000,6 +1005,55 @@ static GSHSCENE_Result image_paint_record(Run * run, const GSHSCENE_Resource * p
 }
 
 /**
+ * A pattern's records (dump_sink.h, S22), the first time a render meets each id: the tile,
+ * `V <id> <hash> items=N` (never its items: the tile's units are the plan's to walk), then the pattern,
+ * `Z <id> <hash> tile=<id> cell=<x> <y> <w> <h> step=<xs> <ys> repeat=<rx><ry> map=<hash> tint=<-|kind r g b a space entry>`
+ * with each double as 16 hexadecimal digits, as a writer emits a tile once and names it by handle.  They share the table of
+ * ids with the gradients (an id is never issued twice by a store, whatever the kind).
+ */
+static GSHSCENE_Result pattern_record(Run * run, const GSHSCENE_Resource * pattern, GSHSCENE_Result * failed) {
+  GSHSCENE_Pattern p;
+  if (gshscene_resource_pattern(pattern, &p) != GSHSCENE_OK) {
+    return GSHSCENE_ERR_INTERNAL;
+  }
+  uint64_t pattern_id = gshscene_resource_id(pattern);
+  for (size_t i = 0; i < run->gradient_count; i++) {
+    if (run->gradients[i] == pattern_id) {
+      return GSHSCENE_OK;
+    }
+  }
+  uint64_t tile_id = gshscene_resource_id(p.tile);
+  int tile_known = 0;
+  for (size_t i = 0; i < run->gradient_count; i++) {
+    tile_known = tile_known || run->gradients[i] == tile_id;
+  }
+  if (!tile_known) {
+    run->gradients[run->gradient_count++] = tile_id;
+    snprintf(run->line, LINE_BYTES, "V %" PRIu64 " %016" PRIx64 " items=%" PRIu64 "\n", tile_id, gshscene_resource_hash(p.tile),
+        (uint64_t)gshscene_list_count(gshscene_resource_picture(p.tile)));
+    emit_text(run, run->line, failed);
+  }
+  run->gradients[run->gradient_count++] = pattern_id;
+  snprintf(run->line, LINE_BYTES,
+      "Z %" PRIu64 " %016" PRIx64 " tile=%" PRIu64 " cell=%016" PRIx64 " %016" PRIx64 " %016" PRIx64 " %016" PRIx64
+      " step=%016" PRIx64 " %016" PRIx64 " repeat=%u%u map=%016" PRIx64 " tint=",
+      pattern_id, gshscene_resource_hash(pattern), tile_id, gshgeom_f64_bits(p.x), gshgeom_f64_bits(p.y),
+      gshgeom_f64_bits(p.w), gshgeom_f64_bits(p.h), gshgeom_f64_bits(p.x_step), gshgeom_f64_bits(p.y_step), p.repeat_x,
+      p.repeat_y, gshgeom_map_hash(&p.map));
+  emit_text(run, run->line, failed);
+  if (!p.has_tint) {
+    emit_text(run, "-\n", failed);
+  } else {
+    snprintf(run->line, LINE_BYTES, "%u %016" PRIx64 " %016" PRIx64 " %016" PRIx64 " %016" PRIx64 " %u:%u:%016" PRIx64 " %u\n",
+        (unsigned)p.tint.kind, gshgeom_f64_bits(p.tint.rgba[0]), gshgeom_f64_bits(p.tint.rgba[1]),
+        gshgeom_f64_bits(p.tint.rgba[2]), gshgeom_f64_bits(p.tint.rgba[3]), (unsigned)p.tint.space.primaries,
+        (unsigned)p.tint.space.transfer, gshgeom_f64_bits(p.tint.space.gamma), p.tint.entry);
+    emit_text(run, run->line, failed);
+  }
+  return GSHSCENE_OK;
+}
+
+/**
  * The style's record (dump_sink.h), the first time a render meets its id (S20): `Q <id> <hash>` and its fields as
  * the style's dump spells them, then a `d` line per dash, as a writer emits a style once.
  */
@@ -1212,6 +1266,9 @@ static GSHSCENE_Result stroke_unit(Run * run, const GSHSCENE_Item * item, const 
   } else if (item->paint.kind == GSHSCENE_PAINT_IMAGE) {
     snprintf(run->line, LINE_BYTES, " img=%" PRIu64, gshscene_resource_id(item->paint.resource));
     emit_text(run, run->line, &failed);
+  } else if (item->paint.kind == GSHSCENE_PAINT_PATTERN) {
+    snprintf(run->line, LINE_BYTES, " pat=%" PRIu64, gshscene_resource_id(item->paint.resource));
+    emit_text(run, run->line, &failed);
   }
   if (b.empty) {
     snprintf(run->line, LINE_BYTES, " box=- expand=%u outline=%s\n", (unsigned)expand, outline_text);
@@ -1228,6 +1285,8 @@ static GSHSCENE_Result stroke_unit(Run * run, const GSHSCENE_Item * item, const 
     r = gradient_record(run, item->paint.resource, &failed);
   } else if (r == GSHSCENE_OK && item->paint.kind == GSHSCENE_PAINT_IMAGE) {
     r = image_paint_record(run, item->paint.resource, &failed);
+  } else if (r == GSHSCENE_OK && item->paint.kind == GSHSCENE_PAINT_PATTERN) {
+    r = pattern_record(run, item->paint.resource, &failed);
   }
   if (r != GSHSCENE_OK) {
     return r;
@@ -1372,6 +1431,9 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
       } else if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_IMAGE) {
         snprintf(run->line, LINE_BYTES, " img=%" PRIu64, gshscene_resource_id(item->paint.resource));
         emit_text(run, run->line, &failed);
+      } else if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_PATTERN) {
+        snprintf(run->line, LINE_BYTES, " pat=%" PRIu64, gshscene_resource_id(item->paint.resource));
+        emit_text(run, run->line, &failed);
       }
       emit_text(run, " box=", &failed);
       if (plane) {
@@ -1390,6 +1452,11 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
         }
       } else if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_IMAGE) {
         GSHSCENE_Result r = image_paint_record(run, item->paint.resource, &failed);
+        if (r != GSHSCENE_OK) {
+          return r;
+        }
+      } else if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_PATTERN) {
+        GSHSCENE_Result r = pattern_record(run, item->paint.resource, &failed);
         if (r != GSHSCENE_OK) {
           return r;
         }

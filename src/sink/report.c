@@ -133,6 +133,12 @@ const char * gshscene_reason_string(GSHSCENE_Reason reason) {
       return "image-filter-space";
     case GSHSCENE_REASON_MASK_FEATURE:
       return "mask-feature";
+    case GSHSCENE_REASON_PATTERN:
+      return "pattern";
+    case GSHSCENE_REASON_PATTERN_DEGENERATE:
+      return "pattern-degenerate";
+    case GSHSCENE_REASON_PATTERN_RESAMPLED:
+      return "pattern-resampled";
     case GSHSCENE_REASON_COUNT:
       break;
   }

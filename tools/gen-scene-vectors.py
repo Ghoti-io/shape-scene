@@ -1274,6 +1274,52 @@ IMAGE_PAINT_LIST_ITEMS = [
 IMAGE_PAINT_LIST_HASH = list_hash(IMAGE_PAINT_LIST_ITEMS)
 
 
+# --- patterns (pattern.h, PT1 to PT3; masks-images-patterns story R1) -------------------------------------------------
+KIND_PATTERN = 12
+PAINT_PATTERN = 5
+
+
+def pattern(tile, cell, steps, repeat, mhash, tint=None):
+    """A pattern over the picture hashed @p tile.  A tint is (paint kind, rgba, space, entry); the cell and steps as given
+    (the store keeps -0 as +0, so the cases write +0)."""
+    out = u32(1) + u32(KIND_PATTERN) + u64(tile) + b"".join(f64(v) for v in tuple(cell) + tuple(steps))
+    out += u8(repeat[0]) + u8(repeat[1]) + u64(mhash)
+    if tint is None:
+        out += u8(0)
+        tint_text = "-"
+    else:
+        kind, rgba, space, entry = tint
+        out += u8(1) + u8(kind) + b"".join(f64(v) for v in rgba) + space_bytes(space) + u32(entry)
+        tint_text = "%d %s %s" % (kind, " ".join("%016x" % bits(v) for v in rgba), space_text(space)) + " %d" % entry
+    digest = fnv(out)
+    dump = "gshscene.resource 1 kind=pattern hash=%016x\npattern cell=%s step=%s repeat=%d%d map=%016x tile=%016x tint=%s\n" % (
+        digest, " ".join("%016x" % bits(v) for v in cell), " ".join("%016x" % bits(v) for v in steps), repeat[0], repeat[1],
+        mhash, tile, tint_text)
+    dump += list_dump(PICTURE_ITEMS)
+    return dict(hash=digest, dump=dump)
+
+
+PATTERNS = [
+    # the defaults: a colored pattern, one cell of one unit, abutting
+    pattern(PICTURE_RES, (0.0, 0.0, 1.0, 1.0), (1.0, 1.0), (1, 1), IDENTITY),
+    # a gap, a translation, an uncolored pattern with a solid tint
+    pattern(PICTURE_RES, (1.5, -0.25, 3.0, 2.0), (4.5, 2.5), (1, 1), TRANSLATE, tint=(PAINT_SOLID, (0.25, 0.5, 0.75, 1.0), SRGB_SRGB, 0)),
+    # an overlap along x, one row, a design map, a foreground tint
+    pattern(PICTURE_RES, (0.0, 0.0, 2.0, 2.0), (1.0, 0.5), (1, 0), DESIGN, tint=(PAINT_FOREGROUND, (0.0, 0.0, 0.0, 0.5), TARGET, 0)),
+    # a degenerate cell (the notice is the planner's; the resource is valid), no repetition, a palette tint
+    pattern(PICTURE_RES, (0.0, 0.0, 0.0, 3.0), (0.0, 0.0), (0, 0), IDENTITY, tint=(PAINT_PALETTE, (0.0, 0.0, 0.0, 1.0), TARGET, 2)),
+    # the ends of G14's band
+    pattern(PICTURE_RES, (2.0 ** -64, 2.0 ** 64, 0.1, 0.3), (0.1, 0.3), (0, 1), TRANSLATE),
+]
+PATTERN_LIST_ITEMS = [
+    fill(KIND_PATH, SQ_RES, IDENTITY, 0, (0.0, 0.0, 0.0, 1.0), paint=PAINT_PATTERN, grad=PATTERNS[0]["hash"]),
+    fill(KIND_PATH, P2_RES, TRANSLATE, 1, (0.0, 0.0, 0.0, 0.5), paint=PAINT_PATTERN, grad=PATTERNS[1]["hash"], layer=2),
+    fill(KIND_PATH, SQ_RES, DESIGN, 0, (0.0, 0.0, 0.0, 0.25), paint=PAINT_PATTERN, grad=PATTERNS[2]["hash"]),
+    fill(KIND_PATH, SQ_RES, IDENTITY, 0, (0.0, 0.0, 0.0, 0.0), paint=PAINT_PATTERN, grad=PATTERNS[0]["hash"], depth=1.0),
+]
+PATTERN_LIST_HASH = list_hash(PATTERN_LIST_ITEMS)
+
+
 def cxx_string(name, text):
     return 'static const char * const %s =\nR"DUMP(%s)DUMP";\n' % (name, text)
 
@@ -1367,6 +1413,11 @@ def render():
     for i, ip in enumerate(IMAGE_PAINTS):
         o.append(cxx_string("kImagePaintDump%d" % i, ip["dump"]))
     o.append(cxx_string("kImagePaintListDump", list_dump(IMAGE_PAINT_LIST_ITEMS)))
+    o.append("static const std::uint64_t kPatternHashes[] = {%s};\n" % ", ".join("UINT64_C(0x%016x)" % p["hash"] for p in PATTERNS))
+    o.append("static const std::uint64_t kPatternListHash = UINT64_C(0x%016x);\n\n" % PATTERN_LIST_HASH)
+    for i, pt in enumerate(PATTERNS):
+        o.append(cxx_string("kPatternDump%d" % i, pt["dump"]))
+    o.append(cxx_string("kPatternListDump", list_dump(PATTERN_LIST_ITEMS)))
     o.append("\n}  // namespace known\n\n#endif\n")
     return "".join(o)
 

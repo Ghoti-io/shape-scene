@@ -326,6 +326,12 @@ typedef enum GSHSCENE_Paint_Kind {
    * alpha multiplier, the space zero, the entry zero.
    */
   GSHSCENE_PAINT_IMAGE = 4,
+  /**
+   * A pattern resource of the list's store (pattern.h, PT1 to PT14): `resource` names it, `rgba[0..2]` zero, `rgba[3]` its
+   * alpha multiplier, the space zero, the entry zero.  Allowed on a fill and on a stroke; a gradient stop and a tint are
+   * plain colors and are never a pattern.
+   */
+  GSHSCENE_PAINT_PATTERN = 5,
   GSHSCENE_PAINT_KIND_COUNT    ///< Closes the enum.
 } GSHSCENE_Paint_Kind;
 
@@ -340,7 +346,7 @@ typedef struct GSHSCENE_Paint {
   /** Solid: the color space of the components (zero is the target's).  Foreground: zero. */
   GSHSCENE_Color_Space space;
   /**
-   * Gradient: the gradient resource.  Image: the image-paint resource.  The list holds a reference.  NULL for a solid,
+   * Gradient: the gradient resource.  Image: the image-paint resource.  Pattern: the pattern resource.  The list holds a reference.  NULL for a solid,
    * foreground or palette paint (and required to be).
    */
   const GSHSCENE_Resource * resource;

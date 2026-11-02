@@ -198,7 +198,7 @@ TEST(Sink, CapsThatBreakTheContractAreInternal) {
   EXPECT_EQ(gshscene_sink_caps(nullptr, &surface->target, &out), GSHSCENE_ERR_INVALID);
   GSHSCENE_Sink_Caps good = ms.mock.caps;
   std::vector<std::function<void(GSHSCENE_Sink_Caps &)>> bad = {
-      [](GSHSCENE_Sink_Caps & c) { c.flags |= 1u << 15; }, // past every flag defined (S19 took 9 to 11, S20 12 and 13, S21 14)
+      [](GSHSCENE_Sink_Caps & c) { c.flags |= 1u << 16; }, // past every flag defined (S19 took 9 to 11, S20 12 and 13, S21 14, S22 15)
       [](GSHSCENE_Sink_Caps & c) { c.image_filters |= 1u << 4; }, // past the four image filters (S21)
       [](GSHSCENE_Sink_Caps & c) { c.image_extends |= 1u << 4; }, // past the four edge modes
       [](GSHSCENE_Sink_Caps & c) { c.image_formats |= 1u << 8; }, // past every sample type, layout and the alpha-only mark
@@ -733,7 +733,8 @@ TEST(Sink, PixelKinds) {
   EXPECT_EQ(GSHSCENE_CAP_GROUP_SOFT_MASK, 0x800u);
   EXPECT_EQ(GSHSCENE_CAP_STROKE_EXPAND, 0x1000u);
   EXPECT_EQ(GSHSCENE_CAP_STROKE_RUNS, 0x2000u);
-  EXPECT_EQ(GSHSCENE_CAP_FLAGS_ALL, 0x7fffu);
+  EXPECT_EQ(GSHSCENE_CAP_PATTERN, 0x8000u);
+  EXPECT_EQ(GSHSCENE_CAP_FLAGS_ALL, 0xffffu);
   EXPECT_EQ(GSHSCENE_STROKE_NATIVE_ALL, 0xffffu);
   EXPECT_EQ(sizeof(GSHSCENE_Sink_Caps) % sizeof(void *), 0u);
   EXPECT_EQ((int)GSHSCENE_CANCEL_BETWEEN_UNITS, 1);
@@ -813,7 +814,7 @@ TEST(Sink, TheExpansionWalkDoesNotEnterAMasksPictureUnlessThePlanAsks) {
   GSHSCENE_Expansion walk;
   std::memset(&walk, 0xFF, sizeof walk);
   ASSERT_EQ(gshscene_expansion_init(&walk, l, memory.data(), bytes), GSHSCENE_OK);
-  EXPECT_EQ(walk.masks, 0);
+  EXPECT_EQ(walk.plan, 0);
   const GSHSCENE_Item * item;
   const size_t * chain;
   size_t count;
@@ -826,7 +827,7 @@ TEST(Sink, TheExpansionWalkDoesNotEnterAMasksPictureUnlessThePlanAsks) {
   // The planning pass asks: the picture's two fills follow the group's push, one level down.
   std::memset(&walk, 0xFF, sizeof walk);
   ASSERT_EQ(gshscene_expansion_init(&walk, l, memory.data(), bytes), GSHSCENE_OK);
-  walk.masks = 1;
+  walk.plan = 1;
   std::vector<size_t> depths;
   while (gshscene_expansion_next(&walk, &item, &chain, &count)) {
     depths.push_back(count);

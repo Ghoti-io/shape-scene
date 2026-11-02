@@ -172,6 +172,7 @@ typedef enum GSHSCENE_Resource_Kind {
   GSHSCENE_RESOURCE_PLANE = 9,     ///< The plane: what a fill covers where no shape bounds it, every point the clips allow (PL1 to PL10).
   GSHSCENE_RESOURCE_IMAGE_PAINT = 10, ///< How a fill samples an image: its window, map, edges, filters, space and tint (image_paint.h, IP1).
   GSHSCENE_RESOURCE_MASK = 11,     ///< A mask: what a group's soft-mask slot names, a picture read as alpha or luminance through a transfer (mask.h, MK1).
+  GSHSCENE_RESOURCE_PATTERN = 12,  ///< A pattern: a picture repeated on a lattice, which a pattern paint names (pattern.h, PT1).
   GSHSCENE_RESOURCE_KIND_COUNT     ///< Closes the enum.
 } GSHSCENE_Resource_Kind;
 

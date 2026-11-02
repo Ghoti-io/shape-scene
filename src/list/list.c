@@ -271,11 +271,16 @@ static void items_release(GSHSCENE_List * list) {
   }
 }
 
-/* The deepest picture an item names: an instance's, or a group's soft mask's (MK12: a mask counts exactly as an instance;
- * a sink that composites masks walks it, so it counts toward the nesting limit). */
+/* The deepest picture an item names: an instance's, a group's soft mask's, or the tile of the pattern a fill or stroke is painted
+ * with (MK12, PT11: a mask and a tile count exactly as an instance; a sink that composites them walks them, so they count
+ * toward the nesting limit). */
 static size_t item_picture_depth(const GSHSCENE_Item * item) {
   if (item->kind == GSHSCENE_ITEM_INSTANCE) {
     return item->resource->u.picture.depth;
+  }
+  if ((item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE) &&
+      item->paint.kind == GSHSCENE_PAINT_PATTERN) {
+    return item->paint.resource->u.pattern.depth;
   }
   if (item->kind == GSHSCENE_ITEM_GROUP_PUSH && item->group.soft_mask) {
     return item->group.soft_mask->u.mask.m.picture->u.picture.depth;
@@ -407,14 +412,15 @@ static GSHSCENE_Result canonical_paint(const GSHSCENE_Store * store, const GSHSC
   }
   if (paint->kind != GSHSCENE_PAINT_SOLID && paint->kind != GSHSCENE_PAINT_FOREGROUND &&
       paint->kind != GSHSCENE_PAINT_PALETTE && paint->kind != GSHSCENE_PAINT_GRADIENT &&
-      paint->kind != GSHSCENE_PAINT_IMAGE) {
+      paint->kind != GSHSCENE_PAINT_IMAGE && paint->kind != GSHSCENE_PAINT_PATTERN) {
     return GSHSCENE_ERR_INVALID;
   }
-  /* One spelling: only a gradient or an image paint names a resource, of its kind and of the list's store (G1, IP1). */
-  if (paint->kind == GSHSCENE_PAINT_GRADIENT || paint->kind == GSHSCENE_PAINT_IMAGE
+  /* One spelling: only a gradient, an image paint or a pattern names a resource, of its kind and of the list's store (G1, IP1, PT1). */
+  if (paint->kind == GSHSCENE_PAINT_GRADIENT || paint->kind == GSHSCENE_PAINT_IMAGE || paint->kind == GSHSCENE_PAINT_PATTERN
           ? (!paint->resource || paint->resource->store != store ||
                 paint->resource->kind != (paint->kind == GSHSCENE_PAINT_GRADIENT ? GSHSCENE_RESOURCE_GRADIENT
-                                                                                  : GSHSCENE_RESOURCE_IMAGE_PAINT))
+                                              : paint->kind == GSHSCENE_PAINT_IMAGE ? GSHSCENE_RESOURCE_IMAGE_PAINT
+                                                                                    : GSHSCENE_RESOURCE_PATTERN))
           : paint->resource != NULL) {
     return GSHSCENE_ERR_INVALID;
   }

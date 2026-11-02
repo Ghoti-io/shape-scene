@@ -168,7 +168,8 @@ static GSHSCENE_Result canonical(const GSHSCENE_Store * store, const GSHSCENE_Gr
   int target = gshscene_color_space_is_target(&in->space);
   for (size_t i = 0; i < in->stop_count; i++) {
     const GSHSCENE_Gradient_Stop * s = &in->stops[i];
-    if (!gshscene_finite(s->offset) || s->color.kind == GSHSCENE_PAINT_GRADIENT || s->color.kind == GSHSCENE_PAINT_IMAGE) {
+    if (!gshscene_finite(s->offset) || s->color.kind == GSHSCENE_PAINT_GRADIENT || s->color.kind == GSHSCENE_PAINT_IMAGE ||
+        s->color.kind == GSHSCENE_PAINT_PATTERN) {
       return GSHSCENE_ERR_INVALID;
     }
     result = gshscene_list_canonical_paint_valid(store, &s->color, &stops[i].color);
@@ -553,6 +554,9 @@ GSHSCENE_Reason gshscene_paint_notice(const GSHSCENE_Item * item, const GSHGEOM_
     size_t instance_count, const GSHGEOM_Map * target_map) {
   if (!item || item->kind != GSHSCENE_ITEM_FILL || !item->paint.resource) {
     return (GSHSCENE_Reason)0;
+  }
+  if (item->paint.kind == GSHSCENE_PAINT_PATTERN) {
+    return gshscene_pattern_notice(item, instance_maps, instance_count, target_map); /* PT10 */
   }
   /* The paint's own map: a gradient's, or an image paint's (IP11). */
   const GSHSCENE_Gradient * g = NULL;
