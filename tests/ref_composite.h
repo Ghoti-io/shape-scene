@@ -574,14 +574,17 @@ inline double clamp01(double x) {
 }
 
 inline Px evaluate_general(const GSHSCENE_List * list, const std::vector<double> & coverage, const Space & target,
-    const Px & backdrop, const PictureCoverage * pictures = nullptr);
+    const Px & backdrop, const PictureCoverage * pictures = nullptr, const Space * paint_target = nullptr);
 
 /**
  * MK2, MK5: the value of a mask at a point, for a masked group that composites into a layer whose blend space is
  * @p enclosing.  The picture is drawn as its own isolated, non-knockout group in the mask's render space; where it draws
- * nothing the layer is `(0, 0, 0, 0)` and the same expression gives the transfer of the backdrop's value.
+ * nothing the layer is `(0, 0, 0, 0)` and the same expression gives the transfer of the backdrop's value.  A paint of the
+ * picture whose space is zero is in @p target, the render target's space, and is converted into R like any paint in a
+ * group (ISO 32000-1 Table 147 and 11.3.4).
  */
-inline double mask_value(const GSHSCENE_Resource * mask, const Space & enclosing, const PictureCoverage * pictures) {
+inline double mask_value(const GSHSCENE_Resource * mask, const Space & enclosing, const PictureCoverage * pictures,
+    const Space & target) {
   GSHSCENE_Mask m;
   gshscene_resource_mask(mask, &m);
   GSHSCENE_Color_Space bp;
@@ -593,7 +596,7 @@ inline double mask_value(const GSHSCENE_Resource * mask, const Space & enclosing
   gshscene_mask_resolve(mask, &bp, &res);
   Space r_space = from(res.render_space), l_space = from(res.luminance_space), b_space = from(res.backdrop_space);
   const GSHSCENE_List * picture = gshscene_resource_picture(m.picture);
-  Px g = evaluate_general(picture, pictures->at(m.picture), r_space, Px{{0, 0, 0, 0}}, pictures);
+  Px g = evaluate_general(picture, pictures->at(m.picture), r_space, Px{{0, 0, 0, 0}}, pictures, &target);
   double a = g.v[3];
   if (m.mode == GSHSCENE_MASK_ALPHA) {
     return clamp01(gshscene_mask_transfer(mask, clamp01(a)));
@@ -628,7 +631,8 @@ inline void group_element(GFrame & parent, const GFrame & done, const Px & moved
 
 /** T1 to T7 and MK2 to MK7 over a closed list of solid fills, clips and groups (each group push's isolation, knockout and mask read). */
 inline Px evaluate_general(const GSHSCENE_List * list, const std::vector<double> & coverage, const Space & target,
-    const Px & backdrop, const PictureCoverage * pictures) {
+    const Px & backdrop, const PictureCoverage * pictures, const Space * paint_target) {
+  const Space & render_target = paint_target ? *paint_target : target;
   std::vector<GFrame> stack(1);
   stack[0].layer = backdrop;
   stack[0].initial = backdrop;
@@ -642,7 +646,7 @@ inline Px evaluate_general(const GSHSCENE_List * list, const std::vector<double>
       case GSHSCENE_ITEM_FILL: {
         Space space = from(item->paint.space);
         if (is_target(space)) {
-          space = target;
+          space = render_target;
         }
         double c[3], a = item->paint.rgba[3];
         convert(item->paint.rgba, space, top.space, c);
@@ -684,7 +688,7 @@ inline Px evaluate_general(const GSHSCENE_List * list, const std::vector<double>
         if (done.group.soft_mask) {
           GSHSCENE_Mask m;
           gshscene_resource_mask(done.group.soft_mask, &m);
-          double v = mask_value(done.group.soft_mask, parent.space, pictures);
+          double v = mask_value(done.group.soft_mask, parent.space, pictures, render_target);
           group_element(parent, done, moved, v, m.acts_on == GSHSCENE_MASK_ACTS_ON_SHAPE);
         } else {
           group_element(parent, done, moved, 1.0, false);

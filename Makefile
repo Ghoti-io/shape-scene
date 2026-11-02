@@ -532,14 +532,14 @@ check-composite: ## Fail if the exact reference does not agree with itself, or t
 	@python3 tools/gen-composite-vectors.py --check
 	@python3 tools/gen-composite-vectors.py --masks --check
 	@for plant in luminance-of-straight-color mask-after-blend tr0-as-zero-outside shape-merged-into-opacity wrong-coefficient-set \
-		backdrop-before-conversion dropped-clamp stitching-side-swapped exponent-inverted table-last-interval acts-on-ignored; do \
+		backdrop-before-conversion dropped-clamp stitching-side-swapped exponent-inverted table-last-interval acts-on-ignored picture-paint-read-in-r; do \
 		if python3 tools/composite-oracle.py --selftest --plant $$plant > /dev/null 2>&1; then \
 			echo "check-composite: the planted defect $$plant was not caught by the selftest"; exit 1; \
 		fi; \
 		if python3 tools/gen-composite-vectors.py --masks --check --plant $$plant > /dev/null 2>&1; then \
 			echo "check-composite: the planted defect $$plant was not caught by the mask vectors"; exit 1; \
 		fi; \
-	done; echo "check-composite: the eleven planted defects of the mask are each caught by the selftest and by the vectors"
+	done; echo "check-composite: the twelve planted defects of the mask are each caught by the selftest and by the vectors"
 
 check-gradient: ## Fail if the gradient oracle does not agree with itself, or tests/gradient_vectors.h is not what it writes
 	@python3 tools/gradient-oracle.py --selftest

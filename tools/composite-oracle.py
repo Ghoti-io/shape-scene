@@ -566,9 +566,15 @@ def element(frame, f, op, a, ex):
     frame.shape_g = frame.shape_g + f - frame.shape_g * f
 
 
-def evaluate_general(items, cov, fg, target, backdrop, palette=None):
-    """T1 to T7: like evaluate(), with each group push's `isolation` (0 isolated, 1 not) and `knockout` (0 or 1)."""
+def evaluate_general(items, cov, fg, target, backdrop, palette=None, paint_target=None):
+    """T1 to T7: like evaluate(), with each group push's `isolation` (0 isolated, 1 not) and `knockout` (0 or 1).
+
+    `target` is the space of the root layer.  `paint_target` is the render target's space, which a paint of space zero
+    is in (MK2); it is `target` unless the list is a mask's picture, whose root layer is the mask's render space R and
+    whose paints of space zero are still the render target's, converted into R like any paint in a group (ISO 32000-1
+    Table 147 and 11.3.4)."""
     ex = Exactness()
+    ptarget = target if paint_target is None else paint_target
     cov = [F(c) for c in cov]
     root = GFrame([F(v) for v in backdrop], target)
     stack = [root]
@@ -585,7 +591,7 @@ def evaluate_general(items, cov, fg, target, backdrop, palette=None):
                 continue
             given = fg[1] if kind == PAINT_FOREGROUND else palette[it["entry"]][1] if kind == PAINT_PALETTE else it["space"]
             scale = F(straight_color[3]) * (F(it["rgba"][3]) if kind in (PAINT_FOREGROUND, PAINT_PALETTE) else ONE)
-            moved = convert([F(v) for v in straight_color[:3]], target if is_target(given) else given, top.space, ex)
+            moved = convert([F(v) for v in straight_color[:3]], ptarget if is_target(given) else given, top.space, ex)
             opaque = premultiply(moved, scale)          # T2: the opacity, the paint's alpha
             f = cov[i] * product(top.clips)             # T2: the shape, coverage and the clips in force
             element(top, f, "src-over", [f * v for v in opaque], ex)
@@ -612,7 +618,7 @@ def evaluate_general(items, cov, fg, target, backdrop, palette=None):
             opacity = F(done.group["opacity"])
             op = OPS[int(done.group["composite"])]
             if done.group.get("mask") is not None:
-                masked_pop(parent, done, moved, opacity, op, done.group["mask"], ex)
+                masked_pop(parent, done, moved, opacity, op, done.group["mask"], ex, ptarget)
             elif op in PDF_OPS:
                 f = done.outer * done.shape_g
                 element(parent, f, op, [done.outer * opacity * v for v in moved], ex)
@@ -675,7 +681,7 @@ IDENTITY = ("identity",)
 PLANTS = set()
 PLANT_NAMES = ("luminance-of-straight-color", "mask-after-blend", "tr0-as-zero-outside", "shape-merged-into-opacity",
                "wrong-coefficient-set", "backdrop-before-conversion", "dropped-clamp", "stitching-side-swapped",
-               "exponent-inverted", "table-last-interval", "acts-on-ignored")
+               "exponent-inverted", "table-last-interval", "acts-on-ignored", "picture-paint-read-in-r")
 
 
 def clamp01(x):
@@ -745,11 +751,13 @@ def transfer(tr, x, ex):
     return clamp01(transfer_raw(tr, clamp01(x), ex))
 
 
-def mask_value(mask, bp, ex):
-    """MK2, MK5: the mask's value at a point, for a masked group that composites into a layer whose blend space is bp."""
+def mask_value(mask, bp, ex, target):
+    """MK2, MK5: the mask's value at a point, for a masked group that composites into a layer whose blend space is bp.
+    `target` is the render target's space: a paint of space zero in the picture is in it, and is converted into R."""
     r = bp if is_target(mask["rspace"]) else mask["rspace"]
     items = [dict(it) for it in mask["pic"]]
-    g, inexact = evaluate_general(items, [it["cov"] for it in items], (None, TARGET), r, (0, 0, 0, 0))
+    pt = r if "picture-paint-read-in-r" in PLANTS else target
+    g, inexact = evaluate_general(items, [it["cov"] for it in items], (None, TARGET), r, (0, 0, 0, 0), paint_target=pt)
     ex.inexact = ex.inexact or inexact
     a = g[3]
     out = (lambda v: v) if "dropped-clamp" in PLANTS else clamp01
@@ -790,9 +798,9 @@ def outside_value(mask, bp, ex):
     return clamp01(transfer_raw(mask["tr"], clamp01(sat(k[0] * b_l[0] + k[1] * b_l[1] + k[2] * b_l[2])), ex))
 
 
-def masked_pop(parent, done, moved, opacity, op, mask, ex):
+def masked_pop(parent, done, moved, opacity, op, mask, ex, target):
     """MK7: T5's element with the mask value v substituted into o (OPACITY) or m (SHAPE) and nothing else."""
-    v = mask_value(mask, parent.space, ex)
+    v = mask_value(mask, parent.space, ex, target)
     acts = mask["acts"]
     if "acts-on-ignored" in PLANTS:
         acts = ACTS_SHAPE
@@ -888,8 +896,8 @@ def selftest_masks(check):
         return dict(pic=pic, mode=mode, coeff=coeff, space=space, rspace=rspace, backdrop=backdrop, bspace=bspace, tr=tr,
                     acts=acts)
 
-    def val(m, bp=SPACE_SRGB):
-        return mask_value(m, bp, Exactness())
+    def val(m, bp=SPACE_SRGB, target=SPACE_SRGB):
+        return mask_value(m, bp, Exactness(), target)
 
     LUMI = MASK_LUMINANCE
     spaces = [SPACE_SRGB, SPACE_LINEAR_SRGB, SPACE_P3, SPACE_LINEAR_P3, SPACE_ADOBE_GAMMA, SPACE_LINEAR_BT2020]
@@ -925,34 +933,34 @@ def selftest_masks(check):
         for ch in range(3):
             rgba = [0, 0, 0, 1]
             rgba[ch] = 1
-            check(val(mk([fill_(tuple(rgba))], LUMI, 3, space=sp, rspace=sp)) == MATRIX[p][1][ch], "MK3: SPACE_Y %d %d" % (p, ch))
+            check(val(mk([fill_(tuple(rgba))], LUMI, 3, space=sp, rspace=sp), target=sp) == MATRIX[p][1][ch], "MK3: SPACE_Y %d %d" % (p, ch))
 
     # MK2: gray invariance for every set, in every space (R = L), and with R != L; translucent gray over its own backdrop.
     for coeff in range(4):
         for sp in spaces:
             for x in (F(0), F(1, 8), F(1, 2), F(3, 4), F(1)):
                 gray = (x, x, x, 1)
-                got = val(mk([fill_(gray)], LUMI, coeff, space=sp, rspace=sp))
+                got = val(mk([fill_(gray)], LUMI, coeff, space=sp, rspace=sp), target=sp)
                 check(got == x, "MK2: gray %s is gray in set %d (R = L = %s)" % (x, coeff, sp))
-                got = val(mk([fill_((x, x, x, F(1, 2)))], LUMI, coeff, space=sp, rspace=sp, backdrop=(x, x, x), bspace=sp))
+                got = val(mk([fill_((x, x, x, F(1, 2)))], LUMI, coeff, space=sp, rspace=sp, backdrop=(x, x, x), bspace=sp), target=sp)
                 check(got == x, "MK2: translucent gray over its own backdrop")
         for r_, l_ in ((SPACE_SRGB, SPACE_P3), (SPACE_SRGB, SPACE_LINEAR_SRGB), (SPACE_LINEAR_P3, SPACE_SRGB)):
             x = F(3, 8)
             want = convert([x, x, x], r_, l_, Exactness())[0]
-            got = val(mk([fill_((x, x, x, 1))], LUMI, coeff, space=l_, rspace=r_))
+            got = val(mk([fill_((x, x, x, 1))], LUMI, coeff, space=l_, rspace=r_), target=r_)
             check(abs(got - clamp01(want)) < F(1, 10 ** 60), "MK2: gray converts to gray, set %d R %s L %s" % (coeff, r_, l_))
 
     # MK2: the luminance of the picture composited over the backdrop in L, written from the straight color.
     rng = random.Random(1021)
     for t in range(80):
-        r_, l_, b_ = rng.choice(spaces), rng.choice(spaces), rng.choice(spaces)
+        r_, l_, b_, t_ = rng.choice(spaces), rng.choice(spaces), rng.choice(spaces), rng.choice(spaces)
         coeff = rng.randrange(4)
         rgb = tuple(F(rng.randint(-4, 12), 8) for _ in range(3))
         a = F(rng.choice([1, 2, 4, 7, 8]), 8)
         bk = tuple(F(rng.randint(0, 8), 8) for _ in range(3))
-        got = val(mk([fill_(rgb + (a,))], LUMI, coeff, space=l_, rspace=r_, backdrop=bk, bspace=b_))
+        got = val(mk([fill_(rgb + (a,))], LUMI, coeff, space=l_, rspace=r_, backdrop=bk, bspace=b_), target=t_)
         ex_ = Exactness()
-        cl = convert(list(rgb), r_, l_, ex_)
+        cl = convert(convert(list(rgb), t_, r_, ex_), r_, l_, ex_)   # MK2: the paint is in the target's space, moved into R
         bl = convert(list(bk), b_, l_, ex_)
         k = coefficients(coeff, l_)
         res = [sat(a * cl[i] + (ONE - a) * bl[i]) for i in range(3)]
@@ -1023,8 +1031,8 @@ def selftest_masks(check):
 
     # MK6/MK2: the picture is rendered in R; the layer's own space is Bp when R is zero.
     half_blue = fill_((0, 0, 1, F(1, 2)))
-    a_ = mask_value(mk([half_blue], LUMI, 1), SPACE_LINEAR_SRGB, Exactness())
-    b_ = mask_value(mk([half_blue], LUMI, 1, rspace=SPACE_LINEAR_SRGB), SPACE_SRGB, Exactness())
+    a_ = mask_value(mk([half_blue], LUMI, 1), SPACE_LINEAR_SRGB, Exactness(), SPACE_SRGB)
+    b_ = mask_value(mk([half_blue], LUMI, 1, rspace=SPACE_LINEAR_SRGB), SPACE_SRGB, Exactness(), SPACE_SRGB)
     check(a_ == b_ == F(722, 20000), "MK2: R is the enclosing space when zero")
 
     # MK7 (1): a group of one constant picture, an opaque white identity alpha mask, is the group; a half-alpha one is half opacity.

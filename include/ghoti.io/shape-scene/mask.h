@@ -35,8 +35,10 @@
  * ::GSHSCENE_MASK_LUMINANCE (zero is invalid, so a front-end must say).  The `coefficients` name the luminance set
  * (MK3).  `space` is the luminance space `L` and `render_space` the space `R` the picture is blended in (both N1 spaces;
  * zero in `space` means `R`, zero in `render_space` means the blend space of the layer the masked group composites
- * into).  The `backdrop` is an opaque color of three finite components of magnitude at most `2^16`, in
- * `backdrop_space` (zero: the luminance space `L`); zero is black.  In `ALPHA` mode `coefficients`, `space`,
+ * into).  A paint of the picture whose color space is zero is in the render target's space and is converted into `R` like
+ * any paint painted into a group (MK2; ISO 32000-1 Table 147 and 11.3.4); it is not read as already in `R`.  The
+ * `backdrop` is an opaque color of three finite components of magnitude at most `2^16`, in `backdrop_space` (zero: the
+ * luminance space `L`); zero is black.  In `ALPHA` mode `coefficients`, `space`,
  * `backdrop` and `backdrop_space` are zero (::GSHSCENE_ERR_INVALID otherwise), because alpha has no color and a
  * field that cannot matter must not split a handle.
  *

@@ -998,7 +998,13 @@ picture's hash, never its items.
 resolved render space (`render_space`, or `Bp` if zero) and `L` its resolved luminance space (`space`, or `R` if zero).
 Let `G_m(p) = (c, a)` be the premultiplied layer, in `R`, that the mask's picture leaves when it is drawn **as its own
 isolated, non-knockout group** (N6 to N9, with `R` as the group's blend space) in the frame of MK6, at the point `p` of
-the sink's pixel grid; `(0, 0, 0, 0)` where it drew nothing. Then the value `v(p)` in `[0, 1]` is:
+the sink's pixel grid; `(0, 0, 0, 0)` where it drew nothing. A paint inside the picture whose color space is zero is in
+the **render target's** space, as everywhere, not in `R`: it is converted into `R` like any paint painted into a group,
+exactly as the paints of an ordinary transparency group are converted into the group's blend space (ISO 32000-1, Table 147,
+entry CS, which is the space colors are converted into when painted into the group, and 11.3.4; a soft mask is derived from
+such a group, 11.6.5.2). `R` is where the picture is blended and where `G_m` is stated, not a
+retelling of what its paints mean; CSS Masking converts only at the luminance step, which is `R -> L` below. A paint that
+names a space is converted from it. Then the value `v(p)` in `[0, 1]` is:
 - `ALPHA`: `v = clamp01(TR(clamp01(a)))`.
 - `LUMINANCE`: `(c_L, a) = convert(G_m, R -> L)` (N3 on the premultiplied value: un-premultiply, convert the straight
   color, premultiply); `B_L` the backdrop converted (N3) into `L`; `r = sat(c_L + (1 - a) B_L)` (the picture composited

@@ -2940,8 +2940,11 @@ PLANTS += [
     ('mk-tst-opacity-into-shape-too', 'tst', RC, '    double ov = o * (shape ? 1.0 : v);', '    double ov = o * v;', MCT),
     ('mk-tst-pdf-shape-without-v', 'tst', RC, '    double f = done.outer * (shape ? v : 1.0) * done.shape_g;',
      '    double f = done.outer * done.shape_g;', MCT),
-    ('mk-tst-picture-space', 'tst', RC, '  Px g = evaluate_general(picture, pictures->at(m.picture), r_space, Px{{0, 0, 0, 0}}, pictures);',
-     '  Px g = evaluate_general(picture, pictures->at(m.picture), enclosing, Px{{0, 0, 0, 0}}, pictures);', MCT),
+    ('mk-tst-picture-space', 'tst', RC, '  Px g = evaluate_general(picture, pictures->at(m.picture), r_space, Px{{0, 0, 0, 0}}, pictures, &target);',
+     '  Px g = evaluate_general(picture, pictures->at(m.picture), enclosing, Px{{0, 0, 0, 0}}, pictures, &target);', MCT),
+    # a paint of space zero in the picture is the render target's, not already in R
+    ('mk-tst-picture-paint-in-r', 'tst', RC, '  Px g = evaluate_general(picture, pictures->at(m.picture), r_space, Px{{0, 0, 0, 0}}, pictures, &target);',
+     '  (void)target;\n  Px g = evaluate_general(picture, pictures->at(m.picture), r_space, Px{{0, 0, 0, 0}}, pictures, &r_space);', MCT),
     # the library's transfer and coefficients (MK3, MK4), reached by the known answers
     ('mk-src-lum-is-rec709', 'src', MKC, '      r.k[0] = 30.0 / 100.0;\n      r.k[1] = 59.0 / 100.0;\n      r.k[2] = 11.0 / 100.0;',
      '      r.k[0] = 2126.0 / 10000.0;\n      r.k[1] = 7152.0 / 10000.0;\n      r.k[2] = 722.0 / 10000.0;', MCT + MT),

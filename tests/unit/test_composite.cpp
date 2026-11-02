@@ -780,7 +780,7 @@ TEST(Masks, AGrayPictureIsAGrayValueUnderEverySetInEverySpace) {
         Ref mask(r);
         refc::PictureCoverage cov;
         cov[pic] = {1.0};
-        double v = refc::mask_value(mask.get(), refc::from(srgb_space()), &cov);
+        double v = refc::mask_value(mask.get(), refc::from(srgb_space()), &cov, refc::from(sp));
         EXPECT_NEAR(v, x, 1e-15 * std::max(1.0, x)) << "set " << coeff << " x " << x;
       }
     }
