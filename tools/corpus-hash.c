@@ -133,6 +133,8 @@ static GSHGEOM_Hash mask_total; /* masks-images-patterns story M1: its own hash,
 static unsigned long mask_count;
 static GSHGEOM_Hash primitive_total; /* named primitives (primitive.h): its own hash, so the seven above are unchanged */
 static unsigned long primitive_count;
+static GSHGEOM_Hash pattern_total; /* patterns (pattern.h): its own hash, so the eight above are unchanged */
+static unsigned long pattern_count;
 static GSHGEOM_Hash * acc = &total; /* where feed folds */
 static unsigned long * acc_count = &count;
 
@@ -2923,6 +2925,386 @@ static void primitive_section(void) {
   gshscene_store_destroy(store);
 }
 
+
+/* The patterns section (pattern.h; PT1 to PT14): random patterns over random tiles through the store (equal content one handle, the
+ * result of every malformed one, the fields as read back, each pattern's nearest neighbor), the position of copies at indexes
+ * from 0 to a million and the shared edge of abutting cells, the notice predicate under random maps, a chain of nested patterns up
+ * to the picture-depth limit, lists of fills painted with patterns folded through dispositions under three caps and the test
+ * sink with and without the capability (a tile that holds a unit the sink refuses among them), and a retained scene of shapes
+ * painted with patterns, its emitted list, a change of a pattern and the diff.  Its own pair after the others, so they never move. */
+static GSHSCENE_Paint pattern_paint_of(const GSHSCENE_Resource * pattern, double alpha) {
+  GSHSCENE_Paint p;
+  memset(&p, 0, sizeof p);
+  p.kind = GSHSCENE_PAINT_PATTERN;
+  p.resource = pattern;
+  p.rgba[3] = alpha;
+  return p;
+}
+
+/** A pattern's content as read back (canonical), its hash and its lattice. */
+static void feed_pattern(const GSHSCENE_Resource * pattern) {
+  GSHSCENE_Pattern p;
+  check(gshscene_resource_pattern(pattern, &p), "pattern read");
+  feed(gshscene_resource_hash(pattern));
+  feed(gshscene_resource_hash(p.tile));
+  feed(gshgeom_f64_bits(p.x));
+  feed(gshgeom_f64_bits(p.y));
+  feed(gshgeom_f64_bits(p.w));
+  feed(gshgeom_f64_bits(p.h));
+  feed(gshgeom_f64_bits(p.x_step));
+  feed(gshgeom_f64_bits(p.y_step));
+  feed((uint64_t)p.repeat_x);
+  feed((uint64_t)p.repeat_y);
+  feed(gshgeom_map_hash(&p.map));
+  feed((uint64_t)p.has_tint);
+  feed((uint64_t)p.tint.kind);
+  for (int i = 0; i < 4; i++) {
+    feed(gshgeom_f64_bits(p.tint.rgba[i]));
+  }
+  feed((uint64_t)p.tint.entry);
+  feed((uint64_t)gshscene_pattern_overlaps(&p));
+  static const int64_t indexes[8] = {0, 1, -1, 7, -300, 999999, 1000000, -1000000};
+  for (int k = 0; k < 8; k++) {
+    double cell[4];
+    check(gshscene_pattern_cell(&p, indexes[k], indexes[(k + 3) % 8], cell), "pattern cell");
+    for (int i = 0; i < 4; i++) {
+      feed(gshgeom_f64_bits(cell[i]));
+    }
+    double next_cell[4];
+    check(gshscene_pattern_cell(&p, indexes[k] + 1, indexes[(k + 3) % 8] + 1, next_cell), "pattern next cell");
+    /* abutting cells share their edge, whatever the index */
+    feed((uint64_t)(p.x_step == p.w ? cell[2] == next_cell[0] : 2));
+    feed((uint64_t)(p.y_step == p.h ? cell[3] == next_cell[1] : 2));
+  }
+}
+
+/** The test sink on @p list with the pattern capability cleared: every unit painted with a pattern is refused. */
+static void feed_render_without_patterns(const GSHSCENE_List * list) {
+  GSHSCENE_Dump_Sink_Config config;
+  gshscene_dump_sink_config_default(&config);
+  config.raster_caps.flags &= ~GSHSCENE_CAP_PATTERN;
+  config.stream_caps.flags &= ~GSHSCENE_CAP_PATTERN;
+  GSHSCENE_Sink * sink = NULL;
+  check(gshscene_dump_sink_create(NULL, NULL, &config, &sink), "pattern test sink");
+  GSHSCENE_Report * report = NULL;
+  check(gshscene_report_create(NULL, NULL, &report), "pattern report");
+  uint64_t written = 0;
+  GSHSCENE_Writer writer = {count_write, &written};
+  GSHSCENE_Target stream;
+  memset(&stream, 0, sizeof stream);
+  stream.kind = GSHSCENE_TARGET_STREAM;
+  stream.surface = &writer;
+  stream.unit = GSHSCENE_UNIT_MILLIMETER;
+  gshgeom_map_identity(2, &stream.map);
+  GSHSCENE_Render_Request request;
+  memset(&request, 0, sizeof request);
+  request.list = list;
+  request.target = &stream;
+  request.report = report;
+  for (int strict = 0; strict < 2; strict++) {
+    request.flags = strict ? GSHSCENE_RENDER_STRICT : 0;
+    feed_job(sink, &request);
+    feed(written);
+  }
+  gshscene_report_destroy(report);
+  check(gshscene_sink_destroy(sink), "destroy");
+}
+
+#define PT_PATHS 5
+#define PT_TILES 4
+#define PT_PATTERNS 28
+
+/** The next double above a non-negative finite @p x: one ulp, with no libm. */
+static double next_up(double x) {
+  uint64_t bits = gshgeom_f64_bits(x) + 1u;
+  double out;
+  memcpy(&out, &bits, sizeof out);
+  return out;
+}
+
+static double pattern_size(void) {
+  static const double sizes[8] = {0.0, 0.1, 0.3, 1.0 / 3.0, 1.0, 2.5, 7.0, 0x1p-20};
+  const uint64_t pick = next();
+  if ((pick & 7u) == 0u) {
+    const double c = coord();
+    return c < 0.0 ? -c : c + 0.125;
+  }
+  return sizes[(pick >> 8) & 7u];
+}
+
+static void pattern_section(void) {
+  acc = &pattern_total;
+  acc_count = &pattern_count;
+  gshgeom_hash_init(&pattern_total);
+  GSHSCENE_Store * store = NULL;
+  check(gshscene_store_create(NULL, NULL, &store), "pattern store");
+  const GSHSCENE_Resource * paths[PT_PATHS];
+  for (unsigned i = 0; i < PT_PATHS; i++) {
+    GSHGEOM_Path * path = random_path(2);
+    check(gshscene_store_intern_path(store, path, &paths[i]), "pattern path");
+    gshgeom_path_destroy(path);
+  }
+  /* Tiles: fills under random maps; a fill in a half-transparent group; a fill and a placeholder no sink draws; nothing. */
+  const GSHSCENE_Resource * tiles[PT_TILES];
+  for (unsigned t = 0; t < PT_TILES; t++) {
+    GSHSCENE_List * list = NULL;
+    check(gshscene_list_create(NULL, NULL, store, &list), "tile list");
+    if (t == 1) {
+      GSHSCENE_Group g = random_group_props();
+      g.opacity = 0.5;
+      check(gshscene_list_group_push(list, &g, 0, 0.0), "tile group");
+    }
+    unsigned fills = t == 3 ? 0 : 2;
+    for (unsigned f = 0; f < fills; f++) {
+      GSHGEOM_Map map = random_map();
+      GSHSCENE_Paint paint = random_paint();
+      check(gshscene_list_fill(list, paths[between(0, PT_PATHS - 1)], &map, GSHGEOM_FILL_NONZERO, &paint, (int32_t)f, 0.0), "tile fill");
+    }
+    if (t == 2) {
+      const double box[4] = {1.0, 2.0, 9.0, 8.0};
+      check(gshscene_list_placeholder(list, GSHSCENE_PLACEHOLDER_SOURCE_COLR, GSHSCENE_PLACEHOLDER_COLR_UNBOUNDED, 0, box, NULL, 0, 0.0),
+          "tile placeholder");
+    }
+    if (t == 1) {
+      check(gshscene_list_group_pop(list), "tile pop");
+    }
+    check(gshscene_list_close(list), "tile close");
+    check(gshscene_store_intern_picture(store, list, &tiles[t]), "tile picture");
+    gshscene_list_destroy(list);
+    feed(gshscene_resource_hash(tiles[t]));
+  }
+  /* Patterns: random content, interned twice, read back, told apart from the nearest neighbor. */
+  const GSHSCENE_Resource * patterns[PT_PATTERNS];
+  for (unsigned i = 0; i < PT_PATTERNS; i++) {
+    GSHSCENE_Pattern p;
+    gshscene_pattern_init(&p);
+    p.tile = tiles[between(0, PT_TILES - 1)];
+    p.x = coord();
+    p.y = coord();
+    p.w = pattern_size();
+    p.h = pattern_size();
+    p.x_step = between(0, 3) == 0 ? pattern_size() : p.w;
+    p.y_step = between(0, 3) == 0 ? pattern_size() : p.h;
+    p.repeat_x = between(0, 4) == 0 ? 0u : 1u;
+    p.repeat_y = between(0, 4) == 0 ? 0u : 1u;
+    p.map = between(0, 2) == 0 ? p.map : random_map();
+    unsigned tint = between(0, 3);
+    if (tint) {
+      p.has_tint = 1;
+      p.tint = random_paint();
+      if (tint == 2) {
+        memset(&p.tint, 0, sizeof p.tint);
+        p.tint.kind = GSHSCENE_PAINT_PALETTE;
+        p.tint.rgba[3] = 1.0;
+        p.tint.entry = between(0, 3);
+      }
+    }
+    check(gshscene_store_intern_pattern(store, &p, &patterns[i]), "pattern");
+    const GSHSCENE_Resource * again = NULL;
+    check(gshscene_store_intern_pattern(store, &p, &again), "pattern again");
+    if (again != patterns[i]) {
+      fail("a pattern interned twice is two handles");
+    }
+    gshscene_resource_release(again);
+    feed_pattern(patterns[i]);
+    GSHSCENE_Pattern near_p = p;
+    near_p.x_step = p.x_step == 0.0 ? 0x1p-30 : next_up(p.x_step);
+    const GSHSCENE_Resource * other = NULL;
+    check(gshscene_store_intern_pattern(store, &near_p, &other), "near pattern");
+    if (other == patterns[i] || gshscene_resource_hash(other) == gshscene_resource_hash(patterns[i])) {
+      fail("two patterns one ulp apart are one");
+    }
+    feed(gshscene_resource_hash(other));
+    gshscene_resource_release(other);
+  }
+  /* The result of every malformed one, in the order PT2 checks them. */
+  for (unsigned round = 0; round < 64; round++) {
+    GSHSCENE_Pattern p;
+    gshscene_pattern_init(&p);
+    p.tile = tiles[0];
+    const unsigned bad = round % 16u;
+    const double huge = 0x1p70;
+    const uint64_t infinity_bits = UINT64_C(0x7FF0000000000000);
+    double infinity;
+    memcpy(&infinity, &infinity_bits, sizeof infinity);
+    switch (bad) {
+      case 0: p.w = -1.0; break;
+      case 1: p.h = -0.5; break;
+      case 2: p.x_step = -0.0 - 2.0; break;
+      case 3: p.y_step = -1e-3; break;
+      case 4: p.x = infinity; break;
+      case 5: p.y = -infinity; break;
+      case 6: p.w = huge; break;
+      case 7: p.h = 0x1p-70; break;
+      case 8: p.repeat_x = 2; break;
+      case 9: p.has_tint = 1; break;
+      case 10: p.tint.rgba[3] = 1.0; break;
+      case 11: gshgeom_map_identity(3, &p.map); break;
+      case 12: p.tile = paths[0]; break;
+      case 13: p.map.t[0] = huge; break;
+      case 14: p.w = -1.0; p.x_step = huge; break;
+      default: p.has_tint = 1; p.tint = random_paint(); p.tint.rgba[0] = 70000.0; break;
+    }
+    const GSHSCENE_Resource * r = NULL;
+    GSHSCENE_Result result = gshscene_store_intern_pattern(store, &p, &r);
+    feed((uint64_t)result);
+    if (result == GSHSCENE_OK) {
+      feed(gshscene_resource_hash(r));
+      gshscene_resource_release(r);
+    }
+  }
+  /* A chain of patterns, each over a picture of a fill painted with the one before: ok until the picture-depth limit. */
+  {
+    const GSHSCENE_Resource * link = patterns[0];
+    gshscene_resource_retain(link);
+    unsigned made = 0;
+    for (unsigned level = 0; level < 40; level++) {
+      GSHSCENE_List * list = NULL;
+      check(gshscene_list_create(NULL, NULL, store, &list), "chain list");
+      GSHSCENE_Paint paint = pattern_paint_of(link, 1.0);
+      check(gshscene_list_fill(list, paths[1], NULL, GSHGEOM_FILL_NONZERO, &paint, 0, 0.0), "chain fill");
+      check(gshscene_list_close(list), "chain close");
+      const GSHSCENE_Resource * tile = NULL;
+      GSHSCENE_Result r = gshscene_store_intern_picture(store, list, &tile);
+      gshscene_list_destroy(list);
+      feed((uint64_t)r);
+      if (r != GSHSCENE_OK) {
+        break;
+      }
+      GSHSCENE_Pattern p;
+      gshscene_pattern_init(&p);
+      p.tile = tile;
+      const GSHSCENE_Resource * next_link = NULL;
+      r = gshscene_store_intern_pattern(store, &p, &next_link);
+      feed((uint64_t)r);
+      gshscene_resource_release(tile);
+      gshscene_resource_release(link);
+      if (r != GSHSCENE_OK) {
+        link = NULL;
+        break;
+      }
+      link = next_link;
+      made++;
+    }
+    feed((uint64_t)made);
+    gshscene_resource_release(link);
+  }
+  GSHSCENE_Store_Stats stats;
+  check(gshscene_store_stats(store, &stats), "pattern stats");
+  feed(stats.created);
+  feed(stats.hits);
+  feed(stats.bytes);
+  /* Lists of fills and strokes painted with patterns: folded through the notice predicate under random target maps and the
+   * dispositions under three caps, then rendered with and without the capability. */
+  GSHSCENE_Dump_Sink_Config config;
+  gshscene_dump_sink_config_default(&config);
+  GSHSCENE_Sink_Caps caps_full = config.raster_caps;
+  GSHSCENE_Sink_Caps caps_none = caps_full;
+  caps_none.flags &= ~GSHSCENE_CAP_PATTERN;
+  GSHSCENE_Sink_Caps caps_no_group = caps_full;
+  caps_no_group.item_kinds &= ~(1u << GSHSCENE_ITEM_GROUP_PUSH);
+  const GSHSCENE_Sink_Caps * variants[3] = {&caps_full, &caps_none, &caps_no_group};
+  GSHSCENE_Stroke_Style style_content;
+  gshscene_stroke_style_init(&style_content);
+  style_content.width = 2.0;
+  const GSHSCENE_Resource * style = NULL;
+  check(gshscene_store_intern_stroke_style(store, &style_content, &style), "pattern stroke style");
+  for (unsigned l = 0; l < 8; l++) {
+    GSHSCENE_List * list = NULL;
+    check(gshscene_list_create(NULL, NULL, store, &list), "pattern list");
+    for (unsigned k = 0; k < 6; k++) {
+      GSHSCENE_Paint paint = pattern_paint_of(patterns[between(0, PT_PATTERNS - 1)], k == 3 ? 0.5 : 1.0);
+      GSHGEOM_Map map = random_map();
+      if (k % 3 == 2) {
+        check(gshscene_list_stroke(list, paths[between(0, PT_PATHS - 1)], style, &map, &paint, (int32_t)k, 0.0), "pattern stroke");
+      } else {
+        check(gshscene_list_fill(list, paths[between(0, PT_PATHS - 1)], &map, GSHGEOM_FILL_NONZERO, &paint, (int32_t)k, 0.0), "pattern fill");
+      }
+    }
+    check(gshscene_list_close(list), "pattern close");
+    feed(gshscene_list_hash(list));
+    feed((uint64_t)gshscene_list_count(list));
+    feed((uint64_t)gshscene_list_expansion(list));
+    feed_ties(list);
+    GSHGEOM_Map target = random_map();
+    GSHGEOM_Map instances[2];
+    instances[0] = random_map();
+    instances[1] = random_map();
+    for (size_t i = 0; i < gshscene_list_count(list); i++) {
+      const GSHSCENE_Item * item = NULL;
+      check(gshscene_list_item(list, i, &item), "pattern item");
+      feed((uint64_t)(item->kind == GSHSCENE_ITEM_STROKE ? gshscene_stroke_notice(item, instances, 2, &target)
+                                                         : gshscene_paint_notice(item, instances, 2, &target)));
+      feed((uint64_t)gshscene_pattern_notice(item, instances, 1, NULL));
+      for (int v = 0; v < 3; v++) {
+        GSHSCENE_Color_Space target_space;
+        memset(&target_space, 0, sizeof target_space);
+        GSHSCENE_Disposition d = gshscene_caps_disposition(variants[v], item, instances, 2, &target, &target_space, NULL);
+        feed((uint64_t)d.entry_class);
+        feed((uint64_t)d.reason);
+        feed(d.detail);
+      }
+    }
+    feed_render(list);
+    feed_render_without_patterns(list);
+    gshscene_list_destroy(list);
+  }
+  /* A retained scene: shapes painted with patterns, emitted, then one changed, diffed. */
+  GSHSCENE_Scene * scene = NULL;
+  check(gshscene_scene_create(NULL, NULL, store, &scene), "pattern scene");
+  GSHSCENE_Edit * edit = NULL;
+  check(gshscene_scene_open_edit(scene, NULL, &edit), "pattern edit");
+  uint64_t shapes[4];
+  for (unsigned i = 0; i < 4; i++) {
+    GSHSCENE_Node n;
+    gshscene_node_init(GSHSCENE_NODE_SHAPE, &n);
+    n.resource = paths[i];
+    n.map = random_map();
+    n.paint = pattern_paint_of(patterns[between(0, PT_PATTERNS - 1)], 1.0);
+    shapes[i] = add_node(edit, GSHSCENE_ROOT_ID, &n, NULL);
+  }
+  const GSHSCENE_Version * v1 = NULL;
+  check(gshscene_scene_publish(scene, edit, NULL, &v1), "pattern publish");
+  gshscene_edit_destroy(edit);
+  feed_version(v1);
+  const GSHSCENE_List * emitted = NULL;
+  check(gshscene_version_list(v1, &emitted), "pattern emit");
+  feed_render(emitted);
+  check(gshscene_scene_open_edit(scene, v1, &edit), "pattern second edit");
+  GSHSCENE_Node changed;
+  gshscene_node_init(GSHSCENE_NODE_SHAPE, &changed);
+  changed.resource = paths[0];
+  changed.paint = pattern_paint_of(patterns[between(0, PT_PATTERNS - 1)], 0.5);
+  check(gshscene_edit_set(edit, shapes[between(0, 3)], &changed), "pattern node set");
+  const GSHSCENE_Version * v2 = NULL;
+  check(gshscene_scene_publish(scene, edit, NULL, &v2), "pattern second publish");
+  gshscene_edit_destroy(edit);
+  feed_version(v2);
+  feed_diff(v1, v2, NULL);
+  GSHGEOM_Map view = random_map();
+  feed_diff(v1, v2, &view);
+  gshscene_version_release(v1);
+  gshscene_version_release(v2);
+  gshscene_scene_destroy(scene);
+  gshscene_resource_release(style);
+  for (unsigned i = 0; i < PT_PATTERNS; i++) {
+    gshscene_resource_release(patterns[i]);
+  }
+  for (unsigned i = 0; i < PT_TILES; i++) {
+    gshscene_resource_release(tiles[i]);
+  }
+  for (unsigned i = 0; i < PT_PATHS; i++) {
+    gshscene_resource_release(paths[i]);
+  }
+  check(gshscene_store_stats(store, &stats), "pattern final stats");
+  feed(stats.created);
+  feed(stats.hits);
+  if (stats.live != 0 || stats.bytes != 0) {
+    fail("a pattern resource is still live after every handle was released");
+  }
+  gshscene_store_destroy(store);
+}
+
 int main(void) {
   gshgeom_hash_init(&total);
   GSHSCENE_Store * store = NULL;
@@ -3118,5 +3500,8 @@ int main(void) {
   primitive_section();
   printf("shape-scene.primitive-hash %016" PRIx64 "\n", gshgeom_hash_value(&primitive_total));
   printf("shape-scene.primitive-count %lu\n", primitive_count);
+  pattern_section();
+  printf("shape-scene.pattern-hash %016" PRIx64 "\n", gshgeom_hash_value(&pattern_total));
+  printf("shape-scene.pattern-count %lu\n", pattern_count);
   return 0;
 }

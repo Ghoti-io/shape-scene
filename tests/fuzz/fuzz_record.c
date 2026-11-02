@@ -107,7 +107,7 @@ enum {
   OP_FILL_FIXED, OP_TRUNCATE, OP_EDIT_PALETTE, OP_INTERN_GRADIENT, OP_FILL_GRADIENT, OP_SCENE_GRADIENT,
   OP_GRADIENT_NODE, OP_COLOR_BOUND, OP_GROUP_PDF, OP_NODE_PDF, OP_INTERN_STYLE, OP_STROKE, OP_STROKE_NODE, OP_PLACEHOLDER,
   OP_PLACEHOLDER_NODE, OP_INTERN_IMAGE, OP_IMAGE_NOT_SHAPE, OP_IMAGE_PAINT, OP_INTERN_MASK,
-  OP_GROUP_MASK, OP_NODE_MASK, OP_INTERN_PRIMITIVE, OP_COUNT
+  OP_GROUP_MASK, OP_NODE_MASK, OP_INTERN_PRIMITIVE, OP_INTERN_PATTERN, OP_PATTERN_FILL, OP_PATTERN_NODE, OP_COUNT
 };
 
 /* --- the outcomes the corpus must reach ------------------------------------------------------------ */
@@ -127,7 +127,10 @@ enum {
   OUT_MASK_GROUP, OUT_MASK_GROUP_INVALID, OUT_MASK_GROUP_UNSUPPORTED, OUT_MASK_LIST_EQUAL, OUT_MASK_DEPTH, OUT_MASK_DEPTH_LIMIT,
   OUT_MASK_NODE, OUT_MASK_NODE_INVALID, OUT_MASK_DAMAGE, OUT_MASK_NO_DAMAGE, OUT_MASK_EMITTED,
   OUT_PRIMITIVE_INTERNED, OUT_PRIMITIVE_FLIPPED, OUT_PRIMITIVE_CANONICAL, OUT_PRIMITIVE_INVALID, OUT_PRIMITIVE_REVERSED,
-  OUT_PRIMITIVE_LIMIT, OUT_PRIMITIVE_HIT, OUT_PRIMITIVE_UNTAGGED, OUT_ARC_PATH, OUT_COUNT
+  OUT_PRIMITIVE_LIMIT, OUT_PRIMITIVE_HIT, OUT_PRIMITIVE_UNTAGGED, OUT_ARC_PATH, OUT_PATTERN_INTERNED, OUT_PATTERN_TINTED,
+  OUT_PATTERN_INVALID, OUT_PATTERN_UNSUPPORTED, OUT_PATTERN_LIMIT, OUT_PATTERN_HIT, OUT_PATTERN_NEAR, OUT_PATTERN_FILL,
+  OUT_PATTERN_FILL_INVALID, OUT_PATTERN_NOTICE, OUT_PATTERN_NODE, OUT_PATTERN_DAMAGE, OUT_PATTERN_NO_DAMAGE,
+  OUT_PATTERN_EMITTED, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limit", "edit limit", "publish limit",
@@ -154,7 +157,12 @@ static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limi
     "an emitted list with a masked group", "a primitive interned", "a flipped primitive interned",
     "a rounded rectangle made a rectangle by its square corners", "a primitive refused as invalid",
     "a rounded rectangle run the other way round interned", "a primitive past the store's limits refused",
-    "a primitive found again", "the same geometry untagged, another handle", "a path with an arc interned"};
+    "a primitive found again", "the same geometry untagged, another handle", "a path with an arc interned",
+    "a pattern interned", "an uncolored pattern interned", "a pattern refused as invalid", "a pattern refused as unsupported",
+    "a pattern past PT2's bounds refused", "a pattern found again", "a pattern told apart from its nearest neighbor",
+    "a fill or stroke painted with a pattern recorded", "a pattern paint refused as invalid", "a degenerate pattern noticed",
+    "a shape node painted with a pattern", "a changed pattern damaging its node", "an unchanged pattern damaging nothing",
+    "an emitted list with a pattern fill"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -237,6 +245,8 @@ typedef struct S {
   const GSHSCENE_Resource * images[3];     /* images, in the standalone store (masks-images-patterns story I1) */
   const GSHSCENE_Resource * masks[4];      /* masks, in the standalone store (story M1) */
   uint64_t mask_hash[4];                   /* each mask's hash when it was made: a handle's hash never changes (MK13) */
+  const GSHSCENE_Resource * patterns[4];   /* patterns, in the standalone store (story R1) */
+  uint64_t pattern_hash[4];                /* each pattern's hash when it was made (PT3) */
   GSHSCENE_Edit * edits[EDITS];
   unsigned edit_generation[EDITS];
   const GSHSCENE_Version * versions[VERSIONS];
@@ -598,6 +608,9 @@ static void hold_check(S * s) {
     if (s->masks[i]) {
       CHECK(gshscene_resource_hash(s->masks[i]) == s->mask_hash[i]); /* MK13: a handle's hash never changes */
     }
+    if (s->patterns[i]) {
+      CHECK(gshscene_resource_hash(s->patterns[i]) == s->pattern_hash[i]); /* PT3 likewise */
+    }
   }
   for (int i = 0; i < VERSIONS; i++) {
     if (s->versions[i]) {
@@ -685,7 +698,7 @@ static char * list_text(const GSHSCENE_List * l) {
   return slurp_close(f);
 }
 
-/** MK12 restated: the deepest picture a list names, as an instance or as a group's mask (0 for none). */
+/** MK12, PT11 restated: the deepest picture a list names, as an instance, as a group's mask or as the tile of a pattern (0 for none). */
 static size_t list_picture_depth(const GSHSCENE_List * list) {
   size_t depth = 0;
   for (size_t i = 0; i < gshscene_list_count(list); i++) {
@@ -698,6 +711,10 @@ static size_t list_picture_depth(const GSHSCENE_List * list) {
       GSHSCENE_Mask content;
       CHECK(gshscene_resource_mask(it->group.soft_mask, &content) == GSHSCENE_OK);
       d = gshscene_resource_picture_depth(content.picture);
+    } else if ((it->kind == GSHSCENE_ITEM_FILL || it->kind == GSHSCENE_ITEM_STROKE) && it->paint.kind == GSHSCENE_PAINT_PATTERN) {
+      GSHSCENE_Pattern content;
+      CHECK(gshscene_resource_pattern(it->paint.resource, &content) == GSHSCENE_OK);
+      d = gshscene_resource_picture_depth(content.tile);
     }
     depth = d > depth ? d : depth;
   }
@@ -1303,6 +1320,322 @@ static void fuzz_mask_node(S * s) {
   gshscene_edit_destroy(e);
   gshscene_resource_release(ma);
   gshscene_resource_release(mb);
+  gshscene_resource_release(shape);
+  gshscene_resource_release(picture);
+  gshscene_scene_destroy(sc);
+}
+
+/* --- patterns (masks-images-patterns story R1: PT1 to PT5, PT10, PT11) -------------------------------------------------- */
+
+static int pattern_in_band(double x) {
+  double m = x < 0.0 ? -x : x;
+  return m == 0.0 || (m >= 0x1p-64 && m <= 0x1p64);
+}
+
+/** PT1 to PT5: a pattern from the input, its result class predicted in PT2's order, and its content, lattice and dump read back. */
+static void fuzz_pattern(S * s) {
+  static const double sizes[12] = {1.0, 0.1, 0.3, 0.5, 2.0, 0.0, -1.0, (double)NAN, (double)INFINITY, 0x1p65, 0x1p-65, 3.0};
+  static const double origins[6] = {0.0, -0.0, 0.5, -7.25, 0x1p64, 0x1p65};
+  unsigned tsel = pick(s, POOL + 2), xsel = pick(s, 6), ysel = pick(s, 6), wsel = pick(s, 12), hsel = pick(s, 12),
+           xssel = pick(s, 12), yssel = pick(s, 12), rsel = pick(s, 6), msel = pick(s, 8), tintsel = pick(s, 10), slot = pick(s, 4);
+  const GSHSCENE_Resource * tile = tsel < POOL ? s->pictures[tsel] : tsel == POOL ? s->res[0] : NULL;
+  /* An empty slot of the pool is a picture of one fill made for the call (the pattern holds its own reference). */
+  const GSHSCENE_Resource * fresh = tsel < POOL && !tile ? one_fill_picture(s, s->store, 2) : NULL;
+  tile = fresh ? fresh : tile;
+  GSHSCENE_Pattern p;
+  gshscene_pattern_init(&p);
+  p.tile = tile;
+  p.x = origins[xsel];
+  p.y = origins[ysel];
+  p.w = sizes[wsel];
+  p.h = sizes[hsel];
+  p.x_step = sizes[xssel];
+  p.y_step = sizes[yssel];
+  p.repeat_x = rsel == 1 ? 0u : rsel == 5 ? 2u : 1u;
+  p.repeat_y = rsel == 2 ? 0u : 1u;
+  int invalid = !tile || gshscene_resource_kind(tile) != GSHSCENE_RESOURCE_PICTURE;
+  int unsupported = 0;
+  int limit = 0;
+  switch (msel) {
+    case 1: gshgeom_map_rotate(GSHGEOM_ANGLE_DEGREES, 30.0, &p.map); break;
+    case 2: gshgeom_map_translate(2, 3.0, -2.0, 0.0, &p.map); break;
+    case 3: gshgeom_map_translate(2, 0x1p70, 0.0, 0.0, &p.map); limit = 1; break;
+    case 4: gshgeom_map_identity(3, &p.map); unsupported = 1; break;
+    case 5: p.map.m[1][1] = (double)NAN; invalid = 1; break;
+    case 6: memset(&p.map, 0, sizeof p.map); invalid = 1; break;
+    default: break;
+  }
+  switch (tintsel) {
+    case 1: p.has_tint = 1; p.tint.kind = GSHSCENE_PAINT_SOLID; p.tint.rgba[0] = 0.25; p.tint.rgba[3] = 0.5; break;
+    case 2: p.has_tint = 1; p.tint.kind = GSHSCENE_PAINT_FOREGROUND; p.tint.rgba[3] = 1.0; break;
+    case 3: p.has_tint = 1; p.tint.kind = GSHSCENE_PAINT_PALETTE; p.tint.rgba[3] = 1.0; p.tint.entry = 1; break;
+    case 4: p.tint.kind = GSHSCENE_PAINT_SOLID; p.tint.rgba[3] = 1.0; invalid = 1; break;  /* a tint beside has_tint 0 */
+    case 5: p.has_tint = 1; break;                                                        /* the zero tint: transparent black */
+    case 6: p.has_tint = 1; p.tint.kind = GSHSCENE_PAINT_GRADIENT; invalid = 1; break;
+    case 7: p.has_tint = 1; p.tint.rgba[0] = 70000.0; p.tint.rgba[3] = 1.0; limit = 1; break;
+    case 8:
+      p.has_tint = 1;
+      p.tint.rgba[3] = 1.0;
+      p.tint.space.primaries = GCOL_PRIMARIES_PROPHOTO;
+      p.tint.space.transfer = GCOL_TRANSFER_SRGB;
+      unsupported = 1;
+      break;
+    default: break;
+  }
+  const double scalars[6] = {p.x, p.y, p.w, p.h, p.x_step, p.y_step};
+  for (int i = 0; i < 6; i++) {
+    invalid = invalid || !(scalars[i] - scalars[i] == 0.0);
+    limit = limit || !pattern_in_band(scalars[i]);
+  }
+  invalid = invalid || p.w < 0.0 || p.h < 0.0 || p.x_step < 0.0 || p.y_step < 0.0 || p.repeat_x > 1u || p.repeat_y > 1u;
+  GSHSCENE_Result want = invalid ? GSHSCENE_ERR_INVALID : unsupported ? GSHSCENE_ERR_UNSUPPORTED : GSHSCENE_OK;
+  if (want == GSHSCENE_OK) {
+    limit = limit || gshscene_resource_picture_depth(tile) + 1 > s->limits.max_picture_depth;
+    want = limit ? GSHSCENE_ERR_LIMIT : GSHSCENE_OK;
+  }
+  const GSHSCENE_Resource * made = NULL;
+  GSHSCENE_Result r = gshscene_store_intern_pattern(s->store, &p, &made);
+  gshscene_resource_release(fresh);
+  if (r != want) {
+    /* The store's own limits (bytes, resources) refuse what is valid, and say so as a limit. */
+    CHECK(want == GSHSCENE_OK && r == GSHSCENE_ERR_LIMIT);
+    outcomes[OUT_PATTERN_LIMIT]++;
+    return;
+  }
+  if (r != GSHSCENE_OK) {
+    CHECK(made == NULL);
+    outcomes[OUT_PATTERN_INVALID] += r == GSHSCENE_ERR_INVALID;
+    outcomes[OUT_PATTERN_UNSUPPORTED] += r == GSHSCENE_ERR_UNSUPPORTED;
+    outcomes[OUT_PATTERN_LIMIT] += r == GSHSCENE_ERR_LIMIT;
+    return;
+  }
+  outcomes[OUT_PATTERN_INTERNED]++;
+  outcomes[OUT_PATTERN_TINTED] += p.has_tint;
+  CHECK(gshscene_resource_kind(made) == GSHSCENE_RESOURCE_PATTERN);
+  uint64_t hash = gshscene_resource_hash(made);
+  GSHSCENE_Pattern back;
+  CHECK(gshscene_resource_pattern(made, &back) == GSHSCENE_OK);
+  CHECK(back.tile == tile && same_bits(back.x, p.x == 0.0 ? 0.0 : p.x) && same_bits(back.y, p.y == 0.0 ? 0.0 : p.y) &&
+        same_bits(back.w, p.w == 0.0 ? 0.0 : p.w) && same_bits(back.h, p.h == 0.0 ? 0.0 : p.h) &&
+        same_bits(back.x_step, p.x_step == 0.0 ? 0.0 : p.x_step) && same_bits(back.y_step, p.y_step == 0.0 ? 0.0 : p.y_step) &&
+        back.repeat_x == p.repeat_x && back.repeat_y == p.repeat_y && back.has_tint == p.has_tint);
+  /* The lattice: the first copy starts at the origin, abutting cells share their edge, and the overlap predicate is PT7's. */
+  double c0[4], c1[4];
+  CHECK(gshscene_pattern_cell(&back, 0, 0, c0) == GSHSCENE_OK && gshscene_pattern_cell(&back, 1, 1, c1) == GSHSCENE_OK);
+  CHECK(c0[0] == back.x && c0[1] == back.y);
+  if (back.x_step == back.w) {
+    CHECK(c0[2] == c1[0]);
+  }
+  if (back.y_step == back.h) {
+    CHECK(c0[3] == c1[1]);
+  }
+  CHECK(gshscene_pattern_overlaps(&back) ==
+        ((back.repeat_x && back.x_step < back.w) || (back.repeat_y && back.y_step < back.h)));
+  CHECK(gshscene_pattern_cell(&back, GSHSCENE_PATTERN_INDEX_MAX + 1, 0, c0) == GSHSCENE_ERR_INVALID);
+  /* Found again: one handle, and the hash is the handle's. */
+  const GSHSCENE_Resource * again = NULL;
+  CHECK(gshscene_store_intern_pattern(s->store, &p, &again) == GSHSCENE_OK && again == made);
+  CHECK(gshscene_resource_hash(again) == hash);
+  gshscene_resource_release(again);
+  outcomes[OUT_PATTERN_HIT]++;
+  /* The nearest neighbor, one field away (a repeat bit), is another handle with another hash. */
+  GSHSCENE_Pattern near_p = p;
+  near_p.repeat_x = p.repeat_x ^ 1u;
+  const GSHSCENE_Resource * other = NULL;
+  GSHSCENE_Result nr = gshscene_store_intern_pattern(s->store, &near_p, &other);
+  CHECK(nr == GSHSCENE_OK || nr == GSHSCENE_ERR_LIMIT);
+  if (nr == GSHSCENE_OK) {
+    CHECK(other != made && gshscene_resource_hash(other) != hash);
+    gshscene_resource_release(other);
+    outcomes[OUT_PATTERN_NEAR]++;
+  }
+  /* The dump is the content's, twice the same, with the tile's list after the pattern's line. */
+  char * d0 = resource_text(made);
+  char * d1 = resource_text(made);
+  if (d0 && d1) {
+    CHECK(strcmp(d0, d1) == 0 && strstr(d0, "\npattern cell=") != NULL && strstr(d0, "\ngshscene.list ") != NULL);
+  }
+  free(d0);
+  free(d1);
+  CHECK(!s->patterns[slot] || gshscene_resource_hash(s->patterns[slot]) == s->pattern_hash[slot]);
+  gshscene_resource_release(s->patterns[slot]);
+  s->patterns[slot] = made;
+  s->pattern_hash[slot] = hash;
+}
+
+/** PT4, PT10, PT11: a fill or a stroke painted with a pattern of the pool, its paint checked and what it draws decided. */
+static void fuzz_pattern_fill(S * s) {
+  unsigned psel = pick(s, 5), asel = pick(s, 5), stroke = pick(s, 3) == 0, bad = pick(s, 6), sel = pick(s, POOL);
+  if (!s->list) {
+    return;
+  }
+  if (psel < 4 && !s->patterns[psel]) {
+    /* An empty slot of the pool is made here: over a picture of one fill, abutting, and in one case in four a width of 0. */
+    const GSHSCENE_Resource * tile = one_fill_picture(s, s->store, 2);
+    GSHSCENE_Pattern made;
+    gshscene_pattern_init(&made);
+    made.tile = tile;
+    made.w = made.h = made.x_step = made.y_step = 4.0;
+    made.w = pick(s, 4) == 0 ? 0.0 : 4.0;
+    if (tile && gshscene_store_intern_pattern(s->store, &made, &s->patterns[psel]) == GSHSCENE_OK) {
+      s->pattern_hash[psel] = gshscene_resource_hash(s->patterns[psel]);
+    } else {
+      s->patterns[psel] = NULL;
+    }
+    gshscene_resource_release(tile);
+  }
+  const GSHSCENE_Resource * pattern = psel < 4 ? s->patterns[psel] : s->res[0];
+  GSHSCENE_Paint paint;
+  memset(&paint, 0, sizeof paint);
+  paint.kind = GSHSCENE_PAINT_PATTERN;
+  paint.resource = pattern;
+  paint.rgba[3] = asel == 4 ? 1.5 : asel / 3.0;
+  int invalid = !pattern || gshscene_resource_kind(pattern) != GSHSCENE_RESOURCE_PATTERN || asel == 4;
+  if (bad == 1) {
+    paint.rgba[0] = 0.5; /* rgb belongs to a solid */
+    invalid = 1;
+  } else if (bad == 2) {
+    paint.entry = 3; /* an entry belongs to a palette */
+    invalid = 1;
+  }
+  const GSHSCENE_Resource * line = s->res[sel];
+  const GSHSCENE_Resource * style = s->styles[0];
+  if (stroke && !style) {
+    return;
+  }
+  ListSnap b = snap(s->list);
+  GSHSCENE_Result r = stroke ? gshscene_list_stroke(s->list, line, style, NULL, &paint, 0, 0.0)
+                             : gshscene_list_fill(s->list, line, NULL, GSHGEOM_FILL_NONZERO, &paint, 0, 0.0);
+  if (invalid) {
+    CHECK(r == GSHSCENE_ERR_INVALID || r == GSHSCENE_ERR_UNSUPPORTED || (stroke && r != GSHSCENE_OK));
+    CHECK(gshscene_list_count(s->list) == b.count);
+    outcomes[OUT_PATTERN_FILL_INVALID]++;
+    return;
+  }
+  if (r == GSHSCENE_ERR_UNSUPPORTED) {
+    return; /* a 3D centerline */
+  }
+  list_after(s, b, r, 0, 0);
+  if (r != GSHSCENE_OK) {
+    return;
+  }
+  const GSHSCENE_Item * item;
+  CHECK(gshscene_list_item(s->list, b.count, &item) == GSHSCENE_OK);
+  CHECK(item->paint.kind == GSHSCENE_PAINT_PATTERN && item->paint.resource == pattern);
+  GSHSCENE_Pattern content;
+  CHECK(gshscene_resource_pattern(pattern, &content) == GSHSCENE_OK);
+  GSHSCENE_Reason notice = gshscene_pattern_notice(item, NULL, 0, NULL);
+  CHECK(notice == 0 || notice == GSHSCENE_REASON_PATTERN_DEGENERATE);
+  CHECK((notice == GSHSCENE_REASON_PATTERN_DEGENERATE) ==
+        (content.w == 0.0 || content.h == 0.0 || (content.repeat_x && content.x_step == 0.0) ||
+            (content.repeat_y && content.y_step == 0.0)));
+  CHECK(item->kind == GSHSCENE_ITEM_STROKE || gshscene_paint_notice(item, NULL, 0, NULL) == notice);
+  outcomes[OUT_PATTERN_FILL]++;
+  outcomes[OUT_PATTERN_NOTICE] += notice != 0;
+  /* PT11: the list counts the tile as it counts an instance's picture. */
+  CHECK(list_picture_depth(s->list) >= gshscene_resource_picture_depth(content.tile));
+}
+
+/** PT12: a shape node painted with a pattern of the scene's store, published, changed and diffed, and emitted. */
+static void fuzz_pattern_node(S * s) {
+  unsigned psel = pick(s, 3), wsel = pick(s, 3), foreign = pick(s, 3) == 0;
+  GSHSCENE_Scene * sc = NULL;
+  if (gshscene_scene_create(&s->alloc, NULL, NULL, &sc) != GSHSCENE_OK) {
+    return;
+  }
+  GSHSCENE_Store * store = gshscene_scene_store(sc);
+  GSHSCENE_Result ignored;
+  const GSHSCENE_Resource * picture = one_fill_picture(s, store, 2);
+  const GSHSCENE_Resource * shape = intern_recipe(s, store, 2, &ignored);
+  const GSHSCENE_Resource * pa = NULL;
+  const GSHSCENE_Resource * pb = NULL;
+  if (picture) {
+    GSHSCENE_Pattern p;
+    gshscene_pattern_init(&p);
+    p.tile = picture;
+    p.w = p.h = p.x_step = p.y_step = 4.0;
+    if (gshscene_store_intern_pattern(store, &p, &pa) != GSHSCENE_OK) {
+      pa = NULL;
+    }
+    p.x_step = 5.0 + (double)wsel;
+    if (gshscene_store_intern_pattern(store, &p, &pb) != GSHSCENE_OK) {
+      pb = NULL;
+    }
+  }
+  GSHSCENE_Edit * e = NULL;
+  GSHSCENE_Problems * problems = NULL;
+  const GSHSCENE_Version * v[3] = {NULL, NULL, NULL};
+  if (pa && pb && shape && gshscene_scene_open_edit(sc, NULL, &e) == GSHSCENE_OK) {
+    GSHSCENE_Node n;
+    gshscene_node_init(GSHSCENE_NODE_SHAPE, &n);
+    n.resource = shape;
+    n.paint.kind = GSHSCENE_PAINT_PATTERN;
+    n.paint.resource = pa;
+    n.paint.rgba[3] = 1.0;
+    uint64_t id = 0;
+    int built = gshscene_edit_add(e, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, &n, NULL, &id) == GSHSCENE_OK;
+    if (built && foreign && s->patterns[psel]) {
+      /* A pattern of another store is not a paint of this node. */
+      GSHSCENE_Node bad = n;
+      bad.paint.resource = s->patterns[psel];
+      CHECK(gshscene_edit_set(e, id, &bad) == GSHSCENE_ERR_INVALID);
+    }
+    GSHSCENE_Edit * one[1] = {e};
+    const GSHSCENE_Version * out = NULL;
+    if (built && gshscene_scene_merge(sc, one, 1, &problems, &out) == GSHSCENE_OK) {
+      v[0] = out;
+      const GSHSCENE_Resource * paints[3] = {pa, pb, pb};
+      for (int step = 1; step < 3; step++) {
+        GSHSCENE_Edit * ed = NULL;
+        if (gshscene_scene_open_edit(sc, v[step - 1], &ed) != GSHSCENE_OK) {
+          break;
+        }
+        GSHSCENE_Node m = n;
+        m.paint.resource = paints[step];
+        CHECK(gshscene_edit_set(ed, id, &m) == GSHSCENE_OK);
+        outcomes[OUT_PATTERN_NODE]++;
+        GSHSCENE_Edit * list[1] = {ed};
+        const GSHSCENE_Version * merged = NULL;
+        GSHSCENE_Result mr = gshscene_scene_merge(sc, list, 1, &problems, &merged);
+        gshscene_edit_destroy(ed);
+        if (mr != GSHSCENE_OK) {
+          break;
+        }
+        v[step] = merged;
+      }
+      for (int step = 1; step < 3 && v[step]; step++) {
+        GSHSCENE_Diff * d = NULL;
+        GSHSCENE_Damage dmg;
+        CHECK(gshscene_diff(v[step - 1], v[step], NULL, NULL, &d) == GSHSCENE_OK);
+        CHECK(gshscene_diff_damage(d, &dmg) == GSHSCENE_OK);
+        if (step == 2) {
+          /* The same pattern again: nothing changed, nothing damaged (PT12). */
+          CHECK(gshscene_diff_count(d) == 0 && dmg.empty && !dmg.unbounded);
+          outcomes[OUT_PATTERN_NO_DAMAGE]++;
+        } else {
+          /* Another pattern: the node changed, and its own bounds are damaged. */
+          CHECK(gshscene_diff_count(d) == 1 && !dmg.empty);
+          outcomes[OUT_PATTERN_DAMAGE]++;
+        }
+        gshscene_diff_destroy(d);
+        const GSHSCENE_List * emitted = NULL;
+        if (gshscene_version_list(v[step], &emitted) == GSHSCENE_OK) {
+          const GSHSCENE_Item * it;
+          CHECK(gshscene_list_count(emitted) == 1 && gshscene_list_item(emitted, 0, &it) == GSHSCENE_OK);
+          CHECK(it->paint.kind == GSHSCENE_PAINT_PATTERN && it->paint.resource == paints[step]);
+          CHECK(list_picture_depth(emitted) >= gshscene_resource_picture_depth(picture));
+          outcomes[OUT_PATTERN_EMITTED]++;
+        }
+      }
+    }
+  }
+  for (int step = 0; step < 3; step++) {
+    gshscene_version_release(v[step]);
+  }
+  gshscene_problems_destroy(problems);
+  gshscene_edit_destroy(e);
+  gshscene_resource_release(pa);
+  gshscene_resource_release(pb);
   gshscene_resource_release(shape);
   gshscene_resource_release(picture);
   gshscene_scene_destroy(sc);
@@ -3471,6 +3804,15 @@ static void op(S * s, unsigned code) {
     case OP_NODE_MASK:
       fuzz_mask_node(s);
       break;
+    case OP_INTERN_PATTERN:
+      fuzz_pattern(s);
+      break;
+    case OP_PATTERN_FILL:
+      fuzz_pattern_fill(s);
+      break;
+    case OP_PATTERN_NODE:
+      fuzz_pattern_node(s);
+      break;
     default:
       break;
   }
@@ -3565,6 +3907,10 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
   for (int i = 0; i < 4; i++) {
     CHECK(!s->masks[i] || gshscene_resource_hash(s->masks[i]) == s->mask_hash[i]);
     gshscene_resource_release(s->masks[i]);
+  }
+  for (int i = 0; i < 4; i++) {
+    CHECK(!s->patterns[i] || gshscene_resource_hash(s->patterns[i]) == s->pattern_hash[i]);
+    gshscene_resource_release(s->patterns[i]);
   }
   gshscene_scene_destroy(s->scene);
   GSHSCENE_Store_Stats stats;
