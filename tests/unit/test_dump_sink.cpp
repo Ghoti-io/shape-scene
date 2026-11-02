@@ -143,6 +143,8 @@ GSHSCENE_Dump_Sink_Config config_writer_like() {
     // coefficient sets and in a stated space, no transfer function, no backdrop, no acting on the shape.
     caps->mask_native = GSHSCENE_MASK_NATIVE_ALPHA | GSHSCENE_MASK_NATIVE_LUMINANCE | GSHSCENE_MASK_NATIVE_COEFF_W3C |
         GSHSCENE_MASK_NATIVE_COEFF_REC709 | GSHSCENE_MASK_NATIVE_SPACES;
+    // A pattern (S22): kept by handle, its tile emitted once, as a PDF tiling pattern or an SVG <pattern> is; it keeps the flag
+    // of the default configuration.
   }
   return c;
 }
@@ -171,6 +173,8 @@ GSHSCENE_Dump_Sink_Config config_toolpath_like() {
     // refused, `SOFT_MASK`.
     caps->flags &= ~GSHSCENE_CAP_GROUP_SOFT_MASK;
     caps->mask_native = 0;
+    // A pen has no pixels to tile a picture on (S22): every unit painted with a pattern is refused, `PATTERN`.
+    caps->flags &= ~GSHSCENE_CAP_PATTERN;
   }
   return c;
 }
@@ -2446,6 +2450,108 @@ TEST(DumpSink, AMaskIsRecordedOncePerHandleAndTheGroupNamesItAndItsPlacement) {
     char want[64];
     std::snprintf(want, sizeof want, " picture=%016llx ", (unsigned long long)gshscene_resource_hash(pic_a));
     EXPECT_EQ(text.find(want) != std::string::npos, w.records > 0) << w.name;
+  }
+}
+
+// S22: a sink that draws patterns records each pattern and each tile once per handle, however many fills name them, with the
+// fill naming the pattern; one that does not refuses every such unit and writes neither record.
+TEST(DumpSink, APatternAndItsTileAreRecordedOncePerHandleAndARefusedUnitWritesNeitherRecord) {
+  Scene s;
+  GSHSCENE_List * tl = s.open();
+  GSHSCENE_Paint white = solid(1, 1, 1);
+  ASSERT_EQ(gshscene_list_fill(tl, s.sq(0, 0, 4), nullptr, GSHGEOM_FILL_NONZERO, &white, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(tl), GSHSCENE_OK);
+  const GSHSCENE_Resource * tile = nullptr;
+  ASSERT_EQ(gshscene_store_intern_picture(s.store, tl, &tile), GSHSCENE_OK);
+  s.held.push_back(tile);
+  GSHSCENE_Pattern a;
+  gshscene_pattern_init(&a);
+  a.tile = tile;
+  a.w = 4.0;
+  a.h = 4.0;
+  a.x_step = 5.0;
+  a.y_step = 5.0;
+  GSHSCENE_Pattern b = a;
+  b.has_tint = 1;
+  b.tint = solid(0.25, 0.5, 0.75, 1.0);
+  const GSHSCENE_Resource * pa = nullptr;
+  const GSHSCENE_Resource * pb = nullptr;
+  ASSERT_EQ(gshscene_store_intern_pattern(s.store, &a, &pa), GSHSCENE_OK);
+  s.held.push_back(pa);
+  ASSERT_EQ(gshscene_store_intern_pattern(s.store, &b, &pb), GSHSCENE_OK);
+  s.held.push_back(pb);
+  GSHSCENE_List * l = s.open();
+  for (const GSHSCENE_Resource * pattern : {pa, pb, pa, pa, pb}) {
+    GSHSCENE_Paint p = solid(0, 0, 0, 1.0);
+    p.kind = GSHSCENE_PAINT_PATTERN;
+    p.resource = pattern;
+    ASSERT_EQ(gshscene_list_fill(l, s.sq(2, 2, 20), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK);
+  }
+  ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  for (int configuration = 0; configuration < 3; configuration++) {
+    SinkRef sink(configuration == 0 ? make_full(nullptr, nullptr)
+                                    : configuration == 1 ? make_writer_like(nullptr, nullptr) : make_toolpath_like(nullptr, nullptr));
+    auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+    ReportRef report;
+    Rendered r = render_job(sink.sink, request_for(l, *stream, report.report));
+    ASSERT_EQ(r.result, GSHSCENE_OK) << configuration;
+    size_t tiles = 0, patterns = 0, fills = 0, refused = 0;
+    std::string z_lines;
+    std::string text = stream->bytes;
+    for (size_t at = 0; at < text.size();) {
+      size_t end = text.find('\n', at);
+      std::string line = text.substr(at, end - at);
+      at = end + 1;
+      if (line.rfind("V ", 0) == 0) {
+        tiles++;
+        char want[96];
+        std::snprintf(want, sizeof want, "V %llu %016llx items=1", (unsigned long long)gshscene_resource_id(tile),
+            (unsigned long long)gshscene_resource_hash(tile));
+        EXPECT_EQ(line, want);
+      } else if (line.rfind("Z ", 0) == 0) {
+        patterns++;
+        z_lines += line + "\n";
+      } else if (line.find(" F res=") != std::string::npos && line.find(" pat=") != std::string::npos) {
+        fills++;
+      } else if (line.find(" X class=1 reason=36") != std::string::npos) {
+        refused++;
+      }
+    }
+    if (configuration == 2) {
+      EXPECT_EQ(tiles, 0u) << "a pen records no tile";
+      EXPECT_EQ(patterns, 0u);
+      EXPECT_EQ(fills, 0u);
+      EXPECT_EQ(refused, 5u) << "every fill painted with a pattern is refused";
+      auto entries = sinkconf::entries(report.report);
+      ASSERT_EQ(entries.size(), 5u);
+      for (const auto & e : entries) {
+        EXPECT_EQ(e.reason, GSHSCENE_REASON_PATTERN);
+      }
+      continue;
+    }
+    EXPECT_EQ(tiles, 1u) << configuration << ": the tile once however many patterns name it";
+    EXPECT_EQ(patterns, 2u) << configuration << ": each pattern once however many fills name it";
+    EXPECT_EQ(fills, 5u) << configuration;
+    EXPECT_EQ(refused, 0u);
+    char want_a[512], want_b[512];
+    std::snprintf(want_a, sizeof want_a,
+        "Z %llu %016llx tile=%llu cell=%016llx %016llx %016llx %016llx step=%016llx %016llx repeat=11 map=%016llx tint=-\n",
+        (unsigned long long)gshscene_resource_id(pa), (unsigned long long)gshscene_resource_hash(pa),
+        (unsigned long long)gshscene_resource_id(tile), 0ull, 0ull, (unsigned long long)gshgeom_f64_bits(4.0),
+        (unsigned long long)gshgeom_f64_bits(4.0), (unsigned long long)gshgeom_f64_bits(5.0),
+        (unsigned long long)gshgeom_f64_bits(5.0), (unsigned long long)gshgeom_map_hash(&a.map));
+    std::snprintf(want_b, sizeof want_b,
+        "Z %llu %016llx tile=%llu cell=%016llx %016llx %016llx %016llx step=%016llx %016llx repeat=11 map=%016llx tint=0 "
+        "%016llx %016llx %016llx %016llx 0:0:0000000000000000 0\n",
+        (unsigned long long)gshscene_resource_id(pb), (unsigned long long)gshscene_resource_hash(pb),
+        (unsigned long long)gshscene_resource_id(tile), 0ull, 0ull, (unsigned long long)gshgeom_f64_bits(4.0),
+        (unsigned long long)gshgeom_f64_bits(4.0), (unsigned long long)gshgeom_f64_bits(5.0),
+        (unsigned long long)gshgeom_f64_bits(5.0), (unsigned long long)gshgeom_map_hash(&b.map),
+        (unsigned long long)gshgeom_f64_bits(0.25), (unsigned long long)gshgeom_f64_bits(0.5),
+        (unsigned long long)gshgeom_f64_bits(0.75), (unsigned long long)gshgeom_f64_bits(1.0));
+    EXPECT_EQ(z_lines, std::string(want_a) + want_b) << configuration << ": the records are the fields, in the order the file states";
+    EXPECT_NE(text.find(" pat=" + std::to_string(gshscene_resource_id(pa)) + " "), std::string::npos);
+    EXPECT_NE(text.find(" pat=" + std::to_string(gshscene_resource_id(pb)) + " "), std::string::npos);
   }
 }
 

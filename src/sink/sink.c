@@ -894,15 +894,24 @@ static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
         return result;
       }
     }
+    int pattern = (item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE) &&
+        item->paint.kind == GSHSCENE_PAINT_PATTERN && item->paint.resource &&
+        item->paint.resource->kind == GSHSCENE_RESOURCE_PATTERN;
+    /* PT13: a unit painted with a pattern the caps draw, refused for a unit in its tile, still has its tile walked, so that the
+     * unit that is refused in it is reported with its chain; one refused for anything else (the flag, a palette tint) has not. */
+    int tile_refused = pattern && d.entry_class == GSHSCENE_ENTRY_REFUSED && d.reason == GSHSCENE_REASON_PATTERN &&
+        (job->caps.flags & GSHSCENE_CAP_PATTERN);
     if (d.entry_class == GSHSCENE_ENTRY_REFUSED) {
       (*refused)++;
-      gshscene_skip_begin(&skip, item, count);
-      continue;
+      if (!tile_refused) {
+        gshscene_skip_begin(&skip, item, count);
+        continue;
+      }
     }
     /* S17, S20, PT10: a gradient, image or pattern fill or a stroke that draws nothing is drawn as defined, and the report says so. */
-    GSHSCENE_Reason notice = item->kind == GSHSCENE_ITEM_STROKE
-        ? gshscene_stroke_notice(item, maps, outer, &job->target.map)
-        : gshscene_paint_notice(item, maps, outer, &job->target.map);
+    GSHSCENE_Reason notice = tile_refused ? (GSHSCENE_Reason)0
+        : item->kind == GSHSCENE_ITEM_STROKE ? gshscene_stroke_notice(item, maps, outer, &job->target.map)
+                                             : gshscene_paint_notice(item, maps, outer, &job->target.map);
     if (notice) {
       result = gshscene_report_add(report, GSHSCENE_ENTRY_NOTICE, notice, chain, count, 0, 0.0);
       if (result != GSHSCENE_OK) {
@@ -911,7 +920,7 @@ static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
     }
     GSHSCENE_Glyph_Route route;
     maps[outer] = item->map; /* the item's own map, after the enclosing levels' (AD-24, as a sink composes them) */
-    if (plan_route(job, item, maps, outer + 1, &route) && route.entry_class) {
+    if (!tile_refused && plan_route(job, item, maps, outer + 1, &route) && route.entry_class) {
       /* A run-level entry (D6, D7): the item's chain, second 0. */
       result = gshscene_report_add(report, (GSHSCENE_Entry_Class)route.entry_class, (GSHSCENE_Reason)route.reason,
           chain, count, 0, 0.0);
@@ -924,9 +933,6 @@ static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
         continue;
       }
     }
-    int pattern = (item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE) &&
-        item->paint.kind == GSHSCENE_PAINT_PATTERN && item->paint.resource &&
-        item->paint.resource->kind == GSHSCENE_RESOURCE_PATTERN;
     if (item->kind == GSHSCENE_ITEM_INSTANCE ||
         (item->kind == GSHSCENE_ITEM_GROUP_PUSH && item->group.soft_mask)) {
       /* An instance's picture is drawn under its map, a mask's under the group's placement of it (MK6): the chain T I_1 .. I_k Q. */
