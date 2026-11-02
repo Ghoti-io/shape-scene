@@ -128,7 +128,10 @@ second hash and count, `stroke-hash` and `stroke-count` in `tests/corpus/scene.h
 first unchanged; both pairs are checked. The image section (store-level interns of images of every layout, sample
 type and alpha form, with partial edge tiles, padded strides, takes and collisions) is a third pair, `image-hash` and
 `image-count`, for the same reason. The primitives section (random primitives of every kind and flip pair through the store, the tag
-read back, the same geometry untagged, paths of arcs) is a pair of its own, `primitive-hash` and `primitive-count`. The stroke section's value moved once with
+read back, the same geometry untagged, paths of arcs) is a pair of its own, `primitive-hash` and `primitive-count`. The pattern
+section (random patterns over random tiles through the store, the result of every malformed one, the position of copies at indexes
+up to a million and the shared edge of abutting cells, a chain of nested patterns to the picture-depth limit, lists painted with
+patterns through the notice and the dispositions, and a retained scene of them) is the ninth, `pattern-hash` and `pattern-count`. The stroke section's value moved once with
 `shape-geometry`'s flattener revision 3: a stroke's clip region flattens rational curves, which the new conic
 route holds to a proved bound instead of a fixed two units, so the vertices of every conic in a clip moved and the
 stroke fold with them; no other pair did.
@@ -341,6 +344,102 @@ float saturated) costs the small components of its pixel about `2048` through a 
 no sink can be asked to do better than the arithmetic allows. A `NEAREST` answer within `2^-16` of a texel boundary may take
 either neighbour.
 
+## Patterns (normative)
+
+A **pattern** repeats a picture on a lattice: SVG's `<pattern>`, a PDF tiling pattern, CSS `background-repeat` (`space` and
+`round` included) and a Canvas pattern are all one. A pattern resource names a **tile**, a closed picture of the same store in
+**pattern space** (y down), and a fill or a stroke names the pattern with a paint of kind `PATTERN` (5), as it names a gradient or
+an image paint. The rules are numbered PT1 to PT14, live in `pattern.h`, and are checked by `tools/pattern-oracle.py`, which
+states the lattice picture in exact rationals and shares no code with the library, against `tests/ref_pattern.h`, the library's
+own evaluator of it in `double`. The sink contract below (S22) says what a sink does with them. There are no pixels here: a sink
+that draws patterns is measured against the oracle's vectors (`tests/pattern_vectors.h`, installed).
+
+**The resource (PT1).** `{tile, cell, x_step, y_step, repeat_x, repeat_y, map, has_tint, tint}`, interned by content as resource
+kind 12. The cell is the rectangle `[x, x + w] x [y, y + h]` of pattern space. The steps are the lattice spacing: the copy
+`(i, j)` is the tile translated by `(i x_step, j y_step)` and has the cell `[x + i x_step, x + i x_step + w] x [y + j y_step,
+y + j y_step + h]`. A step equal to the size abuts the cells, a larger one leaves a gap, a smaller one overlaps them (PDF's
+`XStep` and `YStep` may be smaller than the cell). `repeat_x` and `repeat_y` are 0 or 1; 0 draws only index 0 on that axis
+(`repeat-y` and `no-repeat`), and a step on an axis that does not repeat is not used: it neither makes cells overlap nor makes the
+pattern degenerate. The map takes pattern space to the local space of the item that paints with it, exactly as a gradient's does.
+An empty tint is a **colored** pattern; a tint (a solid, foreground or palette paint, with `has_tint` 1) makes it **uncolored**,
+PDF's `PaintType` 2. A tint beside a `has_tint` of 0 is invalid, and a colored pattern stores the zero paint.
+
+**Validity and bounds (PT2).** Checked in this order, so that a caller always meets the first fault: every double finite and every
+enumeration in range, the tile a picture of this store, the size and the steps not negative, the map valid, the tint given
+exactly when `has_tint` is 1 (`INVALID`); a 3D map or a reserved tint space (`UNSUPPORTED`); then the bounds (`LIMIT`): each of
+`x, y, w, h, x_step, y_step` and every entry of the map zero or of magnitude in `[2^-64, 2^64]` (G14's band), a solid tint's
+components within N1's bound, and the tile's picture depth plus one at most `max_picture_depth`. Zero is a legal size or step and
+is PT10's notice, never refused at record. A negative size or step is invalid; a front end that meets one takes its magnitude,
+which is the same lattice. `-0` is stored as `+0`.
+
+**Hash and dump (PT3).** After resource.h's two leading fields: `u64` the tile's content hash, `f64` `x, y, w, h, x_step, y_step`,
+`u8` `repeat_x`, `u8` `repeat_y`, `u64` `gshgeom_map_hash` of the map, `u8` `has_tint` and, with a tint, `u8` its kind, four `f64`,
+its space and `u32` its entry. The dump is `pattern cell=<x> <y> <w> <h> step=<xs> <ys> repeat=<rx><ry> map=<hash> tile=<hash>
+tint=<- or kind r g b a space entry>`, every double as 16 hexadecimal digits, then the tile's own list dump. The generator
+restates both, and the format stays 1.
+
+**The paint and its chain (PT4).** A `PATTERN` paint names the resource in the paint's resource handle; its `rgba[3]` is an alpha
+multiplier, and the rest is zero. For an item with the chain `T I_1 .. I_k M` and the pattern map `G`, pattern space maps to the
+target by `C = T I_1 .. I_k M G`, composed by `shape-geometry` only. A fill is N7 over the **lattice picture** at the pixel: the
+area average over the pixel of the picture rendered into an isolated layer, premultiplied in the layer's space and multiplied by the
+alpha multiplier. Unlike a gradient's point-sampled parameter this is what makes a tile finer than a pixel average to the right
+color.
+
+**The lattice (PT5).** The copy index is an integer and the translation is its exact product with the step; nothing accumulates, so
+the position of copy `(i, j)` carries no error from the copies before it, where adding the step repeatedly is wrong by `i`
+roundings. `gshscene_pattern_cell` is the one definition: `left = x + i x_step` and `top = y + j y_step` (one product and one sum),
+and, **when the step equals the size, the right edge is `x + (i + 1) x_step`**, the very double the next cell's left edge is, so
+abutting cells name the same pattern-space corner and a cell-filling background has no seam; otherwise the right edge is `left + w`.
+The copies of a use are those whose mapped cell, a closed convex quadrilateral, meets the use's device bounds; they are painted in
+**lattice order**, increasing `j` then increasing `i`.
+
+**Cells that do not overlap (PT6).** Each item of the tile, an instanced picture's items included, is **one element** for all the
+copies: its shape at a pixel is the sum of the copies' coverages, each restricted to its cell and to the clips in force for that
+copy, and its source is the coverage-weighted mean of the copies' sources. A cell-filling background therefore covers every pixel
+across a cell edge exactly once, where compositing the copies one after the other would leave `1 - (1 - a)(1 - b)` at the seam. A
+gradient or an image in the tile moves with its copy, so a pixel that holds two copies of it takes their area-weighted mean. A
+clip block in the tile is the union of its copies' restricted regions, and a group is one group over all copies, its layer,
+opacity, blend mode and composite applied once to the union.
+
+**Cells that overlap (PT7).** When a repeating axis has a step smaller than the size, the copies are composited in lattice order,
+later over earlier. A tile whose blend modes are all Normal is, per copy, an isolated group of the tile with its shapes restricted
+to the cell and composited with source-over; a tile that holds another blend mode is one non-isolated, non-knockout group over the
+lattice layer in which the copies are drawn in that order. The two give the same pixels for a tile of Normal blend (source-over
+is associative), which the oracle's selftest asserts exactly. The restriction to a cell is a **geometric** one, the polygon clip
+of `shape-geometry`, not a multiplied coverage: multiplying a coverage by the cell's would break that equality and leave a seam. The
+order of overlapping copies is this library's choice, not a claim about any format; at `x_step = w` exactly PT6 holds and one ulp
+below it PT7 does, which is the definition and not an error.
+
+**The tile (PT8, PT9).** The lattice layer starts transparent in the layer's blend space and does not depend on the backdrop; a
+non-isolated group directly in the tile sees the lattice layer, not the page. A foreground or palette paint in the tile resolves
+against the list that draws the pattern, as an instance's does, so an SVG front end resolves `currentColor` in pattern content to a
+solid color when it lowers. A palette entry the palette in force lacks refuses the unit that names it. A colored pattern's source is
+the lattice picture times the alpha multiplier. An uncolored one keeps only the lattice picture's alpha `A`: its source is the
+tint's straight color with the alpha `A ta a`, premultiplied; the tile's own colors are evaluated, taking part in blends and group
+alphas, and discarded.
+
+**What draws nothing (PT10).** The one predicate `gshscene_pattern_notice`, which `gshscene_paint_notice` and
+`gshscene_stroke_notice` call, gives `MAP_NOT_INVERTIBLE` exactly when some map of the chain (`T`, `I_1` to `I_k`, `M`, `G`, and
+for an item in a tile the item map and the map of every enclosing pattern) has a 2x2 part of exactly zero determinant, decided by
+`gshgeom_orient2d` on that map's own doubles: no composition is formed, because invertible factors can compose to zero by
+underflow. Then `PATTERN_DEGENERATE` when `w` or `h` is 0, or a step is 0 on an axis that repeats. An empty tile draws nothing and
+is no notice. Both are notices, which never fail a render.
+
+**Nesting, depth and what a tile reads (PT11, PT12).** A pattern inside a tile is evaluated per outer copy: its chain gets the
+outer copy's translation, so its lattice is anchored in the copy, and an outer step that is not a multiple of the inner one shows.
+A pattern's picture depth is its tile's, which a list that names it counts as it counts an instance's picture, so a chain of
+nested patterns is bounded by `max_picture_depth` where a list is frozen into a picture, at the intern of the pattern, and in a
+retained scene's validation. A pattern adds no outset: a fill's or stroke's bounds and damage are its own. The retained scene diffs a
+node's paint by handle, so a changed pattern or tile damages the nodes that paint with it and nothing else, and a changed
+foreground or palette damages the fills whose tile or tint reads it, through instances, masks and nested patterns.
+
+**Sinks (PT13, PT14).** Without `CAP_PATTERN` the planning pass refuses a unit painted with a pattern, `PATTERN`, on every sink,
+before the target is touched. With it, a unit in the tile that the caps refuse is reported with the chain extended by its index in
+the tile, once and not once per copy, and refuses the unit painted with the pattern as well: a pattern with a missing part is not
+the pattern. A sink that resamples a tile within a tolerance reports `PATTERN_RESAMPLED`. The sink's own limits, copies per
+render and the lattice layer's size, are its resource limits, asserted against a hostile pattern (a step of `2^-64` under a full
+target fill) and refused per unit, never silently.
+
 ## Reserved
 
 Refused with `ERR_UNSUPPORTED`: ProPhoto (D50: converting to it needs a chromatic adaptation), the parametric,
@@ -348,7 +447,7 @@ BT.1886, PQ and HLG transfers and ICC profiles, gray-alpha images (a pinned layo
 and a stroke style's **width profile** (variable width, D8 of the strokes spec): the slot is a resource handle,
 hashed as `u64` 0 while it is empty, so that defining a profile fills a spelling that already exists. (The palette
 paint is N14 below; the gradient paint and resource are G1 to G13; the image resource is IM1 to IM14 above; the mask
-resource is MK1 to MK14 below.) A mask's transfer is PDF's function types 0, 2 and 3 on one level, and its coefficients are
+resource is MK1 to MK14 below; the pattern resource is PT1 to PT14 above.) A mask's transfer is PDF's function types 0, 2 and 3 on one level, and its coefficients are
 MK3's four sets; any other function or weights are sampled or named by the front end and reported as approximated.
 
 ## What a scene means: paint, color and composition (normative)
@@ -1404,6 +1503,15 @@ conformance suite (`tests/sink_conformance.h`) cite the rules by number.
   `gshscene_stroke_notice` (SK9), and a stroke of a glyph run only with `STROKE_RUNS`. A writer emits a native stroke as a stroke, deduped by the style's id, and expands
   only a stroke whose required features it lacks; a toolpath sink follows the centerline and refuses what its caps
   lack; a GPU sink later strokes natively within its tolerance or expands. A device width on a stream is in CSS pixels.
+- **S22 Patterns** (PT1 to PT14 above). A pattern reaches a sink by handle, in a fill's or a stroke's paint, and a sink reads its
+  cells with `gshscene_pattern_cell`, whether they overlap with `gshscene_pattern_overlaps`, and what draws nothing with
+  `gshscene_pattern_notice`. A sink that draws patterns has `CAP_PATTERN`; without it the planning pass refuses every unit painted
+  with one (`PATTERN`), writers and toolpath sinks included. The planning pass enters the tile: a unit in it that the sink refuses
+  is reported with the chain `[... , i, j]` (`i` the unit painted with the pattern, `j` the unit in the tile) and refuses the
+  unit painted with it, and `gshscene_caps_disposition` decides both, so a sink that asks it per unit gets the same answer. A
+  writer keeps the pattern by handle and emits it, and its tile, once per resource id; a PDF writer writes a step larger than the
+  cell by enlarging the written tile and a smaller one by instancing the neighbours the lattice order puts under it; a GPU sink
+  caches a tile by the tile picture's id and drops it at release.
 - **S17 Gradients** (color-paint story P1). A gradient reaches a sink by handle. A kind not in the caps'
   `gradient_kinds` is refused (`GRADIENT`) by the planning pass, so strict fails before the sink is called; without
   `GRADIENT_SPACES` a stated interpolation space other than the target's is approximated; a palette stop the palette
