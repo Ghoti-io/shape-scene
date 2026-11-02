@@ -964,7 +964,7 @@ source or its shape.
 **S19 Sinks.** A sink claims `GSHSCENE_CAP_GROUP_NON_ISOLATED`, `_KNOCKOUT` and `_SOFT_MASK` for what it composites, and
 `mask_native` for the mask features (MK9) it has; without them the planning pass refuses the group (`GROUP_ISOLATION`,
 `GROUP_KNOCKOUT`, `SOFT_MASK`, `MASK_FEATURE`, in that order, after `COMPOSITE`), so it is never drawn as a default
-group or a different mask. shape-cpu claims none of them yet; the test sink's configurations claim them as MK14 says.
+group or a different mask. shape-cpu claims all three, with every mask feature; the test sink's configurations claim them as MK14 says.
 
 ## Masks (normative)
 
