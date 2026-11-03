@@ -444,6 +444,11 @@ the pattern. A sink that resamples a tile within a tolerance reports `PATTERN_RE
 render and the lattice layer's size, are its resource limits, asserted against a hostile pattern (a step of `2^-64` under a full
 target fill) and refused per unit, never silently.
 
+The test sink writes `copies=<n>` after `pat=<id>` in the record of a pattern fill or stroke: the copies of the use that
+`gshgeom_lattice_each` finds (the chain `T I_1 .. I_k M G` composed in one call) over the closed rectangle of the item's box in
+whole pixels met with the clips in force and the extent, whatever the damage, so that a sink counts the same number from the same
+list and target; `dump_sink.h` states the spelling of a count past the bound and of a lattice the enumeration refuses.
+
 ## Reserved
 
 Refused with `ERR_UNSUPPORTED`: ProPhoto (D50: converting to it needs a chromatic adaptation), the parametric,

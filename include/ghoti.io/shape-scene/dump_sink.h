@@ -147,6 +147,16 @@
  * refuses the unit (`PATTERN`) and writes neither record; a pattern with a unit in its tile the caps refuse is refused as well, and the
  * unit in the tile is the planning pass's entry, with the chain `[... , i, j]`.
  *
+ * ` pat=<id>` is followed by ` copies=<n>`: the number of copies of the use (pattern.h PT5; shape-geometry's lattice.h, the
+ * function a sink that draws patterns counts with), at the top level of the tile (a pattern nested in the tile is not summed).
+ * The chain is `T I_1 .. I_k M G`, composed in one call.  The rectangle is the item's box in whole pixels (rounded out, the
+ * stamp's rectangle) met with every clip in force and the extent, **whatever the damage** (a render of a part has the whole
+ * render's count), taken as a closed rectangle; a writer's target, which has no extent, leaves that out.  `copies=0` when the
+ * rectangle is empty; `copies=>4194304` when the copies are more than 2^22 (this field only: the test sink has no limit on a render);
+ * `copies=-` when the composed map or the lattice is one the enumeration refuses.  A pattern that draws nothing (PT10) is a
+ * notice and has no record, so no field.  A stroke's rectangle is its `box=` (SK10's bound of the centerline, wider than the outline
+ * a rasterizer measures), so a sink compares its own count with a stroke's field only where that box is its own.
+ *
  * ### Primitive and arc records (PR10)
  *
  * Only when the configuration's `records` asks (default none).  After the record of a fill, clip or stroke of a path resource: with

@@ -2587,6 +2587,215 @@ TEST(DumpSink, APatternAndItsTileAreRecordedOncePerHandleAndARefusedUnitWritesNe
   }
 }
 
+// R2: a pattern fill's record carries `copies=<n>`, the copies of the use counted over the closed rectangle of the fill's pixel
+// box met with the clips in force and the extent, whatever the damage.  The expected counts are restated here by brute force over a
+// window of indices on axis-aligned cells (a quarter turn keeps them axis-aligned), not by shape-geometry's enumeration.
+namespace {
+
+/** The cells [x + i xs, x + i xs + w] of one axis that meet the closed interval [lo, hi], by brute force over a window. */
+size_t brute_axis(double x, double w, double step, double lo, double hi) {
+  size_t n = 0;
+  for (int i = -200; i <= 200; i++) {
+    double a = x + i * step;
+    if (a <= hi && a + w >= lo) {
+      n++;
+    }
+  }
+  return n;
+}
+
+/** The ` copies=` fields of the records of fills painted with a pattern, in order. */
+std::vector<std::string> copies_fields(const std::string & text) {
+  std::vector<std::string> out;
+  for (size_t at = 0; at < text.size();) {
+    size_t end = text.find('\n', at);
+    std::string line = text.substr(at, end - at);
+    at = end + 1;
+    size_t p = line.find(" pat=");
+    if (line.find(" F res=") != std::string::npos && p != std::string::npos) {
+      size_t c = line.find(" copies=", p);
+      size_t e = line.find(' ', c + 1);
+      out.push_back(c == std::string::npos ? "" : line.substr(c + 8, e - c - 8));
+    }
+  }
+  return out;
+}
+
+}  // namespace
+
+TEST(DumpSink, APatternFillsCopiesAreCountedOverTheClosedBoxMetWithTheClipsAndTheExtentWhateverTheDamage) {
+  Scene s;
+  GSHSCENE_List * tl = s.open();
+  GSHSCENE_Paint white = solid(1, 1, 1);
+  ASSERT_EQ(gshscene_list_fill(tl, s.sq(0, 0, 1), nullptr, GSHGEOM_FILL_NONZERO, &white, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(tl), GSHSCENE_OK);
+  const GSHSCENE_Resource * tile = nullptr;
+  ASSERT_EQ(gshscene_store_intern_picture(s.store, tl, &tile), GSHSCENE_OK);
+  s.held.push_back(tile);
+  struct Config {
+    double w, h, xs, ys;
+    double m[4];
+    uint32_t repeat_y;
+  };
+  const Config configs[] = {
+      {4, 4, 4, 4, {1, 0, 0, 1}, 1},    // abutting
+      {3, 3, 5, 5, {1, 0, 0, 1}, 1},    // gapped
+      {3, 3, 2, 7, {0, -1, 1, 0}, 1},   // overlapping in x and gapped in y, a quarter turn: (x, y) to (-y, x)
+  };
+  auto pattern_of = [&](const Config & c) {
+    GSHSCENE_Pattern p;
+    gshscene_pattern_init(&p);
+    p.tile = tile;
+    p.w = c.w;
+    p.h = c.h;
+    p.x_step = c.xs;
+    p.y_step = c.ys;
+    p.repeat_y = c.repeat_y;
+    const double zero[2] = {0.0, 0.0};
+    EXPECT_EQ(gshgeom_map_from_matrix(2, c.m, zero, &p.map), GSHGEOM_OK);
+    const GSHSCENE_Resource * r = nullptr;
+    EXPECT_EQ(gshscene_store_intern_pattern(s.store, &p, &r), GSHSCENE_OK);
+    s.held.push_back(r);
+    return r;
+  };
+  auto paint_of = [](const GSHSCENE_Resource * r) {
+    GSHSCENE_Paint p = solid(0, 0, 0, 1.0);
+    p.kind = GSHSCENE_PAINT_PATTERN;
+    p.resource = r;
+    return p;
+  };
+  // The expected counts for a box [x0, x1] x [y0, y1], by brute force over the cells of each axis (the pattern origin is 0).
+  auto expected = [](const Config & c, double x0, double y0, double x1, double y1) {
+    if (c.m[1] == 0.0) {
+      return brute_axis(0, c.w, c.xs, x0, x1) * brute_axis(0, c.h, c.ys, y0, y1);
+    }
+    // (x, y) to (-y, x): the device x is -y, the device y is x; the cells along y map to [-(j ys + h), -j ys]
+    size_t nx = 0;
+    for (int j = -200; j <= 200; j++) {
+      nx += (-(j * c.ys) >= x0 && -(j * c.ys + c.h) <= x1) ? 1 : 0;
+    }
+    return nx * brute_axis(0, c.w, c.xs, y0, y1);
+  };
+  GSHSCENE_Paint pa = paint_of(pattern_of(configs[0]));
+  GSHGEOM_Map twice;
+  gshgeom_map_scale(2, 2.0, 2.0, 1.0, &twice);
+  // The list, with the expected count (on a raster of extent [0, 64), and on a writer's target, which has none) of each fill.
+  struct Want {
+    std::string raster, stream;
+  };
+  std::vector<Want> want;
+  GSHSCENE_List * l = s.open();
+  auto fill = [&](const GSHSCENE_Resource * path, const GSHGEOM_Map * map, const GSHSCENE_Paint & p, std::string raster,
+                  std::string stream = "") {
+    ASSERT_EQ(gshscene_list_fill(l, path, map, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK);
+    want.push_back({raster, stream.empty() ? raster : stream});
+  };
+  auto n = [](size_t v) { return std::to_string(v); };
+  for (const Config & c : configs) {
+    GSHSCENE_Paint p = paint_of(pattern_of(c));
+    fill(s.sq(0, 0, 20), nullptr, p, n(expected(c, 0, 0, 20, 20)));
+  }
+  EXPECT_EQ(want[0].raster, "49");  // closed: the cell [-4, 0] and the cell [20, 24] touch the box
+  EXPECT_EQ(want[1].raster, "25");
+  EXPECT_EQ(want[2].raster, "48");
+  // Under a clip of 10; under two (the inner one wider); under one wider than the extent; the last two on a writer's target
+  // are met with the clip alone.
+  ASSERT_EQ(gshscene_list_clip_push(l, s.sq(0, 0, 10), nullptr, GSHGEOM_FILL_NONZERO, 0, 0.0), GSHSCENE_OK);
+  fill(s.sq(0, 0, 20), nullptr, pa, n(expected(configs[0], 0, 0, 10, 10)));
+  ASSERT_EQ(gshscene_list_clip_push(l, s.sq(0, 0, 30), nullptr, GSHGEOM_FILL_NONZERO, 0, 0.0), GSHSCENE_OK);
+  fill(s.sq(0, 0, 20), nullptr, pa, n(expected(configs[0], 0, 0, 10, 10)));
+  ASSERT_EQ(gshscene_list_clip_pop(l), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_clip_pop(l), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_clip_push(l, s.sq(-10, -10, 100), nullptr, GSHGEOM_FILL_NONZERO, 0, 0.0), GSHSCENE_OK);
+  fill(s.sq(0, 0, 100), nullptr, pa, n(expected(configs[0], 0, 0, 64, 64)), n(expected(configs[0], 0, 0, 90, 90)));
+  ASSERT_EQ(gshscene_list_clip_pop(l), GSHSCENE_OK);
+  // In a group, whose layer takes none of the clips around it.
+  GSHSCENE_Group group{};
+  group.opacity = 1.0;
+  ASSERT_EQ(gshscene_list_group_push(l, &group, 0, 0.0), GSHSCENE_OK);
+  fill(s.sq(0, 0, 20), nullptr, pa, "49");
+  ASSERT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);
+  // Outside the extent (0 on a raster), and below zero.
+  fill(s.sq(100, 100, 20), nullptr, pa, "0", n(expected(configs[0], 100, 100, 120, 120)));
+  fill(s.sq(-30, -30, 20), nullptr, pa, "0", n(expected(configs[0], -30, -30, -10, -10)));
+  // A box that is not square, off the origin (the rectangle's corners are not interchangeable), and under the item's map.
+  fill(s.sq(5, 0, 20), nullptr, pa, n(expected(configs[0], 5, 0, 25, 20)));
+  fill(s.sq(0, 0, 10), &twice, pa, n(brute_axis(0, 8, 8, 0, 20) * brute_axis(0, 8, 8, 0, 20)));  // the pattern is in the item's space: 8 px cells
+  // More copies than the field counts to: 2^-10 cells under a box of 20 is 20480 squared.
+  Config tiny = {1.0 / 1024, 1.0 / 1024, 1.0 / 1024, 1.0 / 1024, {1, 0, 0, 1}, 1};
+  fill(s.sq(0, 0, 20), nullptr, paint_of(pattern_of(tiny)), ">4194304");
+  ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  EXPECT_EQ(want[3].raster, "16");
+  EXPECT_EQ(want[4].raster, "16");
+  EXPECT_EQ(want[5].raster, "324");
+  EXPECT_EQ(want[5].stream, "576");
+  EXPECT_EQ(want[7].stream, "49");
+  EXPECT_EQ(want[8].stream, "36");
+  EXPECT_EQ(want[9].raster, "42");
+  for (int target = 0; target < 3; target++) {
+    ReportRef report;
+    std::vector<std::string> got;
+    if (target == 0) {
+      SinkRef sink(make_full(nullptr, nullptr));
+      auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+      ASSERT_EQ(render_job(sink.sink, request_for(l, *stream, report.report)).result, GSHSCENE_OK);
+      got = copies_fields(stream->bytes);
+    } else {
+      GSHSCENE_Dump_Sink_Config cfg = config_default();
+      Log log;
+      cfg.log = &log.writer;
+      SinkRef sink(make_with(cfg, nullptr, nullptr));
+      auto raster = make_raster();
+      const GSHSCENE_Rect damage{0, 0, 8, 8};
+      if (target == 2) {
+        raster->target.damage = &damage;  // the count is the whole render's
+      }
+      ASSERT_EQ(render_job(sink.sink, request_for(l, *raster, report.report)).result, GSHSCENE_OK);
+      got = copies_fields(log.text);
+    }
+    std::vector<std::string> expect;
+    for (const Want & w : want) {
+      expect.push_back(target == 0 ? w.stream : w.raster);
+    }
+    EXPECT_EQ(got, expect) << "target " << target;
+  }
+  // The bound itself: exactly 2^22 copies are counted, one more is the limit (one row of 1 by 1 cells, a box 4194302 wide
+  // holds that many plus the two that touch it).
+  Config row = {1, 1000000, 1, 1, {1, 0, 0, 1}, 0};
+  GSHSCENE_Paint pr = paint_of(pattern_of(row));
+  for (int over = 0; over < 2; over++) {
+    GSHSCENE_List * rl = s.open();
+    ASSERT_EQ(gshscene_list_fill(rl, s.sq(0, 0, 4194302.0 + over), nullptr, GSHGEOM_FILL_NONZERO, &pr, 0, 0.0), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_list_close(rl), GSHSCENE_OK);
+    SinkRef rsink(make_full(nullptr, nullptr));
+    ReportRef rreport;
+    auto rstream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+    ASSERT_EQ(render_job(rsink.sink, request_for(rl, *rstream, rreport.report)).result, GSHSCENE_OK);
+    auto fields = copies_fields(rstream->bytes);
+    ASSERT_EQ(fields.size(), 1u);
+    EXPECT_EQ(fields[0], over ? ">4194304" : "4194304");
+  }
+  // A stroke's record has the field too, over its own box (the pen makes it wider than the fill's, so at least as many copies).
+  GSHSCENE_Stroke_Style stroke_style;
+  gshscene_stroke_style_init(&stroke_style);
+  const GSHSCENE_Resource * style = nullptr;
+  ASSERT_EQ(gshscene_store_intern_stroke_style(s.store, &stroke_style, &style), GSHSCENE_OK);
+  s.held.push_back(style);
+  GSHSCENE_List * sl = s.open();
+  ASSERT_EQ(gshscene_list_stroke(sl, s.sq(0, 0, 20), style, nullptr, &pa, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(sl), GSHSCENE_OK);
+  SinkRef ssink(make_full(nullptr, nullptr));
+  ReportRef sreport;
+  auto sstream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+  ASSERT_EQ(render_job(ssink.sink, request_for(sl, *sstream, sreport.report)).result, GSHSCENE_OK);
+  size_t at = sstream->bytes.find(" K res=");
+  ASSERT_NE(at, std::string::npos);
+  size_t c = sstream->bytes.find(" copies=", at);
+  size_t eol = sstream->bytes.find('\n', at);
+  ASSERT_TRUE(c != std::string::npos && c < eol) << sstream->bytes;
+  EXPECT_GE(std::stoull(sstream->bytes.substr(c + 8)), 49u);
+}
+
 // S22, PT10, PT13: the planning pass gives a unit in a tile the maps of its chain, the item's and the pattern's in that order: a
 // stroke whose width needs a similarity is native when the two compose to one in the order of the chain, and refused (its style)
 // when they are given the other way round.

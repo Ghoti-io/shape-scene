@@ -34,6 +34,7 @@
 #include "sink_internal.h"
 
 #include <ghoti.io/shape-geometry/device.h>
+#include <ghoti.io/shape-geometry/lattice.h>
 #include <ghoti.io/shape-geometry/path.h>
 
 #include <inttypes.h>
@@ -91,10 +92,14 @@ typedef struct Cached {
   const GSHSCENE_Resource * resource;
 } Cached;
 
+/** The most copies a pattern fill's `copies=` counts: past it the field says so (4 Mi, a sink-side bound of the test sink only). */
+#define COPIES_BOUND ((uint64_t)1 << 22)
+
 /** An open clip or group of a run. */
 typedef struct Block {
   int group;           /* a group (else a clip) */
   GSHSCENE_Rect clip;  /* the clip in force for what is inside it */
+  GSHSCENE_Rect clip_whole; /* the same with the damage left out (the extent), which is what a pattern's copies are counted over */
   GSHSCENE_Rect outer; /* a group: the clip in force at its push */
   GSHSCENE_Rect gathered; /* a group: the union of what it drew */
   int has_gathered;
@@ -130,6 +135,7 @@ typedef struct Run {
   GSHSCENE_Reason skip_reason;
   GIMG_Raster * raster;   /* a pixel target's surface */
   GSHSCENE_Rect area;     /* the extent and the damage */
+  GSHSCENE_Rect whole;    /* the extent alone; a writer's target, which has none, is the whole range of a whole-pixel box */
   const GSHSCENE_Writer * out;
   uint64_t hash;
   size_t processed;
@@ -353,7 +359,7 @@ static size_t run_bytes(const GSHSCENE_List * list, size_t points, size_t * leve
   size_t n = CARVE_ALIGN - 1;
   n = gshscene_sat_add(n, align_up(sizeof(Run)));
   n = gshscene_sat_add(n, align_up(gshscene_expansion_bytes(list)));
-  n = gshscene_sat_add(n, align_up(gshscene_sat_mul(*levels, sizeof(GSHGEOM_Map))));
+  n = gshscene_sat_add(n, align_up(gshscene_sat_mul(gshscene_sat_add(*levels, 1), sizeof(GSHGEOM_Map))));
   n = gshscene_sat_add(n, align_up(gshscene_sat_mul(*blocks, sizeof(Block))));
   n = gshscene_sat_add(n, align_up(gshscene_sat_mul(*levels, sizeof(size_t))));
   n = gshscene_sat_add(n, align_up(LINE_BYTES));
@@ -675,6 +681,11 @@ static GSHSCENE_Rect clip_now(const Run * run) {
   return run->block_count ? run->blocks[run->block_count - 1].clip : run->area;
 }
 
+/** The clip in force with the damage left out: the innermost block's, or the extent. */
+static GSHSCENE_Rect clip_whole_now(const Run * run) {
+  return run->block_count ? run->blocks[run->block_count - 1].clip_whole : run->whole;
+}
+
 /** Draw @p r: stamped now outside every group, gathered by the innermost group inside one. */
 static void draw_rect(Run * run, GSHSCENE_Rect r, uint32_t mark, GSHSCENE_Result * failed) {
   r = rect_meet(r, clip_now(run));
@@ -690,7 +701,44 @@ static void draw_rect(Run * run, GSHSCENE_Rect r, uint32_t mark, GSHSCENE_Result
   g->has_gathered = 1;
 }
 
-/* --- one unit ----------------------------------------------------------------------- */
+/**
+ * A pattern fill's `copies=<n>` (dump_sink.h): the copies of the use (PT5, shape-geometry's ::gshgeom_lattice_each), counted
+ * over the closed rectangle of the whole pixels of @p box met with the clips in force and the extent, whatever the damage.
+ * The chain is `T I_1 .. I_k M G` composed in one call, the pattern's map the leaf.  `copies=0` when the rectangle is empty;
+ * `copies=>N` past the count's bound `N`; `copies=-` when the lattice cannot be enumerated (a composed map or lattice it
+ * refuses).  The field is written after ` pat=<id>`.
+ */
+static void copies_record(Run * run, const GSHSCENE_Item * item, size_t count, const Box * box, GSHSCENE_Result * failed) {
+  GSHSCENE_Pattern p;
+  if (gshscene_resource_pattern(item->paint.resource, &p) != GSHSCENE_OK) {
+    emit_text(run, " copies=-", failed);
+    return;
+  }
+  GSHSCENE_Rect r = rect_meet(box_pixels(box), clip_whole_now(run));
+  if (box->empty || rect_empty(r)) {
+    emit_text(run, " copies=0", failed);
+    return;
+  }
+  GSHGEOM_Map chain;
+  GSHGEOM_Lattice lattice = {p.x, p.y, p.w, p.h, p.x_step, p.y_step, p.repeat_x, p.repeat_y};
+  run->maps[count] = p.map; /* [count - 1] is the item's map, set with the unit's own */
+  const int64_t rect[4] = {r.x0, r.y0, r.x1, r.y1};
+  uint64_t n = 0;
+  GSHGEOM_Result g = gshgeom_map_compose_chain(run->maps, count + 1, &run->job->target.map, &chain);
+  if (g == GSHGEOM_OK) {
+    g = gshgeom_lattice_each(&chain, &lattice, rect, COPIES_BOUND, NULL, NULL, &n);
+  }
+  if (g == GSHGEOM_OK) {
+    snprintf(run->line, LINE_BYTES, " copies=%" PRIu64, n);
+  } else if (g == GSHGEOM_ERR_LIMIT) {
+    snprintf(run->line, LINE_BYTES, " copies=>%" PRIu64, (uint64_t)COPIES_BOUND);
+  } else {
+    snprintf(run->line, LINE_BYTES, " copies=-");
+  }
+  emit_text(run, run->line, failed);
+}
+
+/* --- one unit ---------------------------------------------------------------------- */
 
 /** The maps of the instances that enclose the unit, root to leaf, in @p run->maps[0] to [count - 2]. */
 static int instance_maps(Run * run, size_t count) {
@@ -1269,6 +1317,8 @@ static GSHSCENE_Result stroke_unit(Run * run, const GSHSCENE_Item * item, const 
   } else if (item->paint.kind == GSHSCENE_PAINT_PATTERN) {
     snprintf(run->line, LINE_BYTES, " pat=%" PRIu64, gshscene_resource_id(item->paint.resource));
     emit_text(run, run->line, &failed);
+    Box sbox = {b.empty, b.min.x, b.min.y, b.max.x, b.max.y};
+    copies_record(run, item, count, &sbox, &failed);
   }
   if (b.empty) {
     snprintf(run->line, LINE_BYTES, " box=- expand=%u outline=%s\n", (unsigned)expand, outline_text);
@@ -1434,6 +1484,7 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
       } else if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_PATTERN) {
         snprintf(run->line, LINE_BYTES, " pat=%" PRIu64, gshscene_resource_id(item->paint.resource));
         emit_text(run, run->line, &failed);
+        copies_record(run, item, count, &box, &failed);
       }
       emit_text(run, " box=", &failed);
       if (plane) {
@@ -1475,9 +1526,11 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
         }
       } else {
         GSHSCENE_Rect inside = rect_meet(clip_now(run), r);
+        GSHSCENE_Rect inside_whole = rect_meet(clip_whole_now(run), r);
         Block * b = &run->blocks[run->block_count++];
         memset(b, 0, sizeof *b);
         b->clip = inside;
+        b->clip_whole = inside_whole;
       }
       break;
     }
@@ -1509,6 +1562,7 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
       b->group = 1;
       b->outer = outer;
       b->clip = run->area; /* a group does not take the clips around it into its own layer (N9) */
+      b->clip_whole = run->whole;
       b->mark = mark_of(chain, count);
       run->groups_open++;
       break;
@@ -1651,7 +1705,7 @@ static GSHSCENE_Result op_begin(void * impl, GSHSCENE_Job * job) {
   Run * run = carve(&cursor, sizeof(Run));
   memset(run, 0, sizeof *run);
   void * walk_memory = carve(&cursor, gshscene_expansion_bytes(request->list));
-  run->maps = carve(&cursor, levels * sizeof(GSHGEOM_Map));
+  run->maps = carve(&cursor, (levels + 1) * sizeof(GSHGEOM_Map)); /* one more than the chain: a pattern's map is its leaf */
   run->blocks = carve(&cursor, blocks * sizeof(Block));
   run->stop = carve(&cursor, levels * sizeof(size_t));
   run->line = carve(&cursor, LINE_BYTES);
@@ -1678,9 +1732,12 @@ static GSHSCENE_Result op_begin(void * impl, GSHSCENE_Job * job) {
   if (target->kind == GSHSCENE_TARGET_RASTER) {
     run->raster = target->surface;
     run->area = target->damage ? rect_meet(target->extent, *target->damage) : target->extent;
+    run->whole = target->extent;
     run->out = ds->config.log;
   } else {
     run->out = target->surface;
+    run->whole.x0 = run->whole.y0 = -((int64_t)1 << 40);
+    run->whole.x1 = run->whole.y1 = (int64_t)1 << 40;
   }
   gshscene_job_set_impl_state(job, run);
   if (ds->config.completion == GSHSCENE_DUMP_SINK_DEFERRED) {

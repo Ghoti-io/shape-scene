@@ -123,6 +123,9 @@ changes no result, cannot be seen by any test:
       * pt-eq-map-kind: a map's kind tag is a function of its entries (`gshgeom_map_from_matrix` and the translation builders classify the identity alike), so two stored maps with the same entries have the same kind
       * pt-eq-colored: a colored pattern stores the zero paint as its tint, so comparing the tints of two colored patterns finds them equal; the early return only skips that comparison
       * pt-build-tile-pointer: the canonical content's tile is the tile the retained copy points at (the intern passes the very pointer), so assigning it again changes nothing
+      * pt-copies-maps-room: the test sink's map array needs one slot more than the chain is long (a pattern's map is its leaf); with one
+        slot fewer the write lands in the block array that follows, after the clip the count was read from, so only a sanitizer sees it
+        (it was tried by hand, uncaught by `testDump_sink`)
       * pt-singular: the caller (`gshscene_stroke_notice`) passes the pattern resource only when the paint is a pattern, so the kind test inside repeats the caller's
       * pt-notice-paint: a paint that is not a pattern has either no resource or one of another kind, and the two tests after it return 0 for both: one guard of three that each suffice
       * pt-notice-resource: the paint-kind test before it refuses every paint that is not a pattern, and a pattern paint's resource is a pattern (list.c checks it at record): the second of two guards that each suffice
@@ -3711,6 +3714,52 @@ PLANTS += [
     ('ph9-probe-entry-forgotten', 'src', SK, '    if (d.entry_class) {\n      /* A stroke refused for its style', '    if (d.entry_class && d.reason != GSHSCENE_REASON_PLACEHOLDER) {\n      /* A stroke refused for its style', ["probe"]),
     ('ph9-probe-second-dropped', 'src', SK, '    d.detail = ((uint64_t)item->placeholder.source << 16) | (uint64_t)item->placeholder.code; /* PH4 */', '    d.detail = 0;', ["probe"]),
 ]
+
+# masks-images-patterns story R2: the test sink's `copies=` (dump_sink.h): the closed pixel box met with the clips in force and the
+# extent, whatever the damage, counted by shape-geometry's lattice over the chain `T I M G`.  Run alone with PLANT_ONLY='^pt-copies-'.
+DSK = ["testDump_sink"]
+PLANTS += [
+    ('pt-copies-damage', 'src', DS, '  GSHSCENE_Rect r = rect_meet(box_pixels(box), clip_whole_now(run));',
+     '  GSHSCENE_Rect r = rect_meet(box_pixels(box), clip_now(run));', DSK),
+    ('pt-copies-no-clips', 'src', DS, '  GSHSCENE_Rect r = rect_meet(box_pixels(box), clip_whole_now(run));',
+     '  GSHSCENE_Rect r = rect_meet(box_pixels(box), run->whole);', DSK),
+    ('pt-copies-no-extent', 'src', DS, '  GSHSCENE_Rect r = rect_meet(box_pixels(box), clip_whole_now(run));',
+     '  GSHSCENE_Rect r = box_pixels(box);', DSK),
+    ('pt-copies-clip-block', 'src', DS, '        b->clip_whole = inside_whole;', '        (void)inside_whole;\n        b->clip_whole = run->whole;', DSK),
+    ('pt-copies-clip-block-nest', 'src', DS, '        GSHSCENE_Rect inside_whole = rect_meet(clip_whole_now(run), r);',
+     '        GSHSCENE_Rect inside_whole = r;', DSK),
+    ('pt-copies-group-clip', 'src', DS, '      b->clip_whole = run->whole;', '      b->clip_whole = run->area;', DSK),
+    ('pt-copies-writer-extent-x', 'src', DS, '    run->whole.x0 = run->whole.y0 = -((int64_t)1 << 40);',
+     '    run->whole.x0 = run->whole.y0 = 0;', DSK),
+    ('pt-copies-writer-extent-y', 'src', DS, '    run->whole.x1 = run->whole.y1 = (int64_t)1 << 40;',
+     '    run->whole.x1 = run->whole.y1 = 4;', DSK),
+    ('pt-copies-extent', 'src', DS, '    run->whole = target->extent;', '    run->whole = run->area;', DSK),
+    ('pt-copies-pattern-map', 'src', DS, '  run->maps[count] = p.map;', '  run->maps[count] = run->maps[count - 1];', DSK),
+    ('pt-copies-chain-leaf', 'src', DS, 'gshgeom_map_compose_chain(run->maps, count + 1, &run->job->target.map, &chain);',
+     'gshgeom_map_compose_chain(run->maps, count, &run->job->target.map, &chain);', DSK),
+    ('pt-copies-half-open', 'src', DS, '  const int64_t rect[4] = {r.x0, r.y0, r.x1, r.y1};',
+     '  const int64_t rect[4] = {r.x0, r.y0, r.x1 - 1, r.y1 - 1};', DSK),
+    ('pt-copies-rect-x', 'src', DS, '  const int64_t rect[4] = {r.x0, r.y0, r.x1, r.y1};',
+     '  const int64_t rect[4] = {r.y0, r.y0, r.y1, r.y1};', DSK),
+    ('pt-copies-rect-y', 'src', DS, '  const int64_t rect[4] = {r.x0, r.y0, r.x1, r.y1};',
+     '  const int64_t rect[4] = {r.x0, r.x0, r.x1, r.x1};', DSK),
+    ('pt-copies-bound', 'src', DS, '#define COPIES_BOUND ((uint64_t)1 << 22)', '#define COPIES_BOUND ((uint64_t)1 << 21)', DSK),
+    ('pt-copies-bound-low', 'src', DS, '#define COPIES_BOUND ((uint64_t)1 << 22)', '#define COPIES_BOUND ((uint64_t)1 << 5)', DSK),
+    ('pt-copies-limit-text', 'src', DS, '    snprintf(run->line, LINE_BYTES, " copies=>%" PRIu64, (uint64_t)COPIES_BOUND);',
+     '    snprintf(run->line, LINE_BYTES, " copies=%" PRIu64, (uint64_t)COPIES_BOUND);', DSK),
+    ('pt-copies-empty', 'src', DS, '    emit_text(run, " copies=0", failed);\n    return;\n  }\n  GSHGEOM_Map chain;',
+     '    emit_text(run, " copies=1", failed);\n    return;\n  }\n  GSHGEOM_Map chain;', DSK),
+    ('pt-copies-stroke', 'src', DS, '    copies_record(run, item, count, &sbox, &failed);', '    (void)sbox;', DSK),
+    ('pt-copies-fill', 'src', DS, '        copies_record(run, item, count, &box, &failed);', '        (void)box;', DSK),
+    ('pt-copies-order', 'src', DS, '        emit_text(run, run->line, &failed);\n        copies_record(run, item, count, &box, &failed);',
+     '        copies_record(run, item, count, &box, &failed);\n        emit_text(run, run->line, &failed);', DSK),
+    ('pt-copies-max-count', 'src', DS, 'gshgeom_lattice_each(&chain, &lattice, rect, COPIES_BOUND, NULL, NULL, &n);',
+     'gshgeom_lattice_each(&chain, &lattice, rect, COPIES_BOUND + 1u, NULL, NULL, &n);', DSK),
+    ('pt-copies-lattice-repeat', 'src', DS, 'p.x_step, p.y_step, p.repeat_x, p.repeat_y};', 'p.x_step, p.y_step, 1, 1};', DSK),
+    ('pt-copies-lattice-steps', 'src', DS, 'GSHGEOM_Lattice lattice = {p.x, p.y, p.w, p.h, p.x_step, p.y_step,',
+     'GSHGEOM_Lattice lattice = {p.x, p.y, p.w, p.h, p.w, p.h,', DSK),
+]
+
 
 
 PLANTS += [
