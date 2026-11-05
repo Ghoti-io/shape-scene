@@ -3005,8 +3005,13 @@ static void clipunion_section(void) {
     GSHSCENE_List * list = NULL;
     check(gshscene_list_create(NULL, NULL, store, &list), "clip union list");
     GSHGEOM_Map placement;
-    gcheck(gshgeom_map_translate(2, (double)between(0, 8), (double)between(0, 8), 0.0, &placement), "clip union placement");
-    check(gshscene_list_clip_push(list, u, &placement, (GSHGEOM_Fill_Rule)between(0, 1), (int32_t)between(0, 3), 0.0), "clip union push");
+    /* every draw its own statement: the order of a call's arguments is the compiler's */
+    const double px = (double)between(0, 8);
+    const double py = (double)between(0, 8);
+    const GSHGEOM_Fill_Rule item_rule = (GSHGEOM_Fill_Rule)between(0, 1);
+    const int32_t item_layer = (int32_t)between(0, 3);
+    gcheck(gshgeom_map_translate(2, px, py, 0.0, &placement), "clip union placement");
+    check(gshscene_list_clip_push(list, u, &placement, item_rule, item_layer, 0.0), "clip union push");
     check(gshscene_list_clip_pop(list), "clip union pop");
     check(gshscene_list_close(list), "clip union close list");
     feed(gshscene_list_hash(list));
