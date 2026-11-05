@@ -437,7 +437,41 @@ def files():
     return out
 
 
+def union_files():
+    """Seeds of tests/fuzz/fuzz_union.c: a member count, four bytes a member (palette path, map, rule, translation), then the instance and order bytes."""
+    def case(*members, inst=0, order=0):
+        return bytes([len(members)]) + b"".join(bytes(m) for m in members) + bytes([inst, order])
+    out = {}
+    out["u-none.bin"] = case()  # the empty list: invalid
+    out["u-touching.bin"] = case((0, 0, 0, 0), (1, 0, 1, 0))  # two rectangles sharing an edge: disjoint
+    out["u-apart-three.bin"] = case((0, 0, 0, 0), (2, 0, 1, 0), (1, 1, 0, 0x22), order=2)
+    out["u-overlap.bin"] = case((0, 0, 0, 0), (3, 0, 0, 0))  # overlapping rectangles
+    out["u-one.bin"] = case((0, 1, 1, 0x21))  # one member: the single clip
+    out["u-dup.bin"] = case((0, 0, 0, 0), (0, 0, 0, 0), (1, 0, 0, 0), order=1)
+    out["u-unprovable.bin"] = case((0, 0, 0, 0), (5, 0, 0, 0), (2, 0, 0, 0))  # a rectangle past 26.6
+    out["u-3d.bin"] = case((0, 0, 0, 0), (1, 4, 0, 0))  # a 3D map: unsupported
+    out["u-bad-rule.bin"] = case((0, 0, 4, 0))  # a rule past the enumeration: invalid
+    out["u-nan.bin"] = case((0, 5, 0, 0))  # a map with NaN: invalid
+    out["u-empty-and-line.bin"] = case((4, 0, 0, 0), (7, 0, 0, 0), (0, 0, 0, 0))  # no region, zero area, a rectangle
+    out["u-run.bin"] = case((6, 0, 0, 0), (2, 0, 0, 0))  # a run of outlines beside a rectangle
+    out["u-scaled-instance.bin"] = case((0, 2, 0, 0), (1, 2, 0, 0), inst=1)  # scale 2, an instance map
+    out["u-singular.bin"] = case((0, 3, 0, 0), (1, 0, 0, 0))
+    out["u-nine.bin"] = case(*[((i % 3), 1, i % 2, 0x10 * (i % 5) + (i % 7)) for i in range(9)], inst=1, order=4)
+    return out
+
+
 def main():
+    uroot = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tests", "fuzz", "corpus", "union")
+    if "--check" in sys.argv:
+        uw = union_files()
+        have = sorted(os.listdir(uroot)) if os.path.isdir(uroot) else []
+        if have != sorted(uw) or any(open(os.path.join(uroot, n), "rb").read() != d for n, d in uw.items()):
+            sys.exit("gen-fuzz-corpus: the committed union corpus is not the generator's")
+    else:
+        os.makedirs(uroot, exist_ok=True)
+        for n, d in union_files().items():
+            with open(os.path.join(uroot, n), "wb") as f:
+                f.write(d)
     root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tests", "fuzz", "corpus", "record")
     want = files()
     if "--check" in sys.argv:

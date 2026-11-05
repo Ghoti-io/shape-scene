@@ -599,23 +599,32 @@ check-fuzz-corpus: ## Fail if the committed fuzz corpora are not what the genera
 # test sink.  Each replay fails on no input and on a corpus that misses one of the outcomes its target lists.
 FUZZ_INPUTS = $(shell find tests/fuzz/corpus/record -type f 2>/dev/null | sort)
 FUZZ_RENDER_INPUTS = $(shell find tests/fuzz/corpus/render -type f 2>/dev/null | sort)
+FUZZ_UNION_INPUTS = $(shell find tests/fuzz/corpus/union -type f 2>/dev/null | sort)
 REPLAY := $(APP_DIR)/fuzz/replay_record$(EXE_EXTENSION)
 REPLAY_RENDER := $(APP_DIR)/fuzz/replay_render$(EXE_EXTENSION)
+REPLAY_UNION := $(APP_DIR)/fuzz/replay_union$(EXE_EXTENSION)
 
 $(REPLAY_RENDER): tests/fuzz/fuzz_render.c tests/fuzz/replay_main.c $(APP_DIR)/$(STATIC_TARGET) \
 		$(FLAGS_STAMP) | $(APP_DIR)/$(TARGET) $(LIBVER_GEN)
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) $(INCLUDE) -o $@ tests/fuzz/fuzz_render.c tests/fuzz/replay_main.c $(LDFLAGS) $(SELF_LIBRARY) $(DEP_LIBS)
 
+$(REPLAY_UNION): tests/fuzz/fuzz_union.c tests/fuzz/replay_main.c $(APP_DIR)/$(STATIC_TARGET) \
+		$(FLAGS_STAMP) | $(APP_DIR)/$(TARGET) $(LIBVER_GEN)
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) $(INCLUDE) -o $@ tests/fuzz/fuzz_union.c tests/fuzz/replay_main.c $(LDFLAGS) $(SELF_LIBRARY) $(DEP_LIBS)
+
 $(REPLAY): tests/fuzz/fuzz_record.c tests/fuzz/replay_main.c $(APP_DIR)/$(STATIC_TARGET) \
 		$(FLAGS_STAMP) | $(APP_DIR)/$(TARGET) $(LIBVER_GEN)
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) $(INCLUDE) -o $@ tests/fuzz/fuzz_record.c tests/fuzz/replay_main.c $(LDFLAGS) $(SELF_LIBRARY) $(DEP_LIBS)
 
-fuzz-replay: $(REPLAY) $(REPLAY_RENDER) ## Feed every corpus file once through its fuzz entry point
+fuzz-replay: $(REPLAY) $(REPLAY_RENDER) $(REPLAY_UNION) ## Feed every corpus file once through its fuzz entry point
 	@if [ -z "$(strip $(FUZZ_INPUTS))" ] || [ -z "$(strip $(FUZZ_RENDER_INPUTS))" ]; then printf 'fuzz-replay: a corpus is empty; this measures nothing\n' >&2; exit 1; fi
 	@LD_LIBRARY_PATH="$(TEST_LD_PATH)" $(REPLAY) $(FUZZ_INPUTS)
 	@LD_LIBRARY_PATH="$(TEST_LD_PATH)" $(REPLAY_RENDER) $(FUZZ_RENDER_INPUTS)
+	@if [ -z "$(strip $(FUZZ_UNION_INPUTS))" ]; then printf 'fuzz-replay: the union corpus is empty; this measures nothing\n' >&2; exit 1; fi
+	@LD_LIBRARY_PATH="$(TEST_LD_PATH)" $(REPLAY_UNION) $(FUZZ_UNION_INPUTS)
 
 # Each planted defect in tools/check-planted.py is built into a copy of the
 # sources and must fail a test (or the probe's hash); the unplanted copy is the
@@ -822,17 +831,22 @@ $(foreach pair,$(TEST_PAIRS),\
 ASAN_TEST_EXECUTABLES := $(addprefix $(ASAN_APP_DIR)/,$(addsuffix $(EXE_EXTENSION),$(TEST_NAMES)))
 ASAN_REPLAY := $(ASAN_APP_DIR)/fuzz/replay_record$(EXE_EXTENSION)
 ASAN_REPLAY_RENDER := $(ASAN_APP_DIR)/fuzz/replay_render$(EXE_EXTENSION)
+ASAN_REPLAY_UNION := $(ASAN_APP_DIR)/fuzz/replay_union$(EXE_EXTENSION)
 
 $(ASAN_REPLAY_RENDER): tests/fuzz/fuzz_render.c tests/fuzz/replay_main.c $(ASAN_ARCHIVE) $(ASAN_FLAGS_STAMP)
 	@mkdir -p $(@D)
 	$(CC) $(ASAN_CFLAGS) $(INCLUDE) -o $@ tests/fuzz/fuzz_render.c tests/fuzz/replay_main.c $(ASAN_LDFLAGS) $(ASAN_SELF_LIBRARY) $(DEP_LIBS)
+
+$(ASAN_REPLAY_UNION): tests/fuzz/fuzz_union.c tests/fuzz/replay_main.c $(ASAN_ARCHIVE) $(ASAN_FLAGS_STAMP)
+	@mkdir -p $(@D)
+	$(CC) $(ASAN_CFLAGS) $(INCLUDE) -o $@ tests/fuzz/fuzz_union.c tests/fuzz/replay_main.c $(ASAN_LDFLAGS) $(ASAN_SELF_LIBRARY) $(DEP_LIBS)
 
 $(ASAN_REPLAY): tests/fuzz/fuzz_record.c tests/fuzz/replay_main.c $(ASAN_ARCHIVE) $(ASAN_FLAGS_STAMP)
 	@mkdir -p $(@D)
 	$(CC) $(ASAN_CFLAGS) $(INCLUDE) -o $@ tests/fuzz/fuzz_record.c tests/fuzz/replay_main.c $(ASAN_LDFLAGS) $(ASAN_SELF_LIBRARY) $(DEP_LIBS)
 ASAN_RUNTIME := $(shell $(CC) -print-file-name=libasan.so 2>/dev/null)
 
-test-asan: $(ASAN_TEST_EXECUTABLES) $(ASAN_REPLAY) $(ASAN_REPLAY_RENDER) ## Build with ASan+UBSan and run the tests, and the fuzz replay
+test-asan: $(ASAN_TEST_EXECUTABLES) $(ASAN_REPLAY) $(ASAN_REPLAY_RENDER) $(ASAN_REPLAY_UNION) ## Build with ASan+UBSan and run the tests, and the fuzz replay
 	@for test_exe in $(ASAN_TEST_EXECUTABLES); do \
 		printf '\n### ASan+UBSan %s ###\n\n' "$$(basename $$test_exe)"; \
 		LD_PRELOAD="$(ASAN_RUNTIME)$${LD_PRELOAD:+:$$LD_PRELOAD}" \
@@ -846,6 +860,9 @@ test-asan: $(ASAN_TEST_EXECUTABLES) $(ASAN_REPLAY) $(ASAN_REPLAY_RENDER) ## Buil
 	@LD_PRELOAD="$(ASAN_RUNTIME)$${LD_PRELOAD:+:$$LD_PRELOAD}" \
 		LD_LIBRARY_PATH="$(ASAN_APP_DIR):$(LIB_INSTALL_PATH)/$(SUITE)$(if $(DEP_LIB_DIRS),:$(DEP_LIB_DIRS))" \
 			$(ASAN_REPLAY_RENDER) $(FUZZ_RENDER_INPUTS)
+	@LD_PRELOAD="$(ASAN_RUNTIME)$${LD_PRELOAD:+:$$LD_PRELOAD}" \
+		LD_LIBRARY_PATH="$(ASAN_APP_DIR):$(LIB_INSTALL_PATH)/$(SUITE)$(if $(DEP_LIB_DIRS),:$(DEP_LIB_DIRS))" \
+			$(ASAN_REPLAY_UNION) $(FUZZ_UNION_INPUTS)
 	@printf '\nASan+UBSan suite clean.\n'
 
 ####################################################################
