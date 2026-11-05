@@ -68,7 +68,10 @@
  * `I_1 .. I_k`, the item map `M` and the pattern's map `G`, takes **pattern space** to the target by
  * `C = T I_1 .. I_k M G` (`gshgeom_map_compose_chain`).  A fill is N7 over the **lattice picture** (below) at the pixel,
  * premultiplied in the layer's space and multiplied by the paint's alpha multiplier; the lattice picture is the area
- * average over the pixel of the picture rendered into an isolated layer.
+ * average over the pixel of the picture rendered into an isolated layer.  Inside that picture a gradient or an image
+ * paint is a function of the position, as it is everywhere else: its value is taken **at the pixel's center**, in the frame
+ * of the copy that holds it (the center mapped by the inverse chain, less the copy's translation), and that value is
+ * weighed by the area the copy covers of the pixel; it is not averaged over the area.
  *
  * ### The lattice (PT5)
  *

@@ -387,7 +387,11 @@ multiplier, and the rest is zero. For an item with the chain `T I_1 .. I_k M` an
 target by `C = T I_1 .. I_k M G`, composed by `shape-geometry` only. A fill is N7 over the **lattice picture** at the pixel: the
 area average over the pixel of the picture rendered into an isolated layer, premultiplied in the layer's space and multiplied by the
 alpha multiplier. Unlike a gradient's point-sampled parameter this is what makes a tile finer than a pixel average to the right
-color.
+color. A gradient or an image *inside* the tile is still a function of the position and is sampled where it is everywhere else:
+**at the pixel's center**, in the frame of the copy that holds it (the center mapped by the inverse chain, less the copy's
+translation), the value then weighed by the area that copy covers of the pixel. It is not averaged over the area, which would
+give a different answer wherever the paint changes across a pixel and would make a tile's gradient disagree with the same gradient
+drawn outside a pattern.
 
 **The lattice (PT5).** The copy index is an integer and the translation is its exact product with the step; nothing accumulates, so
 the position of copy `(i, j)` carries no error from the copies before it, where adding the step repeatedly is wrong by `i`
@@ -401,7 +405,8 @@ The copies of a use are those whose mapped cell, a closed convex quadrilateral, 
 copies: its shape at a pixel is the sum of the copies' coverages, each restricted to its cell and to the clips in force for that
 copy, and its source is the coverage-weighted mean of the copies' sources. A cell-filling background therefore covers every pixel
 across a cell edge exactly once, where compositing the copies one after the other would leave `1 - (1 - a)(1 - b)` at the seam. A
-gradient or an image in the tile moves with its copy, so a pixel that holds two copies of it takes their area-weighted mean. A
+gradient or an image in the tile moves with its copy, so a pixel that holds two copies of it takes the area-weighted mean of
+the two copies' center values. A
 clip block in the tile is the union of its copies' restricted regions, and a group is one group over all copies, its layer,
 opacity, blend mode and composite applied once to the union.
 

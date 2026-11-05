@@ -334,89 +334,46 @@ inline Rgba apply(const Rgba & L, const Rgba & S, double k, int composite) {
 
 inline Rgba premul(const double c[4]) { return Rgba{{c[0] * c[3], c[1] * c[3], c[2] * c[3], c[3]}}; }
 
-// --- paint integrals ------------------------------------------------------------------------------------------------
-inline Rgba linear_integral(const Poly & P, const pv::VOp & op) {
+// --- paint values and integrals ------------------------------------------------------------------------------------------------
+/** The premultiplied color of the gradient @p op at the tile-space point @p pt (pad extension, straight interpolation). */
+inline Rgba linear_value(const Pt & pt, const pv::VOp & op) {
   double dx = op.p1[0] - op.p0[0], dy = op.p1[1] - op.p0[1];
-  double dd = dx * dx + dy * dy;
-  double ta = dx / dd, tb = dy / dd, tc = -(op.p0[0] * dx + op.p0[1] * dy) / dd;  // t = ta x + tb y + tc
-  Rgba total = zero();
-  auto constant = [&](const Poly & piece, const double color[4]) {
-    double a = area(piece);
-    if (a > 0.0) {
-      Rgba pc = premul(color);
-      for (int k = 0; k < 4; k++) {
-        total.v[k] += a * pc.v[k];
-      }
-    }
-  };
+  double t = ((pt.x - op.p0[0]) * dx + (pt.y - op.p0[1]) * dy) / (dx * dx + dy * dy);
   const pv::VStop * st = op.stops;
   int n = op.stop_count;
-  constant(clip_half(P, -ta, -tb, st[0].offset - tc), st[0].rgba);
-  constant(clip_half(P, ta, tb, tc - st[n - 1].offset), st[n - 1].rgba);
-  for (int k = 0; k + 1 < n; k++) {
-    double o0 = st[k].offset, o1 = st[k + 1].offset;
-    Poly piece = clip_half(clip_half(P, ta, tb, tc - o0), -ta, -tb, o1 - tc);
-    for (size_t q = 1; q + 1 < piece.size(); q++) {
-      const Pt a = piece[0], b = piece[q], c = piece[q + 1];
-      double tri = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
-      tri = (tri < 0.0 ? -tri : tri) / 2.0;
-      if (!(tri > 0.0)) {
-        continue;
-      }
-      const Pt mids[3] = {Pt{(a.x + b.x) / 2.0, (a.y + b.y) / 2.0}, Pt{(b.x + c.x) / 2.0, (b.y + c.y) / 2.0},
-          Pt{(c.x + a.x) / 2.0, (c.y + a.y) / 2.0}};
-      for (const Pt & m : mids) {
-        double u = (ta * m.x + tb * m.y + tc - o0) / (o1 - o0);
-        double col[4];
-        for (int s = 0; s < 4; s++) {
-          col[s] = st[k].rgba[s] + u * (st[k + 1].rgba[s] - st[k].rgba[s]);
-        }
-        Rgba pc = premul(col);
-        for (int s = 0; s < 4; s++) {
-          total.v[s] += tri / 3.0 * pc.v[s];
-        }
-      }
-    }
+  if (t <= st[0].offset) {
+    return premul(st[0].rgba);
   }
-  return total;
+  if (t >= st[n - 1].offset) {
+    return premul(st[n - 1].rgba);
+  }
+  int k = 0;
+  while (k + 2 < n && t > st[k + 1].offset) {
+    k++;
+  }
+  double u = (t - st[k].offset) / (st[k + 1].offset - st[k].offset);
+  double col[4];
+  for (int s = 0; s < 4; s++) {
+    col[s] = st[k].rgba[s] + u * (st[k + 1].rgba[s] - st[k].rgba[s]);
+  }
+  return premul(col);
 }
 
-inline Rgba image_integral(const Poly & P, const pv::VOp & op) {
+/** The premultiplied texel of the NEAREST, PAD image of @p op that holds the tile-space point @p pt. */
+inline Rgba image_value(const Pt & pt, const pv::VOp & op) {
   const pv::VImage & im = *op.image;
   double sx = op.image_map[0], sy = op.image_map[1], tx = op.image_map[2], ty = op.image_map[3];
-  Rgba total = zero();
-  for (int iy = 0; iy < im.height; iy++) {
-    Poly row = P;
-    if (iy > 0) {
-      row = clip_half(row, 0.0, 1.0, -(ty + sy * (double)iy));
+  auto texel = [](double v, int n) {  // floor, clamped to the image (PAD)
+    double f = static_cast<double>(static_cast<int64_t>(v));
+    if (f > v) {
+      f -= 1.0;
     }
-    if (iy < im.height - 1) {
-      row = clip_half(row, 0.0, -1.0, ty + sy * (double)(iy + 1));
-    }
-    if (row.size() < 3) {
-      continue;
-    }
-    for (int ix = 0; ix < im.width; ix++) {
-      Poly c = row;
-      if (ix > 0) {
-        c = clip_half(c, 1.0, 0.0, -(tx + sx * (double)ix));
-      }
-      if (ix < im.width - 1) {
-        c = clip_half(c, -1.0, 0.0, tx + sx * (double)(ix + 1));
-      }
-      double a = area(c);
-      if (!(a > 0.0)) {
-        continue;
-      }
-      const uint8_t * t = im.rgba8 + (iy * im.width + ix) * 4;
-      double col[4] = {t[0] / 255.0, t[1] / 255.0, t[2] / 255.0, t[3] / 255.0};
-      Rgba pc = premul(col);
-      for (int s = 0; s < 4; s++) {
-        total.v[s] += a * pc.v[s];
-      }
-    }
-  }
-  return total;
+    return f < 0.0 ? 0 : (f >= n ? n - 1 : static_cast<int>(f));
+  };
+  int ix = texel((pt.x - tx) / sx, im.width), iy = texel((pt.y - ty) / sy, im.height);
+  const uint8_t * t = im.rgba8 + (iy * im.width + ix) * 4;
+  double col[4] = {t[0] / 255.0, t[1] / 255.0, t[2] / 255.0, t[3] / 255.0};
+  return premul(col);
 }
 
 // --- the evaluation -------------------------------------------------------------------------------------------------
@@ -455,7 +412,7 @@ inline Poly device_region(const Ctx & ctx, const pv::VOp & op, const Copy & cp) 
   return out;
 }
 
-inline Rgba paint_integral(const Env & e, const pv::VOp & op, const Poly & reg, double A, double tx, double ty) {
+inline Rgba paint_integral(const Env & e, const pv::VOp & op, double A, double tx, double ty) {
   const Ctx & ctx = *e.ctx;
   Rgba out = zero();
   switch (op.paint) {
@@ -488,12 +445,14 @@ inline Rgba paint_integral(const Env & e, const pv::VOp & op, const Poly & reg, 
     default:
       break;
   }
-  Poly tile;
-  for (const Pt & q : reg) {
-    Pt t = map_pt(ctx.Cinv, q);
-    tile.push_back(Pt{t.x - tx, t.y - ty});
+  // a gradient or an image is a function of the position: its value at the pixel's centre in the copy's own frame, times the area
+  Pt q = map_pt(ctx.Cinv, Pt{ctx.px + 0.5, ctx.py + 0.5});
+  Pt pt{q.x - tx, q.y - ty};
+  Rgba v = op.paint == 2 ? linear_value(pt, op) : image_value(pt, op);
+  for (int k = 0; k < 4; k++) {
+    out.v[k] = A * v.v[k];
   }
-  return op.paint == 2 ? linear_integral(tile, op) : image_integral(tile, op);
+  return out;
 }
 
 inline Rgba draw_fill(const Env & e, const pv::VOp & op, const CopyList & copies, Rgba layer, const Clips & clips) {
@@ -514,7 +473,7 @@ inline Rgba draw_fill(const Env & e, const pv::VOp & op, const CopyList & copies
     }
     double tx = g_plant == kCopy0Source ? 0.0 : cp->tx;
     double ty = g_plant == kCopy0Source ? 0.0 : cp->ty;
-    Rgba I = paint_integral(e, op, reg, A, tx, ty);
+    Rgba I = paint_integral(e, op, A, tx, ty);
     Rgba FS{{c * I.v[0], c * I.v[1], c * I.v[2], c * I.v[3]}};
     if (g_plant == kSeparateShapes) {
       layer = over(layer, FS);

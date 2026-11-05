@@ -43,10 +43,12 @@ pattern (its map takes its space to the enclosing tile's space).  The scene also
   (a gradient or an image moves with its copy; a nested pattern's chain is `C . T(t_x) . G`).  The unit is ONE element
   with the shape `f = sum_x c_x A_x` and the source `S = (sum_x c_x I_x) / f` (0 where `f = 0`), the exact area-weighted
   mean, and it is composited with `apply(L, S, f, SRC_OVER)`; written with the integrals that is
-  `L' = sum_x c_x I_x + (1 - sum_x c_x I_x.alpha) L`.  A paint's mean over a convex region is exact: a gradient is
-  integrated piecewise between its stops (the region cut at the lines t = offset, and over each piece the premultiplied
-  color, a quadratic of the position, by the three-midpoint rule, which is exact for quadratics), an image by the sum
-  over texel rectangles of texel x area, a nested pattern's value is its own pixel value (below) times the area.
+  `L' = sum_x c_x I_x + (1 - sum_x c_x I_x.alpha) L`.  A solid or foreground paint's integral is its color times the
+  area.  **A gradient or an image is a function of the position and is taken at the pixel's centre** (G12, the image
+  paint's sampling, and every sink): its value there, in the copy's own frame (the centre in the tile space of copy x
+  is the centre mapped by the inverse chain minus `t_x`), times the area the copy covers; so at a seam pixel the
+  copies' sources differ by what the paint changes between their frames and the weights are the areas.  A nested
+  pattern's value is its own pixel value (below) times the area.
 - *Groups and clips.*  A group is ONE group over all copies: its layer starts transparent, its units are union
   elements as above, and at its pop `apply(P, o G, 1, composite)` composites it onto the enclosing layer (SRC_OVER:
   `L' = S + (1 - S.alpha) L`; MULTIPLY on premultiplied values: `Cr = (1 - ab) Cs + (1 - as) Cb + Cs Cb`,
@@ -421,79 +423,36 @@ def apply(L, S, k, composite):
             ib * ks[2] + ia * L[2] + ks[2] * L[2], ks[3] + L[3] - ks[3] * L[3])
 
 
-# --- paint integrals --------------------------------------------------------------------------------------------------
+# --- paint values and integrals --------------------------------------------------------------------------------------------------
 def premul(c):
     return (c[0] * c[3], c[1] * c[3], c[2] * c[3], c[3])
 
 
-def triangles(P):
-    return [(P[0], P[k], P[k + 1]) for k in range(1, len(P) - 1)]
-
-
-def linear_integral(P, paint):
-    """The integral over the convex polygon @p P (tile space) of the premultiplied gradient color."""
+def linear_value(pt, paint):
+    """The premultiplied color of the gradient @p paint at the tile-space point @p pt (pad extension, straight interpolation)."""
     _, p0, p1, stops = paint
     dx, dy = p1[0] - p0[0], p1[1] - p0[1]
-    dd = dx * dx + dy * dy
-    ta, tb, tc = dx / dd, dy / dd, -(p0[0] * dx + p0[1] * dy) / dd         # t(x, y) = ta x + tb y + tc
-    total = [F(0)] * 4
-
-    def constant(piece, color):
-        a = area(piece)
-        if a:
-            pc = premul(color)
-            for k in range(4):
-                total[k] += a * pc[k]
-
-    first_o, first_c = stops[0]
-    last_o, last_c = stops[-1]
-    constant(clip_half(P, -ta, -tb, first_o - tc), first_c)                 # t <= first offset
-    constant(clip_half(P, ta, tb, tc - last_o), last_c)                     # t >= last offset
+    t = ((pt[0] - p0[0]) * dx + (pt[1] - p0[1]) * dy) / (dx * dx + dy * dy)
+    if t <= stops[0][0]:
+        return premul(stops[0][1])
+    if t >= stops[-1][0]:
+        return premul(stops[-1][1])
     for k in range(len(stops) - 1):
         o0, c0 = stops[k]
         o1, c1 = stops[k + 1]
-        piece = clip_half(clip_half(P, ta, tb, tc - o0), -ta, -tb, o1 - tc)
-        if len(piece) < 3:
-            continue
-        for a_, b_, c_ in triangles(piece):
-            tri = abs((b_[0] - a_[0]) * (c_[1] - a_[1]) - (c_[0] - a_[0]) * (b_[1] - a_[1])) / 2
-            if tri == 0:
-                continue
-            for m in (((a_[0] + b_[0]) / 2, (a_[1] + b_[1]) / 2), ((b_[0] + c_[0]) / 2, (b_[1] + c_[1]) / 2),
-                      ((c_[0] + a_[0]) / 2, (c_[1] + a_[1]) / 2)):
-                u = (ta * m[0] + tb * m[1] + tc - o0) / (o1 - o0)
-                col = premul(tuple(c0[q] + u * (c1[q] - c0[q]) for q in range(4)))
-                for q in range(4):
-                    total[q] += tri / 3 * col[q]
-    return tuple(total)
+        if o0 <= t <= o1:
+            u = (t - o0) / (o1 - o0)
+            return premul(tuple(c0[q] + u * (c1[q] - c0[q]) for q in range(4)))
+    raise AssertionError("unreachable")
 
 
-def image_integral(P, paint):
-    """The integral over the convex polygon @p P (tile space) of the NEAREST, PAD image's premultiplied texel."""
+def image_value(pt, paint):
+    """The premultiplied texel of the NEAREST, PAD image @p paint at the tile-space point @p pt (the texel holding it)."""
     _, width, height, texels, (sx, sy, tx, ty) = paint
-    total = [F(0)] * 4
-    for iy in range(height):
-        row = P
-        if iy > 0:
-            row = clip_half(row, 0, 1, -(ty + sy * iy))
-        if iy < height - 1:
-            row = clip_half(row, 0, -1, ty + sy * (iy + 1))
-        if len(row) < 3:
-            continue
-        for ix in range(width):
-            cell = row
-            if ix > 0:
-                cell = clip_half(cell, 1, 0, -(tx + sx * ix))
-            if ix < width - 1:
-                cell = clip_half(cell, -1, 0, tx + sx * (ix + 1))
-            a = area(cell)
-            if not a:
-                continue
-            o = (iy * width + ix) * 4
-            col = premul(tuple(F(texels[o + q], 255) for q in range(4)))
-            for q in range(4):
-                total[q] += a * col[q]
-    return tuple(total)
+    ix = min(max(floor((pt[0] - tx) / sx), 0), width - 1)
+    iy = min(max(floor((pt[1] - ty) / sy), 0), height - 1)
+    o = (iy * width + ix) * 4
+    return premul(tuple(F(texels[o + q], 255) for q in range(4)))
 
 
 # --- the evaluation ---------------------------------------------------------------------------------------------------
@@ -547,7 +506,7 @@ def device_region(ctx, region, t):
 
 
 def paint_integral(paint, reg, A, ctx, t):
-    """The integral over the device region @p reg (area @p A) of the paint, evaluated in the frame translated by @p t."""
+    """The paint's premultiplied integral over the device region @p reg (area @p A) in the frame translated by @p t: its color times A for a solid; a gradient or an image is taken at the pixel centre."""
     kind = paint[0]
     if kind == SOLID:
         pc = premul(paint[1])
@@ -561,8 +520,12 @@ def paint_integral(paint, reg, A, ctx, t):
         C = compose(compose(ctx.C, translate(t)), inner.map)
         S = pattern_pixel(inner, C, ctx.px, ctx.py, ctx.fg)
         return tuple(A * v for v in S)
-    tile = [(q[0] - t[0], q[1] - t[1]) for q in (mapf(ctx.Cinv, d) for d in reg)]
-    return linear_integral(tile, paint) if kind == LINEAR else image_integral(tile, paint)
+    # a gradient or an image is a function of the position: its value at the pixel's centre, in the copy's own frame
+    # (the paint moves with its copy), times the area the copy covers (the same as every sink's)
+    q = mapf(ctx.Cinv, (F(2 * ctx.px + 1, 2), F(2 * ctx.py + 1, 2)))
+    pt = (q[0] - t[0], q[1] - t[1])
+    v = linear_value(pt, paint) if kind == LINEAR else image_value(pt, paint)
+    return tuple(A * c for c in v)
 
 
 def draw_fill(item, copies, layer, clips, ctx):
@@ -954,14 +917,13 @@ def run_selftest():
                             map=ID), width=8, height=8)
     ck(all(px_value(per, px, py) == px_value(per, px % 4, py % 4) for px in range(8) for py in range(8)),
        "a gradient and an image in the tile repeat with their copy (periodic pixels)")
-    # the mean of the gradient at a seam pixel: the area-weighted mean of the two sides
+    # the gradient at a seam pixel: each copy's value at the pixel centre, weighted by its area
     sg = Scene("seam-gradient", Pat((0, 0, 2, 1), (2, 1), [fill(rect(0, 0, 2, 1), linear((0, 0), (2, 0), [(0.0, (1, 0, 0, 1)), (1.0, (0, 0, 1, 1))]))],
                                     map=(1, 0, 0, 1, 0.5, 0)), width=4, height=1)
-    # pixel 2 = [2,3]: [2,2.5] is copy 0 at tile x in [1.5,2]: t in [.75,1] mean .875; [2.5,3] is copy 1 at tile x in [0,.5]: mean t .125
-    # straight colors (1-t, 0, t, 1): mean of premult (same alpha 1) is the mean over both halves
-    want_r = (F(1, 2) * (1 - F(7, 8)) + F(1, 2) * (1 - F(1, 8)))
+    # pixel 2 = [2,3], centre 2.5: copy 0 holds it at tile x = 2 (t = 1, blue), copy 1 at tile x = 0 (t = 0, red); half the area each
+    want_r = F(1, 2)
     v = px_value(sg, 2, 0)
-    ck(v == (want_r, F(0), 1 - want_r, F(1)), "seam pixel of a gradient is the area-weighted mean of the two copies: %r" % (v,))
+    ck(v == (want_r, F(0), 1 - want_r, F(1)), "seam pixel of a gradient is the area-weighted mean of the two copies' centre values: %r" % (v,))
 
     # --- shift invariance: the same lattice under the map composed with an exact multiple of the step
     for name in ("abut-translate", "abut-rotate17", "gapped-skew", "overlap-x", "overlap-multiply-group", "gradient-abut",
