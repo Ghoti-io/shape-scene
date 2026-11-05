@@ -13,7 +13,15 @@
 
 #include <ghoti.io/shape-scene/shape-scene.h>
 
+#include <deque>
+
 using namespace sinkconf;
+
+static GSHGEOM_Map hatch_translate(double tx, double ty) {
+  GSHGEOM_Map m;
+  gshgeom_map_translate(2, tx, ty, 0.0, &m);
+  return m;
+}
 
 namespace {
 
@@ -1719,7 +1727,7 @@ TEST(DumpSink, TheConfigurationIsValidated) {
   uint32_t common = GSHSCENE_CAP_CAN_BLOCK | GSHSCENE_CAP_CALLER_MEMORY | GSHSCENE_CAP_GLYPHS_FROM_FONT |
       GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_BLEND_SPACES | GSHSCENE_CAP_GRADIENT_SPACES | GSHSCENE_CAP_PREPARE |
       GSHSCENE_CAP_STROKE_RUNS | GSHSCENE_CAP_IMAGE_FILTER_SPACES | GSHSCENE_CAP_GROUP_SOFT_MASK | GSHSCENE_CAP_PATTERN |
-      GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL;
+      GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL | GSHSCENE_CAP_HATCH;
   EXPECT_EQ(d.raster_caps.flags, common | GSHSCENE_CAP_READBACK);
   EXPECT_EQ(d.stream_caps.flags, common);
   // Not a test sink, not a test sink's job.
@@ -3279,6 +3287,490 @@ TEST(DumpSink, TheArcRecordsAreTheToolpathLikeConfigurationAndNeverTheChord) {
     EXPECT_NE(line.find("radius=4034000000000000 positive=1"), std::string::npos) << line;
   }
   EXPECT_EQ(pen.find("circular=0 centre"), std::string::npos);
+}
+
+
+// S23, HX14: a hatch fill is recorded by handle, once, with its lines and the hash of its pieces at the canonical map, in every
+// configuration that draws hatches; a sink without the flag refuses the unit and writes neither the record nor the fields; the
+// hatch record states the resource, so reading it back gives an equal hatch (the lossless round trip a CAD writer needs).
+namespace {
+
+struct HatchWorld {
+  Scene s;
+  const GSHSCENE_Resource * style = nullptr;
+  const GSHSCENE_Resource * hatch_a = nullptr;
+  const GSHSCENE_Resource * hatch_b = nullptr;
+  std::vector<double> dashes{3.0, -1.0, 0.0, -1.0};
+  GSHSCENE_Hatch_Family fam[2];
+  GSHSCENE_Hatch spec_a, spec_b;
+  const GSHSCENE_List * list = nullptr;
+  HatchWorld() {
+    GSHSCENE_Stroke_Style st;
+    gshscene_stroke_style_init(&st);
+    st.width = 0.25;
+    st.cap = GSHSCENE_STROKE_CAP_ROUND;
+    EXPECT_EQ(gshscene_store_intern_stroke_style(s.store, &st, &style), GSHSCENE_OK);
+    s.held.push_back(style);
+    fam[0] = {45.0, 0.5, 0.25, 0.0, 1.5, 0, nullptr};
+    fam[1] = {0.0, 0.0, 0.0, 0.5, 2.0, dashes.size(), dashes.data()};
+    gshscene_hatch_init(&spec_a);
+    spec_a.style = style;
+    spec_a.family_count = 1;
+    spec_a.families = fam;
+    spec_b = spec_a;
+    spec_b.family_count = 2;
+    spec_b.nesting = GSHSCENE_HATCH_NESTING_OUTER;
+    spec_b.ink = solid(0.25, 0.5, 0.75, 1.0);
+    spec_b.map = hatch_translate(0.125, 0.0);
+    EXPECT_EQ(gshscene_store_intern_hatch(s.store, &spec_a, &hatch_a), GSHSCENE_OK);
+    s.held.push_back(hatch_a);
+    EXPECT_EQ(gshscene_store_intern_hatch(s.store, &spec_b, &hatch_b), GSHSCENE_OK);
+    s.held.push_back(hatch_b);
+    GSHSCENE_List * l = s.open();
+    for (const GSHSCENE_Resource * h : {hatch_a, hatch_b, hatch_a}) {
+      GSHSCENE_Paint p = solid(0, 0, 0, 0.5);
+      p.kind = GSHSCENE_PAINT_HATCH;
+      p.resource = h;
+      EXPECT_EQ(gshscene_list_fill(l, s.sq(2, 2, 20), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK);
+    }
+    EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+    list = l;
+  }
+};
+
+std::vector<std::string> lines_of(const std::string & text) {
+  std::vector<std::string> out;
+  for (size_t at = 0; at < text.size();) {
+    size_t end = text.find('\n', at);
+    out.push_back(text.substr(at, end - at));
+    at = end + 1;
+  }
+  return out;
+}
+
+}  // namespace
+
+TEST(DumpSink, AHatchFillCarriesItsLinesAndPiecesAndTheHatchIsRecordedOncePerHandleInEveryConfiguration) {
+  HatchWorld w;
+  for (int configuration = 0; configuration < 3; configuration++) {
+    SinkRef sink(configuration == 0 ? make_full(nullptr, nullptr)
+                                    : configuration == 1 ? make_writer_like(nullptr, nullptr) : make_toolpath_like(nullptr, nullptr));
+    auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+    ReportRef report;
+    Rendered r = render_job(sink.sink, request_for(w.list, *stream, report.report));
+    ASSERT_EQ(r.result, GSHSCENE_OK) << configuration;
+    size_t records = 0, fills = 0;
+    std::vector<std::string> fields;
+    for (const std::string & line : lines_of(stream->bytes)) {
+      if (line.rfind("H ", 0) == 0) {
+        records++;
+      }
+      size_t at = line.find(" hatch=");
+      if (line.find(" F res=") != std::string::npos && at != std::string::npos) {
+        fills++;
+        fields.push_back(line.substr(at, line.find(" box=", at) - at));
+      }
+    }
+    // A pen follows the centerline and cannot draw the dot of the second hatch's dashes (a degenerate shape under a round cap, HX14): it
+    // refuses that hatch's fill, `STROKE_STYLE`, and writes no record for it.
+    const bool pen = configuration == 2;
+    EXPECT_EQ(records, pen ? 1u : 2u) << "one record per handle, however many fills name it, and none for a refused hatch";
+    ASSERT_EQ(fills, pen ? 2u : 3u);
+    // the lines and the pieces are shape-geometry's at the canonical map: the same text for the same hatch, and for the same hatch twice
+    EXPECT_EQ(fields[0], fields[pen ? 1 : 2]);
+    if (!pen) {
+      EXPECT_NE(fields[0], fields[1]);
+    }
+    EXPECT_NE(fields[0].find(" lines="), std::string::npos);
+    EXPECT_NE(fields[0].find(" pieces="), std::string::npos);
+    EXPECT_EQ(fields[0].find("pieces=-"), std::string::npos) << "the first draws something";
+  }
+}
+
+TEST(DumpSink, ThePiecesFieldIsTheGeometrysHashAtTheCanonicalMapAndAWholePixelShiftDoesNotMoveIt) {
+  HatchWorld w;
+  auto text_of = [&](double dx, double dy) {
+    GSHSCENE_List * l = w.s.open();
+    GSHSCENE_Paint p = solid(0, 0, 0, 1.0);
+    p.kind = GSHSCENE_PAINT_HATCH;
+    p.resource = w.hatch_b;
+    GSHGEOM_Map m = hatch_translate(dx, dy);
+    EXPECT_EQ(gshscene_list_fill(l, w.s.sq(2, 2, 20), &m, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+    SinkRef sink(make_full(nullptr, nullptr));
+    auto stream = make_stream(GSHSCENE_UNIT_PIXEL);
+    ReportRef report;
+    Rendered r = render_job(sink.sink, request_for(l, *stream, report.report));
+    EXPECT_EQ(r.result, GSHSCENE_OK);
+    for (const std::string & line : lines_of(stream->bytes)) {
+      size_t at = line.find(" hatch=");
+      if (at != std::string::npos) {
+        return line.substr(at + 1, line.find(" box=", at) - at - 1);
+      }
+    }
+    return std::string();
+  };
+  const std::string base = text_of(0.25, 0.5);
+  EXPECT_FALSE(base.empty());
+  EXPECT_NE(base.find("hatch="), std::string::npos);
+  auto pieces = [](const std::string & t) { return t.substr(t.find("pieces=")); };
+  auto lines = [](const std::string & t) { return t.substr(t.find("lines="), t.find(" pieces=") - t.find("lines=")); };
+  EXPECT_EQ(pieces(text_of(7.25, -3.5)), pieces(base)) << "a whole-pixel translation is the same expansion";
+  EXPECT_EQ(lines(text_of(7.25, -3.5)), lines(base));
+  EXPECT_NE(pieces(text_of(0.7, 0.5)), pieces(base)) << "another fraction is another expansion";
+}
+
+TEST(DumpSink, ASinkWithoutTheHatchFlagRefusesTheUnitAndWritesNeitherRecordNorFields) {
+  HatchWorld w;
+  GSHSCENE_Dump_Sink_Config c = config_default();
+  c.raster_caps.flags &= ~GSHSCENE_CAP_HATCH;
+  c.stream_caps.flags &= ~GSHSCENE_CAP_HATCH;
+  SinkRef sink(make_with(c, nullptr, nullptr));
+  auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+  ReportRef report;
+  Rendered r = render_job(sink.sink, request_for(w.list, *stream, report.report));
+  ASSERT_EQ(r.result, GSHSCENE_OK);
+  EXPECT_EQ(stream->bytes.find("\nH "), std::string::npos);
+  EXPECT_EQ(stream->bytes.find(" hatch="), std::string::npos);
+  size_t refused = 0;
+  for (const auto & e : entries(report.report)) {
+    refused += e.entry_class == GSHSCENE_ENTRY_REFUSED && e.reason == GSHSCENE_REASON_HATCH;
+  }
+  EXPECT_EQ(refused, 3u);
+  auto strict = make_stream(GSHSCENE_UNIT_MILLIMETER);
+  ReportRef sr;
+  GSHSCENE_Render_Request req = request_for(w.list, *strict, sr.report);
+  req.flags = GSHSCENE_RENDER_STRICT;
+  EXPECT_EQ(render_job(sink.sink, req).result, GSHSCENE_ERR_REFUSED);
+}
+
+TEST(DumpSink, TheHatchRecordStatesTheResourceSoReadingItBackGivesAnEqualHatch) {
+  HatchWorld w;
+  SinkRef sink(make_writer_like(nullptr, nullptr));
+  auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+  ReportRef report;
+  ASSERT_EQ(render_job(sink.sink, request_for(w.list, *stream, report.report)).result, GSHSCENE_OK);
+  // parse the records of hatch_b back into a hatch: its style by the Q record, its families by the h and d lines
+  const std::vector<std::string> lines = lines_of(stream->bytes);
+  char want[64];
+  std::snprintf(want, sizeof want, "H %llu ", (unsigned long long)gshscene_resource_id(w.hatch_b));
+  size_t at = 0;
+  for (; at < lines.size() && lines[at].rfind(want, 0) != 0; at++) {
+  }
+  ASSERT_LT(at, lines.size());
+  unsigned unit = 0, nesting = 0, ink_kind = 0, entry = 0;
+  unsigned long long id = 0, hash = 0, style_id = 0, map_hash = 0, rgba[4] = {0}, gamma = 0, families = 0;
+  unsigned primaries = 0, transfer = 0;
+  ASSERT_EQ(std::sscanf(lines[at].c_str(),
+                "H %llu %llx unit=%u nesting=%u style=%llu map=%llx ink=%u %llx %llx %llx %llx %u:%u:%llx %u families=%llu", &id, &hash,
+                &unit, &nesting, &style_id, &map_hash, &ink_kind, &rgba[0], &rgba[1], &rgba[2], &rgba[3], &primaries, &transfer, &gamma,
+                &entry, &families),
+      16);
+  EXPECT_EQ(hash, gshscene_resource_hash(w.hatch_b));
+  EXPECT_EQ(style_id, gshscene_resource_id(w.style));
+  ASSERT_EQ(families, 2u);
+  std::vector<GSHSCENE_Hatch_Family> back(2);
+  std::vector<std::vector<double>> back_dashes(2);
+  size_t cursor = at + 1;
+  auto d = [](unsigned long long bits) {
+    double v;
+    std::memcpy(&v, &bits, sizeof v);
+    return v;
+  };
+  for (size_t k = 0; k < 2; k++) {
+    ASSERT_LT(cursor, lines.size());
+    unsigned long long f[5] = {0}, nd = 0;
+    ASSERT_EQ(std::sscanf(lines[cursor].c_str(), "h %llx %llx %llx %llx %llx dashes=%llu", &f[0], &f[1], &f[2], &f[3], &f[4], &nd), 6)
+        << lines[cursor];
+    cursor++;
+    for (unsigned long long q = 0; q < nd; q++, cursor++) {
+      unsigned long long bits = 0;
+      ASSERT_EQ(std::sscanf(lines[cursor].c_str(), "d %llx", &bits), 1) << lines[cursor];
+      back_dashes[k].push_back(d(bits));
+    }
+    back[k] = {d(f[0]), d(f[1]), d(f[2]), d(f[3]), d(f[4]), back_dashes[k].size(), back_dashes[k].empty() ? nullptr : back_dashes[k].data()};
+  }
+  GSHSCENE_Hatch again;
+  gshscene_hatch_init(&again);
+  again.angle_unit = unit;
+  again.nesting = nesting;
+  again.style = w.style;
+  again.family_count = 2;
+  again.families = back.data();
+  again.map = hatch_translate(0.125, 0.0);  // the record names the map by its hash; the caller holds the map (the item's own, in a real reader)
+  EXPECT_EQ(gshgeom_map_hash(&again.map), map_hash);
+  again.ink = solid(d(rgba[0]), d(rgba[1]), d(rgba[2]), d(rgba[3]));
+  again.ink.kind = (GSHSCENE_Paint_Kind)ink_kind;
+  std::memset(&again.ink.space, 0, sizeof again.ink.space);
+  again.ink.entry = entry;
+  const GSHSCENE_Resource * equal = nullptr;
+  ASSERT_EQ(gshscene_store_intern_hatch(w.s.store, &again, &equal), GSHSCENE_OK);
+  w.s.held.push_back(equal);
+  EXPECT_EQ(equal, w.hatch_b) << "equal content is the same handle";
+}
+
+
+// --- the fields of a hatch fill follow every part of the hatch, and its box is a stroke's (the ht-/hx- plants) --------------------------------------
+
+namespace {
+
+struct HatchFill {
+  std::string fields;      // " hatch=<id> lines=<n> pieces=<hash|->" without the id
+  uint64_t lines = 0;
+  std::string pieces;
+  double box[4] = {0, 0, 0, 0};
+  bool found = false;
+};
+
+/** Renders a fill of @p region painted with @p hatch (under @p map, @p rule) to a stream of @p unit and reads its hatch fields back. */
+HatchFill render_hatch(Scene & s, const GSHSCENE_Resource * region, const GSHSCENE_Resource * hatch, GSHGEOM_Fill_Rule rule, uint32_t unit,
+    const GSHGEOM_Map * map = nullptr) {
+  GSHSCENE_List * l = s.open();
+  GSHSCENE_Paint p = solid(0, 0, 0, 1.0);
+  p.kind = GSHSCENE_PAINT_HATCH;
+  p.resource = hatch;
+  EXPECT_EQ(gshscene_list_fill(l, region, map, rule, &p, 0, 0.0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  SinkRef sink(make_full(nullptr, nullptr));
+  auto stream = make_stream(unit);
+  ReportRef report;
+  Rendered r = render_job(sink.sink, request_for(l, *stream, report.report));
+  EXPECT_EQ(r.result, GSHSCENE_OK);
+  HatchFill out;
+  for (const std::string & line : lines_of(stream->bytes)) {
+    size_t at = line.find(" hatch=");
+    if (line.find(" F res=") == std::string::npos || at == std::string::npos) {
+      continue;
+    }
+    out.found = true;
+    size_t lp = line.find(" lines=", at);
+    size_t pp = line.find(" pieces=", at);
+    size_t bp = line.find(" box=", at);
+    out.lines = std::strtoull(line.c_str() + lp + 7, nullptr, 10);
+    out.pieces = line.substr(pp + 8, bp - pp - 8);
+    std::string rest = line.substr(bp + 5);
+    for (int i = 0; i < 4; i++) {
+      size_t sp = rest.find(' ');
+      out.box[i] = bits_to_double(rest.substr(0, sp));
+      rest = sp == std::string::npos ? std::string() : rest.substr(sp + 1);
+    }
+    out.fields = line.substr(at + 1, bp - at - 1);
+    out.fields = out.fields.substr(out.fields.find(" lines="));
+  }
+  EXPECT_TRUE(out.found);
+  return out;
+}
+
+const GSHSCENE_Resource * pen(Scene & s, double width, uint32_t space = GSHSCENE_STROKE_WIDTH_LOCAL, uint32_t cap = GSHSCENE_STROKE_CAP_BUTT) {
+  GSHSCENE_Stroke_Style st;
+  gshscene_stroke_style_init(&st);
+  st.width = width;
+  st.width_space = space;
+  st.cap = cap;
+  const GSHSCENE_Resource * r = nullptr;
+  EXPECT_EQ(gshscene_store_intern_stroke_style(s.store, &st, &r), GSHSCENE_OK);
+  s.held.push_back(r);
+  return r;
+}
+
+const GSHSCENE_Resource * hatch_of(Scene & s, const GSHSCENE_Resource * style, std::vector<GSHSCENE_Hatch_Family> fams, uint32_t nesting = 0,
+    const GSHGEOM_Map * map = nullptr) {
+  static std::deque<std::vector<GSHSCENE_Hatch_Family>> keep;
+  keep.push_back(std::move(fams));
+  GSHSCENE_Hatch h;
+  gshscene_hatch_init(&h);
+  h.style = style;
+  h.family_count = keep.back().size();
+  h.families = keep.back().data();
+  h.nesting = nesting;
+  if (map) {
+    h.map = *map;
+  }
+  const GSHSCENE_Resource * r = nullptr;
+  EXPECT_EQ(gshscene_store_intern_hatch(s.store, &h, &r), GSHSCENE_OK);
+  s.held.push_back(r);
+  return r;
+}
+
+/** A path of two nested squares of one direction: a nonzero fill covers both, an even-odd one leaves the inner a hole. */
+const GSHSCENE_Resource * nested(Scene & s) {
+  GSHGEOM_Path * p = nullptr;
+  EXPECT_EQ(gshgeom_path_create(nullptr, nullptr, 2, &p), GSHGEOM_OK);
+  EXPECT_EQ(gshgeom_path_add_rect(p, 2, 2, 20, 20, 0, 0), GSHGEOM_OK);
+  EXPECT_EQ(gshgeom_path_add_rect(p, 7, 7, 10, 10, 0, 0), GSHGEOM_OK);
+  const GSHSCENE_Resource * r = nullptr;
+  EXPECT_EQ(gshscene_store_intern_path(s.store, p, &r), GSHSCENE_OK);
+  gshgeom_path_destroy(p);
+  s.held.push_back(r);
+  return r;
+}
+
+GSHSCENE_Hatch_Family fam(double angle, double ox, double oy, double dx, double dy, const std::vector<double> * dashes = nullptr) {
+  static std::deque<std::vector<double>> keep;
+  GSHSCENE_Hatch_Family f{angle, ox, oy, dx, dy, 0, nullptr};
+  if (dashes) {
+    keep.push_back(*dashes);
+    f.dash_count = keep.back().size();
+    f.dashes = keep.back().data();
+  }
+  return f;
+}
+
+}  // namespace
+
+TEST(DumpSink, EveryPartOfAHatchMovesTheHashOfItsPiecesAndItsLineCountIsTheGeometrys) {
+  Scene s;
+  const GSHSCENE_Resource * butt = pen(s, 0.25);
+  const GSHSCENE_Resource * region = s.sq(2, 2, 20);
+  // horizontal lines every 2 over [2, 22]: y = 2, 4, ..., 22
+  HatchFill plain = render_hatch(s, region, hatch_of(s, butt, {fam(0, 0, 0, 0, 2.0)}), GSHGEOM_FILL_NONZERO, GSHSCENE_UNIT_PIXEL);
+  EXPECT_EQ(plain.lines, 11u);
+  EXPECT_NE(plain.pieces, "-");
+  const std::vector<double> d = {3.0, -2.0};
+  HatchFill base = render_hatch(s, region, hatch_of(s, butt, {fam(45, 0.5, 0.25, 0.3, 1.7, &d)}), GSHGEOM_FILL_NONZERO, GSHSCENE_UNIT_PIXEL);
+  EXPECT_GT(base.lines, 0u);
+  EXPECT_NE(base.pieces, "-");
+  struct Variant {
+    const char * what;
+    std::vector<GSHSCENE_Hatch_Family> fams;
+  };
+  const Variant variants[] = {
+      {"origin x", {fam(45, 1.5, 0.25, 0.3, 1.7, &d)}},
+      {"along", {fam(45, 0.5, 0.25, 0.9, 1.7, &d)}},
+      {"angle", {fam(40, 0.5, 0.25, 0.3, 1.7, &d)}},
+      {"across", {fam(45, 0.5, 0.25, 0.3, 1.9, &d)}},
+  };
+  for (const Variant & v : variants) {
+    HatchFill got = render_hatch(s, region, hatch_of(s, butt, v.fams), GSHGEOM_FILL_NONZERO, GSHSCENE_UNIT_PIXEL);
+    EXPECT_NE(got.pieces, base.pieces) << v.what;
+  }
+  // the dashes (with the same total, another split)
+  const std::vector<double> d2 = {2.0, -3.0};
+  EXPECT_NE(render_hatch(s, region, hatch_of(s, butt, {fam(45, 0.5, 0.25, 0.3, 1.7, &d2)}), GSHGEOM_FILL_NONZERO, GSHSCENE_UNIT_PIXEL).pieces, base.pieces);
+  // the hatch map: the whole pattern moves, and the nesting and the fill rule change what is covered
+  GSHGEOM_Map sc;
+  ASSERT_EQ(gshgeom_map_scale(2, 1.5, 1.5, 1.0, &sc), GSHGEOM_OK);
+  EXPECT_NE(render_hatch(s, region, hatch_of(s, butt, {fam(45, 0.5, 0.25, 0.3, 1.7, &d)}, 0, &sc), GSHGEOM_FILL_NONZERO, GSHSCENE_UNIT_PIXEL).pieces,
+            base.pieces);
+  const GSHSCENE_Resource * two = nested(s);
+  const GSHSCENE_Resource * h = hatch_of(s, butt, {fam(0, 0, 0, 0, 1.0)});
+  HatchFill nz = render_hatch(s, two, h, GSHGEOM_FILL_NONZERO, GSHSCENE_UNIT_PIXEL);
+  HatchFill eo = render_hatch(s, two, h, GSHGEOM_FILL_EVEN_ODD, GSHSCENE_UNIT_PIXEL);
+  EXPECT_NE(nz.pieces, eo.pieces) << "the fill rule reaches the pieces";
+  HatchFill outer = render_hatch(s, two, hatch_of(s, butt, {fam(0, 0, 0, 0, 1.0)}, GSHSCENE_HATCH_NESTING_OUTER), GSHGEOM_FILL_NONZERO, GSHSCENE_UNIT_PIXEL);
+  EXPECT_NE(outer.pieces, nz.pieces) << "the nesting reaches the pieces";
+  // a unit of millimeters makes the pixel another size, so the lines of the use differ
+  HatchFill mm = render_hatch(s, region, hatch_of(s, butt, {fam(45, 0.5, 0.25, 0.3, 1.7, &d)}), GSHGEOM_FILL_NONZERO, GSHSCENE_UNIT_MILLIMETER);
+  EXPECT_FALSE(mm.pieces.empty());
+  // lines that meet the region and leave no piece (the only dash is far from it) are counted and carry no hash
+  const std::vector<double> far = {1.0, -1000.0};
+  HatchFill none = render_hatch(s, region, hatch_of(s, butt, {fam(0, 100, 0, 0, 2.0, &far)}), GSHGEOM_FILL_NONZERO, GSHSCENE_UNIT_PIXEL);
+  EXPECT_GT(none.lines, 0u);
+  EXPECT_EQ(none.pieces, "-");
+}
+
+TEST(DumpSink, TheBoxOfAHatchFillIsTheRegionsOutsetByThePenInTheTargetsUnit) {
+  Scene s;
+  const GSHSCENE_Resource * region = s.sq(10, 10, 10);
+  for (uint32_t unit : {(uint32_t)GSHSCENE_UNIT_PIXEL, (uint32_t)GSHSCENE_UNIT_MILLIMETER}) {
+    for (uint32_t space : {(uint32_t)GSHSCENE_STROKE_WIDTH_LOCAL, (uint32_t)GSHSCENE_STROKE_WIDTH_DEVICE}) {
+      const GSHSCENE_Resource * wide = pen(s, 4.0, space, GSHSCENE_STROKE_CAP_SQUARE);
+      HatchFill got = render_hatch(s, region, hatch_of(s, wide, {fam(0, 0, 0, 0, 3.0)}), GSHGEOM_FILL_NONZERO, unit);
+      GSHGEOM_Bounds in{}, want{};
+      in.min.x = 10;
+      in.min.y = 10;
+      in.max.x = 20;
+      in.max.y = 20;
+      GSHGEOM_Map id;
+      gshgeom_map_identity(2, &id);
+      ASSERT_EQ(gshscene_hatch_bounds(wide, &in, &id, unit, &want), GSHSCENE_OK);
+      EXPECT_EQ(got.box[0], want.min.x) << unit << " " << space;
+      EXPECT_EQ(got.box[1], want.min.y);
+      EXPECT_EQ(got.box[2], want.max.x);
+      EXPECT_EQ(got.box[3], want.max.y);
+      EXPECT_LT(got.box[0], 10.0) << "past the region";
+      EXPECT_GT(got.box[2], 20.0);
+    }
+  }
+}
+
+
+namespace {
+
+/** The pieces' hash and the lines of the use as shape-geometry makes them from the same data at the canonical map of the target's unit. */
+void expected_pieces(const GSHSCENE_Hatch & h, const GSHGEOM_Path * path, GSHGEOM_Fill_Rule rule, uint32_t unit, const GSHGEOM_Map & item_map,
+    uint64_t * lines, std::string * pieces) {
+  GSHGEOM_Hatch geom;
+  std::memset(&geom, 0, sizeof geom);
+  geom.angle_unit = h.angle_unit;
+  geom.nesting = h.nesting;
+  geom.map = h.map;
+  std::vector<GSHGEOM_Hatch_Family> fams;
+  for (size_t i = 0; i < h.family_count; i++) {
+    const GSHSCENE_Hatch_Family & f = h.families[i];
+    fams.push_back({f.angle, f.origin_x, f.origin_y, f.offset_along, f.offset_across, f.dash_count, f.dashes});
+  }
+  geom.family_count = fams.size();
+  geom.families = fams.data();
+  GSHGEOM_Map scale, pixels, canon;
+  const double size = unit == GSHSCENE_UNIT_MILLIMETER ? 25.4 / 96.0 : 1.0;
+  ASSERT_EQ(gshgeom_map_scale(2, 1.0 / size, 1.0 / size, 1.0, &scale), GSHGEOM_OK);
+  ASSERT_EQ(gshgeom_map_compose(&scale, &item_map, &pixels), GSHGEOM_OK);
+  int64_t sx, sy;
+  ASSERT_EQ(gshgeom_stroke_canonical_map(&pixels, &canon, &sx, &sy), GSHGEOM_OK);
+  GSHGEOM_Hatch_Pieces * p = nullptr;
+  ASSERT_EQ(gshgeom_hatch_pieces(path, rule, &geom, &canon, 0, nullptr, nullptr, &p), GSHGEOM_OK);
+  *lines = gshgeom_hatch_pieces_lines(p);
+  char buf[32];
+  std::snprintf(buf, sizeof buf, "%016llx", (unsigned long long)gshgeom_hatch_pieces_hash(p));
+  *pieces = gshgeom_hatch_pieces_count(p) ? buf : "-";
+  gshgeom_hatch_pieces_destroy(p);
+}
+
+}  // namespace
+
+TEST(DumpSink, ThePiecesFieldIsWhatShapeGeometryMakesOfTheSameDataInEveryUnitUnderEveryRuleAndNesting) {
+  Scene s;
+  const GSHSCENE_Resource * butt = pen(s, 0.25);
+  GSHGEOM_Path * region_path = nullptr;
+  ASSERT_EQ(gshgeom_path_create(nullptr, nullptr, 2, &region_path), GSHGEOM_OK);
+  ASSERT_EQ(gshgeom_path_add_rect(region_path, 2, 2, 20, 20, 0, 0), GSHGEOM_OK);
+  ASSERT_EQ(gshgeom_path_add_rect(region_path, 7, 7, 10, 10, 0, 0), GSHGEOM_OK);
+  const GSHSCENE_Resource * region = nullptr;
+  ASSERT_EQ(gshscene_store_intern_path(s.store, region_path, &region), GSHSCENE_OK);
+  s.held.push_back(region);
+  const std::vector<double> d = {3.0, -2.0, 0.0, -1.0};
+  GSHGEOM_Map sc;
+  ASSERT_EQ(gshgeom_map_scale(2, 1.5, 0.75, 1.0, &sc), GSHGEOM_OK);
+  GSHGEOM_Map item_map;
+  ASSERT_EQ(gshgeom_map_translate(2, 0.3125, -0.6, 0.0, &item_map), GSHGEOM_OK);
+  struct Case {
+    std::vector<GSHSCENE_Hatch_Family> fams;
+    uint32_t nesting;
+    const GSHGEOM_Map * hmap;
+    GSHGEOM_Fill_Rule rule;
+    uint32_t unit;
+  };
+  const Case cases[] = {
+      {{fam(45, 0.5, 0.25, 0.3, 1.7, &d)}, 0, nullptr, GSHGEOM_FILL_NONZERO, GSHSCENE_UNIT_PIXEL},
+      {{fam(45, 0.5, 0.25, 0.3, 1.7, &d)}, 0, nullptr, GSHGEOM_FILL_NONZERO, GSHSCENE_UNIT_MILLIMETER},
+      {{fam(30, 1.25, 0.75, 0.9, 1.3, &d), fam(120, 0.0, 0.5, 0.0, 2.1)}, 0, &sc, GSHGEOM_FILL_EVEN_ODD, GSHSCENE_UNIT_PIXEL},
+      {{fam(30, 1.25, 0.75, 0.9, 1.3, &d)}, GSHSCENE_HATCH_NESTING_OUTER, nullptr, GSHGEOM_FILL_NONZERO, GSHSCENE_UNIT_MILLIMETER},
+      {{fam(10, 3.5, 0.0, 0.4, 1.1, &d)}, GSHSCENE_HATCH_NESTING_IGNORE, &sc, GSHGEOM_FILL_EVEN_ODD, GSHSCENE_UNIT_MILLIMETER},
+  };
+  for (const Case & c : cases) {
+    const GSHSCENE_Resource * hatch = hatch_of(s, butt, c.fams, c.nesting, c.hmap);
+    HatchFill got = render_hatch(s, region, hatch, c.rule, c.unit, &item_map);
+    GSHSCENE_Hatch h;
+    ASSERT_EQ(gshscene_resource_hatch(hatch, &h), GSHSCENE_OK);
+    uint64_t lines = 0;
+    std::string pieces;
+    expected_pieces(h, region_path, c.rule, c.unit, item_map, &lines, &pieces);
+    EXPECT_EQ(got.lines, lines);
+    EXPECT_EQ(got.pieces, pieces);
+    EXPECT_GT(got.lines, 0u);
+  }
+  gshgeom_path_destroy(region_path);
 }
 
 int main(int argc, char ** argv) {

@@ -107,7 +107,7 @@ enum {
   OP_FILL_FIXED, OP_TRUNCATE, OP_EDIT_PALETTE, OP_INTERN_GRADIENT, OP_FILL_GRADIENT, OP_SCENE_GRADIENT,
   OP_GRADIENT_NODE, OP_COLOR_BOUND, OP_GROUP_PDF, OP_NODE_PDF, OP_INTERN_STYLE, OP_STROKE, OP_STROKE_NODE, OP_PLACEHOLDER,
   OP_PLACEHOLDER_NODE, OP_INTERN_IMAGE, OP_IMAGE_NOT_SHAPE, OP_IMAGE_PAINT, OP_INTERN_MASK,
-  OP_GROUP_MASK, OP_NODE_MASK, OP_INTERN_PRIMITIVE, OP_INTERN_PATTERN, OP_PATTERN_FILL, OP_PATTERN_NODE, OP_COUNT
+  OP_GROUP_MASK, OP_NODE_MASK, OP_INTERN_PRIMITIVE, OP_INTERN_PATTERN, OP_PATTERN_FILL, OP_PATTERN_NODE, OP_INTERN_HATCH, OP_COUNT
 };
 
 /* --- the outcomes the corpus must reach ------------------------------------------------------------ */
@@ -130,7 +130,8 @@ enum {
   OUT_PRIMITIVE_LIMIT, OUT_PRIMITIVE_HIT, OUT_PRIMITIVE_UNTAGGED, OUT_ARC_PATH, OUT_PATTERN_INTERNED, OUT_PATTERN_TINTED,
   OUT_PATTERN_INVALID, OUT_PATTERN_UNSUPPORTED, OUT_PATTERN_LIMIT, OUT_PATTERN_HIT, OUT_PATTERN_NEAR, OUT_PATTERN_FILL,
   OUT_PATTERN_FILL_INVALID, OUT_PATTERN_NOTICE, OUT_PATTERN_NODE, OUT_PATTERN_DAMAGE, OUT_PATTERN_NO_DAMAGE,
-  OUT_PATTERN_EMITTED, OUT_COUNT
+  OUT_PATTERN_EMITTED, OUT_HATCH_INTERNED, OUT_HATCH_INVALID, OUT_HATCH_UNSUPPORTED, OUT_HATCH_LIMIT, OUT_HATCH_HIT,
+  OUT_HATCH_NEAR, OUT_HATCH_FILL, OUT_HATCH_NOTICE, OUT_HATCH_FILL_REFUSED, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limit", "edit limit", "publish limit",
@@ -162,7 +163,9 @@ static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limi
     "a pattern past PT2's bounds refused", "a pattern found again", "a pattern told apart from its nearest neighbor",
     "a fill or stroke painted with a pattern recorded", "a pattern paint refused as invalid", "a degenerate pattern noticed",
     "a shape node painted with a pattern", "a changed pattern damaging its node", "an unchanged pattern damaging nothing",
-    "an emitted list with a pattern fill"};
+    "an emitted list with a pattern fill", "a hatch interned", "a hatch refused as invalid", "a hatch refused as unsupported",
+    "a hatch past HX2's bounds refused", "a hatch found again", "a hatch told apart from its nearest neighbor",
+    "a fill painted with a hatch recorded", "a hatch fill that draws nothing noticed", "a hatch paint refused where it does not go"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -1534,6 +1537,161 @@ static void fuzz_pattern_fill(S * s) {
   outcomes[OUT_PATTERN_NOTICE] += notice != 0;
   /* PT11: the list counts the tile as it counts an instance's picture. */
   CHECK(list_picture_depth(s->list) >= gshscene_resource_picture_depth(content.tile));
+}
+
+/* --- hatches (masks-images-patterns story H1: HX1 to HX3, HX9, HX15) ------------------------------------------------------------ */
+
+/** HX1 to HX3: a hatch from the input, its result class predicted in HX2's order, read back, found again, told from its neighbor, painted. */
+static void fuzz_hatch(S * s) {
+  static const double angles[8] = {0.0, 45.0, 90.0, 30.0, -17.5, 1e6, (double)NAN, 0x1p41};
+  static const double values[8] = {0.0, 1.5, 2.0, 0.25, -1.0, 0x1p65, (double)INFINITY, 0x1p-65};
+  static const double elements[7][4] = {{0, 0, 0, 0}, {2, -1, 0, 0}, {0, -1, 0, 0}, {-1, -2, 0, 0}, {1, 0, -1, 0.5}, {0, 0, 0, 0}, {3, (double)NAN, 0, 0}};
+  static const unsigned counts[7] = {0, 2, 2, 2, 4, 1, 2};
+  unsigned fcount = pick(s, 4), asel = pick(s, 8), oxsel = pick(s, 8), dxsel = pick(s, 8), dysel = pick(s, 8), esel = pick(s, 7),
+           nesting = pick(s, 4), unit = pick(s, 5), msel = pick(s, 6), inksel = pick(s, 6), wsel = pick(s, 4), sel = pick(s, POOL), mode = pick(s, 3);
+  GSHSCENE_Hatch_Family fam[3];
+  for (unsigned i = 0; i < fcount && i < 3; i++) {
+    fam[i].angle = angles[(asel + i) % 8];
+    fam[i].origin_x = values[(oxsel + i) % 8];
+    fam[i].origin_y = values[(oxsel + 3 * i + 1) % 8];
+    fam[i].offset_along = values[(dxsel + i) % 8];
+    fam[i].offset_across = values[(dysel + 5 * i) % 8];
+    fam[i].dash_count = counts[(esel + i) % 7];
+    fam[i].dashes = fam[i].dash_count ? elements[(esel + i) % 7] : NULL;
+  }
+  GSHSCENE_Stroke_Style st;
+  gshscene_stroke_style_init(&st);
+  st.width = wsel == 0 ? 0.0 : 0.5 * (double)wsel;
+  st.cap = wsel == 3 ? GSHSCENE_STROKE_CAP_ROUND : GSHSCENE_STROKE_CAP_BUTT;
+  const GSHSCENE_Resource * style = NULL;
+  if (gshscene_store_intern_stroke_style(s->store, &st, &style) != GSHSCENE_OK) {
+    return;
+  }
+  GSHSCENE_Hatch h;
+  gshscene_hatch_init(&h);
+  h.style = style;
+  h.family_count = fcount;
+  h.families = fcount ? fam : NULL;
+  h.nesting = nesting;
+  h.angle_unit = unit;
+  int invalid = fcount == 0 || nesting >= 3 || unit >= (unsigned)GSHGEOM_ANGLE_UNIT_COUNT;
+  int unsupported = 0;
+  int limit = 0;
+  switch (msel) {
+    case 1: gshgeom_map_scale(2, 2.0, 0.5, 1.0, &h.map); break;
+    case 2: gshgeom_map_rotate(GSHGEOM_ANGLE_DEGREES, 30.0, &h.map); break;
+    case 3: gshgeom_map_identity(3, &h.map); unsupported = 1; break;
+    case 4: h.map.m[0][0] = (double)NAN; invalid = 1; break;
+    case 5: gshgeom_map_translate(2, 0x1p70, 0.0, 0.0, &h.map); limit = 1; break;
+    default: break;
+  }
+  switch (inksel) {
+    case 1: h.ink.rgba[0] = 0.25; break;
+    case 2: h.ink.kind = GSHSCENE_PAINT_FOREGROUND; break;
+    case 3: h.ink.kind = GSHSCENE_PAINT_PALETTE; h.ink.entry = 2; break;
+    case 4: h.ink.kind = GSHSCENE_PAINT_GRADIENT; invalid = 1; break;
+    case 5: h.ink.space.primaries = GCOL_PRIMARIES_PROPHOTO; h.ink.space.transfer = GCOL_TRANSFER_SRGB; unsupported = 1; break;
+    default: break;
+  }
+  for (unsigned i = 0; i < fcount && i < 3; i++) {
+    const double v[5] = {fam[i].angle, fam[i].origin_x, fam[i].origin_y, fam[i].offset_along, fam[i].offset_across};
+    for (int k = 0; k < 5; k++) {
+      invalid = invalid || !(v[k] - v[k] == 0.0);
+      limit = limit || (k == 0 ? (v[k] < 0 ? -v[k] : v[k]) > 0x1p40 : !pattern_in_band(v[k]));
+    }
+    int down = 0;
+    double sum = 0.0;
+    for (size_t k = 0; k < fam[i].dash_count; k++) {
+      const double e = fam[i].dashes[k];
+      invalid = invalid || !(e - e == 0.0);
+      limit = limit || !pattern_in_band(e);
+      down = down || e >= 0.0;
+      sum += e < 0.0 ? -e : e;
+    }
+    invalid = invalid || (fam[i].dash_count && (!down || !(sum > 0.0)));
+  }
+  GSHSCENE_Result want = invalid ? GSHSCENE_ERR_INVALID : unsupported ? GSHSCENE_ERR_UNSUPPORTED : limit ? GSHSCENE_ERR_LIMIT : GSHSCENE_OK;
+  const GSHSCENE_Resource * made = NULL;
+  GSHSCENE_Result r = gshscene_store_intern_hatch(s->store, &h, &made);
+  gshscene_resource_release(style);
+  if (r != want) {
+    /* The store's own limits refuse what is valid, as a limit; an angle past gshgeom_sincos's quarter turns is a limit of the unit. */
+    CHECK((want == GSHSCENE_OK || want == GSHSCENE_ERR_LIMIT) && r == GSHSCENE_ERR_LIMIT);
+    outcomes[OUT_HATCH_LIMIT]++;
+    return;
+  }
+  if (r != GSHSCENE_OK) {
+    CHECK(made == NULL);
+    outcomes[OUT_HATCH_INVALID] += r == GSHSCENE_ERR_INVALID;
+    outcomes[OUT_HATCH_UNSUPPORTED] += r == GSHSCENE_ERR_UNSUPPORTED;
+    outcomes[OUT_HATCH_LIMIT] += r == GSHSCENE_ERR_LIMIT;
+    return;
+  }
+  outcomes[OUT_HATCH_INTERNED]++;
+  CHECK(gshscene_resource_kind(made) == GSHSCENE_RESOURCE_HATCH);
+  uint64_t hash = gshscene_resource_hash(made);
+  GSHSCENE_Hatch back;
+  CHECK(gshscene_resource_hatch(made, &back) == GSHSCENE_OK);
+  CHECK(back.family_count == fcount && back.nesting == nesting && back.angle_unit == unit);
+  for (unsigned i = 0; i < fcount; i++) {
+    CHECK(back.families[i].dash_count == fam[i].dash_count && same_bits(back.families[i].offset_across, fam[i].offset_across == 0.0 ? 0.0 : fam[i].offset_across));
+  }
+  const GSHSCENE_Resource * again = NULL;
+  CHECK(gshscene_store_intern_hatch(s->store, &h, &again) == GSHSCENE_OK && again == made && gshscene_resource_hash(again) == hash);
+  gshscene_resource_release(again);
+  outcomes[OUT_HATCH_HIT]++;
+  GSHSCENE_Hatch near_h = h;
+  near_h.nesting = (nesting + 1) % 3;
+  const GSHSCENE_Resource * other = NULL;
+  GSHSCENE_Result nr = gshscene_store_intern_hatch(s->store, &near_h, &other);
+  CHECK(nr == GSHSCENE_OK || nr == GSHSCENE_ERR_LIMIT);
+  if (nr == GSHSCENE_OK) {
+    CHECK(other != made && gshscene_resource_hash(other) != hash);
+    gshscene_resource_release(other);
+    outcomes[OUT_HATCH_NEAR]++;
+  }
+  char * d0 = resource_text(made);
+  char * d1 = resource_text(made);
+  if (d0 && d1) {
+    CHECK(strcmp(d0, d1) == 0 && strstr(d0, "hatch unit=") != NULL);
+  }
+  free(d0);
+  free(d1);
+  if (s->list) {
+    /* A fill painted with it, or (mode 2) a stroke, which does not take one. */
+    GSHSCENE_Paint paint;
+    memset(&paint, 0, sizeof paint);
+    paint.kind = GSHSCENE_PAINT_HATCH;
+    paint.resource = made;
+    paint.rgba[3] = 1.0;
+    const GSHSCENE_Resource * region = s->res[sel];
+    ListSnap b = snap(s->list);
+    if (mode == 2) {
+      if (s->styles[0]) {
+        GSHSCENE_Result sr = gshscene_list_stroke(s->list, region, s->styles[0], NULL, &paint, 0, 0.0);
+        CHECK(sr != GSHSCENE_OK);
+        CHECK(gshscene_list_count(s->list) == b.count);
+        outcomes[OUT_HATCH_FILL_REFUSED]++;
+      }
+    } else {
+      GSHSCENE_Result fr = gshscene_list_fill(s->list, region, NULL, GSHGEOM_FILL_NONZERO, &paint, 0, 0.0);
+      if (region && fr == GSHSCENE_OK) {
+        const GSHSCENE_Item * item;
+        CHECK(gshscene_list_item(s->list, b.count, &item) == GSHSCENE_OK);
+        CHECK(item->paint.kind == GSHSCENE_PAINT_HATCH && item->paint.resource == made);
+        GSHSCENE_Reason notice = gshscene_hatch_notice(item, NULL, 0, NULL);
+        CHECK(notice == 0 || notice == GSHSCENE_REASON_STROKE_ZERO_WIDTH || notice == GSHSCENE_REASON_HATCH_DEGENERATE ||
+              notice == GSHSCENE_REASON_MAP_NOT_INVERTIBLE);
+        CHECK(gshscene_paint_notice(item, NULL, 0, NULL) == notice);
+        outcomes[OUT_HATCH_FILL]++;
+        outcomes[OUT_HATCH_NOTICE] += notice != 0;
+      } else if (fr != GSHSCENE_OK) {
+        CHECK(gshscene_list_count(s->list) == b.count);
+        outcomes[OUT_HATCH_FILL_REFUSED]++;
+      }
+    }
+  }
+  gshscene_resource_release(made);
 }
 
 /** PT12: a shape node painted with a pattern of the scene's store, published, changed and diffed, and emitted. */
@@ -3812,6 +3970,9 @@ static void op(S * s, unsigned code) {
       break;
     case OP_PATTERN_NODE:
       fuzz_pattern_node(s);
+      break;
+    case OP_INTERN_HATCH:
+      fuzz_hatch(s);
       break;
     default:
       break;

@@ -419,14 +419,16 @@ static GSHSCENE_Result canonical_paint(const GSHSCENE_Store * store, const GSHSC
   }
   if (paint->kind != GSHSCENE_PAINT_SOLID && paint->kind != GSHSCENE_PAINT_FOREGROUND &&
       paint->kind != GSHSCENE_PAINT_PALETTE && paint->kind != GSHSCENE_PAINT_GRADIENT &&
-      paint->kind != GSHSCENE_PAINT_IMAGE && paint->kind != GSHSCENE_PAINT_PATTERN) {
+      paint->kind != GSHSCENE_PAINT_IMAGE && paint->kind != GSHSCENE_PAINT_PATTERN && paint->kind != GSHSCENE_PAINT_HATCH) {
     return GSHSCENE_ERR_INVALID;
   }
   /* One spelling: only a gradient, an image paint or a pattern names a resource, of its kind and of the list's store (G1, IP1, PT1). */
-  if (paint->kind == GSHSCENE_PAINT_GRADIENT || paint->kind == GSHSCENE_PAINT_IMAGE || paint->kind == GSHSCENE_PAINT_PATTERN
+  if (paint->kind == GSHSCENE_PAINT_GRADIENT || paint->kind == GSHSCENE_PAINT_IMAGE || paint->kind == GSHSCENE_PAINT_PATTERN ||
+              paint->kind == GSHSCENE_PAINT_HATCH
           ? (!paint->resource || paint->resource->store != store ||
                 paint->resource->kind != (paint->kind == GSHSCENE_PAINT_GRADIENT ? GSHSCENE_RESOURCE_GRADIENT
                                               : paint->kind == GSHSCENE_PAINT_IMAGE ? GSHSCENE_RESOURCE_IMAGE_PAINT
+                                              : paint->kind == GSHSCENE_PAINT_HATCH ? GSHSCENE_RESOURCE_HATCH
                                                                                     : GSHSCENE_RESOURCE_PATTERN))
           : paint->resource != NULL) {
     return GSHSCENE_ERR_INVALID;
@@ -673,6 +675,10 @@ GSHSCENE_Result gshscene_list_fill(GSHSCENE_List * list, const GSHSCENE_Resource
   if (result == GSHSCENE_OK) {
     result = gshscene_list_canonical_depth(depth, &item.depth);
   }
+  if (result == GSHSCENE_OK && item.paint.kind == GSHSCENE_PAINT_HATCH &&
+      (resource->kind == GSHSCENE_RESOURCE_PLANE || item.map.dim != 2 || gshscene_centerline_3d(resource))) {
+    result = GSHSCENE_ERR_UNSUPPORTED; /* HX3: a hatch needs a planar region with a boundary; a plane has none */
+  }
   if (result == GSHSCENE_OK && !gshscene_color_bounded(item.paint.rgba)) {
     result = GSHSCENE_ERR_LIMIT; /* N1, after every validity check */
   }
@@ -719,8 +725,8 @@ GSHSCENE_Result gshscene_list_stroke(GSHSCENE_List * list, const GSHSCENE_Resour
   if (result == GSHSCENE_OK) {
     result = gshscene_list_canonical_depth(depth, &item.depth);
   }
-  if (result == GSHSCENE_OK && (item.map.dim != 2 || gshscene_centerline_3d(centerline))) {
-    result = GSHSCENE_ERR_UNSUPPORTED; /* SK4: a stroke is planar */
+  if (result == GSHSCENE_OK && (item.map.dim != 2 || gshscene_centerline_3d(centerline) || item.paint.kind == GSHSCENE_PAINT_HATCH)) {
+    result = GSHSCENE_ERR_UNSUPPORTED; /* SK4: a stroke is planar; HX3: the region to hatch of a stroke is not defined */
   }
   if (result == GSHSCENE_OK && !gshscene_color_bounded(item.paint.rgba)) {
     result = GSHSCENE_ERR_LIMIT; /* N1, after every other check */

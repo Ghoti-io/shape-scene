@@ -267,6 +267,10 @@ GSHSCENE_Result gshscene_node_canonical(const GSHSCENE_Store * store, const GSHS
       if (result == GSHSCENE_OK) {
         result = gshscene_list_canonical_paint(store, &in->paint, &node.paint);
       }
+      if (result == GSHSCENE_OK && node.paint.kind == GSHSCENE_PAINT_HATCH &&
+          gshscene_centerline_3d(in->resource)) {
+        result = GSHSCENE_ERR_UNSUPPORTED; /* HX3: a hatch needs a planar region (a plane is no node's: it is refused above) */
+      }
       if (result != GSHSCENE_OK) {
         return result;
       }
@@ -282,8 +286,8 @@ GSHSCENE_Result gshscene_node_canonical(const GSHSCENE_Store * store, const GSHS
       if (result == GSHSCENE_OK) {
         result = gshscene_list_canonical_paint_valid(store, &in->paint, &node.paint);
       }
-      if (result == GSHSCENE_OK && gshscene_centerline_3d(in->resource)) {
-        result = GSHSCENE_ERR_UNSUPPORTED; /* a stroke is planar */
+      if (result == GSHSCENE_OK && (gshscene_centerline_3d(in->resource) || node.paint.kind == GSHSCENE_PAINT_HATCH)) {
+        result = GSHSCENE_ERR_UNSUPPORTED; /* a stroke is planar; HX3: it is not hatched */
       }
       if (result == GSHSCENE_OK && !gshscene_color_bounded(node.paint.rgba)) {
         result = GSHSCENE_ERR_LIMIT; /* N1, after every other check */

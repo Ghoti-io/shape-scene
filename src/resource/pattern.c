@@ -252,6 +252,8 @@ int gshscene_paint_reads_foreground(const GSHSCENE_Paint * paint) {
       return paint->resource && paint->resource->u.imagepaint.foreground != 0; /* IP10: a foreground tint */
     case GSHSCENE_PAINT_PATTERN:
       return paint->resource && paint->resource->u.pattern.foreground != 0; /* PT12 */
+    case GSHSCENE_PAINT_HATCH:
+      return paint->resource && paint->resource->u.hatch.foreground != 0; /* HX1: the ink */
     default:
       return 0;
   }
@@ -270,6 +272,8 @@ uint32_t gshscene_paint_palette_need(const GSHSCENE_Paint * paint) {
       return paint->resource ? paint->resource->u.imagepaint.palette_need : 0; /* IP10: a palette tint */
     case GSHSCENE_PAINT_PATTERN:
       return paint->resource ? paint->resource->u.pattern.palette_need : 0; /* PT12 */
+    case GSHSCENE_PAINT_HATCH:
+      return paint->resource ? paint->resource->u.hatch.palette_need : 0; /* HX1: the ink */
     default:
       return 0;
   }

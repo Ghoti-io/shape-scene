@@ -417,6 +417,21 @@ static GSHSCENE_Result add_shape(Damage_Walk * d, const GSHSCENE_Walk * walk, co
     add_stroke(d, shape, &composed);
     return GSHSCENE_OK;
   }
+  if (shape->p.paint.kind == GSHSCENE_PAINT_HATCH && shape->p.paint.resource) {
+    /* HX15: a trimmed line is stroked, so a hatch fill reaches past its region by the cap's outset: its region's box through the style's. */
+    GSHGEOM_Bounds region;
+    GSHGEOM_Bounds b;
+    if (gshscene_centerline_box(shape->p.resource, &region) != GSHSCENE_OK ||
+        gshscene_hatch_bounds(gshscene_hatch_style(shape->p.paint.resource), &region, &composed, GSHSCENE_UNIT_PIXEL, &b) != GSHSCENE_OK) {
+      d->unbounded = 1;
+      return GSHSCENE_OK;
+    }
+    if (!b.empty) {
+      add_point(d, b.min.x, b.min.y);
+      add_point(d, b.max.x, b.max.y);
+    }
+    return GSHSCENE_OK;
+  }
   const GSHSCENE_Resource * resource = shape->p.resource;
   if (gshscene_resource_kind(resource) == GSHSCENE_RESOURCE_PATH) {
     const GSHGEOM_Path * path = gshscene_resource_path(resource);

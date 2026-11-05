@@ -54,6 +54,10 @@ got_uhash=$(printf '%s\n' "$got" | awk '$1=="shape-scene.clipunion-hash"{print $
 got_ucount=$(printf '%s\n' "$got" | awk '$1=="shape-scene.clipunion-count"{print $2}')
 want_uhash=$(awk '$1=="clipunion-hash"{print $2}' "$file" 2>/dev/null)
 want_ucount=$(awk '$1=="clipunion-count"{print $2}' "$file" 2>/dev/null)
+got_xhash=$(printf '%s\n' "$got" | awk '$1=="shape-scene.hatch-hash"{print $2}')
+got_xcount=$(printf '%s\n' "$got" | awk '$1=="shape-scene.hatch-count"{print $2}')
+want_xhash=$(awk '$1=="hatch-hash"{print $2}' "$file" 2>/dev/null)
+want_xcount=$(awk '$1=="hatch-count"{print $2}' "$file" 2>/dev/null)
 want_hash=$(awk '$1=="hash"{print $2}' "$file" 2>/dev/null)
 want_count=$(awk '$1=="count"{print $2}' "$file" 2>/dev/null)
 want_shash=$(awk '$1=="stroke-hash"{print $2}' "$file" 2>/dev/null)
@@ -66,7 +70,8 @@ if [ -z "$want_hash" ] || [ -z "$want_count" ] || [ -z "$got_hash" ] || [ -z "$g
    [ -z "$want_mhash" ] || [ -z "$want_mcount" ] || [ -z "$got_mhash" ] || [ -z "$got_mcount" ] ||
    [ -z "$want_khash" ] || [ -z "$want_kcount" ] || [ -z "$got_khash" ] || [ -z "$got_kcount" ] ||
    [ -z "$want_rhash" ] || [ -z "$want_rcount" ] || [ -z "$got_rhash" ] || [ -z "$got_rcount" ] ||
-   [ -z "$want_thash" ] || [ -z "$want_tcount" ] || [ -z "$got_thash" ] || [ -z "$got_tcount" ]; then
+   [ -z "$want_thash" ] || [ -z "$want_tcount" ] || [ -z "$got_thash" ] || [ -z "$got_tcount" ] ||
+   [ -z "$want_xhash" ] || [ -z "$want_xcount" ] || [ -z "$got_xhash" ] || [ -z "$got_xcount" ]; then
   printf 'check-corpus-hash: nothing to compare (probe %s/%s, strokes %s/%s, planes %s/%s, placeholders %s/%s, images %s/%s, image paints %s/%s, masks %s/%s, primitives %s/%s and patterns %s/%s; committed %s/%s, %s/%s, %s/%s, %s/%s, %s/%s, %s/%s, %s/%s, %s/%s and %s/%s in %s)\n' \
     "$got_hash" "$got_count" "$got_shash" "$got_scount" "$got_phash" "$got_pcount" "$got_hhash" "$got_hcount" "$got_ihash" "$got_icount" "$got_mhash" "$got_mcount" "$got_khash" "$got_kcount" "$got_rhash" "$got_rcount" "$got_thash" "$got_tcount" \
     "$want_hash" "$want_count" "$want_shash" "$want_scount" "$want_phash" "$want_pcount" "$want_hhash" "$want_hcount" "$want_ihash" "$want_icount" "$want_mhash" "$want_mcount" "$want_khash" "$want_kcount" "$want_rhash" "$want_rcount" "$want_thash" "$want_tcount" "$file" >&2
@@ -107,6 +112,11 @@ if [ "$got_khash" != "$want_khash" ] || [ "$got_kcount" != "$want_kcount" ]; the
     "$got_khash" "$got_kcount" "$want_khash" "$want_kcount" >&2
   exit 1
 fi
+if [ "$got_xhash" != "$want_xhash" ] || [ "$got_xcount" != "$want_xcount" ]; then
+  printf 'check-corpus-hash: FAIL: hatches %s over %s results, committed %s over %s\n' \
+    "$got_xhash" "$got_xcount" "$want_xhash" "$want_xcount" >&2
+  exit 1
+fi
 if [ "$got_rhash" != "$want_rhash" ] || [ "$got_rcount" != "$want_rcount" ]; then
   printf 'check-corpus-hash: FAIL: primitives %s over %s results, committed %s over %s\n' \
     "$got_rhash" "$got_rcount" "$want_rhash" "$want_rcount" >&2
@@ -123,4 +133,4 @@ if [ -z "$want_uhash" ] || [ -z "$want_ucount" ] || [ -z "$got_uhash" ] || [ -z 
     "$got_uhash" "$got_ucount" "$want_uhash" "$want_ucount" >&2
   exit 1
 fi
-printf 'check-corpus-hash: ok, %s over %s results; strokes %s over %s; planes %s over %s; placeholders %s over %s; images %s over %s; image paints %s over %s; masks %s over %s; primitives %s over %s; patterns %s over %s; clip unions %s over %s\n' "$got_hash" "$got_count" "$got_shash" "$got_scount" "$got_phash" "$got_pcount" "$got_hhash" "$got_hcount" "$got_ihash" "$got_icount" "$got_mhash" "$got_mcount" "$got_khash" "$got_kcount" "$got_rhash" "$got_rcount" "$got_thash" "$got_tcount" "$got_uhash" "$got_ucount"
+printf 'check-corpus-hash: ok, %s over %s results; strokes %s over %s; planes %s over %s; placeholders %s over %s; images %s over %s; image paints %s over %s; masks %s over %s; primitives %s over %s; patterns %s over %s; clip unions %s over %s; hatches %s over %s\n' "$got_hash" "$got_count" "$got_shash" "$got_scount" "$got_phash" "$got_pcount" "$got_hhash" "$got_hcount" "$got_ihash" "$got_icount" "$got_mhash" "$got_mcount" "$got_khash" "$got_kcount" "$got_rhash" "$got_rcount" "$got_thash" "$got_tcount" "$got_uhash" "$got_ucount" "$got_xhash" "$got_xcount"

@@ -497,6 +497,42 @@ for a front end when it exists.
 before duplicates are removed. A glyph run from a font is not a member (`ERR_UNSUPPORTED`; its per-glyph report entries are keyed by
 `(chain, glyph index)`), a 3D map is `ERR_UNSUPPORTED` too, and a run from outlines has the hull of its glyphs' device boxes.
 
+## Hatches (normative; masks-images-patterns story H1)
+
+A **hatch** is geometry, not a raster: families of parallel lines trimmed to a fill's region, dashed by one pattern that runs without
+a restart along each whole line, and stroked. It is what a CAD drawing's hatch is (the DXF HATCH entity's pattern definition lines),
+and the plot of one, the stroked path of a PDF or SVG writer, and the outline of a pixel sink are all the same pieces. A hatch resource
+is resource kind 13, a fill names it with a paint of kind `HATCH` (6), and the rules are numbered HX1 to HX16: HX1 to HX3, HX9, HX14
+and HX15 live in `hatch.h`; the geometry (the lines, the trim, the dashes, the stroke) is `shape-geometry`'s `hatch.h`, HX4 to HX12.
+`tools/gen-scene-vectors.py` restates the hash and the dump of the resource and shares no code with the library.
+
+**What the resource carries (HX1, HX2).** `{angle_unit, nesting, style, map, ink, families}`; a family is a pattern definition line
+(`angle, origin, offset_along, offset_across, dashes`). Three things beyond a CAD line are decided here. The **ink** is in the resource
+(a solid, foreground or palette paint, as a tint is in a pattern): a hatch is one drawing, a theme change re-resolves it, and a
+writer can keep the geometry apart from the color. The **nesting** (`RULE`, `OUTER`, `IGNORE`) is DXF's group 75, kept in the resource
+so a CAD round trip keeps the loops and the style and the lowering is the identity. The **elements are kept as given** and not merged,
+so a file's elements come back as they went in. A family whose elements have no pen-down element or no length has no period and is
+refused at record (the geometry would refuse it at render). The associativity flag, the source boundary objects, the pattern name and the
+seed points are not the waist's: the `model` layer keeps them on its own nodes. The style is a stroke style of the store; a style with
+dashes (a second dash source) or an alignment other than center (an open piece has no inside) is refused; its join, miter limit and
+`degenerate` are carried and unused.
+
+**The paint (HX3).** A hatch fill is composited as N7 with the hatch's covered region in place of the shape and the ink in place of
+the paint, times the paint's alpha multiplier. The fill's own coverage is not multiplied in: the item's path (or run) gives the trim
+region and nothing else, as a stroke's centerline gives its stroke's. A hatch paint on a stroke is unsupported at record, and on a
+gradient stop or a tint it is invalid; a plane has no boundary to trim to. The hatch space reaches the target by `T I_1 .. I_k M H`.
+
+**What draws nothing (HX9), and the bounds (HX15).** One predicate, `gshscene_hatch_notice`: a map of the chain with a linear part of
+exactly zero determinant (each alone), then a style of width 0, then a family with an `offset_across` of 0 (that family draws nothing;
+the others are drawn). A fill's coverage is the region of its stroked lines, so its bounds are the region's box outset as a stroke's
+(`gshscene_hatch_bounds`, SK10 without a join) and not the region's own: a cap at a trimmed end and a butt end against a slanted
+boundary reach outside it. The damage of a retained scene uses the same function.
+
+**Sinks (S23).** Without `CAP_HATCH` the planning pass refuses a hatch fill, `HATCH`. With it the sink draws the hatch as defined or
+exactly equivalently; a sink that strokes the pieces needs of the style what it needs of a stroke's (`gshscene_hatch_required`: the cap,
+the width space, an anisotropic width, and a degenerate shape for a dot, never a join). The test sink writes `hatch=<id> lines=<n>
+pieces=<hash>` after `rule=` and a record of the resource that states it, so that reading it back gives an equal hatch.
+
 ## Reserved
 
 Refused with `ERR_UNSUPPORTED`: ProPhoto (D50: converting to it needs a chromatic adaptation), the parametric,
@@ -504,7 +540,7 @@ BT.1886, PQ and HLG transfers and ICC profiles, gray-alpha images (a pinned layo
 and a stroke style's **width profile** (variable width, D8 of the strokes spec): the slot is a resource handle,
 hashed as `u64` 0 while it is empty, so that defining a profile fills a spelling that already exists. (The palette
 paint is N14 below; the gradient paint and resource are G1 to G13; the image resource is IM1 to IM14 above; the mask
-resource is MK1 to MK14 below; the pattern resource is PT1 to PT14 above.) A mask's transfer is PDF's function types 0, 2 and 3 on one level, and its coefficients are
+resource is MK1 to MK14 below; the pattern resource is PT1 to PT14 above; the hatch resource is HX1 to HX3 above.) A mask's transfer is PDF's function types 0, 2 and 3 on one level, and its coefficients are
 MK3's four sets; any other function or weights are sampled or named by the front end and reported as approximated.
 
 ## What a scene means: paint, color and composition (normative)

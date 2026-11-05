@@ -530,6 +530,9 @@ STYLE_DEVICE = style(width=0.75, space=WIDTH_DEVICE, join=JOIN_ROUND, miter=10.0
 STYLE_CLIP = style(width=-0.0, join=JOIN_MITER_CLIP, miter=2.5, cap=CAP_ROUND, dashes=(0.0, -0.0), offset=5.0,
                    scope=DASH_PATH, rule=RULE_EVEN_ODD)
 STYLE_ARCS = style(width=3.0, join=JOIN_ARCS, miter=65536.0, dashes=(4.0, -1.0), align=ALIGN_OUTSIDE)
+# a pen for a hatch: a style with no dashes and a centered alignment (hatch.h, HX2)
+STYLE_HATCH = style(width=0.75, space=WIDTH_DEVICE, join=JOIN_ROUND, miter=10.0, cap=CAP_SQUARE, degenerate=DEGENERATE_OMIT)
+STYLE_HATCH_HASH = style_hash(STYLE_HATCH)
 STYLE_DEFAULT_HASH = style_hash(STYLE_DEFAULT)
 STYLE_DEVICE_HASH = style_hash(STYLE_DEVICE)
 STYLE_CLIP_HASH = style_hash(STYLE_CLIP)
@@ -1321,6 +1324,48 @@ PATTERN_LIST_ITEMS = [
 ]
 PATTERN_LIST_HASH = list_hash(PATTERN_LIST_ITEMS)
 
+# --- hatches (hatch.h, HX1 and HX2; masks-images-patterns story H1) -------------------------------------------------------
+KIND_HATCH = 13
+PAINT_HATCH = 6
+
+
+def hatch(unit, nesting, style_hash_, mhash, ink, families):
+    """A hatch as the store keeps it.  @p ink is (paint kind, rgba, space, entry); a family is (angle, ox, oy, dx, dy, dashes) and is
+    stored as given (the elements are not merged), `-0` as `+0` (the cases write +0)."""
+    kind, rgba, space, entry = ink
+    out = u32(1) + u32(KIND_HATCH) + u8(unit) + u8(nesting) + u64(style_hash_) + u64(mhash)
+    out += u8(kind) + b"".join(f64(v) for v in rgba) + space_bytes(space) + u32(entry) + u64(len(families))
+    for (ang, ox, oy, dx, dy, dashes) in families:
+        out += b"".join(f64(v) for v in (ang, ox, oy, dx, dy)) + u64(len(dashes)) + b"".join(f64(d) for d in dashes)
+    digest = fnv(out)
+    dump = "gshscene.resource 1 kind=hatch hash=%016x\nhatch unit=%d nesting=%d style=%016x map=%016x ink=%d %s %s %d families=%d\n" % (
+        digest, unit, nesting, style_hash_, mhash, kind, " ".join("%016x" % bits(v) for v in rgba), space_text(space), entry, len(families))
+    for (ang, ox, oy, dx, dy, dashes) in families:
+        dump += "family angle=%016x origin=%016x %016x along=%016x across=%016x dashes=%d" % (
+            bits(ang), bits(ox), bits(oy), bits(dx), bits(dy), len(dashes))
+        dump += "".join(" %016x" % bits(d) for d in dashes) + "\n"
+    return dict(hash=digest, dump=dump)
+
+
+HATCHES = [
+    # the defaults: degrees, the rule, black ink, one solid family at 45 degrees
+    hatch(1, 0, STYLE_DEFAULT_HASH, IDENTITY, (PAINT_SOLID, (0.0, 0.0, 0.0, 1.0), TARGET, 0), [(45.0, 0.0, 0.0, 0.0, 1.5, ())]),
+    # the outer style, a device pen, a foreground ink, a dashed family with a stagger and a dotted one
+    hatch(1, 1, STYLE_HATCH_HASH, TRANSLATE, (PAINT_FOREGROUND, (0.0, 0.0, 0.0, 0.5), TARGET, 0),
+          [(0.0, 1.0, 2.0, 0.5, 2.0, (3.0, -1.0)), (90.0, 0.0, 0.0, 0.0, 2.0, (0.0, -1.5, 2.0))]),
+    # radians, the ignore style, a palette ink, a family with no spacing (the planner's notice; the resource is valid)
+    hatch(0, 2, STYLE_DEFAULT_HASH, DESIGN, (PAINT_PALETTE, (0.0, 0.0, 0.0, 1.0), TARGET, 3), [(0.7853981633974483, -2.5, 0.25, 0.0, 0.0, ())]),
+    # turns, a solid ink in a space, the ends of G14's band
+    hatch(3, 0, STYLE_DEFAULT_HASH, IDENTITY, (PAINT_SOLID, (0.25, 0.5, 0.75, 1.0), SRGB_SRGB, 0),
+          [(0.125, 2.0 ** -64, 2.0 ** 64, -2.0 ** 64, 2.0 ** -64, (2.0 ** -64, -2.0 ** 64))]),
+]
+HATCH_LIST_ITEMS = [
+    fill(KIND_PATH, SQ_RES, IDENTITY, 0, (0.0, 0.0, 0.0, 1.0), paint=PAINT_HATCH, grad=HATCHES[0]["hash"]),
+    fill(KIND_PATH, P2_RES, TRANSLATE, 1, (0.0, 0.0, 0.0, 0.5), paint=PAINT_HATCH, grad=HATCHES[1]["hash"], layer=2),
+    fill(KIND_PATH, SQ_RES, DESIGN, 0, (0.0, 0.0, 0.0, 0.25), paint=PAINT_HATCH, grad=HATCHES[2]["hash"]),
+]
+HATCH_LIST_HASH = list_hash(HATCH_LIST_ITEMS)
+
 
 def cxx_string(name, text):
     return 'static const char * const %s =\nR"DUMP(%s)DUMP";\n' % (name, text)
@@ -1420,6 +1465,11 @@ def render():
     for i, pt in enumerate(PATTERNS):
         o.append(cxx_string("kPatternDump%d" % i, pt["dump"]))
     o.append(cxx_string("kPatternListDump", list_dump(PATTERN_LIST_ITEMS)))
+    o.append("static const std::uint64_t kHatchHashes[] = {%s};\n" % ", ".join("UINT64_C(0x%016x)" % h["hash"] for h in HATCHES))
+    o.append("static const std::uint64_t kHatchListHash = UINT64_C(0x%016x);\n\n" % HATCH_LIST_HASH)
+    for i, h in enumerate(HATCHES):
+        o.append(cxx_string("kHatchDump%d" % i, h["dump"]))
+    o.append(cxx_string("kHatchListDump", list_dump(HATCH_LIST_ITEMS)))
     o.append("\n}  // namespace known\n\n#endif\n")
     return "".join(o)
 

@@ -34,6 +34,7 @@
 #include "sink_internal.h"
 
 #include <ghoti.io/shape-geometry/device.h>
+#include <ghoti.io/shape-geometry/hatch.h>
 #include <ghoti.io/shape-geometry/lattice.h>
 #include <ghoti.io/shape-geometry/path.h>
 
@@ -198,7 +199,8 @@ static void caps_full(GSHSCENE_Sink_Caps * caps, int readback) {
   /* Every pattern, recorded by handle (S22). */
   caps->flags |= GSHSCENE_CAP_PATTERN;
   /* Every clip union, overlapping members included, recorded by handle with its members (S24, CU23). */
-  caps->flags |= GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL;
+  /* Every hatch, recorded by handle with its lines and pieces (S23). */
+  caps->flags |= GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL | GSHSCENE_CAP_HATCH;
   caps->cancel_unit = GSHSCENE_CANCEL_BETWEEN_UNITS;
   caps->cancel_work_bound = 1;
   caps->work_measure = "units";
@@ -308,6 +310,9 @@ static void gradient_need(const GSHSCENE_List * list, size_t * fills, size_t * s
     } else if ((item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE) &&
                item->paint.kind == GSHSCENE_PAINT_PATTERN) {
       *fills = gshscene_sat_add(*fills, 2); /* its pattern and its tile: each recorded once per render, by id */
+    } else if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_HATCH) {
+      *fills = gshscene_sat_add(*fills, 1);     /* its hatch, recorded once per render, by id */
+      *strokes = gshscene_sat_add(*strokes, 1); /* and its style */
     } else if (item->kind == GSHSCENE_ITEM_INSTANCE) {
       gradient_need(gshscene_resource_picture(item->resource), fills, stops, strokes);
     }
@@ -322,8 +327,8 @@ static void stroke_kinds(const GSHSCENE_List * list, int * any, int * of_run) {
     if (gshscene_list_item(list, i, &item) != GSHSCENE_OK) {
       break;
     }
-    if (item->kind == GSHSCENE_ITEM_STROKE) {
-      *any = 1;
+    if (item->kind == GSHSCENE_ITEM_STROKE || (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_HATCH)) {
+      *any = 1; /* a hatch fill's pieces and expansion are made in the stroke scratch */
       *of_run |= item->resource && item->resource->kind == GSHSCENE_RESOURCE_GLYPH_RUN;
     } else if (item->kind == GSHSCENE_ITEM_INSTANCE) {
       stroke_kinds(gshscene_resource_picture(item->resource), any, of_run);
@@ -1183,6 +1188,148 @@ static GSHSCENE_Result style_record(Run * run, const GSHSCENE_Resource * style, 
   return GSHSCENE_OK;
 }
 
+/**
+ * HX14: the hatch of a fill by handle, once per render: its style's record, then `H <id> <hash> unit=N nesting=N style=<id> map=<hash>
+ * ink=<kind> <r> <g> <b> <a> <primaries>:<transfer>:<gamma> <entry> families=N`, a line `h <angle> <ox> <oy> <dx> <dy> dashes=N` for each
+ * family and `d <dash>` for each element.  The record states the resource: reading it back gives an equal hatch.
+ */
+static GSHSCENE_Result hatch_record(Run * run, const GSHSCENE_Resource * hatch, GSHSCENE_Result * failed) {
+  GSHSCENE_Hatch h;
+  if (gshscene_resource_hatch(hatch, &h) != GSHSCENE_OK) {
+    return GSHSCENE_ERR_INTERNAL;
+  }
+  uint64_t id = gshscene_resource_id(hatch);
+  for (size_t i = 0; i < run->gradient_count; i++) {
+    if (run->gradients[i] == id) {
+      return GSHSCENE_OK;
+    }
+  }
+  GSHSCENE_Result r = style_record(run, h.style, failed);
+  if (r != GSHSCENE_OK) {
+    return r;
+  }
+  run->gradients[run->gradient_count++] = id;
+  snprintf(run->line, LINE_BYTES,
+      "H %" PRIu64 " %016" PRIx64 " unit=%u nesting=%u style=%" PRIu64 " map=%016" PRIx64 " ink=%u %016" PRIx64 " %016" PRIx64
+      " %016" PRIx64 " %016" PRIx64 " %u:%u:%016" PRIx64 " %u families=%" PRIu64 "\n",
+      id, gshscene_resource_hash(hatch), (unsigned)h.angle_unit, (unsigned)h.nesting, gshscene_resource_id(h.style),
+      gshgeom_map_hash(&h.map), (unsigned)h.ink.kind, gshgeom_f64_bits(h.ink.rgba[0]), gshgeom_f64_bits(h.ink.rgba[1]),
+      gshgeom_f64_bits(h.ink.rgba[2]), gshgeom_f64_bits(h.ink.rgba[3]), (unsigned)h.ink.space.primaries,
+      (unsigned)h.ink.space.transfer, gshgeom_f64_bits(h.ink.space.gamma), h.ink.entry, (uint64_t)h.family_count);
+  emit_text(run, run->line, failed);
+  for (size_t i = 0; i < h.family_count; i++) {
+    const GSHSCENE_Hatch_Family * f = &h.families[i];
+    snprintf(run->line, LINE_BYTES, "h %016" PRIx64 " %016" PRIx64 " %016" PRIx64 " %016" PRIx64 " %016" PRIx64 " dashes=%" PRIu64 "\n",
+        gshgeom_f64_bits(f->angle), gshgeom_f64_bits(f->origin_x), gshgeom_f64_bits(f->origin_y), gshgeom_f64_bits(f->offset_along),
+        gshgeom_f64_bits(f->offset_across), (uint64_t)f->dash_count);
+    emit_text(run, run->line, failed);
+    for (size_t k = 0; k < f->dash_count; k++) {
+      snprintf(run->line, LINE_BYTES, "d %016" PRIx64 "\n", gshgeom_f64_bits(f->dashes[k]));
+      emit_text(run, run->line, failed);
+    }
+  }
+  return GSHSCENE_OK;
+}
+
+/**
+ * HX14: the pieces of a hatch fill at the canonical map (shape-geometry's hatch.h), the lines of the use and the hash of the pieces.  The region
+ * is the item's path, or for a run the path of all its glyphs' contours (the run is one region), made in the centerline scratch; the pieces in
+ * the stroke scratch.  A scratch too small, or a limit of shape-geometry's, is ::GSHSCENE_ERR_LIMIT, the sink's resource limit.
+ */
+static GSHSCENE_Result hatch_pieces_fields(Run * run, const GSHSCENE_Item * item, const GSHGEOM_Map * map, uint64_t * lines,
+    uint64_t * hash, int * has, const size_t * chain, size_t count, int * stopped) {
+  *lines = 0;
+  *hash = 0;
+  *has = 0;
+  *stopped = 0;
+  GSHSCENE_Hatch h;
+  if (gshscene_resource_hatch(item->paint.resource, &h) != GSHSCENE_OK) {
+    return GSHSCENE_ERR_INTERNAL;
+  }
+  const GSHGEOM_Path * path = gshscene_resource_path(item->resource);
+  GSHSCENE_Glyph_Run glyphs;
+  memset(&glyphs, 0, sizeof glyphs);
+  int is_run = !path && gshscene_resource_glyph_run(item->resource, &glyphs) == GSHSCENE_OK;
+  if (!path && !is_run) {
+    return GSHSCENE_OK;
+  }
+  GSHGEOM_Map pixels = *map;
+  double size = gshscene_stroke_pixel_size(run->job->target.unit);
+  if (size != 1.0) {
+    GSHGEOM_Map scale;
+    if (!(size > 0.0) || gshgeom_map_scale(2, 1.0 / size, 1.0 / size, 1.0, &scale) != GSHGEOM_OK ||
+        gshgeom_map_compose(&scale, map, &pixels) != GSHGEOM_OK) {
+      return GSHSCENE_ERR_LIMIT;
+    }
+  }
+  GSHGEOM_Map canon;
+  int64_t sx;
+  int64_t sy;
+  if (gshgeom_stroke_canonical_map(&pixels, &canon, &sx, &sy) != GSHGEOM_OK) {
+    return GSHSCENE_ERR_LIMIT;
+  }
+  /* the notice is the plan's and the record's (an X line); here the hatch draws something */
+  GSHGEOM_Hatch geom;
+  memset(&geom, 0, sizeof geom);
+  geom.angle_unit = h.angle_unit;
+  geom.nesting = h.nesting;
+  geom.map = h.map;
+  geom.family_count = h.family_count;
+  Glyph_Arena * scratch = &run->centerlines;
+  run->strokes.used = 0;
+  scratch->used = 0;
+  GSHGEOM_Hatch_Family * families = run->strokes.self.malloc_fn(run->strokes.self.ctx, h.family_count * sizeof *families);
+  if (!families) {
+    return GSHSCENE_ERR_LIMIT;
+  }
+  for (size_t i = 0; i < h.family_count; i++) {
+    families[i].angle = h.families[i].angle;
+    families[i].origin_x = h.families[i].origin_x;
+    families[i].origin_y = h.families[i].origin_y;
+    families[i].offset_along = h.families[i].offset_along;
+    families[i].offset_across = h.families[i].offset_across;
+    families[i].dash_count = h.families[i].dash_count;
+    families[i].dashes = h.families[i].dashes;
+  }
+  geom.families = families;
+  GSHGEOM_Path * centerline = NULL;
+  GSHSCENE_Glyph_Note * notes = NULL;
+  if (is_run) {
+    if (glyphs.glyph_count > 0) {
+      notes = scratch->self.calloc_fn(scratch->self.ctx, glyphs.glyph_count, sizeof *notes);
+      if (!notes) {
+        return GSHSCENE_ERR_LIMIT;
+      }
+    }
+    GSHSCENE_Result cr = gshscene_glyph_run_centerline(item->resource, &scratch->self, NULL, &centerline, notes);
+    if (cr == GSHSCENE_ERR_OOM || cr == GSHSCENE_ERR_LIMIT) {
+      return GSHSCENE_ERR_LIMIT;
+    }
+    if (cr != GSHSCENE_OK) {
+      return GSHSCENE_ERR_INTERNAL;
+    }
+    path = centerline;
+  }
+  GSHGEOM_Limits limits;
+  gshgeom_limits_default(&limits);
+  limits.max_points = stroke_points(&run->sink->config);
+  GSHGEOM_Hatch_Pieces * pieces = NULL;
+  GSHGEOM_Result g = gshgeom_hatch_pieces(path, item->fill_rule, &geom, &canon, 0, &run->strokes.self, &limits, &pieces);
+  gshgeom_path_destroy(centerline);
+  if (g != GSHGEOM_OK) {
+    return GSHSCENE_ERR_LIMIT;
+  }
+  *lines = gshgeom_hatch_pieces_lines(pieces);
+  if (gshgeom_hatch_pieces_count(pieces) != 0) {
+    *hash = gshgeom_hatch_pieces_hash(pieces);
+    *has = 1;
+  }
+  gshgeom_hatch_pieces_destroy(pieces);
+  (void)chain;
+  (void)count;
+  return GSHSCENE_OK;
+}
+
 /** Refused while drawing (S6), for @p reason: the record and the entry; under strict the render stops here. */
 static GSHSCENE_Result refuse_here(Run * run, const GSHSCENE_Item * item, const size_t * chain, size_t count,
     GSHSCENE_Reason reason, GSHSCENE_Result failed) {
@@ -1498,11 +1645,29 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
       }
       /* PL4, PL6: the plane has no box, so no extent limit applies to it and nothing is sized from it. */
       int plane = item->kind == GSHSCENE_ITEM_FILL && gshscene_resource_kind(item->resource) == GSHSCENE_RESOURCE_PLANE;
+      /* HX15: a hatch fill's box is its region's, outset as a stroke's is (the caps of the trimmed lines reach outside it). */
+      int hatched = item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_HATCH;
       int bad = !mapped || (font && !routed) ||
           (plane ? 0
               : (item->kind == GSHSCENE_ITEM_CLIP_PUSH && gshscene_resource_kind(item->resource) == GSHSCENE_RESOURCE_CLIP_UNION)
                   ? union_device_box(run, item, count, &box)
                   : (resource_box(item->resource, &model) || box_map(&map, &model, &box)));
+      if (!bad && hatched) {
+        GSHGEOM_Bounds region, hb;
+        memset(&region, 0, sizeof region);
+        region.empty = model.empty;
+        region.min.x = model.x0;
+        region.min.y = model.y0;
+        region.max.x = model.x1;
+        region.max.y = model.y1;
+        memset(&hb, 0, sizeof hb);
+        bad = gshscene_hatch_bounds(gshscene_hatch_style(item->paint.resource), &region, &map, run->job->target.unit, &hb) != GSHSCENE_OK;
+        box.empty = hb.empty;
+        box.x0 = hb.min.x;
+        box.y0 = hb.min.y;
+        box.x1 = hb.max.x;
+        box.y1 = hb.max.y;
+      }
       double limit = run->sink->config.max_extent;
       if (plane) {
         box.empty = 1;
@@ -1539,6 +1704,27 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
         snprintf(run->line, LINE_BYTES, " pat=%" PRIu64, gshscene_resource_id(item->paint.resource));
         emit_text(run, run->line, &failed);
         copies_record(run, item, count, &box, &failed);
+      } else if (hatched) {
+        /* HX14: the hatch by handle, its lines and the hash of its pieces at the canonical map, in every configuration. */
+        uint64_t hlines = 0;
+        uint64_t hhash = 0;
+        int hhas = 0;
+        int hstopped = 0;
+        GSHSCENE_Result hr = hatch_pieces_fields(run, item, &map, &hlines, &hhash, &hhas, chain, count, &hstopped);
+        if (hr == GSHSCENE_ERR_LIMIT) {
+          return refuse_here(run, item, chain, count, GSHSCENE_REASON_RESOURCE_LIMIT, failed);
+        }
+        if (hr != GSHSCENE_OK) {
+          return hr;
+        }
+        if (hhas) {
+          snprintf(run->line, LINE_BYTES, " hatch=%" PRIu64 " lines=%" PRIu64 " pieces=%016" PRIx64,
+              gshscene_resource_id(item->paint.resource), hlines, hhash);
+        } else {
+          snprintf(run->line, LINE_BYTES, " hatch=%" PRIu64 " lines=%" PRIu64 " pieces=-", gshscene_resource_id(item->paint.resource),
+              hlines);
+        }
+        emit_text(run, run->line, &failed);
       }
       emit_text(run, " box=", &failed);
       if (plane) {
@@ -1562,6 +1748,11 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
         }
       } else if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_PATTERN) {
         GSHSCENE_Result r = pattern_record(run, item->paint.resource, &failed);
+        if (r != GSHSCENE_OK) {
+          return r;
+        }
+      } else if (hatched) {
+        GSHSCENE_Result r = hatch_record(run, item->paint.resource, &failed);
         if (r != GSHSCENE_OK) {
           return r;
         }

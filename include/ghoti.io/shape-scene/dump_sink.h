@@ -147,6 +147,17 @@
  * refuses the unit (`PATTERN`) and writes neither record; a pattern with a unit in its tile the caps refuse is refused as well, and the
  * unit in the tile is the planning pass's entry, with the chain `[... , i, j]`.
  *
+ * ### Hatch records (S23)
+ *
+ * A fill painted with a hatch (hatch.h) has ` hatch=<id> lines=<n> pieces=<hash|->` before `box=`, in every configuration that draws
+ * hatches: `lines` is the lines of the use (shape-geometry's hatch.h, HX5) and `pieces` the 16-digit hash of the pieces
+ * (`gshgeom_hatch_pieces_hash`) at the canonical map (the composed map with its translation's fraction), `-` for a hatch that draws no
+ * piece; the box is the region's outset as a stroke's is, without a join (::gshscene_hatch_bounds).  After the fill's record, the
+ * first time the render meets the hatch's id, its style's `Q` record and `H <id> <hash> unit=N nesting=N style=<id> map=<hash>
+ * ink=<kind r g b a primaries:transfer:gamma entry> families=N`, then for each family `h <angle> <ox> <oy> <dx> <dy> dashes=N` and a
+ * line `d <dash>` for each element, every double as 16 hexadecimal digits: a record that states the resource, so a writer (or a test)
+ * can rebuild an equal one.  A configuration without ::GSHSCENE_CAP_HATCH refuses the unit (`HATCH`) and writes neither.
+ *
  * ` pat=<id>` is followed by ` copies=<n>`: the number of copies of the use (pattern.h PT5; shape-geometry's lattice.h, the
  * function a sink that draws patterns counts with), at the top level of the tile (a pattern nested in the tile is not summed).
  * The chain is `T I_1 .. I_k M G`, composed in one call.  The rectangle is the item's box in whole pixels (rounded out, the
@@ -244,7 +255,7 @@ typedef struct GSHSCENE_Dump_Sink_Config {
  * @brief The default configuration: both targets; for each, every item kind, operator and gradient kind, every
  *   stroke feature native (`stroke_native` ::GSHSCENE_STROKE_NATIVE_ALL), the flags
  *   `CAN_BLOCK`, `READBACK` (raster only), `CALLER_MEMORY`, `GLYPHS_FROM_FONT`, `CLIP_AA`, `BLEND_SPACES`,
- *   `GRADIENT_SPACES`, `PREPARE`, `STROKE_RUNS`, `IMAGE_FILTER_SPACES`, `GROUP_SOFT_MASK` and `PATTERN`; cancel
+ *   `GRADIENT_SPACES`, `PREPARE`, `STROKE_RUNS`, `IMAGE_FILTER_SPACES`, `GROUP_SOFT_MASK`, `PATTERN` and `HATCH`; cancel
  *   between units with a work bound of 1 unit; in-line; no extent limit; no log.  NULL is ignored.
  */
 GSHSCENE_API void gshscene_dump_sink_config_default(GSHSCENE_Dump_Sink_Config * config);

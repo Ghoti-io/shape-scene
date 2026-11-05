@@ -271,6 +271,15 @@
  * A unit that draws nothing (::gshscene_pattern_notice) is noticed and skipped.  A writer keeps the pattern by handle and emits
  * it, and its tile, once per resource id; a cache of tiles is keyed by the tile picture's id and dropped at release.
  *
+ * **S23 Hatches (hatch.h, HX1 to HX16).**  A hatch reaches a sink by handle, in a fill's paint, and a sink reads it with
+ * ::gshscene_resource_hatch.  A sink that draws hatches has ::GSHSCENE_CAP_HATCH; without it the planning pass refuses every fill
+ * painted with one, `HATCH`, on every sink (a writer and a toolpath included), before the target is touched.  With it the sink draws
+ * the hatch as defined or exactly equivalently: a CAD writer emits the entity from the resource (the families, the boundary from the
+ * item's path); any other writer strokes the pieces (shape-geometry's hatch.h, `gshgeom_hatch_pieces`, the style's own cap and width)
+ * as a stroked path; a toolpath follows the pieces; a pixel sink draws `gshgeom_hatch_expand`.  There is no feature bit and no
+ * entry for "drawn as defined".  A sink that strokes the pieces checks the style's required features (::gshscene_hatch_required: the
+ * cap, the width space, an anisotropic local width, a degenerate shape for a dot; never a join) as it does a stroke's and refuses
+ * what it lacks with `STROKE_STYLE`.  A fill that draws nothing (::gshscene_hatch_notice) is noticed and skipped.
  * **S24 Union clips (clip_union.h, CU1 to CU25).**  A clip push may name a clip union, the union of several shapes (an SVG
  * `<clipPath>` of several children, a CSS `clip-path` of several shapes, a PDF text clip).  A sink reads it with
  * ::gshscene_resource_clip_union_count and ::gshscene_resource_clip_union_member, and takes each member as a plain clip item through

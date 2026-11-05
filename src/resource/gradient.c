@@ -561,6 +561,9 @@ GSHSCENE_Reason gshscene_paint_notice(const GSHSCENE_Item * item, const GSHGEOM_
   if (item->paint.kind == GSHSCENE_PAINT_PATTERN) {
     return gshscene_pattern_notice(item, instance_maps, instance_count, target_map); /* PT10 */
   }
+  if (item->paint.kind == GSHSCENE_PAINT_HATCH) {
+    return gshscene_hatch_notice(item, instance_maps, instance_count, target_map); /* HX9 */
+  }
   /* The paint's own map: a gradient's, or an image paint's (IP11). */
   const GSHSCENE_Gradient * g = NULL;
   const GSHGEOM_Map * paint_map;

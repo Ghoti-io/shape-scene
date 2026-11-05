@@ -276,6 +276,23 @@ GSHSCENE_Disposition gshscene_caps_disposition_unit(const GSHSCENE_Sink_Caps * c
       return d;
     }
   }
+  const int hatched = item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_HATCH && item->paint.resource &&
+      item->paint.resource->kind == GSHSCENE_RESOURCE_HATCH;
+  if (hatched) {
+    /* S23, HX14: a sink without the flag refuses the fill, whatever else is true of it. */
+    if (!(caps->flags & GSHSCENE_CAP_HATCH)) {
+      d.entry_class = GSHSCENE_ENTRY_REFUSED;
+      d.reason = GSHSCENE_REASON_HATCH;
+      return d;
+    }
+    /* HX1, N14: an ink named by a palette entry the palette in force does not have refuses the fill. */
+    uint32_t need = item->paint.resource->u.hatch.palette_need;
+    if (need && (!palette || palette->kind != GSHSCENE_RESOURCE_PALETTE || need > palette->u.palette.count)) {
+      d.entry_class = GSHSCENE_ENTRY_REFUSED;
+      d.reason = GSHSCENE_REASON_PALETTE_ENTRY;
+      return d;
+    }
+  }
   if (painted && item->paint.kind == GSHSCENE_PAINT_PALETTE) {
     /* N14: the one resolution decides; the foreground is not read for a palette paint. */
     GSHSCENE_Color unused;
@@ -330,6 +347,16 @@ GSHSCENE_Disposition gshscene_caps_disposition_unit(const GSHSCENE_Sink_Caps * c
   if (item->kind == GSHSCENE_ITEM_STROKE && !(caps->flags & GSHSCENE_CAP_STROKE_EXPAND)) {
     uint32_t missing =
         gshscene_stroke_required(item, instance_maps, instance_count, target_map) & ~caps->stroke_native;
+    if (missing) {
+      d.entry_class = GSHSCENE_ENTRY_REFUSED;
+      d.reason = GSHSCENE_REASON_STROKE_STYLE;
+      d.detail = missing;
+      return d;
+    }
+  }
+  /* HX14: the pen of a hatch is a stroke style's, and a sink that strokes the pieces refuses what it cannot express as SK11 does. */
+  if (hatched && !(caps->flags & GSHSCENE_CAP_STROKE_EXPAND)) {
+    uint32_t missing = gshscene_hatch_required(item, instance_maps, instance_count, target_map) & ~caps->stroke_native;
     if (missing) {
       d.entry_class = GSHSCENE_ENTRY_REFUSED;
       d.reason = GSHSCENE_REASON_STROKE_STYLE;

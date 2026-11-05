@@ -406,9 +406,11 @@ static double sub_down(double a, double b) {
 }
 
 /** SK10: `h` for @p s, in units of @p pixel per width unit, never below the real one. */
-static double reach(const GSHSCENE_Stroke_Style * s, double pixel) {
+static double reach(const GSHSCENE_Stroke_Style * s, double pixel, int hatch) {
   double f = 1.0;
-  if (s->join == (uint32_t)GSHSCENE_STROKE_JOIN_MITER) {
+  if (hatch) {
+    /* HX15: a trimmed line is one segment: no join, the style's centered body and its cap only */
+  } else if (s->join == (uint32_t)GSHSCENE_STROKE_JOIN_MITER) {
     f = s->miter_limit; /* the miter's tip: 1 / sin(θ/2) half widths from its vertex, at most the limit */
   } else if (s->join == (uint32_t)GSHSCENE_STROKE_JOIN_MITER_CLIP || s->join == (uint32_t)GSHSCENE_STROKE_JOIN_ARCS) {
     f = s->miter_limit + 1.0; /* a clipped corner: the limit along the bisector, up to one half width across */
@@ -416,12 +418,12 @@ static double reach(const GSHSCENE_Stroke_Style * s, double pixel) {
   if (s->cap == (uint32_t)GSHSCENE_STROKE_CAP_SQUARE && f < 1.5) {
     f = 1.5; /* a square cap's corner, sqrt 2 half widths from the end */
   }
-  double a = s->alignment == (uint32_t)GSHSCENE_STROKE_ALIGN_CENTER ? 1.0 : 2.0;
+  double a = s->alignment == (uint32_t)GSHSCENE_STROKE_ALIGN_CENTER ? 1.0 : 2.0; /* a hatch's style is always centered (HX2) */
   return (s->width * 0.5) * f * a * pixel * STROKE_ROUND_UP;
 }
 
-GSHSCENE_Result gshscene_stroke_bounds(const GSHSCENE_Resource * style, const GSHGEOM_Bounds * centerline,
-    const GSHGEOM_Map * composed, uint32_t unit, GSHGEOM_Bounds * out) {
+static GSHSCENE_Result bounds_core(const GSHSCENE_Resource * style, const GSHGEOM_Bounds * centerline,
+    const GSHGEOM_Map * composed, uint32_t unit, GSHGEOM_Bounds * out, int hatch) {
   double pixel = gshscene_stroke_pixel_size(unit);
   if (!style || style->kind != GSHSCENE_RESOURCE_STROKE_STYLE || !centerline || !composed || !out || pixel == 0.0 ||
       composed->dim != 2 || gshgeom_map_check(composed) != GSHGEOM_OK) {
@@ -436,7 +438,7 @@ GSHSCENE_Result gshscene_stroke_bounds(const GSHSCENE_Resource * style, const GS
     return GSHSCENE_OK;
   }
   int device = s->width_space == (uint32_t)GSHSCENE_STROKE_WIDTH_DEVICE;
-  double h = reach(s, device ? pixel : 1.0);
+  double h = reach(s, device ? pixel : 1.0, hatch);
   double x0 = centerline->min.x;
   double y0 = centerline->min.y;
   double x1 = centerline->max.x;
@@ -481,6 +483,16 @@ GSHSCENE_Result gshscene_stroke_bounds(const GSHSCENE_Resource * style, const GS
   b.min.z = b.max.z = 0.0;
   *out = b;
   return GSHSCENE_OK;
+}
+
+GSHSCENE_Result gshscene_stroke_bounds(const GSHSCENE_Resource * style, const GSHGEOM_Bounds * centerline,
+    const GSHGEOM_Map * composed, uint32_t unit, GSHGEOM_Bounds * out) {
+  return bounds_core(style, centerline, composed, unit, out, 0);
+}
+
+GSHSCENE_Result gshscene_hatch_bounds(const GSHSCENE_Resource * style, const GSHGEOM_Bounds * region, const GSHGEOM_Map * composed,
+    uint32_t unit, GSHGEOM_Bounds * out) {
+  return bounds_core(style, region, composed, unit, out, 1); /* HX15: the same outset, without a join */
 }
 
 /* --- a centerline's box (SK10, for the damage) ---------------------------------------------- */

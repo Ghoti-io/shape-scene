@@ -137,6 +137,8 @@ static GSHGEOM_Hash pattern_total; /* patterns (pattern.h): its own hash, so the
 static unsigned long pattern_count;
 static GSHGEOM_Hash clipunion_total; /* shapes story A3 (clip_union.h): its own hash, so the nine above are unchanged */
 static unsigned long clipunion_count;
+static GSHGEOM_Hash hatch_total; /* hatches (hatch.h): its own hash, so the nine above are unchanged */
+static unsigned long hatch_count;
 static GSHGEOM_Hash * acc = &total; /* where feed folds */
 static unsigned long * acc_count = &count;
 
@@ -3454,6 +3456,223 @@ static void pattern_section(void) {
   gshscene_store_destroy(store);
 }
 
+
+/* The hatches section (hatch.h; HX1 to HX3, HX9, HX14, HX15): random hatches through the store (equal content one handle, the result of
+ * every malformed one, the fields as read back), the notice predicate under random maps, the bounds under random maps, lists of fills
+ * painted with hatches folded through the test sink under several caps (its lines and the hash of its pieces, at the canonical map),
+ * and a retained scene of them with the damage of a change.  Its own pair after the others, so they never move. */
+static GSHSCENE_Paint hatch_paint_of(const GSHSCENE_Resource * hatch, double alpha) {
+  GSHSCENE_Paint p;
+  memset(&p, 0, sizeof p);
+  p.kind = GSHSCENE_PAINT_HATCH;
+  p.rgba[3] = alpha;
+  p.resource = hatch;
+  return p;
+}
+
+static void feed_hatch_render_without(const GSHSCENE_List * list, uint32_t cleared_flags) {
+  GSHSCENE_Dump_Sink_Config config;
+  gshscene_dump_sink_config_default(&config);
+  config.raster_caps.flags &= ~cleared_flags;
+  config.stream_caps.flags &= ~cleared_flags;
+  GSHSCENE_Sink * sink = NULL;
+  check(gshscene_dump_sink_create(NULL, NULL, &config, &sink), "hatch test sink");
+  GSHSCENE_Report * report = NULL;
+  check(gshscene_report_create(NULL, NULL, &report), "hatch report");
+  uint64_t written = 0;
+  GSHSCENE_Writer writer = {count_write, &written};
+  GSHSCENE_Target stream;
+  memset(&stream, 0, sizeof stream);
+  stream.kind = GSHSCENE_TARGET_STREAM;
+  stream.surface = &writer;
+  stream.unit = GSHSCENE_UNIT_MILLIMETER;
+  gshgeom_map_identity(2, &stream.map);
+  GSHSCENE_Render_Request request;
+  memset(&request, 0, sizeof request);
+  request.list = list;
+  request.target = &stream;
+  request.report = report;
+  for (int strict = 0; strict < 2; strict++) {
+    request.flags = strict ? GSHSCENE_RENDER_STRICT : 0;
+    feed_job(sink, &request);
+    feed(written);
+  }
+  gshscene_report_destroy(report);
+  check(gshscene_sink_destroy(sink), "destroy");
+}
+
+#define HX_PATHS 4
+#define HX_STYLES 3
+#define HX_HATCHES 36
+
+static void hatch_section(void) {
+  acc = &hatch_total;
+  acc_count = &hatch_count;
+  gshgeom_hash_init(&hatch_total);
+  GSHSCENE_Store * store = NULL;
+  check(gshscene_store_create(NULL, NULL, &store), "hatch store");
+  const GSHSCENE_Resource * paths[HX_PATHS];
+  for (int i = 0; i < HX_PATHS; i++) {
+    GSHGEOM_Path * path = NULL;
+    check(gshgeom_path_create(NULL, NULL, 2, &path) == GSHGEOM_OK ? GSHSCENE_OK : GSHSCENE_ERR_INTERNAL, "hatch path");
+    double x = (double)between(0, 8) / 2.0;
+    double y = (double)between(0, 8) / 2.0;
+    double w = (double)between(20, 60) / 2.0;
+    double h = (double)between(20, 60) / 2.0;
+    if (gshgeom_path_add_rect(path, x, y, w, h, 0, 0) != GSHGEOM_OK) {
+      fail("hatch rect");
+    }
+    if (i % 2 == 1 && gshgeom_path_add_rect(path, x + 3.0, y + 3.0, w / 2.0, h / 2.0, 1, 0) != GSHGEOM_OK) {
+      fail("hatch hole");
+    }
+    if (i == 3 && gshgeom_path_add_ellipse(path, x + w / 2.0, y + h / 2.0, w / 3.0, h / 3.0, 0, 0) != GSHGEOM_OK) {
+      fail("hatch ellipse");
+    }
+    check(gshscene_store_intern_path(store, path, &paths[i]), "hatch path intern");
+    gshgeom_path_destroy(path);
+  }
+  const GSHSCENE_Resource * styles[HX_STYLES];
+  for (int i = 0; i < HX_STYLES; i++) {
+    GSHSCENE_Stroke_Style st;
+    gshscene_stroke_style_init(&st);
+    st.width = (double)between(1, 12) / 4.0;
+    st.width_space = i == 1 ? GSHSCENE_STROKE_WIDTH_DEVICE : GSHSCENE_STROKE_WIDTH_LOCAL;
+    st.cap = (uint32_t)(i % 3);
+    check(gshscene_store_intern_stroke_style(store, &st, &styles[i]), "hatch style");
+  }
+  static const double angles[] = {0.0, 90.0, 45.0, 30.0, 135.0, 270.0, 17.0};
+  static const double dash_sets[][4] = {{2.0, -1.0, 0.0, 0.0}, {1.0, -0.5, 0.0, -0.5}, {0.0, -1.25, 0.0, 0.0}, {3.0, 0.0, -2.0, 0.0}};
+  static const unsigned dash_n[] = {2, 4, 2, 3};
+  const GSHSCENE_Resource * hatches[HX_HATCHES];
+  size_t hatch_n = 0;
+  for (unsigned i = 0; i < HX_HATCHES; i++) {
+    GSHSCENE_Hatch_Family fam[2];
+    unsigned nf = between(1, 2);
+    unsigned pattern[2];
+    for (unsigned k = 0; k < nf; k++) {
+      pattern[k] = between(0, 5);
+      fam[k].angle = angles[between(0, 6)];
+      fam[k].origin_x = (double)((int)between(0, 16) - 8) / 4.0;
+      fam[k].origin_y = (double)((int)between(0, 16) - 8) / 4.0;
+      fam[k].offset_along = (double)((int)between(0, 8) - 4) / 4.0;
+      fam[k].offset_across = (double)between(0, 12) / 4.0;
+      fam[k].dash_count = pattern[k] < 4 ? dash_n[pattern[k]] : 0;
+      fam[k].dashes = pattern[k] < 4 ? dash_sets[pattern[k]] : NULL;
+    }
+    GSHSCENE_Hatch h;
+    gshscene_hatch_init(&h);
+    h.style = styles[between(0, HX_STYLES - 1)];
+    h.family_count = nf;
+    h.families = fam;
+    h.nesting = between(0, 2);
+    h.angle_unit = between(0, 3) == 0 ? GSHGEOM_ANGLE_GRADIANS : GSHGEOM_ANGLE_DEGREES;
+    if (h.angle_unit == GSHGEOM_ANGLE_GRADIANS) {
+      for (unsigned k = 0; k < nf; k++) {
+        fam[k].angle = fam[k].angle * 10.0 / 9.0;
+      }
+    }
+    unsigned ink = between(0, 2);
+    h.ink.kind = ink == 0 ? GSHSCENE_PAINT_SOLID : (ink == 1 ? GSHSCENE_PAINT_FOREGROUND : GSHSCENE_PAINT_SOLID);
+    h.ink.rgba[0] = ink == 1 ? 0.0 : (double)between(0, 4) / 4.0;
+    h.ink.rgba[3] = (double)between(1, 4) / 4.0;
+    if (between(0, 5) == 0) {
+      h.map.m[0][0] = 2.0;
+      h.map.m[1][1] = 0.5;
+    }
+    // every sixth is malformed in one of the ways HX2 lists
+    unsigned bad = i % 6 == 5 ? between(0, 5) : 99;
+    if (bad == 0) {
+      fam[0].angle = 1.0 / (fam[0].origin_x - fam[0].origin_x);
+    } else if (bad == 1) {
+      h.nesting = 9;
+    } else if (bad == 2) {
+      h.family_count = 0;
+    } else if (bad == 3) {
+      fam[0].offset_across = 1e30;
+    } else if (bad == 4) {
+      gshgeom_map_identity(3, &h.map);
+    } else if (bad == 5) {
+      h.style = paths[0];
+    }
+    const GSHSCENE_Resource * out = NULL;
+    GSHSCENE_Result r = gshscene_store_intern_hatch(store, &h, &out);
+    feed((uint64_t)r);
+    if (r != GSHSCENE_OK) {
+      continue;
+    }
+    feed(gshscene_resource_hash(out));
+    GSHSCENE_Hatch back;
+    check(gshscene_resource_hatch(out, &back), "hatch read");
+    feed((uint64_t)back.family_count);
+    feed((uint64_t)back.nesting);
+    for (size_t k = 0; k < back.family_count; k++) {
+      feed(gshgeom_f64_bits(back.families[k].angle));
+      feed(gshgeom_f64_bits(back.families[k].offset_across));
+      feed((uint64_t)back.families[k].dash_count);
+    }
+    if (hatch_n < HX_HATCHES) {
+      hatches[hatch_n++] = out;
+    } else {
+      gshscene_resource_release(out);
+    }
+  }
+  // the notice and the bounds, under random maps
+  {
+    GSHSCENE_List * l = NULL;
+    check(gshscene_list_create(NULL, NULL, store, &l), "hatch list");
+    for (size_t i = 0; i < hatch_n && i < 12; i++) {
+      GSHGEOM_Map m;
+      gshgeom_map_scale(2, (double)between(0, 4) / 2.0, (double)between(1, 4) / 2.0, 1.0, &m);
+      GSHSCENE_Paint p = hatch_paint_of(hatches[i], (double)between(0, 4) / 4.0);
+      check(gshscene_list_fill(l, paths[between(0, HX_PATHS - 1)], &m, between(0, 1) ? GSHGEOM_FILL_EVEN_ODD : GSHGEOM_FILL_NONZERO, &p,
+                (int32_t)between(0, 2), 0.0), "hatch fill");
+      const GSHSCENE_Item * item = NULL;
+      check(gshscene_list_item(l, gshscene_list_count(l) - 1, &item), "hatch item");
+      GSHGEOM_Map target;
+      gshgeom_map_scale(2, (double)between(0, 3), 1.0, 1.0, &target);
+      feed((uint64_t)gshscene_hatch_notice(item, NULL, 0, &target));
+      feed((uint64_t)gshscene_hatch_notice(item, NULL, 0, NULL));
+      feed((uint64_t)gshscene_hatch_required(item, NULL, 0, NULL));
+      GSHGEOM_Bounds region, b;
+      memset(&region, 0, sizeof region);
+      region.min.x = -1.0;
+      region.min.y = -2.0;
+      region.max.x = 20.0;
+      region.max.y = 30.0;
+      GSHSCENE_Hatch hh;
+      check(gshscene_resource_hatch(hatches[i], &hh), "hatch read for bounds");
+      GSHSCENE_Result br = gshscene_hatch_bounds(hh.style, &region, &m, GSHSCENE_UNIT_PIXEL, &b);
+      feed((uint64_t)br);
+      if (br == GSHSCENE_OK) {
+        feed((uint64_t)b.empty);
+        feed(gshgeom_f64_bits(b.min.x));
+        feed(gshgeom_f64_bits(b.max.y));
+      }
+    }
+    check(gshscene_list_close(l), "close");
+    feed(gshscene_list_hash(l));
+    feed_render(l);
+    feed_hatch_render_without(l, GSHSCENE_CAP_HATCH);
+    feed_hatch_render_without(l, 0u);
+    gshscene_list_destroy(l);
+  }
+  for (size_t i = 0; i < hatch_n; i++) {
+    gshscene_resource_release(hatches[i]);
+  }
+  for (int i = 0; i < HX_STYLES; i++) {
+    gshscene_resource_release(styles[i]);
+  }
+  for (int i = 0; i < HX_PATHS; i++) {
+    gshscene_resource_release(paths[i]);
+  }
+  GSHSCENE_Store_Stats stats;
+  check(gshscene_store_stats(store, &stats), "hatch stats");
+  if (stats.live != 0) {
+    fail("a hatch resource is still live after every handle was released");
+  }
+  gshscene_store_destroy(store);
+}
+
 int main(void) {
   gshgeom_hash_init(&total);
   GSHSCENE_Store * store = NULL;
@@ -3655,5 +3874,8 @@ int main(void) {
   clipunion_section();
   printf("shape-scene.clipunion-hash %016" PRIx64 "\n", gshgeom_hash_value(&clipunion_total));
   printf("shape-scene.clipunion-count %lu\n", clipunion_count);
+  hatch_section();
+  printf("shape-scene.hatch-hash %016" PRIx64 "\n", gshgeom_hash_value(&hatch_total));
+  printf("shape-scene.hatch-count %lu\n", hatch_count);
   return 0;
 }

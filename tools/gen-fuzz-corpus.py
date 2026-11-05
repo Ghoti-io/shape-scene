@@ -36,7 +36,7 @@ OPS = ["LIST_CREATE", "FILL", "CLIP_PUSH", "CLIP_POP", "GROUP_PUSH", "GROUP_POP"
        "FILL_EX", "CLIP_PUSH_EX", "GROUP_PUSH_EX", "LIST_FOREGROUND", "NODE_PROPS", "EDIT_FOREGROUND", "LIST_PALETTE",
        "FILL_FIXED", "TRUNCATE", "EDIT_PALETTE", "INTERN_GRADIENT", "FILL_GRADIENT", "SCENE_GRADIENT", "GRADIENT_NODE",
        "COLOR_BOUND", "GROUP_PDF", "NODE_PDF", "INTERN_STYLE", "STROKE", "STROKE_NODE", "PLACEHOLDER", "PLACEHOLDER_NODE", "INTERN_IMAGE", "IMAGE_NOT_SHAPE", "IMAGE_PAINT",
-       "INTERN_MASK", "GROUP_MASK", "NODE_MASK", "INTERN_PRIMITIVE", "INTERN_PATTERN", "PATTERN_FILL", "PATTERN_NODE"]
+       "INTERN_MASK", "GROUP_MASK", "NODE_MASK", "INTERN_PRIMITIVE", "INTERN_PATTERN", "PATTERN_FILL", "PATTERN_NODE", "INTERN_HATCH"]
 OP = {name: i for i, name in enumerate(OPS)}
 
 BIASED = {
@@ -48,7 +48,7 @@ BIASED = {
     "LIST_PALETTE": 2, "FILL_FIXED": 4, "TRUNCATE": 2, "EDIT_PALETTE": 2, "INTERN_GRADIENT": 4, "FILL_GRADIENT": 4,
     "SCENE_GRADIENT": 4, "GRADIENT_NODE": 5, "INTERN_STYLE": 5, "STROKE": 4, "STROKE_NODE": 4,
     "INTERN_IMAGE": 6, "IMAGE_NOT_SHAPE": 2, "IMAGE_PAINT": 6, "INTERN_MASK": 8, "GROUP_MASK": 6, "NODE_MASK": 3,
-    "INTERN_PRIMITIVE": 5, "INTERN_PATTERN": 8, "PATTERN_FILL": 6, "PATTERN_NODE": 3,
+    "INTERN_PRIMITIVE": 5, "INTERN_PATTERN": 8, "PATTERN_FILL": 6, "PATTERN_NODE": 3, "INTERN_HATCH": 13,
 }
 
 BIASED_FILES = 160
@@ -393,6 +393,11 @@ def scripted():
     def node(va, vb, place, iso, tr):
         return bytes([OP["NODE_MASK"], va, vb, place, iso, tr])
     out["scripted-mask-nodes.bin"] = bytes(bytearray([0xFF, 0xFF]) + node(1, 3, 1, 1, 1) + node(0, 0, 0, 0, 0) + node(2, 5, 2, 2, 2) + node(4, 1, 3, 0, 1))
+    # Masks-images-patterns stories R1 and H1.  A tinted pattern (all picks zero but the tint: a picture of the pool, the origin, a cell of 1 by 1), and a hatch painted on a stroke, which does not take one: the list and the scene a run starts with, a style of the pool (the scene being there, its first pick is the store), then INTERN_HATCH with one
+    # family at 45 degrees, a spacing of 1.5, a pen of width 1, the region of slot 0 and mode 2 (the stroke).
+    out["scripted-pattern-tinted.bin"] = bytes(bytearray([0xFF, 0xFF, OP["INTERN_PATTERN"]]) + bytes(9) + bytes([1, 0]))
+    out["scripted-hatch-stroke.bin"] = bytes(bytearray([0xFF, 0xFF, OP["INTERN_STYLE"]]) + bytes(13) + bytes([1])
+                                             + bytes([OP["INTERN_HATCH"], 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 2, 0, 2]))
     out["scripted-images.bin"] = bytes(bytearray([0xFF, 0xFF]) + images)
     # The same under a store whose bytes are bounded (b1 = 0x40: max_bytes 1500): an image that does not fit is refused by
     # the store's limit, and one that does is interned.

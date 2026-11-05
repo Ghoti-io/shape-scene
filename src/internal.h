@@ -144,6 +144,14 @@ struct GSHSCENE_Resource {
       size_t count;
     } clipunion;
     struct {
+      GSHSCENE_Hatch h;                   /* canonical (HX1); the style, the families and their elements point at the copies below */
+      GSHSCENE_Hatch_Family * families;   /* family_count of them */
+      double * dashes;                    /* every family's elements, in order; NULL for none */
+      const GSHSCENE_Resource * style;    /* retained */
+      int foreground;                     /* the ink is a foreground paint */
+      uint32_t palette_need;              /* the ink's palette entry plus one; 0 for none */
+    } hatch;
+    struct {
       GSHSCENE_Mask m;                    /* canonical (MK1); the picture and the transfer's arrays point at the copies below */
       GSHSCENE_Transfer_Piece * pieces;   /* the stitching's pieces, NULL for none */
       double * samples;                   /* every table's samples, the top level's first, then each piece's; NULL for none */
@@ -426,6 +434,22 @@ void gshscene_mask_free(GSHSCENE_Resource * resource);
 
 /** The payload of a mask's dump (mask.h, MK13); negative on failure. */
 int gshscene_mask_dump(const GSHSCENE_Resource * resource, FILE * out);
+
+/* --- hatch.c ----------------------------------------------------------------- */
+
+/** Whether a hatch resource has the canonical content @p source (a hatch.c Source). */
+int gshscene_hatch_matches(const GSHSCENE_Resource * resource, const void * source);
+
+/** Free a hatch's copies and release its style. */
+void gshscene_hatch_free(GSHSCENE_Resource * resource);
+
+/** The payload of a hatch's dump (hatch.h, HX2): its two kinds of line; negative on failure. */
+int gshscene_hatch_dump(const GSHSCENE_Resource * resource, FILE * out);
+
+/** The stroke style a hatch resource holds (hatch.c); NULL for another kind. */
+const GSHSCENE_Resource * gshscene_hatch_style(const GSHSCENE_Resource * resource);
+
+/** HX9: 1 when the hatch's own map is singular. */
 
 /* --- convert.c -------------------------------------------------------------- */
 

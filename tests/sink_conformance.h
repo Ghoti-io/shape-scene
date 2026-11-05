@@ -4344,4 +4344,168 @@ TEST_P(SinkConformance, S24_AUnionClipIsDrawnOrRefusedAsTheCapsSayAndItsBlockIsS
   }
 }
 
+/* --- S23: hatches (hatch.h, HX14) ------------------------------------------------------------------ */
+
+namespace sinkconf {
+
+/** A hatch of two families (a solid one and a dashed one with a dot) over the stroke style @p style, held by @p s. */
+inline const GSHSCENE_Resource * make_hatch(Scene & s, const GSHSCENE_Resource * style, uint32_t nesting = 0) {
+  static const double dashes[3] = {3.0, -1.0, 0.0};
+  GSHSCENE_Hatch_Family fam[2];
+  fam[0] = {45.0, 0.0, 0.0, 0.0, 3.0, 0, nullptr};
+  fam[1] = {0.0, 0.0, 0.0, 0.5, 4.0, 3, dashes};
+  GSHSCENE_Hatch h;
+  gshscene_hatch_init(&h);
+  h.style = style;
+  h.family_count = 2;
+  h.families = fam;
+  h.nesting = nesting;
+  const GSHSCENE_Resource * r = nullptr;
+  EXPECT_EQ(gshscene_store_intern_hatch(s.store, &h, &r), GSHSCENE_OK);
+  s.held.push_back(r);
+  return r;
+}
+
+inline const GSHSCENE_Resource * make_pen(Scene & s, uint32_t cap, uint32_t space = GSHSCENE_STROKE_WIDTH_LOCAL) {
+  GSHSCENE_Stroke_Style st;
+  gshscene_stroke_style_init(&st);
+  st.width = 0.5;
+  st.cap = cap;
+  st.width_space = space;
+  const GSHSCENE_Resource * r = nullptr;
+  EXPECT_EQ(gshscene_store_intern_stroke_style(s.store, &st, &r), GSHSCENE_OK);
+  s.held.push_back(r);
+  return r;
+}
+
+/** A list of three fills: items 0 and 2 plain, item 1 painted with @p hatch. */
+inline GSHSCENE_List * hatched_list(Scene & s, const GSHSCENE_Resource * hatch) {
+  GSHSCENE_Paint red = solid(1, 0, 0);
+  GSHSCENE_Paint p = solid(0, 0, 0, 1);
+  p.kind = GSHSCENE_PAINT_HATCH;
+  p.resource = hatch;
+  GSHSCENE_List * l = s.open();
+  EXPECT_EQ(gshscene_list_fill(l, s.sq(1, 1, 6), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_fill(l, s.sq(10, 10, 30), nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_fill(l, s.sq(40, 1, 6), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  return l;
+}
+
+}  // namespace sinkconf
+
+// S23, HX14: a fill painted with a hatch is drawn by a sink that says so and refused, `HATCH`, by one that does not: alone, strict
+// failing before the target is touched, and every other unit drawn.  A sink that draws it is refused for its pen only as a stroke is.
+TEST_P(SinkConformance, S23_AFillPaintedWithAHatchIsDrawnOrRefusedAsTheFlagSays) {
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    GSHSCENE_List * l = hatched_list(s, make_hatch(s, make_pen(s, GSHSCENE_STROKE_CAP_BUTT)));
+    auto out = make_surface(kind);
+    ReportRef r;
+    Outcome o = run(f(), sink.sink, request_for(l, *out, r.report));
+    EXPECT_EQ(o.result, GSHSCENE_OK);
+    auto got = chain_entries(r.report);
+    bool draws = (caps.flags & GSHSCENE_CAP_HATCH) != 0;
+    size_t hatch_entries = 0;
+    for (const auto & e : got) {
+      if (e.reason == GSHSCENE_REASON_HATCH) {
+        hatch_entries++;
+        EXPECT_EQ(e.entry_class, GSHSCENE_ENTRY_REFUSED);
+        EXPECT_EQ(e.chain, std::vector<size_t>{1}) << "the unit itself";
+      }
+    }
+    EXPECT_EQ(hatch_entries, draws ? 0u : 1u);
+    EXPECT_EQ(o.status.units_total, gshscene_list_expansion(l));
+    auto strict = make_surface(kind);
+    uint64_t before = strict->snapshot();
+    ReportRef sr;
+    GSHSCENE_Render_Request req = request_for(l, *strict, sr.report);
+    req.flags = GSHSCENE_RENDER_STRICT;
+    GSHSCENE_Result want = draws ? (got.empty() ? GSHSCENE_OK : GSHSCENE_ERR_REFUSED) : GSHSCENE_ERR_REFUSED;
+    EXPECT_EQ(run(f(), sink.sink, req).result, want);
+    if (!draws) {
+      EXPECT_EQ(strict->snapshot(), before) << "strict touched the target";
+    }
+  }
+}
+
+// S23, HX9: a hatch fill that draws nothing (a spacing of zero, a width of zero, a singular map) is noticed and is no refusal, whatever
+// the sink; strict is satisfied.
+TEST_P(SinkConformance, S23_AHatchFillThatDrawsNothingIsNoticedAndNeverRefused) {
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    if (!(caps.flags & GSHSCENE_CAP_HATCH)) {
+      continue;
+    }
+    GSHSCENE_Hatch_Family fam = {0.0, 0.0, 0.0, 0.0, 0.0, 0, nullptr};
+    GSHSCENE_Hatch h;
+    gshscene_hatch_init(&h);
+    h.style = make_pen(s, GSHSCENE_STROKE_CAP_BUTT);
+    h.family_count = 1;
+    h.families = &fam;
+    const GSHSCENE_Resource * degenerate = nullptr;
+    ASSERT_EQ(gshscene_store_intern_hatch(s.store, &h, &degenerate), GSHSCENE_OK);
+    s.held.push_back(degenerate);
+    GSHSCENE_List * l = hatched_list(s, degenerate);
+    auto out = make_surface(kind);
+    ReportRef r;
+    EXPECT_EQ(run(f(), sink.sink, request_for(l, *out, r.report)).result, GSHSCENE_OK);
+    size_t notices = 0;
+    for (const auto & e : chain_entries(r.report)) {
+      if (e.entry_class == GSHSCENE_ENTRY_NOTICE) {
+        notices++;
+        EXPECT_EQ(e.reason, GSHSCENE_REASON_HATCH_DEGENERATE);
+      }
+      EXPECT_NE(e.entry_class, GSHSCENE_ENTRY_REFUSED);
+    }
+    EXPECT_EQ(notices, 1u);
+    auto strict = make_surface(kind);
+    ReportRef sr;
+    GSHSCENE_Render_Request req = request_for(l, *strict, sr.report);
+    req.flags = GSHSCENE_RENDER_STRICT;
+    EXPECT_EQ(run(f(), sink.sink, req).result, GSHSCENE_OK) << "a notice is not a refusal";
+  }
+}
+
+// S23, HX14: a sink that strokes the pieces and cannot express the pen (a square cap it lacks) refuses the fill, `STROKE_STYLE`, naming
+// the missing feature; a sink that expands needs nothing of it.  Either way the refusal is the stroke's, never `HATCH`.
+TEST_P(SinkConformance, S23_ThePenOfAHatchIsRefusedAsAStrokesIsAndNeverAsAHatch) {
+  int checked = 0;
+  for (uint32_t kind : f()->kinds) {
+    SinkRef sink(make());
+    Scene s;
+    auto probe = make_surface(kind);
+    GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+    if (!(caps.flags & GSHSCENE_CAP_HATCH)) {
+      continue;
+    }
+    GSHSCENE_List * l = hatched_list(s, make_hatch(s, make_pen(s, GSHSCENE_STROKE_CAP_SQUARE, GSHSCENE_STROKE_WIDTH_DEVICE)));
+    auto out = make_surface(kind);
+    ReportRef r;
+    EXPECT_EQ(run(f(), sink.sink, request_for(l, *out, r.report)).result, GSHSCENE_OK);
+    const uint32_t need = GSHSCENE_STROKE_NATIVE_CAP_SQUARE | GSHSCENE_STROKE_NATIVE_WIDTH_DEVICE | GSHSCENE_STROKE_NATIVE_DEGENERATE_DRAW;
+    const bool lacks = !(caps.flags & GSHSCENE_CAP_STROKE_EXPAND) && (need & ~caps.stroke_native) != 0;
+    size_t stroke_style = 0;
+    for (const auto & e : entries(r.report)) {
+      EXPECT_NE(e.reason, GSHSCENE_REASON_HATCH);
+      if (e.entry_class == GSHSCENE_ENTRY_REFUSED && e.reason == GSHSCENE_REASON_STROKE_STYLE) {
+        stroke_style++;
+        EXPECT_EQ((uint32_t)e.second, need & ~caps.stroke_native) << "the missing features, named";
+      }
+    }
+    EXPECT_EQ(stroke_style, lacks ? 1u : 0u);
+    checked++;
+  }
+  if (checked == 0) {
+    GTEST_SKIP() << "the sink draws no hatch";
+  }
+}
+
+
 #endif /* GHOTI_IO_GSHSCENE_TEST_SINK_CONFORMANCE_H */
