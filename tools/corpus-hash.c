@@ -3622,10 +3622,16 @@ static void hatch_section(void) {
     check(gshscene_list_create(NULL, NULL, store, &l), "hatch list");
     for (size_t i = 0; i < hatch_n && i < 12; i++) {
       GSHGEOM_Map m;
-      gshgeom_map_scale(2, (double)between(0, 4) / 2.0, (double)between(1, 4) / 2.0, 1.0, &m);
-      GSHSCENE_Paint p = hatch_paint_of(hatches[i], (double)between(0, 4) / 4.0);
-      check(gshscene_list_fill(l, paths[between(0, HX_PATHS - 1)], &m, between(0, 1) ? GSHGEOM_FILL_EVEN_ODD : GSHGEOM_FILL_NONZERO, &p,
-                (int32_t)between(0, 2), 0.0), "hatch fill");
+      /* one draw to a statement: the order in which a call's arguments are evaluated is the compiler's, and differs between targets */
+      const double sx = (double)between(0, 4) / 2.0;
+      const double sy = (double)between(1, 4) / 2.0;
+      gshgeom_map_scale(2, sx, sy, 1.0, &m);
+      const double alpha = (double)between(0, 4) / 4.0;
+      GSHSCENE_Paint p = hatch_paint_of(hatches[i], alpha);
+      const unsigned which = between(0, HX_PATHS - 1);
+      const GSHGEOM_Fill_Rule rule = between(0, 1) ? GSHGEOM_FILL_EVEN_ODD : GSHGEOM_FILL_NONZERO;
+      const int32_t layer = (int32_t)between(0, 2);
+      check(gshscene_list_fill(l, paths[which], &m, rule, &p, layer, 0.0), "hatch fill");
       const GSHSCENE_Item * item = NULL;
       check(gshscene_list_item(l, gshscene_list_count(l) - 1, &item), "hatch item");
       GSHGEOM_Map target;
