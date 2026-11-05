@@ -448,7 +448,7 @@ TEST(PalettePaint, AListTakesEntriesUpTo0xFFFEAndNoKindPastTheLast) {
   GSHSCENE_Paint foreground = entry_paint(0xFFFFu);
   EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &foreground, 0, 0), GSHSCENE_ERR_INVALID)
       << "0xFFFF is lowered to the foreground by the fixed paint, and refused by the double one";
-  for (uint32_t kind : {(uint32_t)GSHSCENE_PAINT_KIND_COUNT, 9u, 0xFFFFFFFFu}) {
+  for (uint32_t kind : {(uint32_t)GSHSCENE_PAINT_HATCH, (uint32_t)GSHSCENE_PAINT_KIND_COUNT, 9u, 0xFFFFFFFFu}) {
     GSHSCENE_Paint unknown = solid(0, 0, 0, 1);
     unknown.kind = (GSHSCENE_Paint_Kind)kind;
     EXPECT_EQ(gshscene_list_fill(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, &unknown, 0, 0), GSHSCENE_ERR_INVALID)

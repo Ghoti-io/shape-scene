@@ -409,7 +409,9 @@ typedef struct GSHSCENE_Target {
 #define GSHSCENE_CAP_IMAGE_FILTER_SPACES (UINT32_C(1) << 14)
 /** Patterns are drawn as pattern.h states them (PT13, S22); without it the planning pass refuses a unit painted with one, `PATTERN`. */
 #define GSHSCENE_CAP_PATTERN (UINT32_C(1) << 15)
-#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 16) - 1) ///< Every flag defined.
+/** A sink draws hatch fills (S23); without it the planning pass refuses a hatch fill, `HATCH`.  Reserved. */
+#define GSHSCENE_CAP_HATCH (UINT32_C(1) << 16)
+#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 17) - 1) ///< Every flag defined.
 /** @} */
 
 /**

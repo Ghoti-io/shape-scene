@@ -172,7 +172,7 @@ static GSHSCENE_Result canonical(const GSHSCENE_Store * store, const GSHSCENE_Gr
   for (size_t i = 0; i < in->stop_count; i++) {
     const GSHSCENE_Gradient_Stop * s = &in->stops[i];
     if (!gshscene_finite(s->offset) || s->color.kind == GSHSCENE_PAINT_GRADIENT || s->color.kind == GSHSCENE_PAINT_IMAGE ||
-        s->color.kind == GSHSCENE_PAINT_PATTERN) {
+        s->color.kind == GSHSCENE_PAINT_PATTERN || s->color.kind == GSHSCENE_PAINT_HATCH) {
       return GSHSCENE_ERR_INVALID;
     }
     result = gshscene_list_canonical_paint_valid(store, &s->color, &stops[i].color);

@@ -139,6 +139,10 @@ const char * gshscene_reason_string(GSHSCENE_Reason reason) {
       return "pattern-degenerate";
     case GSHSCENE_REASON_PATTERN_RESAMPLED:
       return "pattern-resampled";
+    case GSHSCENE_REASON_HATCH:
+      return "hatch";
+    case GSHSCENE_REASON_HATCH_DEGENERATE:
+      return "hatch-degenerate";
     case GSHSCENE_REASON_COUNT:
       break;
   }

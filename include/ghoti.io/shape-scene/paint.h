@@ -332,6 +332,12 @@ typedef enum GSHSCENE_Paint_Kind {
    * plain colors and are never a pattern.
    */
   GSHSCENE_PAINT_PATTERN = 5,
+  /**
+   * A hatch resource of the list's store: `resource` names it, `rgba[0..2]` zero, `rgba[3]` its
+   * alpha multiplier, the space zero, the entry zero.  The value is reserved; until the hatch resource exists a record with this
+   * kind is `ERR_INVALID`, as any kind this build does not define is.
+   */
+  GSHSCENE_PAINT_HATCH = 6,
   GSHSCENE_PAINT_KIND_COUNT    ///< Closes the enum.
 } GSHSCENE_Paint_Kind;
 

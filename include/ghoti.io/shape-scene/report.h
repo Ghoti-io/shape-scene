@@ -170,6 +170,8 @@ typedef enum GSHSCENE_Reason {
   GSHSCENE_REASON_PATTERN = 36,       ///< Refused, per unit: a fill or stroke painted with a pattern the sink does not draw, or a pattern whose tile holds a unit the sink refuses (pattern.h, PT13, S22).
   GSHSCENE_REASON_PATTERN_DEGENERATE = 37, ///< Notice, per unit: the pattern has a size or a step of 0, so it draws nothing (pattern.h, PT10).
   GSHSCENE_REASON_PATTERN_RESAMPLED = 38,  ///< Approximated, per unit: the sink resamples the tile instead of drawing the lattice of copies (pattern.h, PT13).
+  GSHSCENE_REASON_HATCH = 39,         ///< Refused, per unit: a fill painted with a hatch the sink does not draw (reserved, S23).
+  GSHSCENE_REASON_HATCH_DEGENERATE = 40, ///< Notice, per unit: a family of the hatch has an `offset_across` of 0, so it draws nothing (reserved).
   GSHSCENE_REASON_COUNT               ///< Closes the enum.
 } GSHSCENE_Reason;
 

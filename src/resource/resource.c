@@ -64,6 +64,8 @@ const char * gshscene_resource_kind_string(GSHSCENE_Resource_Kind kind) {
       return "mask";
     case GSHSCENE_RESOURCE_PATTERN:
       return "pattern";
+    case GSHSCENE_RESOURCE_HATCH:
+      return "hatch";
     case GSHSCENE_RESOURCE_KIND_COUNT:
       break;
   }

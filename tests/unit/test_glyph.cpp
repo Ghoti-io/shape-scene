@@ -134,7 +134,7 @@ TEST(Face, TheKindsAndConstantsArePinned) {
   EXPECT_EQ((int)GSHSCENE_REASON_GLYPH_UNAVAILABLE, 18);
   EXPECT_EQ((int)GSHSCENE_REASON_FACE_UNBOUND, 19);
   EXPECT_EQ((int)GSHSCENE_REASON_PALETTE_ENTRY, 20);
-  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 39)
+  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 41)
       << "S19 (color-paint story P3) added three refusals of PDF's group fields, SK11 and SK8 (strokes story S1) two, "
          "S20's refusal of a stroked run (strokes story S4) one, the placeholder (color-paint story P5, PH4) one, and S21's image "
          "refusal and two approximations (masks-images-patterns story I2) three, and M1's refusal of a mask feature one, and a pattern's refusal, notice and approximation three";
