@@ -385,17 +385,27 @@ int gshscene_pattern_dump(const GSHSCENE_Resource * resource, FILE * out) {
 
 /* --- the lattice (PT5, PT7) ---------------------------------------------------------------- */
 
+/**
+ * The double of an index of magnitude at most 2^53 (exact), without a 64-bit-integer-to-double instruction: on i686 that is an x87 one (fild),
+ * which the determinism gate refuses.  The high half is a signed 32-bit integer and the low half an unsigned one, each converted through SSE2.
+ */
+static double index_to_double(int64_t v) {
+  const int32_t hi = (int32_t)(v >> 32);
+  const uint32_t lo = (uint32_t)((uint64_t)v & 0xffffffffu);
+  return (double)hi * 4294967296.0 + (double)lo;
+}
+
 GSHSCENE_Result gshscene_pattern_cell(const GSHSCENE_Pattern * pattern, int64_t i, int64_t j, double out[4]) {
   if (!pattern || !out || i < -GSHSCENE_PATTERN_INDEX_MAX || i > GSHSCENE_PATTERN_INDEX_MAX || j < -GSHSCENE_PATTERN_INDEX_MAX ||
       j > GSHSCENE_PATTERN_INDEX_MAX) {
     return GSHSCENE_ERR_INVALID;
   }
   /* The index is an integer below 2^53, so it is exact as a double; the edge is one product and one sum, whatever the index. */
-  double left = pattern->x + (double)i * pattern->x_step;
-  double top = pattern->y + (double)j * pattern->y_step;
+  double left = pattern->x + index_to_double(i) * pattern->x_step;
+  double top = pattern->y + index_to_double(j) * pattern->y_step;
   /* Abutting cells name one double for their shared edge: the next cell's left, not this left plus the width. */
-  double right = pattern->x_step == pattern->w ? pattern->x + (double)(i + 1) * pattern->x_step : left + pattern->w;
-  double bottom = pattern->y_step == pattern->h ? pattern->y + (double)(j + 1) * pattern->y_step : top + pattern->h;
+  double right = pattern->x_step == pattern->w ? pattern->x + index_to_double(i + 1) * pattern->x_step : left + pattern->w;
+  double bottom = pattern->y_step == pattern->h ? pattern->y + index_to_double(j + 1) * pattern->y_step : top + pattern->h;
   out[0] = left;
   out[1] = top;
   out[2] = right;
