@@ -135,6 +135,8 @@ static GSHGEOM_Hash primitive_total; /* named primitives (primitive.h): its own 
 static unsigned long primitive_count;
 static GSHGEOM_Hash pattern_total; /* patterns (pattern.h): its own hash, so the eight above are unchanged */
 static unsigned long pattern_count;
+static GSHGEOM_Hash clipunion_total; /* shapes story A3 (clip_union.h): its own hash, so the nine above are unchanged */
+static unsigned long clipunion_count;
 static GSHGEOM_Hash * acc = &total; /* where feed folds */
 static unsigned long * acc_count = &count;
 
@@ -2926,6 +2928,143 @@ static void primitive_section(void) {
 }
 
 
+/* The clip-union section (clip_union.h; CU1 to CU17): random unions of rectangles, paths with curves and outline runs under random
+ * maps (the result of every intern, the canonical members read back in order, the resource hash, the list hash of a clip push and
+ * of its one-member collapse, the dump hash), the predicate's verdict under random instance and target maps (disjoint, comparisons,
+ * the pair), and the planning pass's disposition under the three caps.  Its own pair after the others, so they never move. */
+static void gcheck(GSHGEOM_Result r, const char * what) {
+  if (r != GSHGEOM_OK) {
+    fail(what);
+  }
+}
+
+static void clipunion_section(void) {
+  acc = &clipunion_total;
+  acc_count = &clipunion_count;
+  gshgeom_hash_init(&clipunion_total);
+  GSHSCENE_Store * store = NULL;
+  check(gshscene_store_create(NULL, NULL, &store), "clip union store");
+  const GSHSCENE_Resource * paths[24];
+  for (unsigned i = 0; i < 24; i++) {
+    GSHGEOM_Path * path = NULL;
+    gcheck(gshgeom_path_create(NULL, NULL, 2, &path), "clip union path");
+    const double x = (double)between(0, 40), y = (double)between(0, 40), w = (double)between(1, 12) / 4.0, h = (double)between(1, 12) / 4.0;
+    GSHGEOM_Point a = {x, y, 0.0}, b = {x + w, y, 0.0}, c = {x + w, y + h, 0.0}, d = {x, y + h, 0.0};
+    gcheck(gshgeom_path_move_to(path, a), "clip union move");
+    gcheck(gshgeom_path_line_to(path, b), "clip union line");
+    if (i % 3 == 1) {
+      GSHGEOM_Point ctl = {x + w + 1.5, y + h / 2.0, 0.0};
+      gcheck(gshgeom_path_quadratic_to(path, ctl, c), "clip union quadratic");
+    } else {
+      gcheck(gshgeom_path_line_to(path, c), "clip union line");
+    }
+    gcheck(gshgeom_path_line_to(path, d), "clip union line");
+    gcheck(gshgeom_path_close(path), "clip union close");
+    check(gshscene_store_intern_path(store, path, &paths[i]), "clip union path intern");
+    gshgeom_path_destroy(path);
+  }
+  for (unsigned round = 0; round < 240; round++) {
+    const unsigned n = between(0, 7);
+    GSHSCENE_Clip_Member members[8];
+    memset(members, 0, sizeof members);
+    for (unsigned k = 0; k < n; k++) {
+      members[k].resource = paths[between(0, 23)];
+      members[k].rule = between(0, 9) == 0 ? (GSHGEOM_Fill_Rule)7 : (GSHGEOM_Fill_Rule)(between(0, 1));
+      if (between(0, 2) == 0) {
+        const double tx = (double)between(0, 16) / 4.0, ty = (double)between(0, 16) / 4.0;
+        gcheck(gshgeom_map_translate(2, tx, ty, 0.0, &members[k].map), "clip union member map");
+      }
+    }
+    const GSHSCENE_Resource * u = NULL;
+    GSHSCENE_Result r = gshscene_store_intern_clip_union(store, members, n, &u);
+    feed((uint64_t)r);
+    if (r != GSHSCENE_OK) {
+      continue;
+    }
+    const size_t distinct = gshscene_resource_clip_union_count(u);
+    feed((uint64_t)distinct);
+    feed(gshscene_resource_hash(u));
+    for (size_t i = 0; i < distinct; i++) {
+      GSHSCENE_Clip_Member m;
+      check(gshscene_resource_clip_union_member(u, i, &m), "clip union member");
+      feed(gshscene_resource_hash(m.resource));
+      feed(gshgeom_map_hash(&m.map));
+      feed((uint64_t)m.rule);
+    }
+    /* the same members in the reverse order and doubled are one handle */
+    GSHSCENE_Clip_Member rev[16];
+    for (unsigned k = 0; k < n; k++) {
+      rev[k] = members[n - 1 - k];
+      rev[n + k] = members[k];
+    }
+    const GSHSCENE_Resource * again = NULL;
+    check(gshscene_store_intern_clip_union(store, rev, 2 * n, &again), "clip union again");
+    feed((uint64_t)(again == u));
+    gshscene_resource_release(again);
+    /* a clip push of it under a map: the list hash (a one-member union collapses to the single clip) and the dump hash */
+    GSHSCENE_List * list = NULL;
+    check(gshscene_list_create(NULL, NULL, store, &list), "clip union list");
+    GSHGEOM_Map placement;
+    gcheck(gshgeom_map_translate(2, (double)between(0, 8), (double)between(0, 8), 0.0, &placement), "clip union placement");
+    check(gshscene_list_clip_push(list, u, &placement, (GSHGEOM_Fill_Rule)between(0, 1), (int32_t)between(0, 3), 0.0), "clip union push");
+    check(gshscene_list_clip_pop(list), "clip union pop");
+    check(gshscene_list_close(list), "clip union close list");
+    feed(gshscene_list_hash(list));
+    const GSHSCENE_Item * item = NULL;
+    check(gshscene_list_item(list, 0, &item), "clip union item");
+    feed((uint64_t)gshscene_resource_kind(item->resource));
+    if (gshscene_resource_kind(item->resource) == GSHSCENE_RESOURCE_CLIP_UNION) {
+      /* the predicate under an instance map, a target map and neither */
+      GSHGEOM_Map instance, target;
+      const double sh[4] = {1.0, (double)between(0, 3) * 0.5, 0.0, 1.0}, z[2] = {0.0, 0.0};
+      gcheck(gshgeom_map_from_matrix(2, sh, z, &instance), "clip union instance");
+      gcheck(gshgeom_map_translate(2, (double)between(0, 5), 0.0, 0.0, &target), "clip union target");
+      for (unsigned variant = 0; variant < 3; variant++) {
+        GSHSCENE_Union_Verdict v;
+        check(gshscene_clip_union_disjoint(item, variant == 1 ? &instance : NULL, variant == 1 ? 1 : 0, variant == 2 ? &target : NULL, &v),
+            "clip union verdict");
+        feed((uint64_t)v.disjoint);
+        feed(v.tests);
+        feed((uint64_t)v.first);
+        feed((uint64_t)v.second);
+      }
+      static const uint32_t cap_sets[3] = {GSHSCENE_CAP_CLIP_AA, GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_CLIP_UNION,
+          GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL};
+      for (unsigned c = 0; c < 3; c++) {
+        GSHSCENE_Sink_Caps caps;
+        memset(&caps, 0, sizeof caps);
+        caps.item_kinds = UINT32_C(0xffffffff);
+        caps.flags = cap_sets[c];
+        GSHSCENE_Disposition disp = gshscene_caps_disposition(&caps, item, &instance, 1, NULL, NULL, NULL);
+        feed((uint64_t)disp.entry_class);
+        feed((uint64_t)disp.reason);
+        feed(disp.detail);
+      }
+    }
+    FILE * f = tmpfile();
+    if (!f) {
+      fail("clip union dump file");
+    }
+    check(gshscene_list_dump(list, f), "clip union dump");
+    rewind(f);
+    GSHGEOM_Hash dh;
+    gshgeom_hash_init(&dh);
+    unsigned char chunk[512];
+    size_t got;
+    while ((got = fread(chunk, 1, sizeof chunk, f)) > 0) {
+      gshgeom_hash_bytes(&dh, chunk, got);
+    }
+    fclose(f);
+    feed(gshgeom_hash_value(&dh));
+    gshscene_list_destroy(list);
+    gshscene_resource_release(u);
+  }
+  for (unsigned i = 0; i < 24; i++) {
+    gshscene_resource_release(paths[i]);
+  }
+  gshscene_store_destroy(store);
+}
+
 /* The patterns section (pattern.h; PT1 to PT14): random patterns over random tiles through the store (equal content one handle, the
  * result of every malformed one, the fields as read back, each pattern's nearest neighbor), the position of copies at indexes
  * from 0 to a million and the shared edge of abutting cells, the notice predicate under random maps, a chain of nested patterns up
@@ -3508,5 +3647,8 @@ int main(void) {
   pattern_section();
   printf("shape-scene.pattern-hash %016" PRIx64 "\n", gshgeom_hash_value(&pattern_total));
   printf("shape-scene.pattern-count %lu\n", pattern_count);
+  clipunion_section();
+  printf("shape-scene.clipunion-hash %016" PRIx64 "\n", gshgeom_hash_value(&clipunion_total));
+  printf("shape-scene.clipunion-count %lu\n", clipunion_count);
   return 0;
 }

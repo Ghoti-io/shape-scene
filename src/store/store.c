@@ -71,6 +71,9 @@ GSHSCENE_Result gshscene_store_create_with_index_hash(const GSHSCENE_Allocator *
   if (!out) {
     return GSHSCENE_ERR_INVALID;
   }
+  if (limits && limits->max_clip_members > GSHSCENE_CLIP_MEMBERS_CEILING) {
+    return GSHSCENE_ERR_INVALID; /* CU9: the predicate's scratch is sized by the ceiling */
+  }
   if (!alloc) {
     alloc = gshscene_allocator_default();
   }

@@ -443,7 +443,17 @@ GSHSCENE_API GSHSCENE_Result gshscene_list_stroke(GSHSCENE_List * list, const GS
 GSHSCENE_API GSHSCENE_Result gshscene_list_placeholder(GSHSCENE_List * list, uint16_t source, uint16_t code,
     uint32_t approximated, const double * box, const GSHGEOM_Map * map, int32_t layer, double depth);
 
-/** @brief Begin a clip: the region of a path or glyph run, under @p map, by @p rule; its layer and depth order it as a unit (N11). */
+/**
+ * @brief Begin a clip: the region of a path or glyph run, or of a clip union (clip_union.h), under @p map, by @p rule; its layer and
+ *        depth order it as a unit (N11).
+ *
+ * A union as @p resource is the union of its members' regions, each under the composition of @p map after the member's own map and by
+ * the member's own rule: @p rule is checked as any rule is and stored as nonzero, so two spellings of one union are one item. A union of
+ * exactly one member is recorded as the single clip push of that member (the composed map, the member's rule), so a list never holds
+ * a one-member union and is equal, hash-equal and dump-equal to the list that records the single clip. A union of two or more is an item
+ * whose hash is a clip push's (the resource's content hash, the map's hash, the rule, the layer and the depth); its dump line is
+ * `C res=clip-union:<hash> map=<hash> rule=0 layer=N depth=<hex>`.  A union counts as one clip for `max_depth`.
+ */
 GSHSCENE_API GSHSCENE_Result gshscene_list_clip_push(GSHSCENE_List * list,
     const GSHSCENE_Resource * resource, const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, int32_t layer, double depth);
 

@@ -197,6 +197,8 @@ static void caps_full(GSHSCENE_Sink_Caps * caps, int readback) {
   caps->mask_native = GSHSCENE_MASK_NATIVE_ALL;
   /* Every pattern, recorded by handle (S22). */
   caps->flags |= GSHSCENE_CAP_PATTERN;
+  /* Every clip union, overlapping members included, recorded by handle with its members (S24, CU23). */
+  caps->flags |= GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL;
   caps->cancel_unit = GSHSCENE_CANCEL_BETWEEN_UNITS;
   caps->cancel_work_bound = 1;
   caps->work_measure = "units";
@@ -574,6 +576,13 @@ static int resource_box(const GSHSCENE_Resource * resource, Box * box) {
   return 0;
 }
 
+/**
+ * CU23: the model-space box of a clip union through the member items' maps: the bounding box of the members' boxes, each placed by
+ * its own composed map (the one CU14 makes).  The result is in device-pixel space already, so it is returned as an empty-flag box
+ * in that space.  Nonzero when a member's box or map cannot be formed.
+ */
+static int union_device_box(Run * run, const GSHSCENE_Item * item, size_t count, Box * out);
+
 /** @p box through @p map: the box of its four corners; nonzero when a corner is not finite. */
 static int box_map(const GSHGEOM_Map * map, const Box * in, Box * out) {
   out->empty = 1;
@@ -759,6 +768,48 @@ static int unit_map(Run * run, const GSHSCENE_Item * item, size_t count, GSHGEOM
   }
   run->maps[count - 1] = item->map;
   return gshgeom_map_compose_chain(run->maps, count, &run->job->target.map, out) != GSHGEOM_OK;
+}
+
+static int union_device_box(Run * run, const GSHSCENE_Item * item, size_t count, Box * out) {
+  out->empty = 1;
+  out->x0 = out->y0 = out->x1 = out->y1 = 0.0;
+  size_t n = gshscene_resource_clip_union_count(item->resource);
+  for (size_t i = 0; i < n; i++) {
+    GSHSCENE_Item member;
+    GSHGEOM_Map member_map;
+    Box model, placed;
+    if (gshscene_clip_union_member_item(item, i, &member) != GSHSCENE_OK || unit_map(run, &member, count, &member_map) ||
+        resource_box(member.resource, &model) || box_map(&member_map, &model, &placed)) {
+      return 1;
+    }
+    if (!placed.empty) {
+      box_add(out, placed.x0, placed.y0, placed.x1, placed.y1);
+    }
+  }
+  return 0;
+}
+
+static void path_records(Run * run, const GSHSCENE_Resource * resource, const GSHGEOM_Map * map, GSHSCENE_Result * failed);
+
+/** CU23: one `m` line for each member of a union clip, in canonical order, and the member's own `T` and `a` lines as asked. */
+static GSHSCENE_Result union_records(Run * run, const GSHSCENE_Item * item, size_t count, GSHSCENE_Result * failed) {
+  if (!(run->sink->config.records & GSHSCENE_DUMP_RECORD_CLIP_UNION)) {
+    return GSHSCENE_OK;
+  }
+  size_t n = gshscene_resource_clip_union_count(item->resource);
+  for (size_t i = 0; i < n; i++) {
+    GSHSCENE_Item member;
+    GSHGEOM_Map member_map;
+    if (gshscene_clip_union_member_item(item, i, &member) != GSHSCENE_OK || unit_map(run, &member, count, &member_map)) {
+      return GSHSCENE_ERR_INTERNAL; /* the box of the same member was formed a moment ago */
+    }
+    snprintf(run->line, LINE_BYTES, "m %llu res=%s:%016" PRIx64 " map=%016" PRIx64 " rule=%d\n", (unsigned long long)i,
+        gshscene_resource_kind_string(gshscene_resource_kind(member.resource)), gshscene_resource_hash(member.resource),
+        gshgeom_map_hash(&member_map), (int)member.fill_rule);
+    emit_text(run, run->line, failed);
+    path_records(run, member.resource, &member_map, failed);
+  }
+  return GSHSCENE_OK;
 }
 
 static void hex(Run * run, const char * prefix, uint64_t value, GSHSCENE_Result * failed) {
@@ -1448,7 +1499,10 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
       /* PL4, PL6: the plane has no box, so no extent limit applies to it and nothing is sized from it. */
       int plane = item->kind == GSHSCENE_ITEM_FILL && gshscene_resource_kind(item->resource) == GSHSCENE_RESOURCE_PLANE;
       int bad = !mapped || (font && !routed) ||
-          (plane ? 0 : (resource_box(item->resource, &model) || box_map(&map, &model, &box)));
+          (plane ? 0
+              : (item->kind == GSHSCENE_ITEM_CLIP_PUSH && gshscene_resource_kind(item->resource) == GSHSCENE_RESOURCE_CLIP_UNION)
+                  ? union_device_box(run, item, count, &box)
+                  : (resource_box(item->resource, &model) || box_map(&map, &model, &box)));
       double limit = run->sink->config.max_extent;
       if (plane) {
         box.empty = 1;
@@ -1508,6 +1562,12 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
         }
       } else if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_PATTERN) {
         GSHSCENE_Result r = pattern_record(run, item->paint.resource, &failed);
+        if (r != GSHSCENE_OK) {
+          return r;
+        }
+      }
+      if (item->kind == GSHSCENE_ITEM_CLIP_PUSH && gshscene_resource_kind(item->resource) == GSHSCENE_RESOURCE_CLIP_UNION) {
+        GSHSCENE_Result r = union_records(run, item, count, &failed);
         if (r != GSHSCENE_OK) {
           return r;
         }

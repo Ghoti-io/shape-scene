@@ -66,6 +66,8 @@ const char * gshscene_resource_kind_string(GSHSCENE_Resource_Kind kind) {
       return "pattern";
     case GSHSCENE_RESOURCE_HATCH:
       return "hatch";
+    case GSHSCENE_RESOURCE_CLIP_UNION:
+      return "clip-union";
     case GSHSCENE_RESOURCE_KIND_COUNT:
       break;
   }
@@ -236,6 +238,8 @@ int gshscene_resource_matches(const GSHSCENE_Resource * resource, const GSHSCENE
       return gshscene_mask_matches(resource, probe->source);
     case GSHSCENE_RESOURCE_PATTERN:
       return gshscene_pattern_matches(resource, probe->source);
+    case GSHSCENE_RESOURCE_CLIP_UNION:
+      return gshscene_clip_union_matches(resource, probe->source);
     case GSHSCENE_RESOURCE_PLANE:
       return 1; /* no content: any plane of the store is this one */
     default:
@@ -288,6 +292,9 @@ void gshscene_resource_free_content(GSHSCENE_Resource * resource) {
       break;
     case GSHSCENE_RESOURCE_PATTERN:
       gshscene_pattern_free(resource);
+      break;
+    case GSHSCENE_RESOURCE_CLIP_UNION:
+      gshscene_clip_union_free(resource);
       break;
     default:
       break;
@@ -855,6 +862,11 @@ GSHSCENE_Result gshscene_resource_dump(const GSHSCENE_Resource * resource, FILE 
       break;
     case GSHSCENE_RESOURCE_PATTERN:
       if (gshscene_pattern_dump(resource, out) < 0) {
+        return GSHSCENE_ERR_IO;
+      }
+      break;
+    case GSHSCENE_RESOURCE_CLIP_UNION:
+      if (gshscene_clip_union_dump(resource, out) < 0) {
         return GSHSCENE_ERR_IO;
       }
       break;

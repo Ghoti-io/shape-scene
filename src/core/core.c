@@ -85,6 +85,7 @@ void gshscene_limits_default(GSHSCENE_Limits * limits) {
   limits->max_node_depth = GSHSCENE_LIMITS_DEFAULT_MAX_NODE_DEPTH;
   limits->max_report_entries = GSHSCENE_LIMITS_DEFAULT_MAX_REPORT_ENTRIES;
   limits->max_jobs = GSHSCENE_LIMITS_DEFAULT_MAX_JOBS;
+  limits->max_clip_members = GSHSCENE_LIMITS_DEFAULT_MAX_CLIP_MEMBERS;
   for (size_t i = 0; i < sizeof limits->_reserved; i++) {
     limits->_reserved[i] = 0;
   }

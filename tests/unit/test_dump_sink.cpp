@@ -127,7 +127,7 @@ GSHSCENE_Sink * make_writer(const GSHSCENE_Allocator * alloc, const GSHSCENE_Lim
  */
 GSHSCENE_Dump_Sink_Config config_writer_like() {
   GSHSCENE_Dump_Sink_Config c = config_default();
-  c.records = GSHSCENE_DUMP_RECORD_PRIMITIVES; // PR10: a writer emits <circle>, <ellipse>, <rect> or re from the tag
+  c.records = GSHSCENE_DUMP_RECORD_PRIMITIVES | GSHSCENE_DUMP_RECORD_CLIP_UNION; // PR10: a writer emits <circle>, <ellipse>, <rect> or re from the tag; CU23: and a <clipPath> of the members of a union
   for (GSHSCENE_Sink_Caps * caps : {&c.raster_caps, &c.stream_caps}) {
     caps->flags |= GSHSCENE_CAP_STROKE_EXPAND;
     caps->stroke_native = GSHSCENE_STROKE_NATIVE_JOIN_MITER | GSHSCENE_STROKE_NATIVE_JOIN_ROUND |
@@ -175,6 +175,8 @@ GSHSCENE_Dump_Sink_Config config_toolpath_like() {
     caps->mask_native = 0;
     // A pen has no pixels to tile a picture on (S22): every unit painted with a pattern is refused, `PATTERN`.
     caps->flags &= ~GSHSCENE_CAP_PATTERN;
+    // A pen cannot follow a clip region (CU24): a union is refused, `CLIP_UNION`.
+    caps->flags &= ~(GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL);
   }
   return c;
 }
@@ -1666,7 +1668,7 @@ TEST(DumpSink, TheConfigurationIsValidated) {
       [](GSHSCENE_Dump_Sink_Config & c) { c.max_extent = -1.0; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.max_extent = 1e300 * 1e300; },
       [](GSHSCENE_Dump_Sink_Config & c) { c._reserved[0] = 1; },
-      [](GSHSCENE_Dump_Sink_Config & c) { c.records = 4; },
+      [](GSHSCENE_Dump_Sink_Config & c) { c.records = 8; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.records = 0x80000000u; },
       [](GSHSCENE_Dump_Sink_Config & c) {
         c.raster_caps.flags &= ~GSHSCENE_CAP_CAN_BLOCK;
@@ -1716,7 +1718,8 @@ TEST(DumpSink, TheConfigurationIsValidated) {
   }
   uint32_t common = GSHSCENE_CAP_CAN_BLOCK | GSHSCENE_CAP_CALLER_MEMORY | GSHSCENE_CAP_GLYPHS_FROM_FONT |
       GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_BLEND_SPACES | GSHSCENE_CAP_GRADIENT_SPACES | GSHSCENE_CAP_PREPARE |
-      GSHSCENE_CAP_STROKE_RUNS | GSHSCENE_CAP_IMAGE_FILTER_SPACES | GSHSCENE_CAP_GROUP_SOFT_MASK | GSHSCENE_CAP_PATTERN;
+      GSHSCENE_CAP_STROKE_RUNS | GSHSCENE_CAP_IMAGE_FILTER_SPACES | GSHSCENE_CAP_GROUP_SOFT_MASK | GSHSCENE_CAP_PATTERN |
+      GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL;
   EXPECT_EQ(d.raster_caps.flags, common | GSHSCENE_CAP_READBACK);
   EXPECT_EQ(d.stream_caps.flags, common);
   // Not a test sink, not a test sink's job.
@@ -3170,6 +3173,75 @@ TEST(DumpSink, ThePrimitiveRecordsAreTheWriterLikeConfigurationsAndNoOthers) {
   EXPECT_EQ(block_of(writer, 8), (std::vector<std::string>{"T prim=rect flip_x=0 flip_y=1 x=3ff0000000000000 y=4000000000000000 "
                                                            "w=4008000000000000 h=4010000000000000"}));
   EXPECT_EQ(block_of(writer, 9), (std::vector<std::string>{}));
+}
+
+TEST(DumpSink, AUnionClipIsRecordedWithItsMembersAndRefusedByCapsAsCU13Orders) {
+  Scene s;
+  const GSHSCENE_Resource * a = s.sq(0, 0, 4);
+  const GSHSCENE_Resource * b = s.sq(10, 0, 4);
+  const GSHSCENE_Resource * near = s.sq(2, 2, 4);
+  GSHSCENE_Clip_Member m[2];
+  std::memset(m, 0, sizeof m);
+  m[0].resource = a;
+  m[1].resource = b;
+  m[1].rule = GSHGEOM_FILL_EVEN_ODD;
+  const GSHSCENE_Resource * apart = nullptr;
+  ASSERT_EQ(gshscene_store_intern_clip_union(s.store, m, 2, &apart), GSHSCENE_OK);
+  m[1].resource = near;
+  const GSHSCENE_Resource * clash = nullptr;
+  ASSERT_EQ(gshscene_store_intern_clip_union(s.store, m, 2, &clash), GSHSCENE_OK);
+  auto list_of = [&](const GSHSCENE_Resource * u) {
+    GSHSCENE_List * l = nullptr;
+    EXPECT_EQ(gshscene_list_create(nullptr, nullptr, s.store, &l), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_clip_push(l, u, nullptr, GSHGEOM_FILL_NONZERO, 0, 0.0), GSHSCENE_OK);
+    GSHSCENE_Paint p{};
+    p.kind = GSHSCENE_PAINT_SOLID;
+    p.rgba[0] = 1;
+    p.rgba[3] = 1;
+    EXPECT_EQ(gshscene_list_fill(l, a, nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_clip_pop(l), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+    return l;
+  };
+  GSHSCENE_List * apart_list = list_of(apart);
+  GSHSCENE_List * clash_list = list_of(clash);
+  const std::string plain = records_dump(config_default(), s, apart_list);
+  const std::string writer = records_dump(config_writer_like(), s, apart_list);
+  EXPECT_EQ(lines_starting(plain, "m "), 0u) << "the records are the configuration's";
+  EXPECT_EQ(lines_starting(writer, "m "), 2u);
+  EXPECT_NE(writer.find(" C res=clip-union:"), std::string::npos);
+  const auto block = block_of(writer, 0);
+  ASSERT_GE(block.size(), 2u);
+  GSHSCENE_Clip_Member first, second;
+  ASSERT_EQ(gshscene_resource_clip_union_member(apart, 0, &first), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_resource_clip_union_member(apart, 1, &second), GSHSCENE_OK);
+  char want[160];
+  snprintf(want, sizeof want, "m 0 res=path:%016llx", (unsigned long long)gshscene_resource_hash(first.resource));
+  EXPECT_EQ(block[0].substr(0, std::strlen(want)), want) << "canonical order";
+  EXPECT_NE(block[1].find(second.rule == GSHGEOM_FILL_EVEN_ODD ? "rule=1" : "rule=0"), std::string::npos);
+  // GENERAL cleared: the overlapping union is refused UNION_OVERLAP (S24) and the disjoint one is drawn; both cleared: CLIP_UNION.
+  GSHSCENE_Dump_Sink_Config fast = config_writer_like();
+  GSHSCENE_Dump_Sink_Config none = config_writer_like();
+  for (GSHSCENE_Sink_Caps * c : {&fast.raster_caps, &fast.stream_caps}) {
+    c->flags &= ~GSHSCENE_CAP_CLIP_UNION_GENERAL;
+  }
+  for (GSHSCENE_Sink_Caps * c : {&none.raster_caps, &none.stream_caps}) {
+    c->flags &= ~(GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL);
+  }
+  auto reason_of = [&](const GSHSCENE_Dump_Sink_Config & config, const GSHSCENE_List * l) {
+    const std::string d = records_dump(config, s, l);
+    return d.find(" X class=") != std::string::npos ? d.substr(d.find(" X class=")) : std::string();
+  };
+  char overlap[64], unionr[64];
+  snprintf(overlap, sizeof overlap, " X class=%d reason=%d", (int)GSHSCENE_ENTRY_REFUSED, (int)GSHSCENE_REASON_UNION_OVERLAP);
+  snprintf(unionr, sizeof unionr, " X class=%d reason=%d", (int)GSHSCENE_ENTRY_REFUSED, (int)GSHSCENE_REASON_CLIP_UNION);
+  EXPECT_EQ(reason_of(fast, clash_list).substr(0, std::strlen(overlap)), overlap);
+  EXPECT_EQ(reason_of(fast, apart_list), "") << "disjoint members are drawn by a sink without GENERAL";
+  EXPECT_EQ(reason_of(none, apart_list).substr(0, std::strlen(unionr)), unionr);
+  EXPECT_EQ(reason_of(config_toolpath_like(), apart_list).substr(0, std::strlen(unionr)), unionr) << "a pen cannot follow a clip region (CU24)";
+  EXPECT_EQ(reason_of(config_default(), clash_list), "") << "the default test sink draws any union";
+  gshscene_list_destroy(apart_list);
+  gshscene_list_destroy(clash_list);
 }
 
 TEST(DumpSink, TheArcRecordsAreTheToolpathLikeConfigurationAndNeverTheChord) {

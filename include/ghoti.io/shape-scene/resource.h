@@ -174,6 +174,7 @@ typedef enum GSHSCENE_Resource_Kind {
   GSHSCENE_RESOURCE_MASK = 11,     ///< A mask: what a group's soft-mask slot names, a picture read as alpha or luminance through a transfer (mask.h, MK1).
   GSHSCENE_RESOURCE_PATTERN = 12,  ///< A pattern: a picture repeated on a lattice, which a pattern paint names (pattern.h, PT1).
   GSHSCENE_RESOURCE_HATCH = 13,    ///< A hatch: line families trimmed to a fill's region and stroked; reserved, not yet interned.
+  GSHSCENE_RESOURCE_CLIP_UNION = 14, ///< A clip union: the union of several shapes, which a clip push and a group's clip name (clip_union.h, CU6).
   GSHSCENE_RESOURCE_KIND_COUNT     ///< Closes the enum.
 } GSHSCENE_Resource_Kind;
 
@@ -254,6 +255,7 @@ typedef struct GSHSCENE_Glyph_Run {
 #define GSHSCENE_BYTES_PER_DASH ((size_t)16)     ///< Added for each dash of a stroke style's canonical array (SK12).
 #define GSHSCENE_BYTES_PER_TRANSFER_PIECE ((size_t)112) ///< Added for each piece of a mask's stitching transfer (MK4).
 #define GSHSCENE_BYTES_PER_TRANSFER_SAMPLE ((size_t)8)  ///< Added for each sample of a mask's tables (MK4).
+#define GSHSCENE_BYTES_PER_CLIP_MEMBER ((size_t)128)    ///< Added for each canonical member of a clip union (CU9); at least the member record the store keeps.
 /** @} */
 
 /** @brief Counters of a store, for tests and diagnostics. */

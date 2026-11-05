@@ -29,6 +29,7 @@
 
 #include <ghoti.io/shape-scene/allocator.h>
 #include <ghoti.io/shape-scene/cancel.h>
+#include <ghoti.io/shape-scene/clip_union.h>
 #include <ghoti.io/shape-scene/core.h>
 #include <ghoti.io/shape-scene/diff.h>
 #include <ghoti.io/shape-scene/dump_sink.h>

@@ -454,6 +454,49 @@ The test sink writes `copies=<n>` after `pat=<id>` in the record of a pattern fi
 whole pixels met with the clips in force and the extent, whatever the damage, so that a sink counts the same number from the same
 list and target; `dump_sink.h` states the spelling of a count past the bound and of a lattice the enumeration refuses.
 
+## Clip unions (normative; shapes story A3)
+
+A union clip is the **set-theoretic union** of its members' regions, each member `{path or outline run, 2D map, fill rule}` under its
+own map and rule (SVG 2 and CSS Masking `clip-path`, ISO 32000-1 text rendering modes 4 to 7). `clip_union.h` states the rules CU1 to
+CU17 field by field; this section says why they are what they are.
+
+**Why a resource.** A clip push names one resource and a retained group's clip is one pointer, so the union is a resource kind
+(`CLIP_UNION`, 14): interned, immutable, hashed and counted like any other, and a clip push or a group's `clip` names it with no new
+item field and no new node field. A union is a *region*, not a shape: nothing but a clip takes one, and unions do not nest (nested
+clipping is intersection and union is associative). It holds an unordered set: members are stored sorted by `(resource hash, map hash,
+rule)` with duplicates removed, so every order and repetition of the same members is one handle, one list hash, one diff. A union of
+one member is recorded as the single clip of that member (the member's rule, the item's map after the member's), so a list has one
+spelling for it and a sink never sees one. The item's own rule is stored as nonzero, so the argument that the members make
+irrelevant does not split a handle.
+
+**What the coverage is.** Exact area of the union in the pixel, quantized **once**: `min(255, floor(min(8192, sum a_i) / 32))` for members
+that are provably disjoint, with `a_i` the member's own accumulated area reduced by its rule in units of 1/8192 pixel. `floor(a/32) +
+floor(b/32)` is not `floor((a+b)/32)`: summing 8-bit coverages leaves a seam where two shapes share an edge (two half pixels compose to
+3/4 where the union is whole), so no sink sums bytes and no front end lowers a union as an alpha mask. A member that overlaps itself inside
+one pixel has the saturating-sum area AD-12 defines for one shape (the oracle's case 10 shows the difference from the exact area). A
+fill wound the other way comes out one level high in a pixel that is not a whole level (a defect of the signed fold, recorded in the
+exact-primitives spec's `open-items.md` item 2 for its own story); a union folds the magnitude and is orientation independent.
+
+**What "disjoint" is, and who decides.** `gshscene_clip_union_disjoint` is the one predicate and `gshscene_caps_disposition` calls it,
+so every sink and the report agree. Members `i` and `j` are disjoint iff the **interiors** of their device boxes (`gshgeom_device_box`:
+the lattice box of the device path the sink draws, formed without making it, by the generator `from_model` shares; Lemma CU15 in
+shape-geometry's `device.h` proves the region lies in the closed box with no outset) do not meet. Touching is disjoint: the regions meet
+in a null set and their areas add. The test never calls overlapping regions disjoint; it may call disjoint regions overlapping (two
+diagonal circles, an L and a square in its notch), which is a refusal and never a wrong picture. The walk compares pairs `(i, j)` in
+canonical order and stops at the first that fails, so there are at most `n (n - 1) / 2` comparisons, and an unprovable member (a box that
+cannot be formed) is reported as `(i, i)`.
+
+**Capabilities and reasons.** `CLIP_UNION` (bit 17) draws disjoint unions; `CLIP_UNION_GENERAL` (bit 18) draws any union; a sink that
+claims `GENERAL` without `CLIP_UNION` breaks the caps contract and is `ERR_INTERNAL` at its first caps call, as every inconsistent set of
+caps is. `CLIP_UNION` (41) and `UNION_OVERLAP` (42) are refusals per clip push, decided after the glyph-source refusal and before every
+approximation; `second` is `i << 16 | j`. The test sink claims both caps and records a union's members (`m` lines, record bit 4);
+`shape-cpu` claims only the first. The general tier is a separate story (exact-primitives `open-items.md` item 1) and nothing changes
+for a front end when it exists.
+
+**Limits.** `max_clip_members` (default 256, ceiling 1024, checked at the creation of the store); the count counted is the one given,
+before duplicates are removed. A glyph run from a font is not a member (`ERR_UNSUPPORTED`; its per-glyph report entries are keyed by
+`(chain, glyph index)`), a 3D map is `ERR_UNSUPPORTED` too, and a run from outlines has the hull of its glyphs' device boxes.
+
 ## Reserved
 
 Refused with `ERR_UNSUPPORTED`: ProPhoto (D50: converting to it needs a chromatic adaptation), the parametric,

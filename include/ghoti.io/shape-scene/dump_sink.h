@@ -209,7 +209,8 @@ typedef enum GSHSCENE_Dump_Sink_Completion {
 typedef enum GSHSCENE_Dump_Sink_Records {
   GSHSCENE_DUMP_RECORD_PRIMITIVES = 1, ///< The `T` line of a tagged path.
   GSHSCENE_DUMP_RECORD_ARCS = 2,       ///< An `a` line for each arc of a path.
-  GSHSCENE_DUMP_RECORDS_ALL = 3        ///< Both.
+  GSHSCENE_DUMP_RECORD_CLIP_UNION = 4, ///< The `m` lines of a clip union: one per member, in canonical order, after the union's `C` line (CU23).
+  GSHSCENE_DUMP_RECORDS_ALL = 7        ///< All three.
 } GSHSCENE_Dump_Sink_Records;
 
 /** @brief The test sink's configuration.  Start from ::gshscene_dump_sink_config_default. */

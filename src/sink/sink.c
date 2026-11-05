@@ -198,6 +198,27 @@ GSHSCENE_Disposition gshscene_caps_disposition_unit(const GSHSCENE_Sink_Caps * c
     d.reason = GSHSCENE_REASON_GLYPH_SOURCE;
     return d;
   }
+  /* S24, CU13: a union clip push.  A sink that does not draw unions refuses it, `CLIP_UNION`; one that draws only disjoint unions
+   * refuses it when the one predicate (CU16) cannot show the members disjoint, `UNION_OVERLAP`, naming the first pair it could
+   * not separate as `i << 16 | j` (or `i << 16 | i` for a member whose box could not be formed).  The refusals come before every
+   * approximation, so the clip's block is skipped (S6) and nothing inside it is drawn unclipped. */
+  if (item->kind == GSHSCENE_ITEM_CLIP_PUSH && item->resource && item->resource->kind == GSHSCENE_RESOURCE_CLIP_UNION) {
+    if (!(caps->flags & GSHSCENE_CAP_CLIP_UNION)) {
+      d.entry_class = GSHSCENE_ENTRY_REFUSED;
+      d.reason = GSHSCENE_REASON_CLIP_UNION;
+      return d;
+    }
+    if (!(caps->flags & GSHSCENE_CAP_CLIP_UNION_GENERAL)) {
+      GSHSCENE_Union_Verdict verdict;
+      if (gshscene_clip_union_disjoint(item, instance_maps, instance_count, target_map, &verdict) != GSHSCENE_OK ||
+          !verdict.disjoint) {
+        d.entry_class = GSHSCENE_ENTRY_REFUSED;
+        d.reason = GSHSCENE_REASON_UNION_OVERLAP;
+        d.detail = ((uint64_t)verdict.first << 16) | (uint64_t)verdict.second;
+        return d;
+      }
+    }
+  }
   const GSHSCENE_Resource * gradient = painted && item->paint.kind == GSHSCENE_PAINT_GRADIENT ? item->paint.resource : NULL;
   if (gradient) {
     /* S17: a kind the sink does not draw is refused, never drawn wrong. */
@@ -545,7 +566,8 @@ static GSHSCENE_Result caps_for(const GSHSCENE_Sink * sink, const GSHSCENE_Targe
   if (result != GSHSCENE_OK) {
     return result;
   }
-  if ((c.flags & ~GSHSCENE_CAP_FLAGS_ALL) || (c.stroke_native & ~GSHSCENE_STROKE_NATIVE_ALL) ||
+  if ((c.flags & ~GSHSCENE_CAP_FLAGS_ALL) ||
+      ((c.flags & GSHSCENE_CAP_CLIP_UNION_GENERAL) && !(c.flags & GSHSCENE_CAP_CLIP_UNION)) /* CU12 */ || (c.stroke_native & ~GSHSCENE_STROKE_NATIVE_ALL) ||
       (c.image_filters & ~((UINT32_C(1) << GSHSCENE_IMAGE_FILTER_COUNT) - 1u)) ||
       (c.image_extends & ~((UINT32_C(1) << GSHSCENE_IMAGE_EXTEND_COUNT) - 1u)) || (c.image_formats & ~GSHSCENE_IMAGE_FORMAT_ALL) ||
       c.cancel_unit == 0 ||

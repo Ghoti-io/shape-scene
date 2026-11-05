@@ -119,6 +119,12 @@ GSHSCENE_API const char * gshscene_result_string(GSHSCENE_Result result);
 /** Default ::GSHSCENE_Limits.max_jobs: 64 renders in flight on one sink (sink.h, S3). */
 #define GSHSCENE_LIMITS_DEFAULT_MAX_JOBS ((size_t)64)
 
+/** Default ::GSHSCENE_Limits.max_clip_members: 256 members in one clip union (clip_union.h, CU9). */
+#define GSHSCENE_LIMITS_DEFAULT_MAX_CLIP_MEMBERS ((size_t)256)
+
+/** The most ::GSHSCENE_Limits.max_clip_members a store accepts: 1024 (the planning predicate's scratch, CU17); more is ::GSHSCENE_ERR_INVALID at the creation of the store. */
+#define GSHSCENE_CLIP_MEMBERS_CEILING ((size_t)1024)
+
 /**
  * @brief Caps for the quantities a caller can make unbounded.
  *
@@ -146,6 +152,7 @@ typedef struct GSHSCENE_Limits {
   /** Most entries a report stores (report.h); past it the report counts, sets `overflowed`, and the render is ::GSHSCENE_ERR_LIMIT. */
   size_t max_report_entries;
   size_t max_jobs;              ///< Most renders in flight on one sink at once (sink.h, S3).
+  size_t max_clip_members;      ///< Most members one clip union may be given, counted before duplicates are removed (clip_union.h, CU9); at most ::GSHSCENE_CLIP_MEMBERS_CEILING.
   uint8_t _reserved[8];         ///< Reserved; zero.
 } GSHSCENE_Limits;
 

@@ -177,10 +177,13 @@ const char * gshscene_node_kind_string(GSHSCENE_Node_Kind kind) {
   return "unknown node kind";
 }
 
-/* A resource a node may name: a path or glyph run of the scene's store. */
-static GSHSCENE_Result check_region(const GSHSCENE_Store * store, const GSHSCENE_Resource * resource) {
+/* A resource a node may name: a path or glyph run of the scene's store, and, for a group's clip only (@p clip), a clip union (CU6, CU11). */
+static GSHSCENE_Result check_region(const GSHSCENE_Store * store, const GSHSCENE_Resource * resource, int clip) {
   if (!resource || resource->store != store) {
     return GSHSCENE_ERR_INVALID;
+  }
+  if (clip && resource->kind == GSHSCENE_RESOURCE_CLIP_UNION) {
+    return GSHSCENE_OK;
   }
   if (resource->kind != GSHSCENE_RESOURCE_PATH && resource->kind != GSHSCENE_RESOURCE_GLYPH_RUN) {
     return GSHSCENE_ERR_INVALID;
@@ -240,7 +243,7 @@ GSHSCENE_Result gshscene_node_canonical(const GSHSCENE_Store * store, const GSHS
         node.soft_mask_map = canonical.soft_mask_map;
       }
       if (in->clip) {
-        result = check_region(store, in->clip);
+        result = check_region(store, in->clip, 1);
         if (result == GSHSCENE_OK) {
           result = node_map(&in->clip_map, &node.clip_map);
         }
@@ -251,12 +254,13 @@ GSHSCENE_Result gshscene_node_canonical(const GSHSCENE_Store * store, const GSHS
           return result;
         }
         node.clip = in->clip;
-        node.clip_rule = in->clip_rule;
+        /* CU11: a union's members carry their rules, so the node's is stored as nonzero (one spelling). */
+        node.clip_rule = in->clip->kind == GSHSCENE_RESOURCE_CLIP_UNION ? GSHGEOM_FILL_NONZERO : in->clip_rule;
       }
       break;
     }
     case GSHSCENE_NODE_SHAPE:
-      result = check_region(store, in->resource);
+      result = check_region(store, in->resource, 0);
       if (result == GSHSCENE_OK) {
         result = gshscene_list_check_rule(in->fill_rule);
       }
@@ -270,7 +274,7 @@ GSHSCENE_Result gshscene_node_canonical(const GSHSCENE_Store * store, const GSHS
       node.fill_rule = in->fill_rule;
       break;
     case GSHSCENE_NODE_STROKE: /* SK13: a stroke item's rules (list.h, SK4), so a node and its emitted item agree */
-      result = check_region(store, in->resource);
+      result = check_region(store, in->resource, 0);
       if (result == GSHSCENE_OK &&
           (!in->style || in->style->store != store || in->style->kind != GSHSCENE_RESOURCE_STROKE_STYLE)) {
         result = GSHSCENE_ERR_INVALID;

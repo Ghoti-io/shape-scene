@@ -143,6 +143,10 @@ const char * gshscene_reason_string(GSHSCENE_Reason reason) {
       return "hatch";
     case GSHSCENE_REASON_HATCH_DEGENERATE:
       return "hatch-degenerate";
+    case GSHSCENE_REASON_CLIP_UNION:
+      return "clip-union";
+    case GSHSCENE_REASON_UNION_OVERLAP:
+      return "union-overlap";
     case GSHSCENE_REASON_COUNT:
       break;
   }

@@ -55,6 +55,7 @@
 #define TAKES_RUN 2u
 #define TAKES_PICTURE 4u
 #define TAKES_PLANE 8u /* a fill only (PL3) */
+#define TAKES_UNION 16u /* a clip push only (CU6, CU10) */
 
 /* --- the arena -------------------------------------------------------------- */
 
@@ -151,6 +152,9 @@ void gshscene_limits_effective(const GSHSCENE_Limits * limits, GSHSCENE_Limits *
   }
   if (limits->max_node_depth) {
     out->max_node_depth = limits->max_node_depth;
+  }
+  if (limits->max_clip_members) {
+    out->max_clip_members = limits->max_clip_members;
   }
   if (out->max_node_depth > GSHSCENE_NODE_DEPTH_CEILING) {
     out->max_node_depth = GSHSCENE_NODE_DEPTH_CEILING;
@@ -374,6 +378,9 @@ static GSHSCENE_Result check_resource(const GSHSCENE_List * list, const GSHSCENE
     return GSHSCENE_OK;
   }
   if (resource->kind == GSHSCENE_RESOURCE_PLANE && (takes & TAKES_PLANE)) {
+    return GSHSCENE_OK;
+  }
+  if (resource->kind == GSHSCENE_RESOURCE_CLIP_UNION && (takes & TAKES_UNION)) {
     return GSHSCENE_OK;
   }
   return GSHSCENE_ERR_INVALID;
@@ -785,7 +792,7 @@ GSHSCENE_Result gshscene_list_clip_push(GSHSCENE_List * list, const GSHSCENE_Res
   }
   GSHSCENE_Item item;
   item_init(&item, GSHSCENE_ITEM_CLIP_PUSH);
-  GSHSCENE_Result result = check_resource(list, resource, TAKES_PATH | TAKES_RUN);
+  GSHSCENE_Result result = check_resource(list, resource, TAKES_PATH | TAKES_RUN | TAKES_UNION);
   if (result == GSHSCENE_OK) {
     result = canonical_map(map, &item.map);
   }
@@ -804,6 +811,19 @@ GSHSCENE_Result gshscene_list_clip_push(GSHSCENE_List * list, const GSHSCENE_Res
   item.resource = resource;
   item.fill_rule = rule;
   item.layer = layer;
+  if (resource->kind == GSHSCENE_RESOURCE_CLIP_UNION) {
+    /* CU10: the members carry their rules, so the item's is stored as nonzero (one spelling), and a union of exactly one member
+     * is recorded as the single clip of that member under the composed map: the list never holds a one-member union. */
+    item.fill_rule = GSHGEOM_FILL_NONZERO;
+    if (gshscene_resource_clip_union_count(resource) == 1) {
+      GSHSCENE_Item single;
+      result = gshscene_clip_union_member_item(&item, 0, &single);
+      if (result != GSHSCENE_OK) {
+        return result;
+      }
+      item = single;
+    }
+  }
   result = list_append(list, &item);
   if (result == GSHSCENE_OK) {
     list->stack[list->depth++] = PUSH_CLIP;

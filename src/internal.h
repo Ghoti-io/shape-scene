@@ -140,6 +140,10 @@ struct GSHSCENE_Resource {
       uint32_t palette_need;          /* the largest palette entry the tile or the tint names, plus one; 0 for none (PT12) */
     } pattern;
     struct {
+      GSHSCENE_Clip_Member * members; /* count of them, canonical order (CU8); each member's resource is retained */
+      size_t count;
+    } clipunion;
+    struct {
       GSHSCENE_Mask m;                    /* canonical (MK1); the picture and the transfer's arrays point at the copies below */
       GSHSCENE_Transfer_Piece * pieces;   /* the stitching's pieces, NULL for none */
       double * samples;                   /* every table's samples, the top level's first, then each piece's; NULL for none */
@@ -347,6 +351,17 @@ int gshscene_image_paint_dump(const GSHSCENE_Resource * resource, FILE * out);
 
 /** The distinct reasons a map of an image paint's chain makes the fill draw nothing: 1 when the paint's own map is singular. */
 int gshscene_image_paint_singular(const GSHSCENE_Resource * resource);
+
+/* --- clip_union.c ----------------------------------------------------------- */
+
+/** Whether a clip union resource has the canonical content @p source (clip_union.c Source). */
+int gshscene_clip_union_matches(const GSHSCENE_Resource * resource, const void * source);
+
+/** Release the members' resources and free the array. */
+void gshscene_clip_union_free(GSHSCENE_Resource * resource);
+
+/** The payload of a clip union's dump (clip_union.h, CU9); negative on failure. */
+int gshscene_clip_union_dump(const GSHSCENE_Resource * resource, FILE * out);
 
 /* --- pattern.c -------------------------------------------------------------- */
 

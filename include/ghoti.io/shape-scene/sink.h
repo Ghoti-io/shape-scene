@@ -271,6 +271,18 @@
  * A unit that draws nothing (::gshscene_pattern_notice) is noticed and skipped.  A writer keeps the pattern by handle and emits
  * it, and its tile, once per resource id; a cache of tiles is keyed by the tile picture's id and dropped at release.
  *
+ * **S24 Union clips (clip_union.h, CU1 to CU25).**  A clip push may name a clip union, the union of several shapes (an SVG
+ * `<clipPath>` of several children, a CSS `clip-path` of several shapes, a PDF text clip).  A sink reads it with
+ * ::gshscene_resource_clip_union_count and ::gshscene_resource_clip_union_member, and takes each member as a plain clip item through
+ * ::gshscene_clip_union_member_item.  A sink that draws unions whose members are provably disjoint has ::GSHSCENE_CAP_CLIP_UNION; its
+ * coverage is the sum of the members' exact areas quantized once (never a sum of bytes, never an alpha mask).  Without it the
+ * planning pass refuses a union clip push, `CLIP_UNION`.  A sink that also has ::GSHSCENE_CAP_CLIP_UNION_GENERAL draws any union.
+ * With only `CLIP_UNION`, a union the one predicate (::gshscene_clip_union_disjoint) cannot show disjoint is refused,
+ * `UNION_OVERLAP`, with the first pair that could not be separated in `second` as `i << 16 | j` (canonical indices; `i << 16 | i` for
+ * a member whose box could not be formed).  Both refusals skip the clip's block, so nothing inside is drawn unclipped; a sink never
+ * draws a union wrong.  ::gshscene_caps_disposition decides both, so a sink that asks it per unit gets the same answer, and the
+ * planning pass enters tiles and mask pictures, so a refused union there refuses the unit painted with the pattern or the masked group.
+ *
  * ### For sink implementations
  *
  * A sink library fills a ::GSHSCENE_Sink_Ops and calls ::gshscene_sink_create
@@ -411,7 +423,14 @@ typedef struct GSHSCENE_Target {
 #define GSHSCENE_CAP_PATTERN (UINT32_C(1) << 15)
 /** A sink draws hatch fills (S23); without it the planning pass refuses a hatch fill, `HATCH`.  Reserved. */
 #define GSHSCENE_CAP_HATCH (UINT32_C(1) << 16)
-#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 17) - 1) ///< Every flag defined.
+/**
+ * A sink draws a clip union whose members are provably disjoint (clip_union.h, CU12, CU16), the sum of their areas quantized once (CU2);
+ * without it the planning pass refuses a union clip push, `CLIP_UNION`, and the clip's block is skipped (S24).
+ */
+#define GSHSCENE_CAP_CLIP_UNION (UINT32_C(1) << 17)
+/** A sink draws any clip union, overlapping members included (CU2, CU25).  Needs ::GSHSCENE_CAP_CLIP_UNION; without it an overlapping union is refused, `UNION_OVERLAP`. */
+#define GSHSCENE_CAP_CLIP_UNION_GENERAL (UINT32_C(1) << 18)
+#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 19) - 1) ///< Every flag defined.
 /** @} */
 
 /**

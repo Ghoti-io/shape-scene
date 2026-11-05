@@ -4283,4 +4283,65 @@ TEST_P(SinkConformance, S22_AStrokePaintedWithAPatternHasItsTilePlannedToo) {
   }
 }
 
+// S24, CU13: a union clip is drawn, or refused as the caps say, and a refused one skips its block.  A union of members the predicate shows
+// disjoint is refused `CLIP_UNION` where the sink lacks the flag and drawn otherwise; an overlapping one is refused `UNION_OVERLAP` where the
+// sink has the flag and not the general one, with the first pair in `second`; where a sink has neither, `CLIP_UNION`.  The fill inside is not
+// reported: it is skipped with its block, and strict fails at the clip.  A sink that skips draws nothing: the target is as it was.
+TEST_P(SinkConformance, S24_AUnionClipIsDrawnOrRefusedAsTheCapsSayAndItsBlockIsSkippedWhenRefused) {
+  for (uint32_t kind : f()->kinds) {
+    for (int overlapping = 0; overlapping < 2; overlapping++) {
+      SinkRef sink(make());
+      Scene s;
+      auto probe = make_surface(kind);
+      GSHSCENE_Sink_Caps caps = caps_of(sink.sink, *probe);
+      GSHSCENE_Clip_Member m[2];
+      std::memset(m, 0, sizeof m);
+      m[0].resource = s.sq(1, 1, 8);
+      m[1].resource = overlapping ? s.sq(5, 5, 8) : s.sq(11, 1, 8);
+      const GSHSCENE_Resource * u = nullptr;
+      ASSERT_EQ(gshscene_store_intern_clip_union(s.store, m, 2, &u), GSHSCENE_OK);
+      s.held.push_back(u);
+      GSHSCENE_List * l = s.open();
+      GSHSCENE_Paint paint = solid(1, 0, 0, 1);
+      ASSERT_EQ(gshscene_list_clip_push(l, u, nullptr, GSHGEOM_FILL_NONZERO, 0, 0.0), GSHSCENE_OK);
+      ASSERT_EQ(gshscene_list_fill(l, s.sq(0, 0, 30), nullptr, GSHGEOM_FILL_NONZERO, &paint, 0, 0.0), GSHSCENE_OK);
+      ASSERT_EQ(gshscene_list_clip_pop(l), GSHSCENE_OK);
+      ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+      auto out = make_surface(kind);
+      ReportRef r;
+      Outcome o = run(f(), sink.sink, request_for(l, *out, r.report));
+      EXPECT_EQ(o.result, GSHSCENE_OK);
+      auto got = chain_entries(r.report);
+      const bool has = (caps.flags & GSHSCENE_CAP_CLIP_UNION) != 0;
+      const bool general = (caps.flags & GSHSCENE_CAP_CLIP_UNION_GENERAL) != 0;
+      GSHSCENE_Reason want = (GSHSCENE_Reason)0;
+      if (!has) {
+        want = GSHSCENE_REASON_CLIP_UNION;
+      } else if (overlapping && !general) {
+        want = GSHSCENE_REASON_UNION_OVERLAP;
+      }
+      size_t refusals = 0;
+      for (const auto & e : got) {
+        if (e.reason == GSHSCENE_REASON_CLIP_UNION || e.reason == GSHSCENE_REASON_UNION_OVERLAP) {
+          refusals++;
+          EXPECT_EQ(e.reason, want);
+          EXPECT_EQ(e.entry_class, GSHSCENE_ENTRY_REFUSED);
+          EXPECT_EQ(e.chain, std::vector<size_t>{0}) << "the clip push itself";
+        }
+      }
+      EXPECT_EQ(refusals, want ? 1u : 0u) << "kind " << kind << " overlapping " << overlapping;
+      if (want) {
+        for (const auto & e : got) {
+          EXPECT_NE(e.chain, std::vector<size_t>{1}) << "the fill inside a refused block is skipped, not reported";
+        }
+      }
+      auto strict = make_surface(kind);
+      ReportRef sr;
+      GSHSCENE_Render_Request req = request_for(l, *strict, sr.report);
+      req.flags = GSHSCENE_RENDER_STRICT;
+      EXPECT_EQ(run(f(), sink.sink, req).result, want ? GSHSCENE_ERR_REFUSED : GSHSCENE_OK);
+    }
+  }
+}
+
 #endif /* GHOTI_IO_GSHSCENE_TEST_SINK_CONFORMANCE_H */

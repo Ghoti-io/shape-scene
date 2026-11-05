@@ -50,6 +50,10 @@ got_thash=$(printf '%s\n' "$got" | awk '$1=="shape-scene.pattern-hash"{print $2}
 got_tcount=$(printf '%s\n' "$got" | awk '$1=="shape-scene.pattern-count"{print $2}')
 want_thash=$(awk '$1=="pattern-hash"{print $2}' "$file" 2>/dev/null)
 want_tcount=$(awk '$1=="pattern-count"{print $2}' "$file" 2>/dev/null)
+got_uhash=$(printf '%s\n' "$got" | awk '$1=="shape-scene.clipunion-hash"{print $2}')
+got_ucount=$(printf '%s\n' "$got" | awk '$1=="shape-scene.clipunion-count"{print $2}')
+want_uhash=$(awk '$1=="clipunion-hash"{print $2}' "$file" 2>/dev/null)
+want_ucount=$(awk '$1=="clipunion-count"{print $2}' "$file" 2>/dev/null)
 want_hash=$(awk '$1=="hash"{print $2}' "$file" 2>/dev/null)
 want_count=$(awk '$1=="count"{print $2}' "$file" 2>/dev/null)
 want_shash=$(awk '$1=="stroke-hash"{print $2}' "$file" 2>/dev/null)
@@ -113,4 +117,10 @@ if [ "$got_thash" != "$want_thash" ] || [ "$got_tcount" != "$want_tcount" ]; the
     "$got_thash" "$got_tcount" "$want_thash" "$want_tcount" >&2
   exit 1
 fi
-printf 'check-corpus-hash: ok, %s over %s results; strokes %s over %s; planes %s over %s; placeholders %s over %s; images %s over %s; image paints %s over %s; masks %s over %s; primitives %s over %s; patterns %s over %s\n' "$got_hash" "$got_count" "$got_shash" "$got_scount" "$got_phash" "$got_pcount" "$got_hhash" "$got_hcount" "$got_ihash" "$got_icount" "$got_mhash" "$got_mcount" "$got_khash" "$got_kcount" "$got_rhash" "$got_rcount" "$got_thash" "$got_tcount"
+if [ -z "$want_uhash" ] || [ -z "$want_ucount" ] || [ -z "$got_uhash" ] || [ -z "$got_ucount" ] ||
+   [ "$got_uhash" != "$want_uhash" ] || [ "$got_ucount" != "$want_ucount" ]; then
+  printf 'check-corpus-hash: FAIL: clip unions %s over %s results, committed %s over %s\n' \
+    "$got_uhash" "$got_ucount" "$want_uhash" "$want_ucount" >&2
+  exit 1
+fi
+printf 'check-corpus-hash: ok, %s over %s results; strokes %s over %s; planes %s over %s; placeholders %s over %s; images %s over %s; image paints %s over %s; masks %s over %s; primitives %s over %s; patterns %s over %s; clip unions %s over %s\n' "$got_hash" "$got_count" "$got_shash" "$got_scount" "$got_phash" "$got_pcount" "$got_hhash" "$got_hcount" "$got_ihash" "$got_icount" "$got_mhash" "$got_mcount" "$got_khash" "$got_kcount" "$got_rhash" "$got_rcount" "$got_thash" "$got_tcount" "$got_uhash" "$got_ucount"

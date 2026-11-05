@@ -172,6 +172,8 @@ typedef enum GSHSCENE_Reason {
   GSHSCENE_REASON_PATTERN_RESAMPLED = 38,  ///< Approximated, per unit: the sink resamples the tile instead of drawing the lattice of copies (pattern.h, PT13).
   GSHSCENE_REASON_HATCH = 39,         ///< Refused, per unit: a fill painted with a hatch the sink does not draw (reserved, S23).
   GSHSCENE_REASON_HATCH_DEGENERATE = 40, ///< Notice, per unit: a family of the hatch has an `offset_across` of 0, so it draws nothing (reserved).
+  GSHSCENE_REASON_CLIP_UNION = 41,    ///< Refused, per clip push: the sink does not draw a clip union (clip_union.h, CU13, S24).
+  GSHSCENE_REASON_UNION_OVERLAP = 42, ///< Refused, per clip push: the sink draws only disjoint unions and the members could not be shown disjoint; `second` is `i << 16 | j` of the first pair (`i << 16 | i` for an unprovable member), canonical indices (CU13).
   GSHSCENE_REASON_COUNT               ///< Closes the enum.
 } GSHSCENE_Reason;
 
