@@ -429,6 +429,17 @@ def scripted():
         "BPQTAAAFAAECAAgGAQAAACYAAgABAAACEwACBQEBAgAAAAAAAN9aWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpa"
         "WlpaZ7oTapgUjxzHmnYBsmMDLIx6GcM4icjtFxqPhZTLIxNKEujxMSxKe4IkYV30ehwTBxIkQHkomtPlOjK9MpsYw8yX2kChtOodJEOllc8R"
         "i8luVzMruI4sLz71UVCE7g70egrOBBNc6G1nmXW7GiAAAQEAAhMAAgUBAQIAAOXl5eXl5eXlAgABAQAC")
+    # Found by pass B's libFuzzer run: a pattern whose step on an axis that does not repeat lies below the band (G14), which the
+    # model took for a limit; the store keeps the size there (PT3), reads no step, and interns the pattern.
+    out["regression-pattern-step-on-an-axis-that-does-not-repeat.bin"] = base64.b64decode(
+        "lCOwo48cqp/HkIcA3NGDEDLqO6EUwV3He7VVaLUaiQuvxwy9+XZTHtL2dVExvtJWWDjD3GIvkPOueT6pdN4Rie8OYpmiN8rFKB95gCtWQy1HzE"
+        "Mn5DKOcOr8ybzJZrW2lAToSQCtA4XlhhGhkAGWd0UyP7Ka53sSCd8lLttBqMJoJP7sWjl2rrxOOLIdqZjtcf1bpmUlGpfTVVnsKIBkjBAc7kbc"
+        "PbF+d8QnN934NxwMYWxQS/tS/PtEanddLtRB49T9RKBg5ukVrEr30NENkDD7mMoEOoZg9u0kcQvLBNmJNp6Rym5LmNmyyD+lmgLk1PyrP656zD"
+        "+0D10M6Raq2YA1Uy20wnShZAK1IqqZeUlPOfe19jGBs4xuOSuL9QgQaXBixm2lvQwr+NLVqlCnbeY2LsFpDxAte+QhI9PkGzVrD0TMB7ry77Jw"
+        "gw2lFOx39NfAp3RbQ7NXFXr6kPoN1grEELz+BpPk0wXy90NjnIf0yWAK3J10rrp2dx6atuiwX1oNY+9cgFWP3KpqwGBwKHz2es/UtF6yYLWkcN"
+        "+wKptRSvUEkOiPF+kDCQ59Ym16U0QzD/T7KOSE2+40db1HIRWnmDuh4kuzJMxzk899WIOvwCPTk192XM+Omh6zBW1W/SaFWDMEm2D4/Tz+H97+"
+        "YSIcCJvhMB4ocrUvM8WLvJXCa9zrPYBVE+uCVwMuopVsLCQtk2urbzixhrtavCKPJdxN5xFC3kTbjn98iHun+mt7FVUpt3hz2ZcOuFD9sMU8zA"
+        "gk9tRpTA==")
     return out
 
 

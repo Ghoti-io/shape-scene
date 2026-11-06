@@ -1388,7 +1388,12 @@ static void fuzz_pattern(S * s) {
   const double scalars[6] = {p.x, p.y, p.w, p.h, p.x_step, p.y_step};
   for (int i = 0; i < 6; i++) {
     invalid = invalid || !(scalars[i] - scalars[i] == 0.0);
-    limit = limit || !pattern_in_band(scalars[i]);
+  }
+  /* The band applies to the step the store keeps (PT3): a step on an axis that does not repeat is never read, and the size
+   * stands in its place, so a step outside the band on such an axis is not a limit. */
+  const double kept[6] = {p.x, p.y, p.w, p.h, p.repeat_x ? p.x_step : p.w, p.repeat_y ? p.y_step : p.h};
+  for (int i = 0; i < 6; i++) {
+    limit = limit || !pattern_in_band(kept[i]);
   }
   invalid = invalid || p.w < 0.0 || p.h < 0.0 || p.x_step < 0.0 || p.y_step < 0.0 || p.repeat_x > 1u || p.repeat_y > 1u;
   GSHSCENE_Result want = invalid ? GSHSCENE_ERR_INVALID : unsupported ? GSHSCENE_ERR_UNSUPPORTED : GSHSCENE_OK;
@@ -1420,7 +1425,7 @@ static void fuzz_pattern(S * s) {
   CHECK(gshscene_resource_pattern(made, &back) == GSHSCENE_OK);
   CHECK(back.tile == tile && same_bits(back.x, p.x == 0.0 ? 0.0 : p.x) && same_bits(back.y, p.y == 0.0 ? 0.0 : p.y) &&
         same_bits(back.w, p.w == 0.0 ? 0.0 : p.w) && same_bits(back.h, p.h == 0.0 ? 0.0 : p.h) &&
-        same_bits(back.x_step, p.x_step == 0.0 ? 0.0 : p.x_step) && same_bits(back.y_step, p.y_step == 0.0 ? 0.0 : p.y_step) &&
+        same_bits(back.x_step, kept[4] == 0.0 ? 0.0 : kept[4]) && same_bits(back.y_step, kept[5] == 0.0 ? 0.0 : kept[5]) &&
         back.repeat_x == p.repeat_x && back.repeat_y == p.repeat_y && back.has_tint == p.has_tint);
   /* The lattice: the first copy starts at the origin, abutting cells share their edge, and the overlap predicate is PT7's. */
   double c0[4], c1[4];
