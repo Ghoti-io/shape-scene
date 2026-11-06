@@ -662,6 +662,75 @@ TEST(EditAllocation, EveryFailingAllocationLeavesTheEditAsItWas) {
   EXPECT_TRUE(t.live.empty()) << t.live.size() << " blocks leaked";
 }
 
+TEST(EditAllocation, EveryFailingAllocationOfAPublishOntoLaterVersionsLeavesTheSceneAsItWas) {
+  // The publish of an edit whose base is older than the scene's current version merges it with what came between (the sibling edits'
+  // changes, the keys, the parameters); each allocation of that merge can fail, and the scene is then as it was: the same current version,
+  // the edit still open and publishable, nothing kept.
+  tracker::Tracker t;
+  GSHSCENE_Allocator a = tracker::allocator_for(&t);
+  {
+    SceneHolder s(nullptr, &a);
+    ASSERT_NE(s.scene, nullptr);
+    Ref sq(intern_square(s.store()));
+    GSHSCENE_Key kk = K(2, 1);
+    uint64_t g = 0;
+    VersionRef v0;
+    {
+      EditHolder e(s);
+      GSHSCENE_Node gn = group_node();
+      ASSERT_EQ(gshscene_edit_add(e.edit, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, &gn, &kk, &g), GSHSCENE_OK);
+      for (int i = 0; i < 6; i++) {
+        GSHSCENE_Node n = shape_node(sq.get(), i);
+        uint64_t out = 0;
+        ASSERT_EQ(gshscene_edit_add(e.edit, g, GSHSCENE_APPEND, &n, nullptr, &out), GSHSCENE_OK);
+      }
+      publish(s, e, &v0);
+    }
+    // A sibling publishes first (a shape under the group), so the base of the next edits is older than the current version.
+    {
+      EditHolder e(s, v0.get());
+      GSHSCENE_Node n = shape_node(sq.get(), 9);
+      uint64_t out = 0;
+      ASSERT_EQ(gshscene_edit_add(e.edit, g, GSHSCENE_APPEND, &n, nullptr, &out), GSHSCENE_OK);
+      publish(s, e);
+    }
+    bool done = false;
+    for (long k = 0; k < 400 && !done; k++) {
+      EditHolder e(s, v0.get());
+      ASSERT_NE(e.edit, nullptr);
+      GSHSCENE_Node n = shape_node(sq.get(), 7);
+      uint64_t out = 0;
+      ASSERT_EQ(gshscene_edit_add(e.edit, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, &n, nullptr, &out), GSHSCENE_OK);
+      GSHSCENE_Node second = group_node(0.5);
+      ASSERT_EQ(gshscene_edit_add(e.edit, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, &second, nullptr, &out), GSHSCENE_OK);
+      const GSHSCENE_Version * before = nullptr;
+      ASSERT_EQ(gshscene_scene_current(s.scene, &before), GSHSCENE_OK);
+      t.fail_from = t.calls + k;
+      t.persistent = false;
+      t.failed = false;
+      const GSHSCENE_Version * v = nullptr;
+      GSHSCENE_Problems * problems = nullptr;
+      GSHSCENE_Result r = gshscene_scene_publish(s.scene, e.edit, &problems, &v);
+      t.fail_from = -1;
+      const GSHSCENE_Version * after = nullptr;
+      ASSERT_EQ(gshscene_scene_current(s.scene, &after), GSHSCENE_OK);
+      if (r == GSHSCENE_OK) {
+        EXPECT_FALSE(t.failed) << "k=" << k;
+        gshscene_version_release(v);
+        done = true;
+      } else {
+        EXPECT_EQ(r, GSHSCENE_ERR_OOM) << "k=" << k;
+        EXPECT_EQ(after, before) << "k=" << k << ": a failed publish moved the current version";
+      }
+      gshscene_problems_destroy(problems);
+      gshscene_version_release(before);
+      gshscene_version_release(after);
+    }
+    EXPECT_TRUE(done);
+  }
+  EXPECT_TRUE(t.live.empty()) << t.live.size() << " blocks leaked";
+}
+
 TEST(EditAllocation, OpeningAnEditFailsCleanly) {
   tracker::Tracker t;
   GSHSCENE_Allocator a = tracker::allocator_for(&t);

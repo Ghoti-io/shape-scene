@@ -26,6 +26,7 @@
  */
 
 #include "scene_fixtures.h"
+#include "../alloc_tracker.h"
 
 #include <algorithm>
 #include <cmath>
@@ -147,6 +148,78 @@ TEST(DiffIds, AddedRemovedAndChangedAreNamedAscending) {
       {c, GSHSCENE_DIFF_CHANGED}, {added, GSHSCENE_DIFF_REMOVED}};
   EXPECT_EQ(back.changes, want_back);
   (void)b;
+}
+
+TEST(DiffIds, EveryFailingAllocationOfADiffLeavesNothingBehind) {
+  // CAP-15: the diff of two versions allocates its marks, its walk and its entries, and each of them can fail (the damage too, under a map
+  // and under none).  A failure is ERR_OOM with no diff, nothing it took is kept, and the diff that succeeds after the failures is the diff
+  // without them.
+  tracker::Tracker t;
+  GSHSCENE_Allocator a = tracker::allocator_for(&t);
+  {
+    SceneHolder s(nullptr, &a);
+    Ref sq(intern_square(s.store()));
+    auto shape = [&](EditHolder & e, uint64_t parent, double x, double y) {
+      GSHSCENE_Node n = shape_node(sq.get(), 0);
+      n.map = translate(x, y);
+      return add(e.edit, parent, n);
+    };
+    uint64_t g, moved, gone, kept;
+    VersionRef v1, v2;
+    {
+      EditHolder e(s);
+      g = add(e.edit, GSHSCENE_ROOT_ID, group_node());
+      moved = shape(e, g, 0, 0);
+      gone = shape(e, g, 10, 0);
+      kept = shape(e, GSHSCENE_ROOT_ID, 20, 0);
+      publish(s, e, &v1);
+    }
+    {
+      EditHolder e(s);
+      ASSERT_EQ(gshscene_edit_remove(e.edit, gone), GSHSCENE_OK);
+      GSHSCENE_Node n = shape_node(sq.get(), 0);
+      n.map = translate(3, 4);
+      ASSERT_EQ(gshscene_edit_set(e.edit, moved, &n), GSHSCENE_OK);
+      shape(e, GSHSCENE_ROOT_ID, 40, 0);
+      for (int i = 0; i < 12; i++) {
+        shape(e, g, 50 + 5 * i, 0);
+      }
+      publish(s, e, &v2);
+    }
+    (void)kept;
+    const GSHGEOM_Map scaled = scale_map(2.0);
+    for (const GSHGEOM_Map * map : {(const GSHGEOM_Map *)nullptr, &scaled}) {
+      Result want = diff_of(v1.get(), v2.get(), map);
+      bool done = false;
+      for (long k = 0; k < 400 && !done; k++) {
+        const size_t before = t.live.size();
+        t.fail_from = t.calls + k;
+        t.persistent = false;
+        t.failed = false;
+        GSHSCENE_Diff * d = nullptr;
+        GSHSCENE_Result r = gshscene_diff(v1.get(), v2.get(), map, nullptr, &d);
+        t.fail_from = -1;
+        if (r == GSHSCENE_OK) {
+          EXPECT_FALSE(t.failed) << "k=" << k;
+          std::vector<std::pair<uint64_t, int>> got;
+          for (size_t i = 0; i < gshscene_diff_count(d); i++) {
+            uint64_t id;
+            GSHSCENE_Diff_Kind kind;
+            ASSERT_EQ(gshscene_diff_get(d, i, &id, &kind), GSHSCENE_OK);
+            got.push_back({id, (int)kind});
+          }
+          EXPECT_EQ(got, want.changes) << "k=" << k;
+          gshscene_diff_destroy(d);
+          done = true;
+        } else {
+          EXPECT_EQ(r, GSHSCENE_ERR_OOM) << "k=" << k;
+          EXPECT_EQ(d, nullptr) << "k=" << k;
+        }
+        EXPECT_EQ(t.live.size(), before) << "k=" << k << ": a failed or finished diff kept memory";
+      }
+      EXPECT_TRUE(done);
+    }
+  }
 }
 
 TEST(DiffIds, TwoIndependentVersionsWithEqualContentDifferInNothing) {
