@@ -4942,9 +4942,71 @@ PLANTS += [
 ]
 
 
+# PLANT_OBJ_EQUIV=1: the mechanical proof of equivalence.  A plant of one source file is compiled beside the unplanted file, both from a
+# copy of the tree at the same relative path, with -g0, no identification string and the copy's prefix mapped away; if the two objects
+# are byte for byte the same, or their full disassemblies and section contents are (the symbol table and the relocations included),
+# the mutant is the same program and no test can tell it from the code.  Printed as `equiv` with the digest; a plant whose objects differ
+# is `differs` (a test must catch it, or a test is missing), one that does not compile is `nocompile` (the compiler caught it).
+# Header plants are not decided by this (every object that includes the header is rebuilt): they print `skipped`.
+def _object_text(obj):
+    out = []
+    for args in (["-d", "-r", "--no-show-raw-insn"], ["-s"], ["-t"]):
+        r = subprocess.run(["objdump"] + args + [str(obj)], capture_output=True, text=True)
+        out.append(r.stdout)
+    return "\n".join(out)
+
+
+def object_equivalence(plant):
+    pid, kind, fname, old, new, _tests = plant
+    if kind not in ("src", "srcl") or fname.endswith(".h"):
+        return pid, "skipped", "not a plant of one source file"
+    d = WORK / ("eq-" + pid)
+    shutil.rmtree(d, ignore_errors=True)
+    d.mkdir(parents=True)
+    original = (ROOT / fname).read_text()
+    try:
+        text = apply(original, old, new, pid) if kind == "src" else apply_line(original, old, new, pid)
+    except RuntimeError as e:
+        return pid, "error", str(e).splitlines()[0]
+    objs = []
+    for tag, body in (("control", original), ("planted", text)):
+        root = d / tag
+        shutil.copytree(ROOT / "src", root / "src", dirs_exist_ok=True)
+        (root / fname).write_text(body)
+        obj = root / "x.o"
+        r = run(CC + CFLAGS + ["-g0", "-fno-ident", "-ffile-prefix-map=%s=." % root, "-c", str(root / fname), "-o", str(obj)])
+        if r.returncode != 0:
+            shutil.rmtree(d, ignore_errors=True)
+            return pid, "nocompile", r.stderr.strip().splitlines()[0][:100] if r.stderr.strip() else ""
+        objs.append(obj)
+    same = objs[0].read_bytes() == objs[1].read_bytes()
+    how = "identical object bytes"
+    if not same:
+        a, b = _object_text(objs[0]), _object_text(objs[1])
+        same = a == b
+        how = "identical disassembly, section contents, symbols and relocations"
+    import hashlib
+    digest = hashlib.sha256(objs[0].read_bytes()).hexdigest()[:16]
+    shutil.rmtree(d, ignore_errors=True)
+    return pid, ("equiv" if same else "differs"), (how + ", control object sha256 " + digest) if same else ""
+
+
+def object_equivalence_main(plants):
+    counts = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=JOBS) as pool:
+        for pid, verdict, detail in pool.map(object_equivalence, plants):
+            counts[verdict] = counts.get(verdict, 0) + 1
+            print("%-9s %-40s %s" % (verdict, pid, detail))
+    print("object equivalence: %d plants: %s" % (len(plants), ", ".join("%d %s" % (v, k) for k, v in sorted(counts.items()))))
+    return 0
+
+
 def main():
     shutil.rmtree(WORK, ignore_errors=True)
     WORK.mkdir(parents=True)
+    if os.environ.get("PLANT_OBJ_EQUIV"):
+        chosen = [p for p in PLANTS if not ONLY or re.search(ONLY, p[0])]
+        return object_equivalence_main(chosen)
     srcs = sources()
     failures = 0
 
