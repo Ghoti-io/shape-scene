@@ -405,7 +405,12 @@ across a cell edge exactly once, where compositing the copies one after the othe
 gradient or an image in the tile moves with its copy, so a pixel that holds two copies of it takes the area-weighted mean of
 the two copies' center values. A
 clip block in the tile is the union of its copies' restricted regions, and a group is one group over all copies, its layer,
-opacity, blend mode and composite applied once to the union.
+opacity, blend mode and composite applied once to the union. A **union clip** in the tile (a clip block named by a `CLIP_UNION`
+resource) is formed per copy: its coverage in a copy is the area of the union of the members' regions, each cut to that copy's cell
+and to the pixel, and it takes the place of a single clip's area in the copy's weight; the copies' areas add as they do for a single
+clip, and the union is never formed across copies. The oracle states this by inclusion and exclusion over the members (the intersection of
+convex regions is convex), and the vectors hold overlapping, abutting, spilling, nested and three-member unions in abutting, gapped,
+rotated and overlapping lattices.
 
 **Cells that overlap (PT7).** When a repeating axis has a step smaller than the size, the copies are composited in lattice order,
 later over earlier. A tile whose blend modes are all Normal is, per copy, an isolated group of the tile with its shapes restricted

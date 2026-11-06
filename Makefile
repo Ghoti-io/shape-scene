@@ -562,14 +562,14 @@ check-pattern: ## Fail if the pattern oracle does not agree with itself, or test
 	@python3 tools/pattern-oracle.py --selftest
 	@python3 tools/gen-pattern-vectors.py --check
 	@for plant in separate-shapes copy0-source group-per-copy reverse-lattice-order tile-not-isolated keeps-tile-colors \
-		add-step left-plus-w content-not-clipped foreground-from-creator; do \
+		add-step left-plus-w content-not-clipped foreground-from-creator union-sum union-first-member union-product union-uncut; do \
 		if python3 tools/pattern-oracle.py --selftest --plant $$plant > /dev/null 2>&1; then \
 			echo "check-pattern: the planted defect $$plant was not caught by the selftest"; exit 1; \
 		fi; \
 		if python3 tools/gen-pattern-vectors.py --check --plant $$plant > /dev/null 2>&1; then \
 			echo "check-pattern: the planted defect $$plant was not caught by the vectors"; exit 1; \
 		fi; \
-	done; echo "check-pattern: the ten planted defects are each caught by the selftest and by the vectors"
+	done; echo "check-pattern: the fourteen planted defects are each caught by the selftest and by the vectors"
 
 check-clipunion: ## Fail if the clip union oracle does not agree with itself, or tests/clipunion_vectors.h is not what it writes
 	@python3 tools/clip-union-oracle.py --selftest

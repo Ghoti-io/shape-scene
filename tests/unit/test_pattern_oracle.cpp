@@ -157,7 +157,8 @@ TEST(PatternOracle, PlantedSceneFailuresAreNotNoise) {
   // A plant is caught by more than the tolerance: by at least 1e-3 on some pixel for the rules that change what a pixel shows
   // (the lattice-position plants move a pixel by far less, and are checked above).
   for (pr::Plant plant : {pr::kSeparateShapes, pr::kCopy0Source, pr::kGroupPerCopy, pr::kReverseLatticeOrder, pr::kTileNotIsolated,
-           pr::kKeepsTileColors, pr::kContentNotClipped, pr::kForegroundFromCreator}) {
+           pr::kKeepsTileColors, pr::kContentNotClipped, pr::kForegroundFromCreator, pr::kUnionSum, pr::kUnionFirstMember,
+           pr::kUnionProduct, pr::kUnionUncut}) {
     pr::PlantScope scope(plant);
     double worst = 0.0;
     for (int k = 0; k < pv::kSceneCount; k++) {

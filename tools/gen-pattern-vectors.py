@@ -47,7 +47,7 @@ spec = importlib.util.spec_from_file_location("pattern_oracle", os.path.join(HER
 oracle = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(oracle)
 
-KIND = {"fill": 1, "gpush": 2, "gpop": 3, "cpush": 4, "cpop": 5}
+KIND = {"fill": 1, "gpush": 2, "gpop": 3, "cpush": 4, "cpop": 5, "ucpush": 6}
 
 
 def hexd(x):
@@ -92,6 +92,7 @@ class Block(object):
             kind = KIND[k]
             paint, pts, rgba, ns, stops, p0, p1, img, imap, nest, opacity, comp = 0, "nullptr", (0, 0, 0, 0), 0, "nullptr", (0, 0), (0, 0), "nullptr", (0, 0, 0, 0), "nullptr", 0, 0
             count = 0
+            members, member_count = "nullptr", 0
             if k == "fill":
                 region, pt = op[1], op[2]
                 paint = pt[0]
@@ -117,8 +118,15 @@ class Block(object):
                 opacity, comp = op[1], op[2]
             elif k == "cpush":
                 pts, count = self.points(op[1]), len(op[1])
-            ops.append("{%d, %d, %d, %s, {%s}, %d, %s, {%s}, {%s}, %s, {%s}, %s, %s, %d}" % (
-                kind, paint, count, pts, hexs(rgba), ns, stops, hexs(p0), hexs(p1), img, hexs(imap), nest, hexd(opacity), comp))
+            elif k == "ucpush":
+                regions = [{"pts": self.points(r), "count": len(r)} for r in op[1]]
+                members = self.name("members")
+                self.lines.append("static const VRegion %s[] = {%s};\n" % (members, ", ".join(
+                    "{%d, %s}" % (r["count"], r["pts"]) for r in regions)))
+                member_count = len(regions)
+            ops.append("{%d, %d, %d, %s, {%s}, %d, %s, {%s}, {%s}, %s, {%s}, %s, %s, %d, %d, %s}" % (
+                kind, paint, count, pts, hexs(rgba), ns, stops, hexs(p0), hexs(p1), img, hexs(imap), nest, hexd(opacity), comp,
+                member_count, members))
         opsname = "nullptr"
         if ops:
             opsname = self.name("ops")
@@ -204,6 +212,12 @@ struct VStop {
   double rgba[4];
 };
 
+// A member of a union clip: a convex region in the tile's pattern space.
+struct VRegion {
+  int point_count;
+  const VPoint * points;
+};
+
 // A NEAREST image: straight rgba8 texels, row by row, top row first.
 struct VImage {
   int width;
@@ -213,7 +227,8 @@ struct VImage {
 
 struct VPattern;
 
-// One operation of a tile.  kind: 1 fill, 2 group push, 3 group pop, 4 clip push, 5 clip pop.
+// One operation of a tile.  kind: 1 fill, 2 group push, 3 group pop, 4 clip push, 5 clip pop, 6 union clip push (CU21; its pop
+// is kind 5): member_count convex regions in `members`, and the clip is their union, cut to the copy's cell.
 // fill: paint 1 solid (rgba straight), 2 linear gradient (stops, p0, p1 in the tile's pattern space; pad; straight
 // interpolation), 3 NEAREST image (image; pad; tile x = image_map[0] u + image_map[2], tile y = image_map[1] v +
 // image_map[3]), 4 pattern (nested; its map takes its space to the enclosing tile's space), 5 the drawing list's
@@ -235,6 +250,8 @@ struct VOp {
   const VPattern * nested;
   double opacity;
   int composite;
+  int member_count;
+  const VRegion * members;
 };
 
 // A pattern: the cell {x, y, w, h}, the steps {x_step, y_step}, the repeats, the tint (straight rgba, used when

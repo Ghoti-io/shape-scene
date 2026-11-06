@@ -52,7 +52,12 @@ pattern (its map takes its space to the enclosing tile's space).  The scene also
 - *Groups and clips.*  A group is ONE group over all copies: its layer starts transparent, its units are union
   elements as above, and at its pop `apply(P, o G, 1, composite)` composites it onto the enclosing layer (SRC_OVER:
   `L' = S + (1 - S.alpha) L`; MULTIPLY on premultiplied values: `Cr = (1 - ab) Cs + (1 - as) Cb + Cs Cb`,
-  `ar = as + ab - as ab`).  A clip block multiplies its clip coverage into the fills it holds (above).  **Restriction
+  `ar = as + ab - as ab`).  A clip block multiplies its clip coverage into the fills it holds (above).  **A union clip block (CU21)** is a clip whose
+  region is the union of several convex member regions: its coverage in the copy x is `u_x`, the exact area of the union of
+  the members' device regions `C(m + t_x)`, each intersected with `C(cell_x)` and the pixel (so the union is cut to the cell
+  exactly as a single clip is), computed here by inclusion and exclusion over the subsets of the members (the intersection of
+  convex polygons is convex, so each term is an exact convex clip), which shares nothing with the library's sweep.  `u_x` takes the place
+  of a single clip's area in the product `c_x`; the copies' areas add as ever, so the union is formed per copy and never across copies.  **Restriction
   (flagged):** a group pushed while a clip is in force is refused here (the product of clips would have to be defined
   for a union of copies, and no vector needs it); no scene of the vectors has one.
 - *The lattice picture (PT6, PT7, PT8).*  The layer starts at (0, 0, 0, 0), whatever the backdrop is.  When the cells do
@@ -84,7 +89,9 @@ must then fail: `separate-shapes` (PT6 units composited copy by copy: the seam p
 backdrop), `keeps-tile-colors` (an uncolored pattern keeps the tile's colors), `add-step` (a copy's position is the
 step added i times, in doubles), `left-plus-w` (an abutting cell's right edge is `left + w` in doubles),
 `content-not-clipped` (the tile's content is not restricted to its cell), `foreground-from-creator` (a FOREGROUND
-paint resolves against another color than the drawing list's).
+paint resolves against another color than the drawing list's), and for a union clip (CU21) `union-sum` (the members' areas are
+added: an overlap counts twice), `union-first-member` (only the first member clips), `union-product` (the members multiply, as nested
+clips would: the intersection) and `union-uncut` (the union is not restricted to the copy's cell).
 
     python3 tools/pattern-oracle.py --selftest
     python3 tools/pattern-oracle.py --selftest --plant NAME
@@ -96,7 +103,8 @@ from fractions import Fraction as F
 from math import ceil, floor
 
 PLANT_NAMES = ("separate-shapes", "copy0-source", "group-per-copy", "reverse-lattice-order", "tile-not-isolated",
-               "keeps-tile-colors", "add-step", "left-plus-w", "content-not-clipped", "foreground-from-creator")
+               "keeps-tile-colors", "add-step", "left-plus-w", "content-not-clipped", "foreground-from-creator",
+               "union-sum", "union-first-member", "union-product", "union-uncut")
 PLANTS = set()
 
 SRC_OVER, MULTIPLY = 1, 2
@@ -249,6 +257,11 @@ def cpush(region):
 CPOP = ("cpop",)
 
 
+def ucpush(*regions):
+    """A union clip block (CU21): the clip is the union of the convex @p regions (each a polygon in pattern space)."""
+    return ("ucpush", tuple(regions))
+
+
 def build_tree(ops):
     """The flat operations as a tree: ("fill", R, paint), ("group", o, composite, items), ("clip", R, items)."""
     root = []
@@ -263,6 +276,12 @@ def build_tree(ops):
             stack.append(("group", node[3]))
         elif k == "cpush":
             node = ("clip", op[1], [])
+            stack[-1][1].append(node)
+            stack.append(("clip", node[2]))
+        elif k == "ucpush":
+            if len(op[1]) < 1:
+                raise ValueError("a union clip has a member")
+            node = ("uclip", op[1], [])
             stack[-1][1].append(node)
             stack.append(("clip", node[2]))
         elif k in ("gpop", "cpop"):
@@ -295,7 +314,7 @@ def tree_has_blend(items):
     for it in items:
         if it[0] == "group" and (it[2] != SRC_OVER or tree_has_blend(it[3])):
             return True
-        if it[0] == "clip" and tree_has_blend(it[2]):
+        if it[0] in ("clip", "uclip") and tree_has_blend(it[2]):
             return True
     return False
 
@@ -528,6 +547,47 @@ def paint_integral(paint, reg, A, ctx, t):
     return tuple(A * c for c in v)
 
 
+def subsets(n):
+    """The non-empty subsets of range(n) as index tuples, by the bits of 1 .. 2^n - 1."""
+    return [tuple(i for i in range(n) if m >> i & 1) for m in range(1, 1 << n)]
+
+
+def intersection(polys):
+    """The intersection of convex polygons (exact), [] when it has no area."""
+    cur = polys[0]
+    for q in polys[1:]:
+        if len(cur) < 3:
+            return []
+        qq = ccw(q)
+        if qq is None:
+            return []
+        cur = convex_clip(cur, qq)
+    return cur if len(cur) >= 3 else []
+
+
+def clip_area(clip, cp, ctx):
+    """The area of a clip in the copy @p cp: a convex region's, or (CU21) the union of a union clip's members, each cut to the cell and the pixel."""
+    if isinstance(clip, tuple) and clip and clip[0] == "union":
+        members = clip[1]
+        cell = ctx.pixel if "union-uncut" in PLANTS else cp.cellpix
+        polys = [convex_clip(device_region(ctx, m, cp.t), cell) for m in members]
+        if "union-first-member" in PLANTS:
+            return area(polys[0])
+        if "union-sum" in PLANTS:
+            return sum((area(p) for p in polys), F(0))
+        if "union-product" in PLANTS:
+            prod = F(1)
+            for p in polys:
+                prod *= area(p)
+            return prod
+        total = F(0)
+        for sub in subsets(len(polys)):
+            term = area(intersection([polys[i] for i in sub]))
+            total += term if len(sub) % 2 == 1 else -term
+        return total
+    return area(convex_clip(device_region(ctx, clip, cp.t), cp.cellpix))
+
+
 def draw_fill(item, copies, layer, clips, ctx):
     _, region, paint = item
     total = [F(0)] * 4
@@ -538,7 +598,7 @@ def draw_fill(item, copies, layer, clips, ctx):
             continue
         c = F(1)
         for clip in clips:
-            c *= area(convex_clip(device_region(ctx, clip, cp.t), cp.cellpix))
+            c *= clip_area(clip, cp, ctx)
         if c == 0:
             continue
         tp = (F(0), F(0)) if "copy0-source" in PLANTS else cp.t
@@ -572,6 +632,8 @@ def draw_items(items, copies, layer, clips, ctx):
                     layer = draw_group(it, [cp], layer, clips, ctx)
             else:
                 layer = draw_group(it, copies, layer, clips, ctx)
+        elif it[0] == "uclip":
+            layer = draw_items(it[2], copies, layer, clips + [("union", it[1])], ctx)
         else:
             layer = draw_items(it[2], copies, layer, clips + [it[1]], ctx)
     return layer
@@ -708,6 +770,37 @@ def catalog():
     clip_tile = [fill(rect(0, 0, 3, 3), solid(*BG)), cpush(poly((-1, -1), (4, 1.5), (1, 4))),
                  fill(rect(0, 0, 3, 3), solid(0.1, 0.4, 0.8, 1.0)), fill(rect(0, 1, 3, 2), solid(*BAND)), CPOP]
     add("clip-block", Pat((0, 0, 3, 3), (3, 3), clip_tile, map=(1, 0, 0, 1, 0.4, 0.3)))
+    # --- union clips in the tile (CU21): the union of the members is formed in each copy, cut to the cell
+    ov_a, ov_b = rect(0, 0, 1.3, 1.3), rect(0.7, 0.7, 2, 2)
+    union_tile = [fill(rect(0, 0, 2, 2), solid(*BG)), ucpush(ov_a, ov_b),
+                  fill(rect(0, 0, 2, 2), solid(0.1, 0.4, 0.8, 1.0)), fill(rect(0, 1, 2, 1.5), solid(*BAND)), CPOP]
+    add("union-clip-abut", Pat((0, 0, 2, 2), (2, 2), union_tile, map=(1, 0, 0, 1, 0.375, 0.625)),
+        note="two members that overlap: the overlap is counted once")
+    spill_tile = [fill(rect(0, 0, 2, 2), solid(*BG)), ucpush(rect(-0.5, 0.2, 1.2, 1.0), rect(0.9, -0.3, 2.6, 1.4)),
+                  fill(rect(-1, -1, 3, 3), solid(0.8, 0.2, 0.3, 0.9)), CPOP]
+    add("union-clip-seam", Pat((0, 0, 2, 2), (2, 2), spill_tile, map=(1, 0, 0, 1, 0.5, 0.25)),
+        note="members that cross the cell edges: each copy's union is cut to its cell, and the seam pixel adds the copies' areas")
+    add("union-clip-gapped-rotate", Pat((0, 0, 3, 3), (4, 3.5),
+                                        [fill(rect(0, 0, 3, 3), solid(*BG)),
+                                         ucpush(poly((0.2, 0.3), (2.6, 0.5), (1.1, 2.4)), rect(1.5, 1.2, 2.9, 2.8), rect(0.1, 2.2, 0.9, 2.9)),
+                                         fill(rect(0, 0, 3, 3), solid(0.2, 0.7, 0.4, 1.0)), CPOP],
+                                        map=rot17), note="three members, one disjoint, under a rotation")
+    add("union-clip-overlap-lattice", Pat((0, 0, 3, 2), (2, 2),
+                                          [fill(rect(0, 0, 3, 2), solid(*BG)), ucpush(rect(0, 0, 2.2, 1.2), rect(1.4, 0.6, 3, 2)),
+                                           fill(rect(0, 0, 3, 2), solid(0.9, 0.5, 0.1, 0.8)), CPOP],
+                                          map=(1, 0, 0, 1, 0.5, 0.25)), note="overlapping cells (PT7): the union is cut to each copy's cell")
+    add("union-clip-in-clip", Pat((0, 0, 3, 3), (3, 3),
+                                  [fill(rect(0, 0, 3, 3), solid(*BG)), cpush(poly((-1, -1), (4, 1.5), (1, 4))),
+                                   ucpush(rect(0, 0, 2, 2), rect(1, 1, 3, 3)), fill(rect(0, 0, 3, 3), solid(0.1, 0.4, 0.8, 1.0)),
+                                   CPOP, CPOP], map=(1, 0, 0, 1, 0.4, 0.3)), note="a union clip inside a clip: the coverages multiply")
+    add("union-clip-gradient", Pat((0, 0, 2, 2), (2, 2),
+                                   [ucpush(rect(0, 0, 1.4, 1.4), rect(0.6, 0.6, 2, 2), poly((0, 2), (0.5, 0.9), (1.4, 2))),
+                                    fill(rect(0, 0, 2, 2), linear((0, 0), (2, 0), stops3)), CPOP],
+                                   map=(1, 0, 0, 1, 0.5, 0.25)), note="a gradient under a union clip of three members")
+    add("union-clip-single", Pat((0, 0, 2, 2), (2, 2),
+                                 [fill(rect(0, 0, 2, 2), solid(*BG)), ucpush(poly((0.2, 0.2), (1.8, 0.6), (0.9, 1.9))),
+                                  fill(rect(0, 0, 2, 2), solid(0.1, 0.4, 0.8, 1.0)), CPOP], map=(1, 0, 0, 1, 0.3, 0.7)),
+        note="a union of one member is its clip")
     add("stroke-band", Pat((0, 0, 2, 2), (2, 2),
                            [fill(poly((-0.5, 0.3), (2.5, 0.8), (2.5, 1.3), (-0.5, 0.8)), solid(0.1, 0.1, 0.1, 0.9)),
                             fill(poly((1.7, -0.5), (2.2, -0.5), (2.2, 2.5), (1.7, 2.5)), solid(0.9, 0.5, 0.1, 1.0))],
@@ -866,6 +959,45 @@ def run_selftest():
     # one after the other: 1 - (3/4)(3/4) = 7/16
     for q in ((0, 0), (1, 1), (1, 0), (3, 2)):
         ck(px_value(corner, q[0], q[1])[3] == F(7, 16), "hand corner pixel %r is 7/16" % (q,))
+
+    # --- union clips (CU21)
+    def black_in(*clip_ops, tile_w=2, cell=2, step=2, mp=ID, w=4, h=2):
+        return Scene("u", Pat((0, 0, cell, cell), (step, step), [*clip_ops, fill(rect(0, 0, tile_w, 2), solid(0, 0, 0, 1)), CPOP], map=mp),
+                     width=w, height=h)
+
+    # two members that overlap on [0.5, 1.25]: the union is [0, 1.75], so pixel 1 holds .75 (the sum of the areas would hold 1)
+    hu = black_in(ucpush(rect(0, 0, 1.25, 2), rect(0.5, 0, 1.75, 2)))
+    for px, want in ((0, F(1)), (1, F(3, 4)), (2, F(1)), (3, F(3, 4))):
+        ck(px_value(hu, px, 0)[3] == want, "union of two overlapping members, pixel %d: %r (want %r)" % (px, px_value(hu, px, 0)[3], want))
+    # abutting members make their union whole (the intersection has no area)
+    ab = black_in(ucpush(rect(0, 0, 1, 2), rect(1, 0, 2, 2)))
+    ck(all(px_value(ab, px, 0)[3] == 1 for px in range(4)), "abutting members make the whole cell")
+    # a member inside another changes nothing, a union of one member is its clip, and the order of the members does not matter
+    base = black_in(cpush(poly((0.2, 0.2), (1.8, 0.6), (0.9, 1.9))), mp=(1, 0, 0, 1, 0.3, 0.2))
+    one = black_in(ucpush(poly((0.2, 0.2), (1.8, 0.6), (0.9, 1.9))), mp=(1, 0, 0, 1, 0.3, 0.2))
+    inside = black_in(ucpush(poly((0.2, 0.2), (1.8, 0.6), (0.9, 1.9)), rect(0.9, 0.6, 1.0, 0.7)), mp=(1, 0, 0, 1, 0.3, 0.2))
+    swapped = black_in(ucpush(rect(0.9, 0.6, 1.0, 0.7), poly((0.2, 0.2), (1.8, 0.6), (0.9, 1.9))), mp=(1, 0, 0, 1, 0.3, 0.2))
+    twice = black_in(ucpush(poly((0.2, 0.2), (1.8, 0.6), (0.9, 1.9)), poly((0.2, 0.2), (1.8, 0.6), (0.9, 1.9))), mp=(1, 0, 0, 1, 0.3, 0.2))
+    for px in range(4):
+        for py in range(2):
+            b = px_value(base, px, py)
+            ck(px_value(one, px, py) == b, "a union of one member is its clip (%d, %d)" % (px, py))
+            ck(px_value(inside, px, py) == b, "a member inside another changes nothing (%d, %d)" % (px, py))
+            ck(px_value(swapped, px, py) == b, "the order of the members does not matter (%d, %d)" % (px, py))
+            ck(px_value(twice, px, py) == b, "a member twice is once (%d, %d)" % (px, py))
+    # the union is cut to the cell: members that spill give each copy only its cell's part.  A pixel a cell edge crosses holds the two
+    # copies' products c_x A_x (PT6): .25 + .25, where a pixel inside one cell holds 1
+    sp = black_in(ucpush(rect(-1, 0, 0.5, 2), rect(0.25, 0, 3, 2)), mp=(1, 0, 0, 1, 0.5, 0), w=6)
+    ck(all(px_value(sp, px, 0)[3] == (1 if px % 2 else F(1, 2)) for px in range(6)),
+       "spilling members: the union is the whole cell in each copy; a seam pixel holds the products of the two copies")
+    # the union of the members that tile a triangle's two halves is the triangle (an arrangement the sweep would have to cut on a diagonal)
+    tri = poly((0, 0), (2, 0), (0, 2))
+    half1 = poly((0, 0), (1, 0), (0, 2))
+    half2 = poly((1, 0), (2, 0), (0, 2))
+    t1 = black_in(ucpush(half1, half2), w=2)
+    t2 = black_in(cpush(tri), w=2)
+    ck(all(px_value(t1, px, py) == px_value(t2, px, py) for px in range(2) for py in range(2)),
+       "two halves of a triangle that share an edge (a diagonal the sweep would have to cut) are the triangle's own clip")
 
     # --- PT6 versus PT7 at the seam: the same seam pixel, abutting and one ulp below
     a, b = cat["abut-same-map"], cat["overlap-one-ulp"]

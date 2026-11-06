@@ -38,7 +38,8 @@
  * **Plants.**  Setting ::pattern_ref::g_plant breaks one rule on purpose, the way the oracle's `--plant` does, so a test can
  * show that its comparison with the vectors fails for each: `separate-shapes`, `copy0-source`, `group-per-copy`,
  * `reverse-lattice-order`, `tile-not-isolated`, `keeps-tile-colors`, `add-step`, `left-plus-w`, `content-not-clipped`,
- * `foreground-from-creator`.  `add-step` and `left-plus-w` change ::pattern_ref::cell and the translation of a copy.
+ * `foreground-from-creator`, and for a union clip (CU21) `union-sum`, `union-first-member`, `union-product` and `union-uncut`.
+ * `add-step` and `left-plus-w` change ::pattern_ref::cell and the translation of a copy.
  */
 
 #ifndef GHOTI_IO_GSHSCENE_TEST_REF_PATTERN_H
@@ -70,6 +71,10 @@ enum Plant {
   kLeftPlusW,
   kContentNotClipped,
   kForegroundFromCreator,
+  kUnionSum,
+  kUnionFirstMember,
+  kUnionProduct,
+  kUnionUncut,
   kPlantCount
 };
 
@@ -78,7 +83,8 @@ inline Plant g_plant = kNoPlant;
 
 inline const char * plant_name(Plant p) {
   static const char * const names[] = {"none", "separate-shapes", "copy0-source", "group-per-copy", "reverse-lattice-order",
-      "tile-not-isolated", "keeps-tile-colors", "add-step", "left-plus-w", "content-not-clipped", "foreground-from-creator"};
+      "tile-not-isolated", "keeps-tile-colors", "add-step", "left-plus-w", "content-not-clipped", "foreground-from-creator",
+      "union-sum", "union-first-member", "union-product", "union-uncut"};
   return names[p];
 }
 
@@ -455,6 +461,69 @@ inline Rgba paint_integral(const Env & e, const pv::VOp & op, double A, double t
   return out;
 }
 
+/** The device polygon of one member region of a union clip (CU21) in the copy @p cp. */
+inline Poly member_region(const Ctx & ctx, const pv::VRegion & m, const Copy & cp) {
+  Poly out;
+  for (int k = 0; k < m.point_count; k++) {
+    out.push_back(map_pt(ctx.C, Pt{m.points[k].x + cp.tx, m.points[k].y + cp.ty}));
+  }
+  return out;
+}
+
+/** The intersection of the convex polygons @p polys (all non-empty subsets' terms use it): empty when it has no area. */
+inline Poly intersection(const std::vector<Poly> & polys, const std::vector<size_t> & pick) {
+  Poly cur = polys[pick[0]];
+  for (size_t k = 1; k < pick.size(); k++) {
+    if (cur.size() < 3) {
+      return Poly{};
+    }
+    Poly q = ccw(polys[pick[k]]);
+    if (q.empty()) {
+      return Poly{};
+    }
+    cur = convex_clip(cur, q);
+  }
+  return cur.size() >= 3 ? cur : Poly{};
+}
+
+/** The coverage of a union clip push in the copy @p cp (CU21): the area of the union of its members, each cut to the cell and the pixel, by inclusion and exclusion. */
+inline double union_area(const Ctx & ctx, const pv::VOp & op, const Copy & cp) {
+  std::vector<Poly> polys;
+  for (int k = 0; k < op.member_count; k++) {
+    polys.push_back(convex_clip(member_region(ctx, op.members[k], cp), g_plant == kUnionUncut ? ctx.pixel : cp.cellpix));
+  }
+  if (g_plant == kUnionFirstMember) {
+    return area(polys[0]);
+  }
+  if (g_plant == kUnionSum) {
+    double sum = 0.0;
+    for (const Poly & p : polys) {
+      sum += area(p);
+    }
+    return sum;
+  }
+  if (g_plant == kUnionProduct) {
+    double prod = 1.0;
+    for (const Poly & p : polys) {
+      prod *= area(p);
+    }
+    return prod;
+  }
+  double total = 0.0;
+  const size_t n = polys.size();
+  for (size_t mask = 1; mask < ((size_t)1 << n); mask++) {
+    std::vector<size_t> pick;
+    for (size_t i = 0; i < n; i++) {
+      if (mask >> i & 1u) {
+        pick.push_back(i);
+      }
+    }
+    const double term = area(intersection(polys, pick));
+    total += pick.size() % 2 == 1 ? term : -term;
+  }
+  return total;
+}
+
 inline Rgba draw_fill(const Env & e, const pv::VOp & op, const CopyList & copies, Rgba layer, const Clips & clips) {
   const Ctx & ctx = *e.ctx;
   Rgba total = zero();
@@ -466,7 +535,7 @@ inline Rgba draw_fill(const Env & e, const pv::VOp & op, const CopyList & copies
     }
     double c = 1.0;
     for (const pv::VOp * clip : clips) {
-      c *= area(convex_clip(device_region(ctx, *clip, *cp), cp->cellpix));
+      c *= clip->kind == 6 ? union_area(ctx, *clip, *cp) : area(convex_clip(device_region(ctx, *clip, *cp), cp->cellpix));
     }
     if (!(c > 0.0)) {
       continue;
@@ -519,6 +588,7 @@ inline Rgba draw_items(const Env & e, size_t & pos, const CopyList & copies, Rgb
         break;
       }
       case 4:
+      case 6:  // a union clip push (CU21): its pop is the same kind-5 pop
         clips.push_back(&op);
         layer = draw_items(e, pos, copies, layer, clips);
         clips.pop_back();
