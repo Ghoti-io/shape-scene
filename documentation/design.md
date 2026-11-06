@@ -131,10 +131,7 @@ type and alpha form, with partial edge tiles, padded strides, takes and collisio
 read back, the same geometry untagged, paths of arcs) is a pair of its own, `primitive-hash` and `primitive-count`. The pattern
 section (random patterns over random tiles through the store, the result of every malformed one, the position of copies at indexes
 up to a million and the shared edge of abutting cells, a chain of nested patterns to the picture-depth limit, lists painted with
-patterns through the notice and the dispositions, and a retained scene of them) is the ninth, `pattern-hash` and `pattern-count`. The stroke section's value moved once with
-`shape-geometry`'s flattener revision 3: a stroke's clip region flattens rational curves, which the new conic
-route holds to a proved bound instead of a fixed two units, so the vertices of every conic in a clip moved and the
-stroke fold with them; no other pair did.
+patterns through the notice and the dispositions, and a retained scene of them) is the ninth, `pattern-hash` and `pattern-count`.
 
 ## Recording without floats (fixed.h; story 14c)
 
