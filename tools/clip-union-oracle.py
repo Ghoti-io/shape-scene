@@ -13,7 +13,8 @@
 Independent of the library and of every other oracle; `fractions.Fraction` throughout, no float takes part in a decision.
 
 A **member** is a list of closed polygons (contours) whose vertices are integer points of the 26.6 lattice (1/64 pixel,
-y down) and a fill rule ("nonzero" or "evenodd").  A union is a list of members; the grid is W x H pixels, pixel (px, py)
+y down) and a fill rule ("nonzero" or "evenodd"); the region it bounds is that of the polygon **as the scan converter cuts it** (`cut_polyline`:
+render.h, UC2), because every area the sink adds is the area of the pieces it deposits, whose cut points are rounded to the lattice.  A union is a list of members; the grid is W x H pixels, pixel (px, py)
 being the lattice square [64 px, 64 px + 64] x [64 py, 64 py + 64].
 
 Three numbers per pixel, which must agree where the members' boxes have disjoint interiors:
@@ -30,8 +31,19 @@ Three numbers per pixel, which must agree where the members' boxes have disjoint
     meets has constant membership in every member, so it counts whole in `inner` when the union holds at its centre and is left out
     otherwise; every cell an edge meets is added whole to `outer` (exact segment-against-closed-box tests).
 
-The committed byte is `min(255, floor(min(8192, area) / 32))` of (a).  A **disjointness** half classifies pairs of members by the
+The committed byte is `min(255, floor(min(8192, area) / 32))`.  A **disjointness** half classifies pairs of members by the
 interiors of their lattice boxes (the box of the vertices of polygon members).
+
+**The general tier (story A3b, rules CG1 to CG4; `union_units`).**  The members are partitioned into **groups**, the connected
+components of the relation "the interiors of the two members' boxes meet" (CU16's overlap, the graph's edges).  The area of a pixel is
+the sum over the groups, held at 8192, of the group's area: for a group of one member its own area `a_i` (the number of AD-12, the
+member's accumulated winding area reduced by its rule, which for a member that does not overlap itself inside the pixel is the exact
+area of its region); for a group of two or more, the **floor** of the exact area (a) of the union of the group's members' regions in
+the pixel, a whole number of units.  When every group is a single member (the members' boxes are pairwise interior-disjoint) this is
+(b), the fast tier's form, so the general tier equals the fast tier wherever the fast tier applies, including for a member that
+overlaps itself.  A pixel's exact area (a) is a rational; the sink computes it with an error of less than (8 K + 2 E + 1) 2^-30 of a unit for K meetings and E evaluations
+at slabs' ends (under 2^-12 up to 2^17 meetings), so a vector is committed only where its distance below the next whole unit is 0 or at
+least 2^-12 (`margin_ok`), and the selftest asserts it.
 
 `--selftest [--plant NAME]` runs the oracle's invariants over a family of cases (a must lie in c's bracket, and equal b where the
 boxes are disjoint) and `--plant` breaks the oracle on purpose; each plant must make the selftest fail:
@@ -42,6 +54,12 @@ boxes are disjoint) and `--plant` breaks the oracle on purpose; each plant must 
   one-rule         the first member's rule is applied to every member
   no-saturate      the sum of areas is not held at 8192
   outer-ignores-boundary  the bracket's outer count leaves out the cells an edge meets
+  one-group        every member is one group (a self-overlapping member far from the others is then made exact)
+  no-groups        every member is a group of its own (an overlapping pair is then summed, counting the overlap twice)
+  round-not-floor  a group's exact area is rounded to the nearest unit, ties up, instead of floored
+  group-by-closed-boxes  groups by the closed boxes (boxes that touch are joined)
+  dense-in-group   a group of several members takes the sum of its members' own areas, saturated, where it overlaps itself
+  uncut            the edges are not cut at the pixel boundaries (the polygons are the devices paths' own, not the pieces the scan converter makes)
 """
 import sys
 from fractions import Fraction as F
@@ -50,14 +68,67 @@ from itertools import combinations
 PLANT = None
 
 
+def round_div(n, d):
+    """Integer division rounding half away from zero (the scan converter's rounding of a cut)."""
+    q = (abs(n) + abs(d) // 2) // abs(d)
+    return -q if (n < 0) != (d < 0) else q
+
+
+def cut_polyline(a, b):
+    """The lattice points of the edge a -> b as the scan converter cuts it (render.h, UC2), in the direction a -> b: the edge is cut from
+    its upper end (the lesser y; an edge that goes up is cut as its reverse is and then handed on reversed), at every row boundary it
+    crosses, and each row's piece at every column boundary it crosses; every cut point is the rounding of the cut from the start of
+    the piece it is cut from (the edge's, then the row piece's), so a slanted edge becomes a polyline of lattice points that is not
+    the edge.  A horizontal edge is not cut."""
+    if a[1] == b[1]:
+        return [a, b]
+    rev = a[1] > b[1]
+    f, t = (b, a) if rev else (a, b)
+    pts = [f]
+    for ey in range(f[1] // 64, t[1] // 64 + 1):
+        if PLANT == "uncut":
+            break
+        pa = f if ey == f[1] // 64 else (f[0] + round_div((ey * 64 - f[1]) * (t[0] - f[0]), t[1] - f[1]), ey * 64)
+        pb = t if ey == t[1] // 64 else (f[0] + round_div(((ey + 1) * 64 - f[1]) * (t[0] - f[0]), t[1] - f[1]), (ey + 1) * 64)
+        ex1, ex2 = pa[0] // 64, pb[0] // 64
+        if ex1 != ex2:
+            right = ex2 > ex1
+            for ex in (range(ex1, ex2) if right else range(ex1, ex2, -1)):
+                bx = (ex + 1) * 64 if right else ex * 64
+                pts.append((bx, pa[1] + round_div((bx - pa[0]) * (pb[1] - pa[1]), pb[0] - pa[0])))
+        pts.append(pb)
+    if PLANT == "uncut":
+        pts = [f, t]
+    out = []
+    for p in pts:
+        if not out or out[-1] != p:
+            out.append(p)
+    return out[::-1] if rev else out
+
+
+_EDGES = {}
+
+
 def edges_of(member):
+    """The member's edges as the scan converter deposits them (cut_polyline); kept, because every area asks for them again."""
+    hit = _EDGES.get(id(member))
+    if hit is not None and hit[0] is member and hit[1] == PLANT:
+        return hit[2]
+    es = _edges_of(member)
+    _EDGES[id(member)] = (member, PLANT, es)
+    return es
+
+
+def _edges_of(member):
     es = []
     for contour in member[0]:
         n = len(contour)
         for i in range(n):
             a, b = contour[i], contour[(i + 1) % n]
             if a != b:
-                es.append((F(a[0]), F(a[1]), F(b[0]), F(b[1])))
+                pts = cut_polyline(a, b)
+                for u, v in zip(pts, pts[1:]):
+                    es.append((F(u[0]), F(u[1]), F(v[0]), F(v[1])))
     return es
 
 
@@ -150,8 +221,22 @@ def measure(intervals_by_member, rules, union=True):
     return total
 
 
+_AREAS = {}
+
+
 def exact_area(members, px, py):
-    """(a): the exact area of the union in the pixel, in 1/8192 pixel."""
+    """(a): the exact area of the union in the pixel, in 1/8192 pixel (kept: the selftest asks for the same area several times)."""
+    key = (tuple(id(m) for m in members), px, py, PLANT)
+    hit = _AREAS.get(key)
+    if hit is not None and all(a is b for a, b in zip(hit[0], members)):
+        return hit[1]
+    area = _exact_area(members, px, py)
+    _AREAS[key] = (list(members), area)
+    return area
+
+
+def _exact_area(members, px, py):
+    """(a), computed."""
     px0, px1, py0, py1 = F(64 * px), F(64 * px + 64), F(64 * py), F(64 * py + 64)
     xs = breakpoints(members, px0, px1, py0, py1)
     rules = [m[1] if PLANT != "one-rule" else members[0][1] for m in members]
@@ -204,9 +289,10 @@ def byte_of(area):
 
 
 def byte(members, px, py):
+    """The committed byte of a pixel (CG3): the level of the sum over the groups of each group's area."""
     if PLANT == "sum-bytes":
         return min(255, sum(byte_of(fold(member_area(m, px, py), m[1])) for m in members))
-    return byte_of(exact_area(members, px, py))
+    return general_byte(members, px, py)
 
 
 def point_in(member, x, y):
@@ -256,7 +342,7 @@ def bracket(members, px, py, k=8):
                 if PLANT != "outer-ignores-boundary":
                     outer += unit
             else:
-                cx, cy = bx0 + cell / 2, by0 + cell / 2
+                cx, cy = bx0 + cell / 2 + F(1, 4096), by0 + cell / 2 + F(1, 8192)  # off the lattice, where a vertex's x would make the winding ambiguous
                 if any(holds(m[1], point_in(m, cx, cy)) for m in members):
                     inner += unit
                     outer += unit
@@ -282,6 +368,73 @@ def boxes_disjoint(a, b):
 
 def union_disjoint(members):
     return all(boxes_disjoint(a, b) for a, b in combinations(members, 2))
+
+
+def group_of(members):
+    """CG2: the groups, the connected components of the relation "the interiors of the boxes meet"; each a list of member indices, in order."""
+    n = len(members)
+    parent = list(range(n))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    if PLANT == "one-group":
+        return [list(range(n))] if n else []
+    if PLANT != "no-groups":
+        for i in range(n):
+            for j in range(i + 1, n):
+                if PLANT == "group-by-closed-boxes":
+                    bi, bj = box_of(members[i]), box_of(members[j])
+                    meet = bi is not None and bj is not None and max(bi[0], bj[0]) <= min(bi[2], bj[2]) and max(bi[1], bj[1]) <= min(bi[3], bj[3])
+                else:
+                    meet = not boxes_disjoint(members[i], members[j])
+                if meet:
+                    parent[find(i)] = find(j)
+    out = {}
+    for i in range(n):
+        out.setdefault(find(i), []).append(i)
+    return [out[k] for k in sorted(out, key=lambda r: min(out[r]))]
+
+
+def group_units(members, g, px, py):
+    """CG3: the area of one group in the pixel, in whole units."""
+    if len(g) == 1:
+        m = members[g[0]]
+        return fold(member_area(m, px, py), m[1])
+    sub = [members[i] for i in g]
+    a = exact_area(sub, px, py)
+    if PLANT == "dense-in-group":
+        return min(F(8192), sum(fold(member_area(m, px, py), m[1]) for m in sub))
+    if PLANT == "round-not-floor":
+        return min(F(8192), (a + F(1, 2)) // 1)
+    return min(F(8192), a // 1)
+
+
+def union_units(members, px, py):
+    """CG3: the pixel's area, the sum over the groups held at 8192, in whole units (the committed byte is its level)."""
+    total = F(0)
+    for g in group_of(members):
+        total += group_units(members, g, px, py)
+    return min(total, F(8192))
+
+
+def margin_ok(members, px, py):
+    """The sink's error bound (under 2^-12 of a unit for up to 2^17 meetings): the exact area of a group is 0 below a whole unit or at least 2^-12 below the next."""
+    for g in group_of(members):
+        if len(g) > 1:
+            a = exact_area([members[i] for i in g], px, py)
+            gap = (-a) % 1
+            if gap != 0 and gap < F(1, 4096):
+                return False
+    return True
+
+
+def general_byte(members, px, py):
+    """The byte of a union under the general tier (CG3): the level of union_units."""
+    return byte_of(union_units(members, px, py))
 
 
 def render(members, w, h):
@@ -311,6 +464,60 @@ def selftest_cases():
     return cases
 
 
+def general_cases():
+    """Named unions the general tier is committed against (CG3): overlapping, nested, with holes, abutting and coincident edges, a rule per
+    member, boxes that touch, a member that overlaps itself beside and inside a group, and seeded random polygons."""
+    R = rect
+    cases = []
+    cases.append(("g-overlap-one-unit", [([R(0, 0, 100, 100)], "nonzero"), ([R(99, 0, 200, 100)], "nonzero")]))
+    cases.append(("g-overlap-pixel", [([R(10, 10, 120, 120)], "nonzero"), ([R(56, 10, 190, 120)], "nonzero")]))
+    cases.append(("g-nested", [([R(0, 0, 192, 192)], "nonzero"), ([R(60, 60, 130, 130)], "nonzero"), ([R(150, 10, 250, 80)], "nonzero")]))
+    cases.append(("g-hole-filled-partly", [([R(0, 0, 192, 192), R(48, 48, 144, 144)[::-1]], "nonzero"), ([R(100, 60, 230, 130)], "nonzero")]))
+    cases.append(("g-evenodd-ring-and-nonzero", [([R(0, 0, 192, 192), R(48, 48, 144, 144)], "evenodd"), ([R(100, 60, 230, 130)], "nonzero")]))
+    cases.append(("g-coincident-edges", [([R(0, 0, 100, 100)], "nonzero"), ([R(0, 20, 60, 80)], "nonzero"), ([R(30, 0, 130, 40)], "nonzero")]))
+    cases.append(("g-same-region-two-rules", [([R(10, 10, 150, 150)], "nonzero"), ([R(10, 10, 150, 150)], "evenodd")]))
+    cases.append(("g-crossing-slivers", [([[(0, 0), (192, 61), (192, 101), (0, 40)]], "nonzero"), ([[(0, 120), (192, 20), (192, 60), (0, 161)]], "nonzero")]))
+    star = [(96, 0), (156, 186), (0, 70), (192, 70), (36, 186)]
+    cases.append(("g-star-rules", [([star], "nonzero"), ([[(x + 40, y + 20) for x, y in star]], "evenodd")]))
+    cases.append(("g-chain", [([R(0, 0, 100, 100)], "nonzero"), ([R(90, 0, 190, 100)], "nonzero"), ([R(180, 0, 280, 100)], "nonzero")]))
+    cases.append(("g-two-groups-and-a-single", [([R(0, 0, 80, 80)], "nonzero"), ([R(50, 20, 120, 100)], "evenodd"),
+                                                ([[(200, 0), (330, 90), (200, 100)]], "nonzero"), ([[(200, 70), (340, 10), (330, 100)]], "nonzero"),
+                                                ([R(400, 10, 470, 90)], "nonzero")]))
+    cases.append(("g-selfoverlap-singleton-beside-group", [([R(0, 0, 100, 100)], "nonzero"), ([R(60, 30, 150, 120)], "nonzero"),
+                                                           ([R(256, 0, 304, 64), R(256, 0, 304, 64)], "nonzero")]))
+    cases.append(("g-selfoverlap-in-group", [([R(0, 0, 40, 64), R(0, 0, 40, 64)], "nonzero"), ([R(20, 10, 60, 50)], "nonzero")]))
+    cases.append(("g-touching-boxes", [([R(0, 0, 100, 100)], "nonzero"), ([R(100, 0, 200, 100)], "nonzero"), ([R(200, 0, 300, 100)], "nonzero")]))
+    cases.append(("g-corner-touch-and-overlap", [([R(0, 0, 64, 64)], "nonzero"), ([R(64, 64, 128, 128)], "nonzero"), ([R(40, 40, 100, 100)], "nonzero")]))
+    cases.append(("g-degenerate-members", [([], "nonzero"), ([R(30, 30, 30, 90)], "nonzero"), ([R(0, 0, 90, 90)], "nonzero"), ([R(45, 45, 130, 130)], "evenodd")]))
+    cases.append(("g-many-in-one-pixel", [([[(0, 0), (60, 20), (0, 9)]], "nonzero"), ([[(0, 30), (63, 3), (63, 14)]], "nonzero"),
+                                          ([[(5, 0), (30, 63), (14, 63)]], "nonzero"), ([[(60, 0), (33, 63), (49, 63)]], "nonzero"),
+                                          ([[(0, 55), (63, 40), (63, 51)]], "evenodd")]))
+    cases.append(("g-mixed-orientation", [([R(0, 0, 100, 100)], "nonzero"), ([R(60, 40, 170, 130)[::-1]], "nonzero")]))
+    dodeca = [(48 + int(round(40 * __import__("math").cos(k * 3.14159265358979 / 6))), 48 + int(round(40 * __import__("math").sin(k * 3.14159265358979 / 6)))) for k in range(12)]
+    cases.append(("g-twelve-gons", [([dodeca], "nonzero"), ([[(x + 50, y + 10) for x, y in dodeca]], "nonzero"), ([R(30, 60, 110, 100)], "nonzero")]))
+    import random
+    rng = random.Random(20261106)
+    made = 0
+    attempts = 0
+    while made < 20 and attempts < 400:
+        attempts += 1
+        k = rng.choice([2, 2, 3, 4])
+        members = []
+        for _ in range(k):
+            nv = rng.choice([3, 3, 4, 5, 6])
+            poly = [(rng.randrange(0, 192), rng.randrange(0, 192)) for _ in range(nv)]
+            members.append(([poly], rng.choice(["nonzero", "evenodd"])))
+        if union_disjoint(members):
+            continue
+        w = max(1, (max(box_of(m)[2] for m in members if box_of(m)) + 63) // 64)
+        h = max(1, (max(box_of(m)[3] for m in members if box_of(m)) + 63) // 64)
+        if not all(margin_ok(members, x, y) for y in range(h) for x in range(w)):
+            continue
+        cases.append(("g-rand-%02d" % made, members))
+        made += 1
+    return cases
+
+
 def selftest():
     bad = []
     for ci, members in enumerate(selftest_cases()):
@@ -323,7 +530,7 @@ def selftest():
                 lo, hi = bracket(members, x, y)
                 if not (lo <= a <= hi):
                     bad.append("case %d pixel (%d,%d): exact area %s outside bracket [%s, %s]" % (ci, x, y, a, lo, hi))
-                if byte(members, x, y) != byte_of(a):
+                if ci not in (10, 11) and byte(members, x, y) != byte_of(a):
                     bad.append("case %d pixel (%d,%d): byte %d != byte of the exact area %d" % (ci, x, y, byte(members, x, y), byte_of(a)))
                 if disjoint and ci == 10:
                     # The inherited difference (CU2): a member whose contours overlap inside the pixel (a hole inside a pixel
@@ -341,6 +548,7 @@ def selftest():
             bad.append("case 0 (abutting): touching boxes read as overlapping")
         if ci == 6 and disjoint:
             bad.append("case 6 (overlap): read as disjoint")
+    bad.extend(selftest_general())
     # the quantization example: 48 + 48 units are 96 units, three levels
     two = selftest_cases()[2]
     if byte(two, 0, 0) != 255:
@@ -349,6 +557,87 @@ def selftest():
     if byte(quant, 0, 0) != 3:
         bad.append("48 and 48 units are not three levels (one quantization): %d" % byte(quant, 0, 0))
     return bad
+
+
+SELF_OVERLAP_CASES = ("g-selfoverlap-singleton-beside-group", "g-selfoverlap-in-group")
+SELF_OVERLAP_APART = "g-selfoverlap-singleton-beside-group"  # the singleton keeps its own (AD-12) number: not the exact area of the whole union
+
+
+def selftest_cut():
+    """The cut of an edge at the pixel boundaries (render.h, UC2), against points worked by hand."""
+    bad = []
+    want = {
+        ((0, 0), (192, 61)): [(0, 0), (64, 20), (128, 41), (192, 61)],        # 64 * 61 / 192 = 20.33, 128 * 61 / 192 = 40.67
+        ((10, 0), (40, 100)): [(10, 0), (29, 64), (40, 100)],                  # 10 + 64 * 30 / 100 = 29.2
+        ((40, 100), (10, 0)): [(40, 100), (29, 64), (10, 0)],                  # the reverse is the same points, cut from the upper end
+        ((0, 0), (0, 150)): [(0, 0), (0, 64), (0, 128), (0, 150)],             # a vertical edge keeps its x
+        ((0, 5), (100, 5)): [(0, 5), (100, 5)],                                # a horizontal edge is not cut
+        ((130, 70), (-10, 130)): [(130, 70), (128, 71), (64, 98), (0, 126), (-5, 128), (-10, 130)],  # leftward, across three columns and the row boundary y = 128 at x = -5
+    }
+    for (a, b), pts in want.items():
+        got = cut_polyline(a, b)
+        if got != pts:
+            bad.append("cut_polyline(%s, %s) = %s, worked by hand %s" % (a, b, got, pts))
+    return bad
+
+
+def selftest_general():
+    """CG2 to CG4 over the general cases."""
+    bad = selftest_cut()
+    seen_fraction_over_half = False
+    seen_group_of_three = False
+    for name, members in selftest_cases_named() + general_cases():
+        boxes = [box_of(m) for m in members if box_of(m)]
+        w = max(1, (max(b[2] for b in boxes) + 63) // 64) if boxes else 1
+        h = max(1, (max(b[3] for b in boxes) + 63) // 64) if boxes else 1
+        groups = group_of(members)
+        disjoint = union_disjoint(members)
+        if disjoint and any(len(g) > 1 for g in groups):
+            bad.append("%s: boxes are disjoint but a group has several members" % name)
+        if any(len(g) >= 3 for g in groups):
+            seen_group_of_three = True
+        differs = False
+        for y in range(h):
+            for x in range(w):
+                u = union_units(members, x, y)
+                if u != int(u):
+                    bad.append("%s pixel (%d,%d): the area %s is not a whole unit" % (name, x, y, u))
+                if not margin_ok(members, x, y):
+                    bad.append("%s pixel (%d,%d): the exact area is within 2^-12 below a whole unit" % (name, x, y))
+                if disjoint and u != sum_area(members, x, y):
+                    bad.append("%s pixel (%d,%d): the general tier's area %s differs from the fast tier's form %s" % (name, x, y, u, sum_area(members, x, y)))
+                whole = min(F(8192), exact_area(members, x, y) // 1)
+                if u != whole:
+                    differs = True
+                    if name not in SELF_OVERLAP_CASES and name != "ring-and-rect" and name != "self-overlap-beside":
+                        bad.append("%s pixel (%d,%d): area %s differs from the floor of the exact area of the whole union %s" % (name, x, y, u, whole))
+                for g in groups:
+                    if len(g) > 1:
+                        a = exact_area([members[i] for i in g], x, y)
+                        lo, hi = bracket([members[i] for i in g], x, y, 4)
+                        if not (lo <= a <= hi):
+                            bad.append("%s pixel (%d,%d): a group's exact area %s outside its bracket [%s, %s]" % (name, x, y, a, lo, hi))
+                        if a - (a // 1) >= F(1, 2):
+                            seen_fraction_over_half = True
+        if name == SELF_OVERLAP_APART and not differs:
+            bad.append("%s: a self-overlapping member apart from the group left no difference from the exact area of the whole union" % name)
+        if name == "g-selfoverlap-in-group":
+            ins = [members[i] for i in groups[0]]
+            if all(union_units(members, x, y) == min(F(8192), sum(fold(member_area(m, x, y), m[1]) for m in ins)) for y in range(h) for x in range(w)):
+                bad.append("%s: a self-overlapping member in a group left no difference from the sum of the members' own areas" % name)
+    if not seen_fraction_over_half:
+        bad.append("no vector has a group's exact area with a fraction of a half or more: floor and rounding are not told apart")
+    if not seen_group_of_three:
+        bad.append("no vector has a group of three or more members")
+    return bad
+
+
+CASE_NAMES = ["abutting-at-3.5", "shared-corner", "48-and-48-units", "apart-mixed-rules", "ring-beside-rect", "two-triangles",
+              "overlapping", "opposite-orientation", "empty-member", "one-quantization", "ring-and-rect", "self-overlap-beside", "rect-then-ring"]
+
+
+def selftest_cases_named():
+    return list(zip(CASE_NAMES, selftest_cases()))
 
 
 def main(argv):

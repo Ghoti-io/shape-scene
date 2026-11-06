@@ -574,16 +574,16 @@ check-pattern: ## Fail if the pattern oracle does not agree with itself, or test
 check-clipunion: ## Fail if the clip union oracle does not agree with itself, or tests/clipunion_vectors.h is not what it writes
 	@python3 tools/clip-union-oracle.py --selftest
 	@python3 tools/gen-clipunion-vectors.py --check
-	@for plant in sum-bytes touching-overlap edge-twice one-rule no-saturate outer-ignores-boundary; do \
+	@for plant in sum-bytes touching-overlap edge-twice one-rule no-saturate outer-ignores-boundary one-group no-groups round-not-floor group-by-closed-boxes dense-in-group uncut; do \
 		if python3 tools/clip-union-oracle.py --selftest --plant $$plant > /dev/null 2>&1; then \
 			echo "check-clipunion: the planted defect $$plant was not caught by the selftest"; exit 1; \
 		fi; \
 	done
-	@for plant in sum-bytes touching-overlap one-rule; do \
+	@for plant in sum-bytes touching-overlap one-rule one-group no-groups round-not-floor group-by-closed-boxes dense-in-group uncut; do \
 		if python3 tools/gen-clipunion-vectors.py --check --plant $$plant > /dev/null 2>&1; then \
 			echo "check-clipunion: the planted defect $$plant was not caught by the vectors"; exit 1; \
 		fi; \
-	done; echo "check-clipunion: the six planted defects are each caught by the selftest and three by the vectors (the rest change no committed byte)"
+	done; echo "check-clipunion: the twelve planted defects are each caught by the selftest and nine by the vectors (the rest change no committed byte)"
 
 # Only the application publishes (AD-9, CAP-11): what an edit can reach has no publish, and an edit cannot stand where
 # the scene goes.  The probes in tests/types are compiled, never linked: the control must compile, the violations must not.

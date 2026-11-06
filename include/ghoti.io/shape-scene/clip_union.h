@@ -37,8 +37,13 @@
  *
  * Coverage is exact area of the region in the pixel, quantized once.  For a pixel `P` let `a_i(P)` be member `i`'s area in units of
  * 1/8192 of a pixel (`0 <= a_i <= 8192`, reduced by the member's rule as a fill's accumulated winding area is).  For members whose
- * regions are pairwise interior-disjoint the coverage byte is `min(255, floor(min(8192, sum a_i) / 32))`; for any union it is
- * `floor` of 1/32 of the exact area of the union, saturating at 255 (a sink that claims ::GSHSCENE_CAP_CLIP_UNION_GENERAL).
+ * device boxes have pairwise disjoint interiors the coverage byte is `min(255, floor(min(8192, sum a_i) / 32))`.  A sink that claims
+ * ::GSHSCENE_CAP_CLIP_UNION_GENERAL draws any union: the members are partitioned into groups, the connected components of "the interiors
+ * of the two members' device boxes meet"; the pixel's area is the sum over the groups, held at 8192, of the group's area (for a group of one
+ * member its own `a_i`; for a group of several the floor of the exact area, in the same units, of the union of the members' regions, each
+ * region the points where the member's own rule holds at the member's own winding), and the byte is `min(255, floor(area / 32))`.  That is
+ * the fast tier's value wherever the fast tier applies, since every member is then a group of its own.  A region is the one the scan
+ * converter deposits (its edges cut at the pixel boundaries, every cut point rounded to the lattice).
  * Quantization happens once, on the sum.  No sink lowers a union as an alpha mask and no sink forms its coverage from the members'
  * 8-bit coverages: two abutting halves give 255 at the shared pixel where a mask of the same shapes gives 192.
  * A member with no segment, a zero-area contour or a singular map has an empty region and contributes 0; a union all of whose

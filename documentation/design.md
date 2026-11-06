@@ -487,8 +487,24 @@ cannot be formed) is reported as `(i, i)`.
 claims `GENERAL` without `CLIP_UNION` breaks the caps contract and is `ERR_INTERNAL` at its first caps call, as every inconsistent set of
 caps is. `CLIP_UNION` (41) and `UNION_OVERLAP` (42) are refusals per clip push, decided after the glyph-source refusal and before every
 approximation; `second` is `i << 16 | j`. The test sink claims both caps and records a union's members (`m` lines, record bit 4);
-`shape-cpu` claims only the first. The general tier is a separate story (exact-primitives `open-items.md` item 1) and nothing changes
-for a front end when it exists.
+`shape-cpu` claims both: the fast tier draws a union the predicate shows disjoint and the general tier any other. Nothing changes for a
+front end between the two: it names members and nothing else.
+
+**The general tier's value (CG2, CG3).** A sink that claims `CLIP_UNION_GENERAL` gives, for every pixel, the number below, which
+is the fast tier's wherever the fast tier applies and the exact area of the union where members overlap. The members are partitioned
+into **groups**, the connected components of the relation "the interiors of two members' device boxes meet" (the relation of the
+predicate; every member of a union whose members are provably disjoint is a group of its own). The area of a pixel is the sum over the
+groups, held at 8192, of the group's area: for a group of one member, its own area `a_i` (AD-12's number, above); for a group of two or
+more, the **floor** of the exact area, in units of 1/8192 pixel, of the union of the group's members' regions in the pixel, each region
+the points where the member's own rule holds at the member's own winding (nonzero, or odd), orientation irrelevant. The byte is
+`min(255, floor(area / 32))`. Two things are fixed by this and not by taste. A member that overlaps itself inside one pixel keeps AD-12's
+saturating-sum number when it is alone in its group, so the general tier equals the fast tier on every union the fast tier takes; in a
+group its region is the exact one, because the exact area of a union is a statement about regions and the saturating sum is not. And a
+region is the region of the polygon **as the scan converter cuts it**: every edge is cut at the pixel boundaries and each cut point is
+rounded to the lattice (shape-cpu `render.h`, UC2), so a slanted edge is the polyline of the pieces that are deposited and not the
+straight segment between its ends. The oracle (`tools/clip-union-oracle.py`) is exact rational arithmetic over those polylines and
+commits its answers (`tests/clipunion_vectors.h`); a vector is committed only where the exact area of a group is a whole unit or
+at least 2^-12 below the next one, which is the margin the sink's integer arithmetic keeps (its error is `(8 K + 2 E + 1) 2^-30` of a unit for `K` meetings, under 2^-12 up to 2^17).
 
 **Limits.** `max_clip_members` (default 256, ceiling 1024, checked at the creation of the store); the count counted is the one given,
 before duplicates are removed. A glyph run from a font is not a member (`ERR_UNSUPPORTED`; its per-glyph report entries are keyed by
