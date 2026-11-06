@@ -471,8 +471,8 @@ that are provably disjoint, with `a_i` the member's own accumulated area reduced
 floor(b/32)` is not `floor((a+b)/32)`: summing 8-bit coverages leaves a seam where two shapes share an edge (two half pixels compose to
 3/4 where the union is whole), so no sink sums bytes and no front end lowers a union as an alpha mask. A member that overlaps itself inside
 one pixel has the saturating-sum area AD-12 defines for one shape (the oracle's case 10 shows the difference from the exact area). A
-fill wound the other way comes out one level high in a pixel that is not a whole level (a defect of the signed fold, recorded in the
-exact-primitives spec's `open-items.md` item 2 for its own story); a union folds the magnitude and is orientation independent.
+fill folds the magnitude too, so a fill, a single clip and a union member are the floor of the level of their area either way the
+contours are wound; a union of one member, recorded as the single clip, equals the union of it and an empty member.
 
 **What "disjoint" is, and who decides.** `gshscene_clip_union_disjoint` is the one predicate and `gshscene_caps_disposition` calls it,
 so every sink and the report agree. Members `i` and `j` are disjoint iff the **interiors** of their device boxes (`gshgeom_device_box`:
