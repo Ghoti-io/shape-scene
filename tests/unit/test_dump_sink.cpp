@@ -2239,7 +2239,7 @@ TEST(DumpSink, PrepareHoldsOutlinesAndCreateCanFail) {
   }
   EXPECT_EQ(gshscene_resource_refcount(a), ca);
   EXPECT_TRUE(t.live.empty());
-  for (long fail = 0; fail < 8; fail++) {
+  for (long fail = 0; fail < 64; fail++) {
     tracker::Tracker f;
     f.fail_from = fail;
     GSHSCENE_Allocator fa = tracker::allocator_for(&f);
@@ -3774,6 +3774,45 @@ TEST(DumpSink, ThePiecesFieldIsWhatShapeGeometryMakesOfTheSameDataInEveryUnitUnd
     EXPECT_GT(got.lines, 0u);
   }
   gshgeom_path_destroy(region_path);
+}
+
+TEST(DumpSink, EveryFailingAllocationOfARenderIsTheSinksLimitAndLeavesNothingBehind) {
+  // CAP-15: the scratch of a stroke's outline, of a glyph's notes and of a hatch's pieces is taken from the allocator the sink was
+  // created with, a render at a time.  Each allocation of a render is made to fail in turn, over a list of strokes, a list of glyph runs
+  // and the primitives; a failure is the sink's own resource limit (never a crash, never a half-written block that is kept), and nothing it
+  // took is kept.
+  Scene s;
+  const GSHSCENE_List * lists[] = {stroke_list(s), glyph_list(s), primitive_list(s), answer_list(s)};
+  int which = 0;
+  for (const GSHSCENE_List * list : lists) {
+    tracker::Tracker t;
+    GSHSCENE_Allocator alloc = tracker::allocator_for(&t);
+    {
+      SinkRef sink(make_full(&alloc, nullptr));
+      bool done = false;
+      for (long k = 0; k < 600 && !done; k++) {
+        auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+        ReportRef report;
+        const size_t before = t.live.size();
+        t.fail_from = t.calls + k;
+        t.persistent = false;
+        t.failed = false;
+        Rendered r = render_job(sink.sink, request_for(list, *stream, report.report));
+        t.fail_from = -1;
+        if (!t.failed) {
+          EXPECT_EQ(r.result, GSHSCENE_OK) << "list " << which << " k=" << k;
+          done = true;
+        } else {
+          EXPECT_TRUE(r.result == GSHSCENE_OK || r.result == GSHSCENE_ERR_LIMIT || r.result == GSHSCENE_ERR_OOM)
+              << "list " << which << " k=" << k << " result " << (int)r.result;
+        }
+        EXPECT_EQ(t.live.size(), before) << "list " << which << " k=" << k << ": a render kept memory";
+      }
+      EXPECT_TRUE(done) << "list " << which;
+    }
+    EXPECT_TRUE(t.live.empty()) << "list " << which << ": " << t.live.size() << " blocks leaked";
+    which++;
+  }
 }
 
 int main(int argc, char ** argv) {
