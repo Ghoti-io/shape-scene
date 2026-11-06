@@ -754,6 +754,35 @@ TEST(Pattern, OnlyTheContentDecidesWhenEveryHashCollides) {
   variant_of(v, "tint entry");
 }
 
+TEST(Pattern, AnAxisThatRepeatsAtItsSizeIsNotTheAxisThatDoesNotRepeatWhenEveryHashCollides) {
+  // A step on an axis that does not repeat is stored as the size (PT3), so a pattern that repeats at exactly its size and
+  // one that does not repeat store the same numbers and differ in the flag alone; the flag is then all that equality has.
+  StoreHolder shared(nullptr, nullptr, all_zero);
+  Ref sq(intern_square(shared.store));
+  Ref tile(make_picture(shared.store, [&](GSHSCENE_List * l) {
+    EXPECT_EQ(gshscene_list_fill(l, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
+  }));
+  for (int axis = 0; axis < 2; axis++) {
+    GSHSCENE_Pattern abutting;
+    gshscene_pattern_init(&abutting);
+    abutting.tile = tile.get();
+    abutting.w = 2.0;
+    abutting.h = 3.0;
+    abutting.x_step = 2.0;
+    abutting.y_step = 3.0;
+    GSHSCENE_Pattern single = abutting;
+    (axis == 0 ? single.repeat_x : single.repeat_y) = 0;
+    Ref a;
+    Ref b;
+    ASSERT_EQ(gshscene_store_intern_pattern(shared.store, &abutting, (const GSHSCENE_Resource **)&a.resource), GSHSCENE_OK);
+    ASSERT_EQ(gshscene_store_intern_pattern(shared.store, &single, (const GSHSCENE_Resource **)&b.resource), GSHSCENE_OK);
+    EXPECT_NE(a.get(), b.get()) << "axis " << axis;
+    GSHSCENE_Pattern back;
+    ASSERT_EQ(gshscene_resource_pattern(b.get(), &back), GSHSCENE_OK);
+    EXPECT_EQ(axis == 0 ? back.repeat_x : back.repeat_y, 0u) << "axis " << axis;
+  }
+}
+
 TEST(Pattern, ThePatternRetainsItsTileUntilItIsReleased) {
   World w;
   const GSHSCENE_Resource * tile = w.pic.get();
