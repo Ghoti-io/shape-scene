@@ -731,6 +731,45 @@ TEST(EditAllocation, EveryFailingAllocationOfAPublishOntoLaterVersionsLeavesTheS
   EXPECT_TRUE(t.live.empty()) << t.live.size() << " blocks leaked";
 }
 
+TEST(EditAllocation, EveryFailingAllocationOfAChangeToAnInheritedGroupLeavesTheEditAsItWas) {
+  // A node the edit inherits from its base version is copied (with the array of its children) before the first change to it: the copy
+  // allocates, and each allocation can fail.
+  tracker::Tracker t;
+  GSHSCENE_Allocator a = tracker::allocator_for(&t);
+  {
+    SceneHolder s(nullptr, &a);
+    ASSERT_NE(s.scene, nullptr);
+    Ref sq(intern_square(s.store()));
+    uint64_t g = 0, first = 0;
+    VersionRef v0;
+    {
+      EditHolder e(s);
+      GSHSCENE_Node gn = group_node();
+      ASSERT_EQ(gshscene_edit_add(e.edit, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, &gn, nullptr, &g), GSHSCENE_OK);
+      for (int i = 0; i < 6; i++) {
+        GSHSCENE_Node n = shape_node(sq.get(), i);
+        uint64_t out = 0;
+        ASSERT_EQ(gshscene_edit_add(e.edit, g, GSHSCENE_APPEND, &n, nullptr, &out), GSHSCENE_OK);
+        if (i == 0) {
+          first = out;
+        }
+      }
+      publish(s, e, &v0);
+    }
+    EditHolder e(s, v0.get());
+    ASSERT_NE(e.edit, nullptr);
+    const uint64_t kMax = 40;
+    GSHSCENE_Node n = shape_node(sq.get(), 9);
+    uint64_t out = 0;
+    sweep_op(t, e.edit, kMax, "add under an inherited group", [&] { return gshscene_edit_add(e.edit, g, GSHSCENE_APPEND, &n, nullptr, &out); });
+    GSHSCENE_Node gn2 = group_node(0.5, 3);
+    sweep_op(t, e.edit, kMax, "set an inherited group", [&] { return gshscene_edit_set(e.edit, g, &gn2); });
+    sweep_op(t, e.edit, kMax, "remove an inherited child", [&] { return gshscene_edit_remove(e.edit, first); });
+    sweep_op(t, e.edit, kMax, "move an inherited child", [&] { return gshscene_edit_move(e.edit, first + 1, GSHSCENE_ROOT_ID, 0); });
+  }
+  EXPECT_TRUE(t.live.empty()) << t.live.size() << " blocks leaked";
+}
+
 TEST(EditAllocation, OpeningAnEditFailsCleanly) {
   tracker::Tracker t;
   GSHSCENE_Allocator a = tracker::allocator_for(&t);

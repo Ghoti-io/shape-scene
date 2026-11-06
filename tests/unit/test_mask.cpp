@@ -1571,6 +1571,51 @@ TEST(MaskLimits, AMaskOfAMaskCountsBothLevelsInTheListThatHoldsIt) {
   gshscene_list_destroy(l);
 }
 
+TEST(MaskAllocation, EveryFailingAllocationOfAnInternLeavesNothingBehind) {
+  // The resource, the array of pieces and the samples are three allocations, and each can fail: the intern is then ERR_OOM, no handle
+  // comes back, what was taken is given back, and the intern that follows is the intern without the failures.
+  tracker::Tracker t;
+  GSHSCENE_Allocator a = tracker::allocator_for(&t);
+  {
+    StoreHolder store(nullptr, &a);
+    ASSERT_NE(store.store, nullptr);
+    Ref sq(intern_square(store.store));
+    Ref p2(intern_fixture(store.store));
+    Ref pic(fixture_picture(store.store, sq.get(), p2.get()));
+    Owned o;
+    std::memset(&o.m, 0, sizeof o.m);
+    o.m.picture = pic.get();
+    o.m.mode = GSHSCENE_MASK_ALPHA;
+    o.m.transfer.kind = GSHSCENE_TRANSFER_STITCHING;
+    o.pieces = {piece(0.0, 0.5, 0.0, 1.0), piece(0.5, 1.0, 0.0, 1.0)};
+    o.pieces[1].leaf_kind = GSHSCENE_TRANSFER_TABLE;
+    o.bind();
+    o.piece_samples[1] = {0.0, 0.25, 1.0};
+    o.bind();
+    bool done = false;
+    for (long k = 0; k < 64 && !done; k++) {
+      const size_t before = t.live.size();
+      t.fail_from = t.calls + k;
+      t.persistent = false;
+      t.failed = false;
+      const GSHSCENE_Resource * r = nullptr;
+      GSHSCENE_Result result = gshscene_store_intern_mask(store.store, &o.m, &r);
+      t.fail_from = -1;
+      if (result == GSHSCENE_OK) {
+        EXPECT_FALSE(t.failed) << "k=" << k;
+        gshscene_resource_release(r);
+        done = true;
+      } else {
+        EXPECT_EQ(result, GSHSCENE_ERR_OOM) << "k=" << k;
+        EXPECT_EQ(r, nullptr) << "k=" << k;
+        EXPECT_EQ(t.live.size(), before) << "k=" << k << ": a failed intern kept memory";
+      }
+    }
+    EXPECT_TRUE(done);
+  }
+  EXPECT_TRUE(t.live.empty()) << t.live.size() << " blocks leaked";
+}
+
 int main(int argc, char ** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

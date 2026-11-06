@@ -539,6 +539,49 @@ TEST(Emit, TheStoresResourceLimitIsMetAtEmissionAndNothingIsLeftBehind) {
   EXPECT_EQ(after.live, before.live) << "a failed emission releases what it interned";
 }
 
+TEST(Emit, AForegroundTheEditAcceptsIsOneTheEmissionAcceptsToo) {
+  // The emission copies the version's foreground into the list and checks it (the same check the edit made), so the arm that gives the
+  // emission back when the list refuses it is reached by no value the API takes.  Asserted at the extremes of what the edit accepts: every
+  // channel at the bound 2^16 in either sign, alpha at 0 and 1, and the first value past each, which the edit refuses.
+  const double bound = 65536.0;
+  struct Case {
+    double rgba[4];
+    bool accepted;
+  };
+  const Case cases[] = {
+      {{bound, bound, bound, 1.0}, true},
+      {{-bound, -bound, -bound, 0.0}, true},
+      {{0.0, 0.0, 0.0, 0.0}, true},
+      {{1.0, 0.5, 0.25, 1.0}, true},
+      {{std::nextafter(bound, 1e300), 0.0, 0.0, 1.0}, false},
+      {{0.0, -std::nextafter(bound, 1e300), 0.0, 1.0}, false},
+      {{0.0, 0.0, 0.0, std::nextafter(1.0, 2.0)}, false},
+      {{0.0, 0.0, 0.0, std::nextafter(0.0, -1.0)}, false},
+  };
+  for (const Case & c : cases) {
+    SceneHolder s;
+    Ref sq(intern_square(s.store()));
+    EditHolder e(s);
+    GSHSCENE_Color color;
+    gshscene_color_init(&color);
+    std::memcpy(color.rgba, c.rgba, sizeof color.rgba);
+    GSHSCENE_Result set = gshscene_edit_set_foreground(e.edit, &color);
+    EXPECT_EQ(set == GSHSCENE_OK, c.accepted) << c.rgba[0] << " " << c.rgba[1] << " " << c.rgba[2] << " " << c.rgba[3];
+    if (!c.accepted) {
+      continue;
+    }
+    add(e.edit, GSHSCENE_ROOT_ID, shape_node(sq.get()));
+    VersionRef v;
+    publish(s, e, &v);
+    const GSHSCENE_List * list = nullptr;
+    EXPECT_EQ(gshscene_version_list(v.get(), &list), GSHSCENE_OK);
+    GSHSCENE_Color back;
+    ASSERT_NE(list, nullptr);
+    ASSERT_EQ(gshscene_list_foreground(list, &back), GSHSCENE_OK);
+    EXPECT_EQ(std::memcmp(back.rgba, c.rgba, sizeof back.rgba), 0);
+  }
+}
+
 TEST(Emit, EveryFailingAllocationLeavesTheVersionAbleToEmitAgain) {
   tracker::Tracker t;
   GSHSCENE_Allocator a = tracker::allocator_for(&t);
