@@ -4998,15 +4998,27 @@ def object_equivalence_main(plants):
             counts[verdict] = counts.get(verdict, 0) + 1
             print("%-9s %-40s %s" % (verdict, pid, detail))
     print("object equivalence: %d plants: %s" % (len(plants), ", ".join("%d %s" % (v, k) for k, v in sorted(counts.items()))))
-    return 0
+    return counts
 
 
 def main():
     shutil.rmtree(WORK, ignore_errors=True)
     WORK.mkdir(parents=True)
+    if os.environ.get("PLANT_OBJ_EQUIV") == "check":
+        # The plants tools/equivalent-plants.json holds are equivalent by their object code: every one must say so again.
+        import json as _eqjson
+        with open(ROOT / "tools" / "equivalent-plants.json") as _f:
+            listed = [tuple(x) for x in _eqjson.load(_f)]
+        counts = object_equivalence_main(listed)
+        if counts.get("equiv", 0) != len(listed):
+            print("FAIL  tools/equivalent-plants.json names plants that are not object-identical")
+            return 1
+        print("ok    %d plants of tools/equivalent-plants.json are equivalent by their object code" % len(listed))
+        return 0
     if os.environ.get("PLANT_OBJ_EQUIV"):
         chosen = [p for p in PLANTS if not ONLY or re.search(ONLY, p[0])]
-        return object_equivalence_main(chosen)
+        object_equivalence_main(chosen)
+        return 0
     srcs = sources()
     failures = 0
 
