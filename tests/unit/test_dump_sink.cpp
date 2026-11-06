@@ -3250,6 +3250,9 @@ TEST(DumpSink, AUnionClipIsRecordedWithItsMembersAndRefusedByCapsAsCU13Orders) {
   EXPECT_EQ(reason_of(config_default(), clash_list), "") << "the default test sink draws any union";
   gshscene_list_destroy(apart_list);
   gshscene_list_destroy(clash_list);
+  // The interning handed out one reference to each union; the store is not destroyed with one outstanding.
+  gshscene_resource_release(apart);
+  gshscene_resource_release(clash);
 }
 
 TEST(DumpSink, TheArcRecordsAreTheToolpathLikeConfigurationAndNeverTheChord) {
