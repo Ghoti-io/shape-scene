@@ -3906,16 +3906,22 @@ TEST(DumpSink, AStrokeOrAHatchOfARunOrAPathThatTheMapOrThePointCapCannotHoldIsTh
   hp.resource = hatch;
   GSHSCENE_Paint ink = solid(0.2, 0.3, 0.9);
   GSHGEOM_Map maps[9];
-  gshgeom_map_scale(2, 1.0, 1.0, 1.0, &maps[0]);
-  gshgeom_map_scale(2, 0.0, 1.0, 1.0, &maps[1]);
-  gshgeom_map_scale(2, 1e300, 1e300, 1.0, &maps[2]);
-  gshgeom_map_scale(2, 1e-300, 1e-300, 1.0, &maps[3]);
-  gshgeom_map_scale(2, 1e150, 1e-150, 1.0, &maps[4]);
+  // a placement the constructor refuses is replaced by the identity: only maps that were made are placed
+  auto made = [&](int i, GSHGEOM_Result r) {
+    if (r != GSHGEOM_OK) {
+      gshgeom_map_identity(2, &maps[i]);
+    }
+  };
+  made(0, gshgeom_map_scale(2, 1.0, 1.0, 1.0, &maps[0]));
+  made(1, gshgeom_map_scale(2, 0.0, 1.0, 1.0, &maps[1]));
+  made(2, gshgeom_map_scale(2, 1e300, 1e300, 1.0, &maps[2]));
+  made(3, gshgeom_map_scale(2, 1e-300, 1e-300, 1.0, &maps[3]));
+  made(4, gshgeom_map_scale(2, 1e150, 1e-150, 1.0, &maps[4]));
   // a translation past the range the canonical map can split, and factors whose product with the unit's scale overflows
-  gshgeom_map_translate(2, 1e300, 0.0, 0.0, &maps[5]);
-  gshgeom_map_translate(2, 0.0, -1e300, 0.0, &maps[6]);
-  gshgeom_map_scale(2, 1.7e308, 1.7e308, 1.0, &maps[7]);
-  gshgeom_map_translate(2, 9.3e18, 9.3e18, 0.0, &maps[8]);
+  made(5, gshgeom_map_translate(2, 1e300, 0.0, 0.0, &maps[5]));
+  made(6, gshgeom_map_translate(2, 0.0, -1e300, 0.0, &maps[6]));
+  made(7, gshgeom_map_scale(2, 1.7e308, 1.7e308, 1.0, &maps[7]));
+  made(8, gshgeom_map_translate(2, 9.3e18, 9.3e18, 0.0, &maps[8]));
   const size_t caps[] = {0, 1, 2, 3, 4, 8, 16, 64, 1024};
   // Runs of many glyphs: the notes of a run (a note a glyph) and its centerline are taken from a scratch of one mebibyte, so a run past
   // it is the sink's resource limit at each of the three places that take from it; the counts bracket every one.
