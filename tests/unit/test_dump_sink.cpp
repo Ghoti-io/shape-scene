@@ -4031,6 +4031,103 @@ TEST(DumpSink, TheWalkOfAListIsAlwaysMadeInTheBytesTheSinkCarvesForItSoItsIntern
   EXPECT_EQ(gshscene_sink_begin(sink.sink, &req, &job), GSHSCENE_ERR_INVALID);
 }
 
+TEST(DumpSink, TheHashOfAReportInItsDumpIsAlwaysSixteenDigits) {
+  // %016 in the report line: a hash below 2^60 has leading zeros, which are digits of the line (the vectors, and the diff of two dumps, are
+  // text). Reports of one to 120 placeholders are dumped: some hashes have a leading zero, and every hash is sixteen digits.
+  Scene s;
+  int leading_zero = 0;
+  for (int n = 1; n <= 120; n++) {
+    GSHSCENE_List * l = s.open();
+    for (int i = 0; i < n; i++) {
+      EXPECT_EQ(gshscene_list_placeholder(l, GSHSCENE_PLACEHOLDER_SOURCE_COLR, GSHSCENE_PLACEHOLDER_COLR_NO_RECORD, 0, nullptr, nullptr,
+                    (int32_t)(i % 5), 0.0),
+          GSHSCENE_OK);
+    }
+    EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+    SinkRef sink(make_full(nullptr, nullptr));
+    auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+    ReportRef report;
+    ASSERT_EQ(render_job(sink.sink, request_for(l, *stream, report.report)).result, GSHSCENE_OK);
+    std::string text = report_dump(report.report);
+    size_t at = text.find("hash=");
+    ASSERT_NE(at, std::string::npos);
+    size_t end = text.find('\n', at);
+    EXPECT_EQ(end - (at + 5), 16u) << text;
+    leading_zero += text[at + 5] == '0';
+  }
+  EXPECT_GT(leading_zero, 0) << "the test sees a hash with a leading zero";
+}
+
+TEST(DumpSink, AHatchFillOfAGlyphRunCarriesTheLinesAndPiecesOfTheRunsContoursAsOneRegion) {
+  // HX14: the region of a hatch over a run is the path of all its glyphs' contours (the run is one region); the record has its lines and the
+  // hash of its pieces like a path's. Three squares side by side, hatched at 45 degrees a unit apart: lines, and pieces that are not "-".
+  Scene s;
+  const GSHSCENE_Resource * sq_a = s.sq(0, 0, 4);
+  GSHSCENE_Glyph g[3] = {{1, 0, 0, sq_a}, {2, 6, 0, sq_a}, {3, 12, 0, sq_a}};
+  GSHSCENE_Glyph_Run run{};
+  run.source = GSHSCENE_GLYPHS_FROM_OUTLINES;
+  run.glyph_count = 3;
+  run.glyphs = g;
+  const GSHSCENE_Resource * text = nullptr;
+  ASSERT_EQ(gshscene_store_intern_glyph_run(s.store, &run, &text), GSHSCENE_OK);
+  s.held.push_back(text);
+  GSHSCENE_Stroke_Style pen;
+  gshscene_stroke_style_init(&pen);
+  pen.width = 0.25;
+  const GSHSCENE_Resource * pen_style = nullptr;
+  ASSERT_EQ(gshscene_store_intern_stroke_style(s.store, &pen, &pen_style), GSHSCENE_OK);
+  s.held.push_back(pen_style);
+  GSHSCENE_Hatch_Family fam{45.0, 0.0, 0.0, 0.0, 1.0, 0, nullptr};
+  GSHSCENE_Hatch spec;
+  gshscene_hatch_init(&spec);
+  spec.style = pen_style;
+  spec.family_count = 1;
+  spec.families = &fam;
+  const GSHSCENE_Resource * hatch = nullptr;
+  ASSERT_EQ(gshscene_store_intern_hatch(s.store, &spec, &hatch), GSHSCENE_OK);
+  s.held.push_back(hatch);
+  GSHSCENE_Paint hp = solid(0, 0, 0, 0.5);
+  hp.kind = GSHSCENE_PAINT_HATCH;
+  hp.resource = hatch;
+  GSHSCENE_List * l = s.open();
+  ASSERT_EQ(gshscene_list_fill(l, text, nullptr, GSHGEOM_FILL_NONZERO, &hp, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  SinkRef sink(make_full(nullptr, nullptr));
+  auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+  ReportRef report;
+  ASSERT_EQ(render_job(sink.sink, request_for(l, *stream, report.report)).result, GSHSCENE_OK);
+  size_t fills = 0;
+  for (const std::string & line : lines_of(stream->bytes)) {
+    size_t at = line.find(" hatch=");
+    if (line.find(" F res=") != std::string::npos && at != std::string::npos) {
+      fills++;
+      const std::string field = line.substr(at, line.find(" box=", at) - at);
+      EXPECT_NE(field.find(" lines="), std::string::npos) << line;
+      EXPECT_EQ(field.find(" lines=0"), std::string::npos) << "the hatch lines cross the squares: " << field;
+      EXPECT_NE(field.find(" pieces="), std::string::npos) << line;
+      EXPECT_EQ(field.find("pieces=-"), std::string::npos) << "the run's region is hatched: " << field;
+    }
+  }
+  EXPECT_EQ(fills, 1u) << stream->bytes;
+}
+
+TEST(DumpSink, ANullListHoldsNothingAndAPaintWhoseResourceIsOfAnotherKindIsRefused) {
+  // The witnesses of two arguments (tools/argued-plants.json): the dump sink's walk of a list's pictures may be handed no list because a
+  // list that is none has no item (the kind test before it only saves the call), and a gradient test on an item need only read the
+  // resource's kind where the paint says gradient because the list refuses a paint whose resource is of another kind.
+  EXPECT_EQ(gshscene_list_count(nullptr), 0u);
+  Scene s;
+  const GSHSCENE_Resource * path = s.sq(0, 0, 4);
+  GSHSCENE_List * l = s.open();
+  for (GSHSCENE_Paint_Kind k : {GSHSCENE_PAINT_GRADIENT, GSHSCENE_PAINT_IMAGE, GSHSCENE_PAINT_PATTERN, GSHSCENE_PAINT_HATCH}) {
+    GSHSCENE_Paint p = solid(0, 0, 0, 1.0);
+    p.kind = k;
+    p.resource = path;
+    EXPECT_NE(gshscene_list_fill(l, path, nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK) << (int)k;
+  }
+  EXPECT_EQ(gshscene_list_count(l), 0u) << "none of them was recorded";
+}
+
 int main(int argc, char ** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

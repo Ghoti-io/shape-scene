@@ -1220,6 +1220,22 @@ TEST(ListAllocation, AFailureAtEveryCallLeavesTheListConsistentAndNothingLeaked)
 }
 
 
+TEST(Composite, EveryOperatorHasItsOwnNameAndOneAtOrPastTheEndHasNone) {
+  // The names are spelled in the dump and in the vectors; each is pinned here, in the enum's order.
+  const char * names[] = {"src-over", "clear", "src", "dest", "dest-over", "src-in", "dest-in", "src-out", "dest-out", "src-atop",
+      "dest-atop", "xor", "plus", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light",
+      "difference", "exclusion", "multiply", "hue", "saturation", "color", "luminosity"};
+  ASSERT_EQ(sizeof names / sizeof names[0], (size_t)GSHSCENE_COMPOSITE_COUNT);
+  for (size_t i = 0; i < GSHSCENE_COMPOSITE_COUNT; i++) {
+    EXPECT_STREQ(gshscene_composite_string((GSHSCENE_Composite)i), names[i]) << i;
+    for (size_t j = i + 1; j < GSHSCENE_COMPOSITE_COUNT; j++) {
+      EXPECT_STRNE(names[i], names[j]);
+    }
+  }
+  EXPECT_STREQ(gshscene_composite_string(GSHSCENE_COMPOSITE_COUNT), "unknown composite");
+  EXPECT_STREQ(gshscene_composite_string((GSHSCENE_Composite)200), "unknown composite");
+}
+
 int main(int argc, char ** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

@@ -45,6 +45,50 @@ def cases():
     out.append(("stacked", [([R(10, 10, 90, 70)], "nonzero"), ([R(10, 70, 90, 130)], "nonzero")]))
     out.append(("diagonal-halves-of-pixels", [([[(0, 0), (128, 0), (0, 128)]], "nonzero"), ([[(128, 0), (128, 128), (0, 128)]], "nonzero")]))
     out.extend(oracle.general_cases())
+    out.extend(random_overlapping_unions())
+    return out
+
+
+def random_overlapping_unions():
+    """Seeded unions of 2 to 5 convex members (triangles and quadrilaterals on the 26.6 lattice) in a 5 by 5 pixel grid, most of them
+    overlapping, so that the general tier's sweep meets edges of different members crossing at places that are not pixel edges, in many
+    orders and depths: the rules of its exchange of two neighbours (the depth at the meeting, the step at the last row of a cell, the
+    neighbours made new by an exchange) are on the answer's path for some pixel of some case."""
+    import random
+    rng = random.Random(20261107)
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    def hull(pts):
+        pts = sorted(set(pts))
+        if len(pts) < 3:
+            return None
+        lo = []
+        for q in pts:
+            while len(lo) >= 2 and cross(lo[-2], lo[-1], q) <= 0:
+                lo.pop()
+            lo.append(q)
+        up = []
+        for q in reversed(pts):
+            while len(up) >= 2 and cross(up[-2], up[-1], q) <= 0:
+                up.pop()
+            up.append(q)
+        h = lo[:-1] + up[:-1]
+        return h if len(h) >= 3 else None
+
+    out = []
+    for k in range(240):
+        members = []
+        for _ in range(2 + rng.randrange(4)):
+            while True:
+                n = 3 + rng.randrange(3)
+                pts = [(rng.randrange(0, 5 * 64), rng.randrange(0, 5 * 64)) for _ in range(n)]
+                h = hull(pts)
+                if h and abs(sum(cross(h[0], h[i], h[i + 1]) for i in range(1, len(h) - 1))) >= 64 * 64 // 4:
+                    break
+            members.append(([h], "nonzero"))
+        out.append(("random-union-%03d" % k, members))
     return out
 
 

@@ -786,6 +786,51 @@ TEST(EditAllocation, OpeningAnEditFailsCleanly) {
   EXPECT_TRUE(t.live.empty());
 }
 
+TEST(EditAdd, ANodeOfAKindThatIsNoneIsInvalidAtBothEnds) {
+  // The node's kind is checked against the enum: 0 and everything from the count up are not kinds (INVALID, not a limit or an accident of the
+  // fields that follow), and every kind of the enum is one.
+  Fx f;
+  GSHSCENE_Node n = shape_node(f.sq.get());
+  uint64_t id = 0;
+  for (uint32_t k : {0u, (uint32_t)GSHSCENE_NODE_KIND_COUNT, (uint32_t)GSHSCENE_NODE_KIND_COUNT + 1u, 1000u, 0xffffffffu}) {
+    n.kind = (GSHSCENE_Node_Kind)k;
+    EXPECT_EQ(gshscene_edit_add(f.e.edit, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, &n, nullptr, &id), GSHSCENE_ERR_INVALID) << k;
+  }
+  EXPECT_EQ(gshscene_edit_node_count(f.e.edit), 1u) << "nothing was added";
+}
+
+TEST(EditAdd, ANodeNeedsItsPropertiesAndNamesNoPlaneAndNoHatchOverARegionWithoutABox) {
+  // The witnesses of three arguments (tools/argued-plants.json): every call that canonicalises a node has already refused no properties
+  // (so the canonicaliser's own refusal of none is never what a caller sees); a node never names a plane (so a damage that meets one,
+  // PL5, is not met); and a hatch fill never has a region whose box cannot be taken (a hatch fill is refused over a path of three dimensions, and the
+  // one over a run of an unbound face has its own test in test_diff.cpp).
+  Fx f;
+  uint64_t id = 0;
+  EXPECT_EQ(gshscene_edit_add(f.e.edit, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, nullptr, nullptr, &id), GSHSCENE_ERR_INVALID);
+  uint64_t shape = f.shape();
+  EXPECT_EQ(gshscene_edit_set(f.e.edit, shape, nullptr), GSHSCENE_ERR_INVALID);
+  const GSHSCENE_Resource * plane = nullptr;
+  ASSERT_EQ(gshscene_store_intern_plane(f.s.store(), &plane), GSHSCENE_OK);
+  Ref held(plane);
+  GSHSCENE_Node n = shape_node(plane);
+  EXPECT_NE(gshscene_edit_add(f.e.edit, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, &n, nullptr, &id), GSHSCENE_OK) << "a plane is no node's region";
+  GSHSCENE_Node g = group_node();
+  g.clip = plane;
+  EXPECT_NE(gshscene_edit_add(f.e.edit, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, &g, nullptr, &id), GSHSCENE_OK) << "nor a clip";
+  GSHGEOM_Path * p3 = nullptr;
+  ASSERT_EQ(gshgeom_path_create(nullptr, nullptr, 3, &p3), GSHGEOM_OK);
+  gshgeom_path_move_to(p3, GSHGEOM_Point{0, 0, 0});
+  gshgeom_path_line_to(p3, GSHGEOM_Point{4, 0, 1});
+  gshgeom_path_line_to(p3, GSHGEOM_Point{4, 4, 2});
+  gshgeom_path_close(p3);
+  const GSHSCENE_Resource * path3 = nullptr;
+  ASSERT_EQ(gshscene_store_intern_path(f.s.store(), p3, &path3), GSHSCENE_OK);
+  gshgeom_path_destroy(p3);
+  Ref held3(path3);
+  GSHSCENE_Node n3 = shape_node(path3);
+  EXPECT_EQ(gshscene_edit_add(f.e.edit, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, &n3, nullptr, &id), GSHSCENE_OK) << "a plain fill of a 3D path is a node";
+}
+
 int main(int argc, char ** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

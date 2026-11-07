@@ -613,6 +613,66 @@ TEST(Damage, AGlyphRunWhoseOutlineIs3DIsUnbounded) {
   EXPECT_EQ(diff_of(v1.get(), v2.get()).damage.unbounded, 1);
 }
 
+TEST(Damage, AHatchFillOverARegionWithNoBoxIsUnboundedAndOneOverARegionWithOneIsNot) {
+  // HX15: a hatch fill reaches past its region by the cap's outset, from the region's box through the style's. A region whose box cannot be
+  // taken (a glyph run of an unbound face, which has no glyph boxes) leaves the reach unknown: the damage is unbounded; a flat region's is its box
+  // grown, and bounded. (A hatch fill over a path, or an outline run, of three dimensions is refused at the edit, UNSUPPORTED.)
+  Doc d;
+  GSHSCENE_Stroke_Style pen;
+  gshscene_stroke_style_init(&pen);
+  pen.width = 0.25;
+  Ref style;
+  ASSERT_EQ(gshscene_store_intern_stroke_style(d.s.store(), &pen, &style.resource), GSHSCENE_OK);
+  GSHSCENE_Hatch_Family fam{45.0, 0.0, 0.0, 0.0, 1.0, 0, nullptr};
+  GSHSCENE_Hatch spec;
+  gshscene_hatch_init(&spec);
+  spec.style = style.get();
+  spec.family_count = 1;
+  spec.families = &fam;
+  Ref hatch;
+  ASSERT_EQ(gshscene_store_intern_hatch(d.s.store(), &spec, &hatch.resource), GSHSCENE_OK);
+  Ref square(intern_square(d.s.store()));
+  GSHSCENE_Face_Desc fd;
+  std::memset(&fd, 0, sizeof fd);
+  fd.font_key = 1;  // no provider: the face is unbound, and has no glyph boxes
+  Ref face;
+  ASSERT_EQ(gshscene_store_intern_face(d.s.store(), &fd, &face.resource), GSHSCENE_OK);
+  GSHSCENE_Glyph glyphs3[1] = {{1, 2.0, 3.0, nullptr}};
+  GSHSCENE_Glyph glyphs2[1] = {{1, 0, 0, square.get()}};
+  for (int flat = 0; flat < 2; flat++) {
+    GSHSCENE_Glyph_Run run;
+    std::memset(&run, 0, sizeof run);
+    run.source = flat ? GSHSCENE_GLYPHS_FROM_OUTLINES : GSHSCENE_GLYPHS_FROM_FONT;
+    run.face = flat ? nullptr : face.get();
+    run.size = flat ? 0.0 : 8.0;
+    run.hint_mode = flat ? 0u : (uint32_t)GSHSCENE_HINT_NONE;
+    run.glyph_count = 1;
+    run.glyphs = flat ? glyphs2 : glyphs3;
+    Ref text;
+    SCOPED_TRACE(flat ? "flat" : "unbound face");
+    ASSERT_EQ(gshscene_store_intern_glyph_run(d.s.store(), &run, &text.resource), GSHSCENE_OK);
+    VersionRef v1, v2;
+    {
+      EditHolder e(d.s);
+      v1 = d.publish_edit(e);
+    }
+    {
+      EditHolder e(d.s);
+      GSHSCENE_Node n = shape_node(text.get());
+      n.paint.kind = GSHSCENE_PAINT_HATCH;
+      n.paint.resource = hatch.get();
+      uint64_t id = 0;
+      GSHSCENE_Result r = gshscene_edit_add(e.edit, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, &n, nullptr, &id);
+      EXPECT_EQ(r, GSHSCENE_OK) << "a hatch fill over a run of an unbound face is a node";
+      if (r != GSHSCENE_OK) {
+        continue;
+      }
+      v2 = d.publish_edit(e);
+    }
+    EXPECT_EQ(diff_of(v1.get(), v2.get()).damage.unbounded, flat ? 0 : 1) << (flat ? "flat" : "three dimensions");
+  }
+}
+
 TEST(Damage, AChangedInstanceDamagesItsPictureAndNothingAfterIt) {
   Doc d;
   VersionRef v1, v2;
