@@ -5001,7 +5001,18 @@ def object_equivalence_main(plants):
     return counts
 
 
+# Plants no test catches and that are argued not to be defects (tools/argued-plants.json: id -> the argument and the witness that backs it).
+# Each is run like any other: if a test catches one later, the run says so and the entry goes.
+ARGUED = {}
+_argued_file = ROOT / "tools" / "argued-plants.json"
+if _argued_file.exists():
+    import json as _argued_json
+    with open(_argued_file) as _f:
+        ARGUED = _argued_json.load(_f)
+
+
 def main():
+    known = 0
     shutil.rmtree(WORK, ignore_errors=True)
     WORK.mkdir(parents=True)
     if os.environ.get("PLANT_OBJ_EQUIV") == "check":
@@ -5075,13 +5086,20 @@ def main():
             print("FAIL  %-34s %s" % (p[0], r))
             failures += 1
         elif not r:
-            print("FAIL  %-34s not caught by %s" % (p[0], " ".join(p[5])))
+            if p[0] in ARGUED:
+                known += 1
+                print("known %-34s not caught: %s" % (p[0], ARGUED[p[0]]))
+            else:
+                print("FAIL  %-34s not caught by %s" % (p[0], " ".join(p[5])))
+                failures += 1
+        elif p[0] in ARGUED:
+            print("FAIL  %-34s is caught by %s: take it out of tools/argued-plants.json" % (p[0], r[0][0]))
             failures += 1
         else:
             print("ok    %-34s caught by %s" % (p[0], ", ".join("%s (%s)" % (t, (f[0][14:70] if f else "crash")) for t, f in r)))
 
     if ONLY and not PROBE_ONLY:
-        print("%d plants run (PLANT_ONLY=%s), %d not caught" % (len(plants), ONLY, failures))
+        print("%d plants run (PLANT_ONLY=%s), %d not caught, %d argued" % (len(plants), ONLY, failures, known))
         return 1 if failures else 0
 
     # The probe's own plants.
