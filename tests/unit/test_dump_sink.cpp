@@ -3808,7 +3808,24 @@ TEST(DumpSink, EveryFailingAllocationOfARenderIsTheSinksLimitAndLeavesNothingBeh
   GSHSCENE_List * stroked = s.open();
   ASSERT_EQ(gshscene_list_stroke(stroked, text, pen_style, nullptr, &ink, 0, 0.0), GSHSCENE_OK);
   gshscene_list_close(stroked);
-  const GSHSCENE_List * lists[] = {base[0], base[1], base[2], base[3], hw.list, stroked};
+  // A hatch over the run (its region is the run's glyphs' contours, made in the centerline scratch), and a hatch over a path whose map
+  // cannot be inverted for a device pixel.
+  GSHSCENE_Hatch_Family fam{45.0, 0.0, 0.0, 0.0, 1.0, 0, nullptr};
+  GSHSCENE_Hatch spec;
+  gshscene_hatch_init(&spec);
+  spec.style = pen_style;
+  spec.family_count = 1;
+  spec.families = &fam;
+  const GSHSCENE_Resource * hatch = nullptr;
+  ASSERT_EQ(gshscene_store_intern_hatch(s.store, &spec, &hatch), GSHSCENE_OK);
+  s.held.push_back(hatch);
+  GSHSCENE_Paint hp = solid(0, 0, 0, 0.5);
+  hp.kind = GSHSCENE_PAINT_HATCH;
+  hp.resource = hatch;
+  GSHSCENE_List * hatched = s.open();
+  ASSERT_EQ(gshscene_list_fill(hatched, text, nullptr, GSHGEOM_FILL_NONZERO, &hp, 0, 0.0), GSHSCENE_OK);
+  gshscene_list_close(hatched);
+  const GSHSCENE_List * lists[] = {base[0], base[1], base[2], base[3], hw.list, stroked, hatched};
   struct Config {
     const char * name;
     GSHSCENE_Dump_Sink_Config config;
@@ -3845,6 +3862,105 @@ TEST(DumpSink, EveryFailingAllocationOfARenderIsTheSinksLimitAndLeavesNothingBeh
       EXPECT_TRUE(t.live.empty()) << "list " << which << " " << c.name << ": " << t.live.size() << " blocks leaked";
     }
     which++;
+  }
+}
+
+TEST(DumpSink, AStrokeOrAHatchOfARunOrAPathThatTheMapOrThePointCapCannotHoldIsTheSinksLimitNeverAnInternalError) {
+  // The scratch of a stroke's outline, of a glyph run's notes and of a hatch's pieces is carved from the one block the render takes, so its
+  // exhaustion is not an allocation failing but the cap of points (`max_stroke_points`) or a placement the canonical map cannot take; both
+  // are the sink's resource limit (ST1, HX14), at every size, and the render after one is whole.
+  Scene s;
+  const GSHSCENE_Resource * sq_a = s.sq(0, 0, 2);
+  const GSHSCENE_Resource * sq_b = s.sq(3, 0, 2);
+  GSHSCENE_Glyph outlines[3] = {{1, 0, 0, sq_a}, {2, 5, 0, sq_b}, {3, 9, 0, sq_a}};
+  GSHSCENE_Glyph_Run run{};
+  run.source = GSHSCENE_GLYPHS_FROM_OUTLINES;
+  run.glyph_count = 3;
+  run.glyphs = outlines;
+  const GSHSCENE_Resource * text = nullptr;
+  ASSERT_EQ(gshscene_store_intern_glyph_run(s.store, &run, &text), GSHSCENE_OK);
+  s.held.push_back(text);
+  const GSHSCENE_Resource * path = s.sq(1, 1, 6);
+  GSHSCENE_Stroke_Style pen;
+  gshscene_stroke_style_init(&pen);
+  pen.width = 0.5;
+  const GSHSCENE_Resource * pen_style = nullptr;
+  ASSERT_EQ(gshscene_store_intern_stroke_style(s.store, &pen, &pen_style), GSHSCENE_OK);
+  s.held.push_back(pen_style);
+  GSHSCENE_Hatch_Family fam{45.0, 0.0, 0.0, 0.0, 1.0, 0, nullptr};
+  GSHSCENE_Hatch spec;
+  gshscene_hatch_init(&spec);
+  spec.style = pen_style;
+  spec.family_count = 1;
+  spec.families = &fam;
+  const GSHSCENE_Resource * hatch = nullptr;
+  ASSERT_EQ(gshscene_store_intern_hatch(s.store, &spec, &hatch), GSHSCENE_OK);
+  s.held.push_back(hatch);
+  GSHSCENE_Paint hp = solid(0, 0, 0, 0.5);
+  hp.kind = GSHSCENE_PAINT_HATCH;
+  hp.resource = hatch;
+  GSHSCENE_Paint ink = solid(0.2, 0.3, 0.9);
+  GSHGEOM_Map maps[5];
+  gshgeom_map_scale(2, 1.0, 1.0, 1.0, &maps[0]);
+  gshgeom_map_scale(2, 0.0, 1.0, 1.0, &maps[1]);
+  gshgeom_map_scale(2, 1e300, 1e300, 1.0, &maps[2]);
+  gshgeom_map_scale(2, 1e-300, 1e-300, 1.0, &maps[3]);
+  gshgeom_map_scale(2, 1e150, 1e-150, 1.0, &maps[4]);
+  const size_t caps[] = {0, 1, 2, 3, 4, 8, 16, 64, 1024};
+  // Runs of many glyphs: the notes of a run (a note a glyph) and its centerline are taken from a scratch of one mebibyte, so a run past
+  // it is the sink's resource limit at each of the three places that take from it; the counts bracket every one.
+  std::vector<const GSHSCENE_Resource *> bigs;
+  for (size_t n : {size_t(300), size_t(3000), size_t(12000), size_t(30000), size_t(60000), size_t(200000)}) {
+    std::vector<GSHSCENE_Glyph> many(n);
+    for (size_t i = 0; i < n; i++) {
+      many[i] = {1, double(i % 100) * 3.0, double(i / 100) * 3.0, (i & 1) ? sq_a : sq_b};
+    }
+    GSHSCENE_Glyph_Run big{};
+    big.source = GSHSCENE_GLYPHS_FROM_OUTLINES;
+    big.glyph_count = n;
+    big.glyphs = many.data();
+    const GSHSCENE_Resource * r = nullptr;
+    if (gshscene_store_intern_glyph_run(s.store, &big, &r) == GSHSCENE_OK) {
+      s.held.push_back(r);
+      bigs.push_back(r);
+    }
+  }
+  std::vector<const GSHSCENE_Resource *> subjects{text, path};
+  subjects.insert(subjects.end(), bigs.begin(), bigs.end());
+  std::set<int> verdicts;
+  for (int what = 0; what < 4; what++) {
+    for (const GSHSCENE_Resource * subject : subjects) {
+      for (const GSHGEOM_Map & map : maps) {
+        GSHSCENE_List * l = s.open();
+        GSHSCENE_Result made = what < 2 ? gshscene_list_stroke(l, subject, pen_style, &map, &ink, 0, 0.0)
+                                        : gshscene_list_fill(l, subject, &map, GSHGEOM_FILL_NONZERO, &hp, 0, 0.0);
+        if (made != GSHSCENE_OK) {
+          continue;
+        }
+        gshscene_list_close(l);
+        for (size_t cap : caps) {
+          GSHSCENE_Dump_Sink_Config c = (cap & 1) ? config_toolpath_like() : config_default();
+          c.max_stroke_points = cap;
+          tracker::Tracker t;
+          GSHSCENE_Allocator alloc = tracker::allocator_for(&t);
+          {
+            SinkRef sink(make_with(c, &alloc, nullptr));
+            auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+            ReportRef report;
+            Rendered r = render_job(sink.sink, request_for(l, *stream, report.report));
+            EXPECT_TRUE(r.result == GSHSCENE_OK || r.result == GSHSCENE_ERR_LIMIT)
+                << "what " << what << " cap " << cap << " result " << (int)r.result;
+            if (stream->bytes.find(" reason=" + std::to_string((int)GSHSCENE_REASON_RESOURCE_LIMIT)) != std::string::npos) {
+              verdicts.insert(what * 16 + (int)GSHSCENE_ERR_LIMIT);
+            }
+          }
+          EXPECT_TRUE(t.live.empty());
+        }
+      }
+    }
+  }
+  for (int what = 0; what < 4; what++) {
+    EXPECT_TRUE(verdicts.count(what * 16 + (int)GSHSCENE_ERR_LIMIT)) << "what " << what << " never reached the limit";
   }
 }
 
