@@ -1293,15 +1293,9 @@ static GSHSCENE_Result hatch_pieces_fields(Run * run, const GSHSCENE_Item * item
   }
   geom.families = families;
   GSHGEOM_Path * centerline = NULL;
-  GSHSCENE_Glyph_Note * notes = NULL;
   if (is_run) {
-    if (glyphs.glyph_count > 0) {
-      notes = scratch->self.calloc_fn(scratch->self.ctx, glyphs.glyph_count, sizeof *notes);
-      if (!notes) {
-        return GSHSCENE_ERR_LIMIT;
-      }
-    }
-    GSHSCENE_Result cr = gshscene_glyph_run_centerline(item->resource, &scratch->self, NULL, &centerline, notes);
+    /* the notes of the glyphs are the plan's and the record's, never read here: none are asked for, so the scratch holds only the contours */
+    GSHSCENE_Result cr = gshscene_glyph_run_centerline(item->resource, &scratch->self, NULL, &centerline, NULL);
     if (cr == GSHSCENE_ERR_OOM || cr == GSHSCENE_ERR_LIMIT) {
       return GSHSCENE_ERR_LIMIT;
     }

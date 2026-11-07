@@ -13,6 +13,11 @@
 
 #include <ghoti.io/shape-scene/shape-scene.h>
 
+#include <atomic>
+#include <cerrno>
+#include <dlfcn.h>
+#include <pthread.h>
+#include <set>
 #include <deque>
 
 using namespace sinkconf;
@@ -3900,12 +3905,17 @@ TEST(DumpSink, AStrokeOrAHatchOfARunOrAPathThatTheMapOrThePointCapCannotHoldIsTh
   hp.kind = GSHSCENE_PAINT_HATCH;
   hp.resource = hatch;
   GSHSCENE_Paint ink = solid(0.2, 0.3, 0.9);
-  GSHGEOM_Map maps[5];
+  GSHGEOM_Map maps[9];
   gshgeom_map_scale(2, 1.0, 1.0, 1.0, &maps[0]);
   gshgeom_map_scale(2, 0.0, 1.0, 1.0, &maps[1]);
   gshgeom_map_scale(2, 1e300, 1e300, 1.0, &maps[2]);
   gshgeom_map_scale(2, 1e-300, 1e-300, 1.0, &maps[3]);
   gshgeom_map_scale(2, 1e150, 1e-150, 1.0, &maps[4]);
+  // a translation past the range the canonical map can split, and factors whose product with the unit's scale overflows
+  gshgeom_map_translate(2, 1e300, 0.0, 0.0, &maps[5]);
+  gshgeom_map_translate(2, 0.0, -1e300, 0.0, &maps[6]);
+  gshgeom_map_scale(2, 1.7e308, 1.7e308, 1.0, &maps[7]);
+  gshgeom_map_translate(2, 9.3e18, 9.3e18, 0.0, &maps[8]);
   const size_t caps[] = {0, 1, 2, 3, 4, 8, 16, 64, 1024};
   // Runs of many glyphs: the notes of a run (a note a glyph) and its centerline are taken from a scratch of one mebibyte, so a run past
   // it is the sink's resource limit at each of the three places that take from it; the counts bracket every one.
@@ -3962,6 +3972,63 @@ TEST(DumpSink, AStrokeOrAHatchOfARunOrAPathThatTheMapOrThePointCapCannotHoldIsTh
   for (int what = 0; what < 4; what++) {
     EXPECT_TRUE(verdicts.count(what * 16 + (int)GSHSCENE_ERR_LIMIT)) << "what " << what << " never reached the limit";
   }
+}
+
+// The system's mutex initialisation, made to fail on demand: the executable's definition is the one the library's call resolves to, and every
+// other call is passed on to the system's.
+static std::atomic<int> g_mutex_init_failures{0};
+
+extern "C" int pthread_mutex_init(pthread_mutex_t * mutex, const pthread_mutexattr_t * attr) {
+  using Real = int (*)(pthread_mutex_t *, const pthread_mutexattr_t *);
+  static Real real = reinterpret_cast<Real>(dlsym(RTLD_NEXT, "pthread_mutex_init"));
+  int armed = g_mutex_init_failures.load();
+  while (armed > 0 && !g_mutex_init_failures.compare_exchange_weak(armed, armed - 1)) {
+  }
+  if (armed > 0) {
+    return ENOMEM;
+  }
+  return real(mutex, attr);
+}
+
+TEST(DumpSink, ASinkWhoseMutexCannotBeMadeIsRefusedAsOutOfMemoryAndLeavesNothingBehind) {
+  tracker::Tracker t;
+  GSHSCENE_Allocator alloc = tracker::allocator_for(&t);
+  GSHSCENE_Dump_Sink_Config c = config_default();
+  GSHSCENE_Sink * sink = nullptr;
+  g_mutex_init_failures = 1;
+  GSHSCENE_Result r = gshscene_dump_sink_create(&alloc, nullptr, &c, &sink);
+  g_mutex_init_failures = 0;
+  EXPECT_EQ(r, GSHSCENE_ERR_OOM);
+  EXPECT_EQ(sink, nullptr);
+  EXPECT_TRUE(t.live.empty()) << t.live.size() << " blocks kept by a refused create";
+  // and the next create, once the system can make a mutex, is whole
+  r = gshscene_dump_sink_create(&alloc, nullptr, &c, &sink);
+  EXPECT_EQ(r, GSHSCENE_OK);
+  gshscene_sink_destroy(sink);
+  EXPECT_TRUE(t.live.empty());
+}
+
+TEST(DumpSink, TheWalkOfAListIsAlwaysMadeInTheBytesTheSinkCarvesForItSoItsInternalErrorIsUnreachable) {
+  // The dump sink carves gshscene_expansion_bytes(list) for the walk and starts it there; that start fails for a list that is not closed, for no
+  // memory, or for fewer bytes, and the contract layer refuses an open list before the sink sees it, while the carve is never smaller than the
+  // bytes and never null.  So the INTERNAL a failed start would return is no API input's.
+  Scene s;
+  const GSHSCENE_List * lists[] = {stroke_list(s), glyph_list(s), primitive_list(s), answer_list(s)};
+  for (const GSHSCENE_List * list : lists) {
+    std::vector<unsigned char> exact(gshscene_expansion_bytes(list) + sizeof(void *));
+    GSHSCENE_Expansion walk;
+    EXPECT_EQ(gshscene_expansion_init(&walk, list, exact.data(), gshscene_expansion_bytes(list)), GSHSCENE_OK);
+    EXPECT_EQ(gshscene_expansion_init(&walk, list, exact.data(), gshscene_expansion_bytes(list) - 1), GSHSCENE_ERR_INVALID);
+  }
+  GSHSCENE_List * open = s.open();
+  GSHSCENE_Paint red = solid(1, 0, 0);
+  ASSERT_EQ(gshscene_list_fill(open, s.sq(0, 0, 4), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0), GSHSCENE_OK);
+  SinkRef sink(make_full(nullptr, nullptr));
+  auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+  ReportRef report;
+  GSHSCENE_Render_Request req = request_for(open, *stream, report.report);
+  GSHSCENE_Job job{};
+  EXPECT_EQ(gshscene_sink_begin(sink.sink, &req, &job), GSHSCENE_ERR_INVALID);
 }
 
 int main(int argc, char ** argv) {
