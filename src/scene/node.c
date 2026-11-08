@@ -265,6 +265,9 @@ GSHSCENE_Result gshscene_node_canonical(const GSHSCENE_Store * store, const GSHS
         result = gshscene_list_check_rule(in->fill_rule);
       }
       if (result == GSHSCENE_OK) {
+        result = gshscene_list_check_antialias(in->antialias);
+      }
+      if (result == GSHSCENE_OK) {
         result = gshscene_list_canonical_paint(store, &in->paint, &node.paint);
       }
       if (result == GSHSCENE_OK && node.paint.kind == GSHSCENE_PAINT_HATCH &&
@@ -276,12 +279,16 @@ GSHSCENE_Result gshscene_node_canonical(const GSHSCENE_Store * store, const GSHS
       }
       node.resource = in->resource;
       node.fill_rule = in->fill_rule;
+      node.antialias = in->antialias;
       break;
     case GSHSCENE_NODE_STROKE: /* SK13: a stroke item's rules (list.h, SK4), so a node and its emitted item agree */
       result = check_region(store, in->resource, 0);
       if (result == GSHSCENE_OK &&
           (!in->style || in->style->store != store || in->style->kind != GSHSCENE_RESOURCE_STROKE_STYLE)) {
         result = GSHSCENE_ERR_INVALID;
+      }
+      if (result == GSHSCENE_OK) {
+        result = gshscene_list_check_antialias(in->antialias);
       }
       if (result == GSHSCENE_OK) {
         result = gshscene_list_canonical_paint_valid(store, &in->paint, &node.paint);
@@ -297,6 +304,7 @@ GSHSCENE_Result gshscene_node_canonical(const GSHSCENE_Store * store, const GSHS
       }
       node.resource = in->resource;
       node.style = in->style;
+      node.antialias = in->antialias;
       break;
     case GSHSCENE_NODE_PLACEHOLDER: /* PH7: a placeholder item's rules (list.h, PH1), so a node and its emitted item agree */
       result = gshscene_placeholder_canonical(in->placeholder.source, in->placeholder.code, in->placeholder.approximated,
@@ -356,7 +364,8 @@ int gshscene_props_equal(const GSHSCENE_Node * a, const GSHSCENE_Node * b) {
       return a->clip == NULL || (a->clip_rule == b->clip_rule && map_equal(&a->clip_map, &b->clip_map));
     case GSHSCENE_NODE_SHAPE:
     case GSHSCENE_NODE_STROKE:
-      if (a->resource != b->resource || a->style != b->style || a->fill_rule != b->fill_rule || a->paint.kind != b->paint.kind ||
+      if (a->resource != b->resource || a->style != b->style || a->fill_rule != b->fill_rule || a->antialias != b->antialias ||
+          a->paint.kind != b->paint.kind ||
           !gshscene_space_equal(&a->paint.space, &b->paint.space) || a->paint.resource != b->paint.resource ||
           a->paint.entry != b->paint.entry) {
         return 0;
@@ -523,7 +532,13 @@ size_t gshscene_node_remove_child(GSHSCENE_Node_Rec * node, uint64_t child) {
 void gshscene_node_hash(GSHGEOM_Hash * h, const GSHSCENE_Node_Rec * node) {
   const GSHSCENE_Node * p = &node->p;
   gshgeom_hash_u64(h, node->id);
-  gshgeom_hash_u8(h, (uint8_t)p->kind);
+  if (p->antialias != (uint32_t)GSHSCENE_ANTIALIAS_AREA) {
+    /* AA6, as a list item's: bit 7 of the kind byte, then the mode; the default is spelled as it was. */
+    gshgeom_hash_u8(h, (uint8_t)((uint32_t)p->kind | 0x80u));
+    gshgeom_hash_u8(h, (uint8_t)p->antialias);
+  } else {
+    gshgeom_hash_u8(h, (uint8_t)p->kind);
+  }
   gshgeom_hash_u8(h, (uint8_t)p->flags);
   gshgeom_hash_u64(h, node->parent);
   gshgeom_hash_u8(h, node->has_key ? 1 : 0);

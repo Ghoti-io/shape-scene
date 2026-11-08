@@ -49,7 +49,7 @@
  * | Class | What it says |
  * | --- | --- |
  * | `REFUSED` | the item, and its block if it is a push or an instance, was skipped |
- * | `APPROXIMATED` | the item was drawn, differently from the definition (a clip without antialiasing, a group blended in another space) |
+ * | `APPROXIMATED` | the item was drawn, differently from the definition (a clip without antialiasing, an item that asks for no antialiasing drawn with it, a group blended in another space) |
  * | `RESOLVED_AMBIGUITY` | a depth tie of the list (N11): `second` is the first item of the unit painted after, in the same list, `depth` the depth they share |
  * | `HINT_STATUS` | a run from a font not hinted as it asked (glyph.h, D7): one entry per run for a run-level cause, `second` 0; one per glyph for a glyph-level cause, `second` the glyph's index in the run |
  * | `NOTICE` | the item was drawn as defined, and the definition draws nothing there: a gradient fill whose chain is not invertible or whose gradient is degenerate (paint.h, G10, G11); a fill or stroke painted with a pattern whose chain is not invertible or whose pattern has a size or step of 0 (pattern.h, PT10); a stroke whose chain is not invertible, whose width is 0 or whose gradient paint is degenerate (stroke.h, SK8, SK9).  It never fails a render, strict or not |
@@ -174,6 +174,7 @@ typedef enum GSHSCENE_Reason {
   GSHSCENE_REASON_HATCH_DEGENERATE = 40, ///< Notice, per unit: a family of the hatch has an `offset_across` of 0, so it draws nothing (reserved).
   GSHSCENE_REASON_CLIP_UNION = 41,    ///< Refused, per clip push: the sink does not draw a clip union (clip_union.h, CU13, S24).
   GSHSCENE_REASON_UNION_OVERLAP = 42, ///< Refused, per clip push: the sink draws only disjoint unions and the members could not be shown disjoint; `second` is `i << 16 | j` of the first pair (`i << 16 | i` for an unprovable member), canonical indices (CU13).
+  GSHSCENE_REASON_ANTIALIAS = 43,     ///< Approximated, per fill or stroke: the item asks for no antialiasing and the sink draws it antialiased (list.h, AA5).
   GSHSCENE_REASON_COUNT               ///< Closes the enum.
 } GSHSCENE_Reason;
 

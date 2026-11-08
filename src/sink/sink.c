@@ -369,6 +369,13 @@ GSHSCENE_Disposition gshscene_caps_disposition_unit(const GSHSCENE_Sink_Caps * c
     d.reason = GSHSCENE_REASON_CLIP_ALIASED;
     return d;
   }
+  /* AA5: a fill or stroke that asks for no antialiasing, drawn by a sink that antialiases it. */
+  if ((item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE) &&
+      item->antialias != (uint32_t)GSHSCENE_ANTIALIAS_AREA && !(caps->flags & GSHSCENE_CAP_ANTIALIAS_NONE)) {
+    d.entry_class = GSHSCENE_ENTRY_APPROXIMATED;
+    d.reason = GSHSCENE_REASON_ANTIALIAS;
+    return d;
+  }
   if (item->kind == GSHSCENE_ITEM_GROUP_PUSH && !(caps->flags & GSHSCENE_CAP_BLEND_SPACES) &&
       !gshscene_color_space_is_target(&item->group.blend_space) &&
       !(target_space && gshscene_space_equal(&item->group.blend_space, target_space))) {

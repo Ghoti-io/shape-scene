@@ -31,13 +31,13 @@
  *
  * | Kind | Resource | Map | Fill rule | Paint | Other |
  * | --- | --- | --- | --- | --- | --- |
- * | ::GSHSCENE_ITEM_FILL | path or glyph run | placement | yes | yes | layer, depth |
+ * | ::GSHSCENE_ITEM_FILL | path or glyph run | placement | yes | yes | antialias, layer, depth |
  * | ::GSHSCENE_ITEM_CLIP_PUSH | path or glyph run | placement | yes | | layer, depth |
  * | ::GSHSCENE_ITEM_CLIP_POP | | | | | |
  * | ::GSHSCENE_ITEM_GROUP_PUSH | | | | | opacity, blend space, composite, ordering, isolation, knockout, soft mask, layer, depth |
  * | ::GSHSCENE_ITEM_GROUP_POP | | | | | |
  * | ::GSHSCENE_ITEM_INSTANCE | picture | placement | | | layer, depth |
- * | ::GSHSCENE_ITEM_STROKE | path or glyph run (the centerline) | placement | | yes | style, layer, depth |
+ * | ::GSHSCENE_ITEM_STROKE | path or glyph run (the centerline) | placement | | yes | style, antialias, layer, depth |
  * | ::GSHSCENE_ITEM_PLACEHOLDER | | placement | | | source, code, approximated, box, layer, depth |
  *
  * The **map** places the resource's own coordinates (the model space of its
@@ -94,8 +94,52 @@
  * whose entry is missing is refused.  **G1 to G13** (paint.h): a
  * ::GSHSCENE_PAINT_GRADIENT fill takes its color at each point from a gradient
  * resource.  **SK5**: a stroke is N7 with the region its centerline covers under its
- * style (stroke.h) in place of the shape.  **N11, N12**: the order is made by
+ * style (stroke.h) in place of the shape.  **AA1 to AA6** (below): a fill or stroke may ask for coverage that is whole or
+ * nothing, decided at each pixel's center.  **N11, N12**: the order is made by
  * ::gshscene_list_close, as below.
+ *
+ * ### Antialiasing of an item (AA1 to AA6)
+ *
+ * **AA1.**  A fill and a stroke carry an `antialias`, a ::GSHSCENE_Antialias, zero by default: ::GSHSCENE_ANTIALIAS_AREA, the
+ * coverage `k` of N7 and SK5, the area of the shape inside the pixel.  ::GSHSCENE_ANTIALIAS_NONE asks for no antialiasing, the
+ * rule below.  Every other item kind has it zero (a clip's edge is a sink's own, ::GSHSCENE_CAP_CLIP_AA), and a group has none: an
+ * item says it of its own shape, so that a fill and a stroke of one path may differ and a group is not a second way to say it.
+ * A fill painted with a gradient, an image, a pattern or a hatch takes it on the fill; the paint is then drawn through the
+ * coverage the rule gives.  The items inside a pattern's tile or a mask's picture carry their own.
+ *
+ * **AA2 The rule.**  In device space (the target's pixels, with the unit of the sink's geometry, 1/64 of a pixel, so that every
+ * coordinate below is an integer) the pixel `(x, y)` has the center `c = (64 x + 32, 64 y + 32)`.  The item's shape is a set of
+ * directed contours (a fill's path, flattened; every glyph of a run; a stroke's expanded outline: the contours of the region
+ * SK5 covers), each closed by its last point's line to its first, and their windings add.  For each contour edge from `p` to
+ * `q`: it **straddles** `c` when exactly one of `p.y <= c.y` and `q.y <= c.y` holds; it then meets the line `y = c.y` at the
+ * rational `x_e = p.x + (c.y - p.y)(q.x - p.x)/(q.y - p.y)`, and it **counts** when `x_e > c.x`, as `+1` when `q.y > p.y` and
+ * `-1` otherwise.  The winding number `w(c)` is the sum of the counts.  `c` is inside when `w(c) != 0` under the nonzero rule and
+ * when `w(c)` is odd under the even-odd rule; the coverage of the pixel is `k = 255/255` (the whole pixel) inside and `0`
+ * outside.  The arithmetic is exact: nothing is rounded and no tolerance applies, so a sink that implements the rule
+ * agrees with every other bit for bit.  A stroke whose style aligns its outline (stroke.h, SK5) decides each of the three
+ * parts of SK5 by this rule and combines the three coverages as SK5 does, which on whole-or-nothing values is the set union of the
+ * body with the aligned part met with the clip (or its complement).
+ *
+ * **AA3 Ties.**  The rule is the same as asking whether the point `c + (e, e^2)` is inside, for an infinitely small `e > 0`
+ * (to the right in `x` first, then below in `y`), which is why no center is ever on an edge: it is the **top-left rule**.  A center
+ * on a non-horizontal edge is inside when the interior is on the right of that edge (a left edge) and outside when it is on the
+ * left (a right edge); a center on a horizontal edge is inside when the interior is below it (a top edge; device y points down)
+ * and outside when it is above it (a bottom edge); a center at a vertex is decided by the same point `c + (e, e^2)`.  Two shapes
+ * that share an edge therefore neither overlap nor leave a gap at the centers on it, and a shape of whole pixels (a
+ * rectangle with corners on the pixel grid) covers exactly its pixels.
+ *
+ * **AA4 Then as any coverage.**  The coverage `k` of AA2 goes where an antialiased `k` goes, unchanged in kind: N7's product with
+ * the clips in force, the paint, the opacity, the operator, the group's layer, a mask.  Nothing else about the item changes; a
+ * stroke's width, caps, joins, dashes and alignment are the style's (stroke.h) and the expansion is as for any stroke.
+ *
+ * **AA5 What a sink says.**  A sink that draws an item as AA2 says has ::GSHSCENE_CAP_ANTIALIAS_NONE.  One that does not
+ * draws it antialiased and the planning pass reports it `APPROXIMATED` with the reason `ANTIALIAS` (report.h); it is not a
+ * refusal, so ::GSHSCENE_RENDER_STRICT does not fail it.
+ *
+ * **AA6 Spelling.**  The default is spelled by nothing: a list of items with the default is hashed, dumped and compared as it was
+ * before the field existed.  The hash of an item whose `antialias` is not the default sets bit 7 of its kind byte and writes
+ * the mode as a `u8` right after it; its dump line ends with ` aa=N`.
+ *
  *
  * ### Order and ties (N11, N12)
  *
@@ -152,6 +196,9 @@
  *   (`x0 y0 x1 y1`), `u64` the map's hash, `i32` layer, `f64` depth.
  * - **clip pop**, **group pop**: nothing.
  *
+ * An item whose `antialias` is not the default (AA6) sets bit 7 of its kind byte and writes `u8` the mode right after it,
+ * before the fields above; every other item is spelled as above.
+ *
  * A **space** is `u8` primaries, `u8` transfer, `f64` gamma.  Handles, ids, the
  * allocator and the ties are not part of it.
  *
@@ -165,7 +212,7 @@
  * mask=<hash>` after `order=N` when one of them is not the default, T1), `g`,
  * `I res=<kind>:<hash> map=<hash> layer=N depth=<hex>`,
  * `K res=<kind>:<hash> style=<hash> map=<hash> paint=N <r> <g> <b> <a> space=<space> entry=E resource=<hash> layer=N depth=<hex>`
- * (a stroke), `P source=N code=N approx=N box=<x0> <y0> <x1> <y1>|- map=<hash> layer=N depth=<hex>` (a placeholder; the
+ * (a stroke; a fill and a stroke end with ` aa=N` when their `antialias` is not the default, AA6), `P source=N code=N approx=N box=<x0> <y0> <x1> <y1>|- map=<hash> layer=N depth=<hex>` (a placeholder; the
  * box's four numbers as 16 hexadecimal digits each), then one line per tie,
  * `T first=I second=J depth=<hex> reason=N`, with every `double` as the 16
  * hexadecimal digits of its bit pattern, every hash as 16 digits and a `<space>`
@@ -285,6 +332,18 @@ typedef enum GSHSCENE_Isolation {
   GSHSCENE_ISOLATION_COUNT             ///< Closes the enum.
 } GSHSCENE_Isolation;
 
+/**
+ * @brief How the coverage of a fill or a stroke is decided (AA1 to AA6).  The values are pinned (they are hashed).
+ *
+ * Zero is the default, so a zero-filled item is antialiased as it always was.  A value at or past
+ * ::GSHSCENE_ANTIALIAS_COUNT is ::GSHSCENE_ERR_INVALID.
+ */
+typedef enum GSHSCENE_Antialias {
+  GSHSCENE_ANTIALIAS_AREA = 0, ///< The default: the coverage is the area of the shape inside the pixel (N7, SK5).
+  GSHSCENE_ANTIALIAS_NONE = 1, ///< AA2: the pixel is covered whole when its center is inside the shape, else not at all; a tie is the top-left rule (AA3).  A sink without ::GSHSCENE_CAP_ANTIALIAS_NONE is approximated, `ANTIALIAS` (AA5).
+  GSHSCENE_ANTIALIAS_COUNT     ///< Closes the enum.
+} GSHSCENE_Antialias;
+
 /** @brief The properties of a group. */
 typedef struct GSHSCENE_Group {
   double opacity;                   ///< Finite, in `[0, 1]`: the group's result is scaled by it before it is composited.
@@ -338,6 +397,8 @@ typedef struct GSHSCENE_Item {
   /** Stroke: the stroke style (stroke.h; the list holds the reference); else NULL.  A stroke's `resource` is its
    *  centerline, its `fill_rule` nonzero and its `group` zero. */
   const GSHSCENE_Resource * style;
+  /** Fill, stroke: a ::GSHSCENE_Antialias, how its coverage is decided (AA1); else 0. */
+  uint32_t antialias;
   /** Placeholder: its content (PH1), with the placement in @p map; else zero. */
   GSHSCENE_Placeholder placeholder;
 } GSHSCENE_Item;
@@ -406,6 +467,20 @@ GSHSCENE_API GSHSCENE_Result gshscene_list_fill(GSHSCENE_List * list, const GSHS
     const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, const GSHSCENE_Paint * paint, int32_t layer, double depth);
 
 /**
+ * @brief Record a fill whose coverage is decided as @p antialias says (AA1).
+ *
+ * ::gshscene_list_fill is this call with ::GSHSCENE_ANTIALIAS_AREA.  Errors as ::gshscene_list_fill's, and
+ * ::GSHSCENE_ERR_INVALID for an @p antialias outside ::GSHSCENE_Antialias, decided with the other arguments' validity and
+ * before N1's limit.  A fill of the plane has no outline to decide a center against: its coverage is whole wherever the
+ * clips allow whatever @p antialias says, and the item records the mode all the same.
+ *
+ * @param antialias A ::GSHSCENE_Antialias.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_list_fill_antialias(GSHSCENE_List * list, const GSHSCENE_Resource * resource,
+    const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, const GSHSCENE_Paint * paint, GSHSCENE_Antialias antialias, int32_t layer,
+    double depth);
+
+/**
  * @brief Record a stroke (stroke.h, SK4): the region @p centerline covers under @p style, placed by @p map, painted
  *   with @p paint.
  *
@@ -423,6 +498,16 @@ GSHSCENE_API GSHSCENE_Result gshscene_list_fill(GSHSCENE_List * list, const GSHS
  */
 GSHSCENE_API GSHSCENE_Result gshscene_list_stroke(GSHSCENE_List * list, const GSHSCENE_Resource * centerline,
     const GSHSCENE_Resource * style, const GSHGEOM_Map * map, const GSHSCENE_Paint * paint, int32_t layer, double depth);
+
+/**
+ * @brief Record a stroke whose coverage is decided as @p antialias says (AA1).
+ *
+ * ::gshscene_list_stroke is this call with ::GSHSCENE_ANTIALIAS_AREA.  Errors as ::gshscene_list_stroke's, and
+ * ::GSHSCENE_ERR_INVALID for an @p antialias outside ::GSHSCENE_Antialias.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_list_stroke_antialias(GSHSCENE_List * list, const GSHSCENE_Resource * centerline,
+    const GSHSCENE_Resource * style, const GSHGEOM_Map * map, const GSHSCENE_Paint * paint, GSHSCENE_Antialias antialias,
+    int32_t layer, double depth);
 
 /**
  * @brief Record a placeholder (PH1, PH2): a unit that draws nothing and that every sink reports.

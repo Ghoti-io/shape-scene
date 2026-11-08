@@ -1634,6 +1634,104 @@ static void stroke_section(void) {
   }
   gshscene_scene_destroy(scene);
 
+  /*
+   * Antialiasing (list.h, AA1 to AA6): the same paths and styles recorded as fills and strokes of every mode, and a retained scene of
+   * shapes and strokes of both.  The mode is a byte of the hash and a token of the dump, and what the test sinks report without
+   * the capability must be the same on every target.  Nothing here draws from the generator, so the sections after this one are
+   * what they were.
+   */
+  {
+    GSHSCENE_List * list = NULL;
+    check(gshscene_list_create(NULL, NULL, store, &list), "antialias list");
+    for (unsigned i = 0; i < 6; i++) {
+      GSHSCENE_Paint paint;
+      memset(&paint, 0, sizeof paint);
+      paint.kind = GSHSCENE_PAINT_SOLID;
+      paint.rgba[0] = (double)i / 8.0;
+      paint.rgba[3] = 1.0;
+      GSHSCENE_Antialias mode = (i & 1u) ? GSHSCENE_ANTIALIAS_NONE : GSHSCENE_ANTIALIAS_AREA;
+      if (i % 3u == 0) {
+        check(gshscene_list_fill_antialias(list, paths[i % STROKE_PATHS], NULL, (i & 2u) ? GSHGEOM_FILL_EVEN_ODD : GSHGEOM_FILL_NONZERO,
+                  &paint, mode, (int32_t)i, 0.0), "antialias fill");
+      } else {
+        check(gshscene_list_stroke_antialias(list, paths[i % STROKE_PATHS], styles[i % STROKE_STYLES], NULL, &paint, mode, (int32_t)i, 0.0),
+            "antialias stroke");
+      }
+    }
+    check(gshscene_list_close(list), "antialias close");
+    feed(gshscene_list_hash(list));
+    feed((uint64_t)gshscene_list_count(list));
+    for (size_t i = 0; i < gshscene_list_count(list); i++) {
+      const GSHSCENE_Item * item = NULL;
+      check(gshscene_list_item(list, i, &item), "antialias item");
+      feed((uint64_t)item->antialias);
+      feed((uint64_t)item->kind);
+    }
+    feed_render(list);
+    feed_stroke_render(list);
+    gshscene_list_destroy(list);
+
+    GSHSCENE_Scene * ascene = NULL;
+    check(gshscene_scene_create(NULL, NULL, NULL, &ascene), "antialias scene");
+    GSHSCENE_Store * astore = gshscene_scene_store(ascene);
+    const GSHSCENE_Resource * apath = NULL;
+    const GSHSCENE_Resource * astyle = NULL;
+    GSHGEOM_Path * square = NULL;
+    if (gshgeom_path_create(NULL, NULL, 2, &square) != GSHGEOM_OK) {
+      fail("antialias path");
+    }
+    gshgeom_path_move_to(square, (GSHGEOM_Point){1.5, 1.5, 0.0});
+    gshgeom_path_line_to(square, (GSHGEOM_Point){9.5, 1.5, 0.0});
+    gshgeom_path_line_to(square, (GSHGEOM_Point){9.5, 9.5, 0.0});
+    gshgeom_path_line_to(square, (GSHGEOM_Point){1.5, 9.5, 0.0});
+    gshgeom_path_close(square);
+    check(gshscene_store_intern_path(astore, square, &apath), "antialias intern path");
+    gshgeom_path_destroy(square);
+    GSHSCENE_Stroke_Style ast;
+    gshscene_stroke_style_init(&ast);
+    ast.width = 1.5;
+    check(gshscene_store_intern_stroke_style(astore, &ast, &astyle), "antialias intern style");
+    GSHSCENE_Edit * aedit = NULL;
+    check(gshscene_scene_open_edit(ascene, NULL, &aedit), "antialias edit");
+    GSHSCENE_Node node;
+    gshscene_node_init(GSHSCENE_NODE_SHAPE, &node);
+    node.resource = apath;
+    node.antialias = GSHSCENE_ANTIALIAS_NONE;
+    uint64_t shape_id = add_node(aedit, GSHSCENE_ROOT_ID, &node, NULL);
+    gshscene_node_init(GSHSCENE_NODE_STROKE, &node);
+    node.resource = apath;
+    node.style = astyle;
+    node.antialias = GSHSCENE_ANTIALIAS_NONE;
+    (void)add_node(aedit, GSHSCENE_ROOT_ID, &node, NULL);
+    const GSHSCENE_Version * av1 = NULL;
+    check(gshscene_scene_publish(ascene, aedit, NULL, &av1), "antialias publish 1");
+    gshscene_edit_destroy(aedit);
+    feed_version(av1);
+    check(gshscene_scene_open_edit(ascene, av1, &aedit), "antialias edit 2");
+    GSHSCENE_Node_Info ainfo;
+    check(gshscene_edit_node(aedit, shape_id, &ainfo), "antialias node");
+    ainfo.node.antialias = GSHSCENE_ANTIALIAS_AREA;
+    check(gshscene_edit_set(aedit, shape_id, &ainfo.node), "antialias set");
+    const GSHSCENE_Version * av2 = NULL;
+    check(gshscene_scene_publish(ascene, aedit, NULL, &av2), "antialias publish 2");
+    gshscene_edit_destroy(aedit);
+    feed_version(av2);
+    GSHGEOM_Map adevice;
+    if (gshgeom_map_scale(2, 2.0, 2.0, 1.0, &adevice) != GSHGEOM_OK) {
+      fail("antialias device map");
+    }
+    feed_diff(av1, av2, &adevice);
+    const GSHSCENE_List * alist = NULL;
+    check(gshscene_version_list(av1, &alist), "antialias version list");
+    feed(gshscene_list_hash(alist));
+    feed_render(alist);
+    gshscene_version_release(av1);
+    gshscene_version_release(av2);
+    gshscene_resource_release(apath);
+    gshscene_resource_release(astyle);
+    gshscene_scene_destroy(ascene);
+  }
+
   GSHSCENE_Store_Stats stats;
   check(gshscene_store_stats(store, &stats), "stroke stats");
   feed(stats.live);

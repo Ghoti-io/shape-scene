@@ -147,6 +147,8 @@ const char * gshscene_reason_string(GSHSCENE_Reason reason) {
       return "clip-union";
     case GSHSCENE_REASON_UNION_OVERLAP:
       return "union-overlap";
+    case GSHSCENE_REASON_ANTIALIAS:
+      return "antialias";
     case GSHSCENE_REASON_COUNT:
       break;
   }

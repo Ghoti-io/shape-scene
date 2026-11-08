@@ -551,6 +551,66 @@ exactly equivalently; a sink that strokes the pieces needs of the style what it 
 the width space, an anisotropic width, and a degenerate shape for a dot, never a join). The test sink writes `hatch=<id> lines=<n>
 pieces=<hash>` after `rule=` and a record of the resource that states it, so that reading it back gives an equal hatch.
 
+## Antialiasing of an item (normative; AA1 to AA6)
+
+A fill and a stroke may ask for coverage that is whole or nothing instead of the area of the shape inside the pixel. It is the
+`antialias` field of the item (`list.h`, a `GSHSCENE_Antialias`): `GSHSCENE_ANTIALIAS_AREA` (0, the default, N7's and SK5's
+coverage) or `GSHSCENE_ANTIALIAS_NONE` (1). SVG's `shape-rendering: crispEdges` and `optimizeSpeed` are this mode; no other
+front end of the family has a per-path switch for it. A retained scene's shape and stroke node carry the same field and emit it
+on their item.
+
+**Why it is the item's.** A group has no outline, so what "no antialiasing" would mean for it is only what it means for each
+shape inside, and a group flag would be a second way to say that. A fill and a stroke of one path are two items and may differ
+(a crisp outline on a smooth fill). A clip's edge is the sink's own (`GSHSCENE_CAP_CLIP_AA`, AD-12), and the items inside a
+pattern's tile or a mask's picture are items and carry their own. A fill painted with a gradient, an image, a pattern or a hatch
+takes the mode on the fill that carries the paint, and the paint is drawn through the coverage the rule gives; a hatch is a
+fill whose coverage is its lines' strokes, so the lines are decided by the rule for strokes. The field is an enumeration, with a
+value outside it `ERR_INVALID`, so that a later mode has a place.
+
+**The rule (AA2, AA3).** Device space is the pixel grid in the sink's geometry unit, 1/64 of a pixel, and the pixel `(x, y)`
+has the center `c = (64 x + 32, 64 y + 32)`, an integer pair. The shape is the directed contours of the item (the flattened
+path or paths, every glyph of a run, the contours of the stroke's expansion that SK5 covers), each closed by the line from its last
+point to its first; the winding numbers add. An edge from `p` to `q` *straddles* `c` when exactly one of `p.y <= c.y` and
+`q.y <= c.y` holds, and then meets the line `y = c.y` at the rational `x_e = p.x + (c.y - p.y)(q.x - p.x)/(q.y - p.y)`; it
+*counts* when `x_e > c.x`, as `+1` when `q.y > p.y` and `-1` otherwise. The winding `w(c)` is the sum of the counts; `c` is
+inside when `w(c) != 0` (nonzero) or `w(c)` is odd (even-odd), and the pixel's coverage is the whole pixel inside and nothing
+outside. That is the whole definition and it is exact: no tolerance, no rounding, and the same answer from every sink that
+implements it.
+
+It is the **top-left rule** because it is the question "is `c + (e, e^2)` inside?" for an infinitely small `e > 0`: the point
+is moved right in `x` first and then down in `y`, so it is never on an edge or a vertex of integer coordinates. A center on a
+non-horizontal edge is inside when the shape is on the right of the edge (a left edge) and outside when it is on the left (a
+right edge); on a horizontal edge it is inside when the shape is below it (a top edge) and outside when it is above (a bottom
+edge); at a vertex the same point decides, which is what makes the corners of a rectangle on the pixel grid follow the edges
+they join. Two shapes that share an edge neither overlap nor leave a gap at the centers on it, and a rectangle with whole-pixel
+corners covers exactly its pixels. A stroke of an aligned style (SK5) decides its body, aligned part and clip each by the rule and
+combines the three whole-or-nothing coverages as SK5 does, which is the union of the body with the aligned part met with the clip
+(or with its complement).
+
+**Then as any coverage (AA4).** The coverage the rule gives is the `k` of N7, and everything after it is unchanged: the product
+with the clips in force, the paint, the opacity, the operator, the layer of a group, a soft mask. The stroke's expansion (width,
+caps, joins, dashes, alignment) is the style's, and is the sink's own geometry; what the rule fixes is the decision at each center
+given that geometry.
+
+**What a sink says (AA5).** `GSHSCENE_CAP_ANTIALIAS_NONE` means the sink draws the mode as AA2 and AA3 say. A sink without it
+draws the item antialiased, and the planning pass reports it `APPROXIMATED` with the reason `GSHSCENE_REASON_ANTIALIAS`; the item is
+drawn, so a strict render does not fail on it. Among the planning pass's decisions it follows every refusal and comes first among
+the approximations (the clip's, the blend space's, the gradient's, the image's). The test sink claims the capability, since it
+records items by handle, and records the mode in its stream as ` aa=1` after the head of the item's record, only when it is not the
+default.
+
+**Spelling (AA6).** The default is spelled by nothing, so every list, scene and dump that has no such item is what it was before the
+field existed. An item whose mode is not the default sets bit 7 of its kind byte in the hash and writes the mode as a `u8` right after
+it, as a group's PDF fields set bit 7 of the composite byte; its dump line ends with ` aa=N`. `tools/gen-scene-vectors.py` states
+both spellings independently and `tests/known_answers.h` is what it writes. The cross-target probe folds a list and a retained scene of
+items of both modes, rendered by test sinks that do and do not claim the capability, into the stroke section's hash, which is why
+`stroke-hash` and `stroke-count` in `tests/corpus/scene.hash` changed with it and no other pair did.
+
+**Recording.** `gshscene_list_fill_antialias` and `gshscene_list_stroke_antialias` take the mode after the paint; the calls
+without it are the same calls with `GSHSCENE_ANTIALIAS_AREA`, and so are the fixed-point recorders (fixed.h), which record the
+default. A mode outside the enumeration is `ERR_INVALID`, decided with the other arguments' validity and before N1's limit. A fill of
+the plane has no outline to test a center against: it covers every pixel the clips allow and records the mode all the same.
+
 ## Reserved
 
 Refused with `ERR_UNSUPPORTED`: ProPhoto (D50: converting to it needs a chromatic adaptation), the parametric,

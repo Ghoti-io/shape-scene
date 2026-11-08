@@ -626,6 +626,11 @@ GSHSCENE_Result gshscene_list_check_rule(GSHGEOM_Fill_Rule rule) {
   return check_rule(rule);
 }
 
+/* AA1: a mode is one of the enumeration; shared with a retained scene's node (src/scene/node.c). */
+GSHSCENE_Result gshscene_list_check_antialias(uint32_t antialias) {
+  return antialias < (uint32_t)GSHSCENE_ANTIALIAS_COUNT ? GSHSCENE_OK : GSHSCENE_ERR_INVALID;
+}
+
 /* --- the push stack ------------------------------------------------------------ */
 
 /* Room for one more open push, and the depth limit.  Nothing is pushed. */
@@ -654,6 +659,12 @@ static GSHSCENE_Result stack_reserve(GSHSCENE_List * list) {
 
 GSHSCENE_Result gshscene_list_fill(GSHSCENE_List * list, const GSHSCENE_Resource * resource,
     const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, const GSHSCENE_Paint * paint, int32_t layer, double depth) {
+  return gshscene_list_fill_antialias(list, resource, map, rule, paint, GSHSCENE_ANTIALIAS_AREA, layer, depth);
+}
+
+GSHSCENE_Result gshscene_list_fill_antialias(GSHSCENE_List * list, const GSHSCENE_Resource * resource,
+    const GSHGEOM_Map * map, GSHGEOM_Fill_Rule rule, const GSHSCENE_Paint * paint, GSHSCENE_Antialias antialias, int32_t layer,
+    double depth) {
   if (!list || list->closed) {
     return GSHSCENE_ERR_INVALID;
   }
@@ -668,6 +679,9 @@ GSHSCENE_Result gshscene_list_fill(GSHSCENE_List * list, const GSHSCENE_Resource
   }
   if (result == GSHSCENE_OK) {
     result = check_rule(rule);
+  }
+  if (result == GSHSCENE_OK) {
+    result = gshscene_list_check_antialias(antialias);
   }
   if (result == GSHSCENE_OK) {
     result = canonical_paint(list->store, paint, &item.paint);
@@ -687,6 +701,7 @@ GSHSCENE_Result gshscene_list_fill(GSHSCENE_List * list, const GSHSCENE_Resource
   }
   item.resource = resource;
   item.fill_rule = rule;
+  item.antialias = (uint32_t)antialias;
   item.layer = layer;
   return list_append(list, &item);
 }
@@ -707,6 +722,12 @@ int gshscene_centerline_3d(const GSHSCENE_Resource * resource) {
 
 GSHSCENE_Result gshscene_list_stroke(GSHSCENE_List * list, const GSHSCENE_Resource * centerline,
     const GSHSCENE_Resource * style, const GSHGEOM_Map * map, const GSHSCENE_Paint * paint, int32_t layer, double depth) {
+  return gshscene_list_stroke_antialias(list, centerline, style, map, paint, GSHSCENE_ANTIALIAS_AREA, layer, depth);
+}
+
+GSHSCENE_Result gshscene_list_stroke_antialias(GSHSCENE_List * list, const GSHSCENE_Resource * centerline,
+    const GSHSCENE_Resource * style, const GSHGEOM_Map * map, const GSHSCENE_Paint * paint, GSHSCENE_Antialias antialias,
+    int32_t layer, double depth) {
   if (!list || list->closed) {
     return GSHSCENE_ERR_INVALID;
   }
@@ -718,6 +739,9 @@ GSHSCENE_Result gshscene_list_stroke(GSHSCENE_List * list, const GSHSCENE_Resour
   }
   if (result == GSHSCENE_OK) {
     result = canonical_map(map, &item.map);
+  }
+  if (result == GSHSCENE_OK) {
+    result = gshscene_list_check_antialias(antialias);
   }
   if (result == GSHSCENE_OK) {
     result = canonical_paint(list->store, paint, &item.paint);
@@ -736,6 +760,7 @@ GSHSCENE_Result gshscene_list_stroke(GSHSCENE_List * list, const GSHSCENE_Resour
   }
   item.resource = centerline;
   item.style = style;
+  item.antialias = (uint32_t)antialias;
   item.layer = layer;
   return list_append(list, &item);
 }
@@ -1471,7 +1496,7 @@ int gshscene_color_equal(const GSHSCENE_Color * a, const GSHSCENE_Color * b) {
 
 static int item_equal(const GSHSCENE_Item * a, const GSHSCENE_Item * b) {
   if (a->kind != b->kind || a->resource != b->resource || a->style != b->style || !map_equal(&a->map, &b->map) ||
-      a->fill_rule != b->fill_rule || a->layer != b->layer ||
+      a->fill_rule != b->fill_rule || a->antialias != b->antialias || a->layer != b->layer ||
       gshgeom_f64_bits(a->depth) != gshgeom_f64_bits(b->depth)) {
     return 0;
   }
@@ -1568,7 +1593,13 @@ uint64_t gshscene_list_hash(const GSHSCENE_List * list) {
   gshgeom_hash_u64(&h, (uint64_t)list->count);
   for (size_t i = 0; i < list->count; i++) {
     const GSHSCENE_Item * item = item_at(list, i);
-    gshgeom_hash_u8(&h, (uint8_t)item->kind);
+    if (item->antialias != (uint32_t)GSHSCENE_ANTIALIAS_AREA) {
+      /* AA6: a mode that is not the default sets bit 7 of the kind byte and follows it; the default is spelled as it was. */
+      gshgeom_hash_u8(&h, (uint8_t)((uint32_t)item->kind | 0x80u));
+      gshgeom_hash_u8(&h, (uint8_t)item->antialias);
+    } else {
+      gshgeom_hash_u8(&h, (uint8_t)item->kind);
+    }
     switch (item->kind) {
       case GSHSCENE_ITEM_FILL:
         hash_resource_and_map(&h, item);
@@ -1666,6 +1697,11 @@ static int dump_layer_depth(FILE * out, const GSHSCENE_Item * item) {
   return fprintf(out, " layer=%lld depth=%016llx", (long long)item->layer, HEX(gshgeom_f64_bits(item->depth)));
 }
 
+/* AA6: ` aa=N` ends the line of an item whose mode is not the default, and nothing ends any other. */
+static int dump_antialias(FILE * out, const GSHSCENE_Item * item) {
+  return item->antialias == (uint32_t)GSHSCENE_ANTIALIAS_AREA ? 0 : fprintf(out, " aa=%u", (unsigned)item->antialias);
+}
+
 GSHSCENE_Result gshscene_list_dump(const GSHSCENE_List * list, FILE * out) {
   if (!list || !out) {
     return GSHSCENE_ERR_INVALID;
@@ -1696,6 +1732,9 @@ GSHSCENE_Result gshscene_list_dump(const GSHSCENE_List * list, FILE * out) {
         if (written >= 0) {
           written = dump_layer_depth(out, item);
         }
+        if (written >= 0) {
+          written = dump_antialias(out, item);
+        }
         break;
       case GSHSCENE_ITEM_STROKE: /* SK12 */
         written = fprintf(out, "K res=%s:%016llx style=%016llx map=%016llx",
@@ -1706,6 +1745,9 @@ GSHSCENE_Result gshscene_list_dump(const GSHSCENE_List * list, FILE * out) {
         }
         if (written >= 0) {
           written = dump_layer_depth(out, item);
+        }
+        if (written >= 0) {
+          written = dump_antialias(out, item);
         }
         break;
       case GSHSCENE_ITEM_PLACEHOLDER: /* PH1 */

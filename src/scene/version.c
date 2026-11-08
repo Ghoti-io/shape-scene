@@ -306,7 +306,8 @@ static int put_node(FILE * out, const GSHSCENE_Node_Rec * node) {
           gshscene_space_dump(out, &p->paint.space) < 0 ||
           fprintf(out, " entry=%u resource=%016llx layer=%lld depth=%016llx", (unsigned)p->paint.entry,
               HEX(p->paint.resource ? gshscene_resource_hash(p->paint.resource) : 0), (long long)p->layer,
-              HEX(gshgeom_f64_bits(p->depth))) < 0) {
+              HEX(gshgeom_f64_bits(p->depth))) < 0 ||
+          (p->antialias != (uint32_t)GSHSCENE_ANTIALIAS_AREA && fprintf(out, " aa=%u", (unsigned)p->antialias) < 0)) {
         return -1;
       }
       return 0;

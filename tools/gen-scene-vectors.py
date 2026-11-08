@@ -552,9 +552,9 @@ TIE_LAYER, TIE_PATH, TIE_DECLARED = 1, 2, 3
 DEFAULT_FG = ((0.0, 0.0, 0.0, 1.0), TARGET)
 
 
-def fill(rkind, rhash, mhash, rule, rgba, space=TARGET, layer=0, depth=0.0, paint=PAINT_SOLID, entry=0, grad=0):
+def fill(rkind, rhash, mhash, rule, rgba, space=TARGET, layer=0, depth=0.0, paint=PAINT_SOLID, entry=0, grad=0, aa=0):
     return dict(k=FILL, rkind=rkind, rhash=rhash, mhash=mhash, rule=rule, rgba=rgba, space=space, layer=layer,
-                depth=depth, paint=paint, entry=entry, grad=grad)
+                depth=depth, paint=paint, entry=entry, grad=grad, aa=aa)
 
 
 def clip_push(rkind, rhash, mhash, rule, layer=0, depth=0.0):
@@ -587,10 +587,10 @@ def pdf_fields_text(isolation=0, knockout=0, mask=0, maskmap=None):
     return text
 
 
-def stroke(rkind, rhash, shash, mhash, rgba, space=TARGET, layer=0, depth=0.0, paint=PAINT_SOLID, entry=0, grad=0):
+def stroke(rkind, rhash, shash, mhash, rgba, space=TARGET, layer=0, depth=0.0, paint=PAINT_SOLID, entry=0, grad=0, aa=0):
     """A stroke item (SK4): a centerline, a style, a map, a paint as a fill's, a layer and a depth."""
     return dict(k=STROKE, rkind=rkind, rhash=rhash, shash=shash, mhash=mhash, rgba=rgba, space=space, layer=layer,
-                depth=depth, paint=paint, entry=entry, grad=grad)
+                depth=depth, paint=paint, entry=entry, grad=grad, aa=aa)
 
 
 def placeholder(source, code, approx, box, mhash, layer=0, depth=0.0):
@@ -619,9 +619,14 @@ CLIP_POP_ITEM = dict(k=CLIP_POP)
 GROUP_POP_ITEM = dict(k=GROUP_POP)
 
 
+def kind_bytes(k, aa):
+    """AA6 (list.h): a mode that is not the default sets bit 7 of the kind byte and follows it; the default is the kind alone."""
+    return u8(k) if not aa else u8(0x80 | k) + u8(aa)
+
+
 def item_bytes(it):
     k = it["k"]
-    out = u8(k)
+    out = kind_bytes(k, it.get("aa", 0))
     if k == FILL:
         out += u64(it["rhash"]) + u64(it["mhash"]) + u8(it["rule"]) + u8(it["paint"])
         out += color_bytes(it["rgba"], it["space"]) + u32(it["entry"]) + u64(it["grad"]) + i32(it["layer"])
@@ -644,6 +649,11 @@ def item_bytes(it):
     return out
 
 
+def aa_text(it):
+    """AA6: ` aa=N` ends the line of a fill, a stroke or a shape node whose mode is not the default."""
+    return " aa=%d" % it["aa"] if it.get("aa", 0) else ""
+
+
 def list_hash(items, fg=DEFAULT_FG, palette=0):
     out = u32(1) + u32(0x5453494C) + color_bytes(fg[0], fg[1]) + u64(palette) + u64(len(items))
     for it in items:
@@ -657,7 +667,7 @@ def item_line(it):
     if k == FILL:
         return "F res=%s:%016x map=%016x rule=%d paint=%d %s space=%s entry=%d resource=%016x %s" % (
             KIND_NAME[it["rkind"]], it["rhash"], it["mhash"], it["rule"], it["paint"],
-            " ".join("%016x" % bits(c) for c in it["rgba"]), space_text(it["space"]), it["entry"], it["grad"], ld)
+            " ".join("%016x" % bits(c) for c in it["rgba"]), space_text(it["space"]), it["entry"], it["grad"], ld) + aa_text(it)
     if k == CLIP_PUSH:
         return "C res=%s:%016x map=%016x rule=%d %s" % (KIND_NAME[it["rkind"]], it["rhash"], it["mhash"], it["rule"], ld)
     if k == CLIP_POP:
@@ -671,7 +681,7 @@ def item_line(it):
     if k == STROKE:
         return "K res=%s:%016x style=%016x map=%016x paint=%d %s space=%s entry=%d resource=%016x %s" % (
             KIND_NAME[it["rkind"]], it["rhash"], it["shash"], it["mhash"], it["paint"],
-            " ".join("%016x" % bits(c) for c in it["rgba"]), space_text(it["space"]), it["entry"], it["grad"], ld)
+            " ".join("%016x" % bits(c) for c in it["rgba"]), space_text(it["space"]), it["entry"], it["grad"], ld) + aa_text(it)
     if k == PLACEHOLDER:
         return "P %s map=%016x %s" % (placeholder_text(it), it["mhash"], ld)
     return "I res=%s:%016x map=%016x %s" % (KIND_NAME[it["rkind"]], it["rhash"], it["mhash"], ld)
@@ -930,7 +940,7 @@ def key_bytes(key):
 
 
 def node_bytes(n):
-    out = u64(n["id"]) + u8(n["kind"]) + u8(n["flags"]) + u64(n["parent"]) + key_bytes(n["key"])
+    out = u64(n["id"]) + kind_bytes(n["kind"], n.get("aa", 0)) + u8(n["flags"]) + u64(n["parent"]) + key_bytes(n["key"])
     if n["kind"] == NODE_GROUP:
         out += u64(n["map"]) + f64(n["opacity"]) + space_bytes(n["blend"])
         out += composite_bytes(n["composite"], n.get("isolation", 0), n.get("knockout", 0), n.get("mask", 0), n.get("maskmap"))
@@ -981,7 +991,7 @@ def node_line(n):
         return "%s res=%s:%016x%s map=%016x rule=%d paint=%d %s space=%s entry=%d resource=%016x layer=%d depth=%016x" % (
             head, KIND_NAME[n["res"][0]], n["res"][1], style, n["map"], n["rule"], n["paint"],
             " ".join("%016x" % bits(c) for c in n["rgba"]), space_text(n["space"]), n["entry"], n["grad"], n["layer"],
-            bits(n["depth"]))
+            bits(n["depth"])) + aa_text(n)
     if n["kind"] == NODE_PLACEHOLDER:
         return "%s %s map=%016x layer=%d depth=%016x" % (head, placeholder_text(n), n["map"], n["layer"], bits(n["depth"]))
     return "%s target=%d map=%016x layer=%d depth=%016x" % (head, n["target"], n["map"], n["layer"], bits(n["depth"]))
@@ -1082,6 +1092,28 @@ STROKE_SCENE_LIST_HASH = list_hash([
     stroke(KIND_PATH, SQ_RES, STYLE_DEFAULT_HASH, IDENTITY, BLACK),
     stroke(KIND_RUN, OUTLINE_RUN_HASH, STYLE_DEVICE_HASH, TRANSLATE, (0.0, 0.0, 0.0, 0.5), paint=PAINT_FOREGROUND,
            layer=3, depth=1.0),
+])
+# Antialiasing (AA1, AA6): a list of a fill and a stroke of each mode, a default one among them spelled as before, and a
+# scene of a shape and a stroke asking for none with the list it emits; the hash and the dump spell the mode only when it
+# is not the default.
+AA_LIST_ITEMS = [
+    fill(KIND_PATH, SQ_RES, IDENTITY, 0, (0.25, 0.5, 0.75, 1.0), aa=1),
+    stroke(KIND_PATH, SQ_RES, STYLE_DEFAULT_HASH, IDENTITY, BLACK, aa=1),
+    fill(KIND_PATH, SQ_RES, IDENTITY, 1, (0.0, 0.0, 0.0, 0.5), paint=PAINT_FOREGROUND, layer=2, depth=1.5),
+    stroke(KIND_PATH, SQ_RES, STYLE_DEFAULT_HASH, IDENTITY, (0.0, 0.0, 0.0, 0.5), layer=2, depth=1.5, aa=1),
+]
+AA_LIST_HASH = list_hash(AA_LIST_ITEMS)
+AA_SCENE_NODES = [
+    group_node(1, 0, [2, 3, 4]),
+    shape_node(2, 1, (KIND_PATH, SQ_RES), rgba=(0.25, 0.5, 0.75, 1.0), aa=1),
+    stroke_node(3, 1, (KIND_PATH, SQ_RES), STYLE_DEFAULT_HASH, aa=1),
+    shape_node(4, 1, (KIND_PATH, SQ_RES)),
+]
+AA_SCENE_HASH = version_hash(AA_SCENE_NODES)
+AA_SCENE_LIST_HASH = list_hash([
+    fill(KIND_PATH, SQ_RES, IDENTITY, 0, (0.25, 0.5, 0.75, 1.0), aa=1),
+    stroke(KIND_PATH, SQ_RES, STYLE_DEFAULT_HASH, IDENTITY, BLACK, aa=1),
+    fill(KIND_PATH, SQ_RES, IDENTITY, 0, BLACK),
 ])
 # Placeholders (PH1, PH7; color-paint story P5): a list holding every shape of one -- a refused one with a box, an
 # approximated one after a fill (a stand-in), one without a box, a negative-zero edge, a layer and a depth, a map -- and
@@ -1395,7 +1427,8 @@ def render():
                     ("kPlaceholderListHash", PLACEHOLDER_LIST_HASH), ("kPlaceholderSceneHash", PLACEHOLDER_SCENE_HASH),
                     ("kPlaceholderSceneListHash", PLACEHOLDER_SCENE_LIST_HASH),
                     ("kStrokeListHash", STROKE_LIST_HASH), ("kStrokeSceneHash", STROKE_SCENE_HASH),
-                    ("kStrokeSceneListHash", STROKE_SCENE_LIST_HASH)):
+                    ("kStrokeSceneListHash", STROKE_SCENE_LIST_HASH), ("kAntialiasListHash", AA_LIST_HASH),
+                    ("kAntialiasSceneHash", AA_SCENE_HASH), ("kAntialiasSceneListHash", AA_SCENE_LIST_HASH)):
         o.append("static const std::uint64_t %s = UINT64_C(0x%016x);\n" % (name, v))
     o.append("static const int kSceneBLayer = %d;\n" % B_LAYER)
     o.append("static const double kSceneBTranslate[4][2] = {%s};\n" % ", ".join("{%r, %r}" % (t[0], t[1]) for t in B_T))
@@ -1439,6 +1472,8 @@ def render():
     o.append(cxx_string("kStrokeArcsDump", style_dump(STYLE_ARCS)))
     o.append(cxx_string("kStrokeListDump", list_dump(STROKE_LIST_ITEMS)))
     o.append(cxx_string("kStrokeSceneDump", version_dump(STROKE_SCENE_NODES)))
+    o.append(cxx_string("kAntialiasListDump", list_dump(AA_LIST_ITEMS)))
+    o.append(cxx_string("kAntialiasSceneDump", version_dump(AA_SCENE_NODES)))
     o.append(cxx_string("kPlaceholderListDump", list_dump(PLACEHOLDER_LIST_ITEMS)))
     o.append(cxx_string("kPlaceholderSceneDump", version_dump(PLACEHOLDER_SCENE_NODES)))
     o.append("struct ImageCase {\n  const char * name;\n  unsigned width, height, layout, type, bits, alpha, alpha_only;\n"

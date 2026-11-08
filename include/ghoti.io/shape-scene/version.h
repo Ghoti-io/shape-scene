@@ -131,6 +131,9 @@
  * - **placeholder** (PH7): as a list spells one (list.h): `u16` source, `u16` code, `u8` approximated, `u8` 1 if there
  *   is a box and then its four `f64`, then `u64` the map's hash, `i32` layer, `f64` depth.
  *
+ * A shape or stroke whose `antialias` is not the default sets bit 7 of its kind byte and writes `u8` the mode right after it,
+ * as a list item does (list.h, AA6); every other node is spelled as above.
+ *
  * A **space** is `u8` primaries, `u8` transfer, `f64` gamma.
  *
  * ### The dump
@@ -144,7 +147,7 @@
  *   (with ` isolation=N knockout=N mask=<hash>` after `order=N` when one of them is not the default)
  * - `S id=I parent=P flags=F key=K res=KIND:H map=H rule=R paint=PK r g b a space=<space> entry=E resource=G layer=L depth=D`
  * - `K id=I parent=P flags=F key=K res=KIND:H style=H map=H rule=R paint=PK r g b a space=<space> entry=E resource=G layer=L depth=D`
- *   (a stroke)
+ *   (a stroke); a shape or a stroke whose `antialias` is not the default ends with ` aa=N`
  * - `I id=I parent=P flags=F key=K target=T map=H layer=L depth=D`
  * - `P id=I parent=P flags=F key=K source=N code=N approx=N box=<x0> <y0> <x1> <y1>|- map=H layer=L depth=D`
  *   (a placeholder)
@@ -234,6 +237,7 @@ typedef struct GSHSCENE_Node {
   const GSHSCENE_Resource * resource; ///< Shape: the path or glyph run.  Stroke: its centerline, a 2D path or a run.  Else NULL.
   GSHGEOM_Fill_Rule fill_rule;       ///< Shape: the rule.  Else nonzero.
   GSHSCENE_Paint paint;              ///< Shape, stroke: the paint (solid, foreground, palette or gradient).  Else as ::gshscene_node_init leaves it.
+  uint32_t antialias;                ///< Shape, stroke: a ::GSHSCENE_Antialias (list.h, AA1), emitted on the item; zero (area coverage) by default.  Else 0.
   uint64_t target;                   ///< Instance: the ID of the node it draws.  Else 0.
   /** Stroke: the stroke style, a resource of the scene's store, which the node holds (stroke.h, SK13).  Else NULL. */
   const GSHSCENE_Resource * style;

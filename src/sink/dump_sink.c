@@ -183,7 +183,7 @@ static void caps_full(GSHSCENE_Sink_Caps * caps, int readback) {
   }
   caps->flags = GSHSCENE_CAP_CAN_BLOCK | GSHSCENE_CAP_CALLER_MEMORY | GSHSCENE_CAP_GLYPHS_FROM_FONT |
       GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_BLEND_SPACES | GSHSCENE_CAP_GRADIENT_SPACES | GSHSCENE_CAP_PREPARE |
-      GSHSCENE_CAP_STROKE_RUNS |
+      GSHSCENE_CAP_STROKE_RUNS | GSHSCENE_CAP_ANTIALIAS_NONE |
       (readback ? GSHSCENE_CAP_READBACK : 0);
   for (uint32_t k = GSHSCENE_GRADIENT_LINEAR; k < GSHSCENE_GRADIENT_KIND_COUNT; k++) {
     caps->gradient_kinds |= UINT32_C(1) << k;
@@ -1435,6 +1435,14 @@ static GSHSCENE_Result stroke_outline_hash(Run * run, const GSHSCENE_Item * item
   return GSHSCENE_OK;
 }
 
+/** AA6: ` aa=N` after the head of a fill's or a stroke's record whose mode is not the default; nothing otherwise. */
+static void emit_antialias(Run * run, const GSHSCENE_Item * item, GSHSCENE_Result * failed) {
+  if (item->antialias != (uint32_t)GSHSCENE_ANTIALIAS_AREA) {
+    snprintf(run->line, LINE_BYTES, " aa=%u", (unsigned)item->antialias);
+    emit_text(run, run->line, failed);
+  }
+}
+
 /**
  * A stroke (S20): its notice (SK8, SK9: an `X` record, not stamped); its box, SK10's bound of its centerline's box
  * (the model box a fill of it would have) under the composed map, in target units; the features it requires that the
@@ -1500,6 +1508,7 @@ static GSHSCENE_Result stroke_unit(Run * run, const GSHSCENE_Item * item, const 
       gshscene_resource_kind_string(gshscene_resource_kind(item->resource)), gshscene_resource_hash(item->resource),
       gshscene_resource_id(item->style), gshgeom_map_hash(&map));
   emit_text(run, run->line, &failed);
+  emit_antialias(run, item, &failed);
   if (item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
     snprintf(run->line, LINE_BYTES, " grad=%" PRIu64, gshscene_resource_id(item->paint.resource));
     emit_text(run, run->line, &failed);
@@ -1688,6 +1697,7 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
           item->kind == GSHSCENE_ITEM_FILL ? 'F' : 'C', gshscene_resource_kind_string(gshscene_resource_kind(item->resource)),
           gshscene_resource_hash(item->resource), gshgeom_map_hash(&map), (int)item->fill_rule);
       emit_text(run, run->line, &failed);
+      emit_antialias(run, item, &failed);
       if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
         snprintf(run->line, LINE_BYTES, " grad=%" PRIu64, gshscene_resource_id(item->paint.resource));
         emit_text(run, run->line, &failed);

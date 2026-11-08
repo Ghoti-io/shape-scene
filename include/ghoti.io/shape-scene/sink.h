@@ -439,7 +439,13 @@ typedef struct GSHSCENE_Target {
 #define GSHSCENE_CAP_CLIP_UNION (UINT32_C(1) << 17)
 /** A sink draws any clip union, overlapping members included (CU2, CU25).  Needs ::GSHSCENE_CAP_CLIP_UNION; without it an overlapping union is refused, `UNION_OVERLAP`. */
 #define GSHSCENE_CAP_CLIP_UNION_GENERAL (UINT32_C(1) << 18)
-#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 19) - 1) ///< Every flag defined.
+/**
+ * A sink draws a fill or a stroke whose `antialias` is ::GSHSCENE_ANTIALIAS_NONE as list.h's AA2 and AA3 say, a pixel covered whole
+ * when its center is inside and not at all otherwise (AA5); without it the sink draws the item antialiased and the planning pass
+ * reports it `APPROXIMATED`, `ANTIALIAS`.
+ */
+#define GSHSCENE_CAP_ANTIALIAS_NONE (UINT32_C(1) << 19)
+#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 20) - 1) ///< Every flag defined.
 /** @} */
 
 /**
@@ -824,7 +830,8 @@ typedef struct GSHSCENE_Disposition {
  * (`MASK_FEATURE`, the missing bits in `detail`, MK9); a stroke with a required feature
  * (::gshscene_stroke_required, which reads the chain) that `stroke_native` lacks, without `STROKE_EXPAND`, is refused
  * (`STROKE_STYLE`, the missing features in `detail`; S20, SK11), after every other refusal and before any
- * approximation; a clip push without `CLIP_AA` is approximated (`CLIP_ALIASED`); a group whose own blend space is
+ * approximation; a clip push without `CLIP_AA` is approximated (`CLIP_ALIASED`); a fill or stroke whose `antialias` is not
+ * ::GSHSCENE_ANTIALIAS_AREA, without `ANTIALIAS_NONE`, is approximated (`ANTIALIAS`, list.h, AA5); a group whose own blend space is
  * stated and differs from @p target_space, without `BLEND_SPACES`, is approximated (`BLEND_SPACE`); a gradient fill or
  * stroke whose interpolation space is stated and differs from @p target_space, without `GRADIENT_SPACES`, is
  * approximated (`INTERPOLATION_SPACE`).  A pop is drawn as its push was decided (the walk tells).  Anything else is

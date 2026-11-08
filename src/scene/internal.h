@@ -231,6 +231,8 @@ int gshscene_key_compare(const GSHSCENE_Key * a, const GSHSCENE_Key * b);
 /* --- the list.c helpers the node validation shares ---------------------------------- */
 
 GSHSCENE_Result gshscene_list_check_rule(GSHGEOM_Fill_Rule rule);
+/** AA1: whether @p antialias is a ::GSHSCENE_Antialias. */
+GSHSCENE_Result gshscene_list_check_antialias(uint32_t antialias);
 
 /* --- edit.c ----------------------------------------------------------------------- */
 

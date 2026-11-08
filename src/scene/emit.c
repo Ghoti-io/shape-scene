@@ -185,10 +185,10 @@ static GSHSCENE_Result emit_shape(
     return placed == GSHSCENE_OK ? sink_origin(s, shape->id) : placed;
   }
   GSHSCENE_Result result = shape->p.kind == GSHSCENE_NODE_STROKE
-      ? gshscene_list_stroke(s->list, shape->p.resource, shape->p.style, map, &shape->p.paint, shape->p.layer,
-            shape->p.depth) /* SK13: one stroke item, its placement composed */
-      : gshscene_list_fill(
-            s->list, shape->p.resource, map, shape->p.fill_rule, &shape->p.paint, shape->p.layer, shape->p.depth);
+      ? gshscene_list_stroke_antialias(s->list, shape->p.resource, shape->p.style, map, &shape->p.paint,
+            (GSHSCENE_Antialias)shape->p.antialias, shape->p.layer, shape->p.depth) /* SK13: one stroke item, its placement composed */
+      : gshscene_list_fill_antialias(s->list, shape->p.resource, map, shape->p.fill_rule, &shape->p.paint,
+            (GSHSCENE_Antialias)shape->p.antialias, shape->p.layer, shape->p.depth);
   if (result == GSHSCENE_OK) {
     result = sink_origin(s, shape->id);
   }

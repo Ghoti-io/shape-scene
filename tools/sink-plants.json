@@ -3558,7 +3558,7 @@
 "rp-300-ne",
 "srcl",
 "src/sink/report.c",
-"300:!=",
+"302:!=",
 "==",
 [
 "testDump_sink",
@@ -4776,7 +4776,7 @@
 "sk-492-eq",
 "srcl",
 "src/sink/sink.c",
-"492:==",
+"499:==",
 "!=",
 [
 "testDump_sink",
@@ -4797,7 +4797,7 @@
 "sk-505-ne",
 "srcl",
 "src/sink/sink.c",
-"505:!=",
+"512:!=",
 "==",
 [
 "testDump_sink",
@@ -4818,7 +4818,7 @@
 "sk-512-ge",
 "srcl",
 "src/sink/sink.c",
-"512:>=",
+"519:>=",
 ">",
 [
 "testDump_sink",
@@ -4839,7 +4839,7 @@
 "sk-976-ne",
 "srcl",
 "src/sink/sink.c",
-"976:!=",
+"983:!=",
 "==",
 [
 "testDump_sink",
@@ -4860,7 +4860,7 @@
 "sk-976-neg",
 "srcl",
 "src/sink/sink.c",
-"976:(result != GSHSCENE_OK)",
+"983:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -4881,7 +4881,7 @@
 "sk-1088-ne",
 "srcl",
 "src/sink/sink.c",
-"1088:!=",
+"1095:!=",
 "==",
 [
 "testDump_sink",
@@ -4902,7 +4902,7 @@
 "sk-1094-ne",
 "srcl",
 "src/sink/sink.c",
-"1094:!=",
+"1101:!=",
 "==",
 [
 "testDump_sink",
@@ -4923,7 +4923,7 @@
 "sk-1143-or",
 "srcl",
 "src/sink/sink.c",
-"1143:||",
+"1150:||",
 "&&",
 [
 "testDump_sink",
@@ -4944,7 +4944,7 @@
 "sk-1144-ret",
 "srcl",
 "src/sink/sink.c",
-"1144:GSHSCENE_ERR_INVALID",
+"1151:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -5049,7 +5049,7 @@
 "rp-150-str",
 "srcl",
 "src/sink/report.c",
-"150:c",
+"152:c",
 "Z",
 [
 "testDump_sink",
@@ -5070,7 +5070,7 @@
 "rp-360-ret",
 "srcl",
 "src/sink/report.c",
-"360:GSHSCENE_ERR_INVALID",
+"362:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -5091,7 +5091,7 @@
 "rp-373-or",
 "srcl",
 "src/sink/report.c",
-"373:||",
+"375:||",
 "&&",
 [
 "testDump_sink",
@@ -5112,7 +5112,7 @@
 "rp-374-ret",
 "srcl",
 "src/sink/report.c",
-"374:GSHSCENE_ERR_INVALID",
+"376:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -5133,7 +5133,7 @@
 "rp-423-hwu64",
 "srcl",
 "src/sink/report.c",
-"423:gshgeom_hash_u64(",
+"425:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testDump_sink",
@@ -5154,7 +5154,7 @@
 "rp-426-hwu8",
 "srcl",
 "src/sink/report.c",
-"426:gshgeom_hash_u8(",
+"428:gshgeom_hash_u8(",
 "gshgeom_hash_u32(",
 [
 "testDump_sink",
@@ -5175,7 +5175,7 @@
 "rp-428-hwu64",
 "srcl",
 "src/sink/report.c",
-"428:gshgeom_hash_u64(",
+"430:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testDump_sink",
@@ -5196,7 +5196,7 @@
 "rp-430-hwu64",
 "srcl",
 "src/sink/report.c",
-"430:gshgeom_hash_u64(",
+"432:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testDump_sink",
@@ -5217,7 +5217,7 @@
 "rp-470-wd",
 "srcl",
 "src/sink/report.c",
-"470:%016",
+"472:%016",
 "%",
 [
 "testDump_sink",
@@ -5388,7 +5388,7 @@
 "sk-879-or",
 "srcl",
 "src/sink/sink.c",
-"879:||",
+"886:||",
 "&&",
 [
 "testDump_sink",
@@ -8776,7 +8776,7 @@
 "sk-372-eq",
 "srcl",
 "src/sink/sink.c",
-"372:==",
+"379:==",
 "!=",
 [
 "testDump_sink",
@@ -8798,7 +8798,7 @@
 "sk-374-and",
 "srcl",
 "src/sink/sink.c",
-"374:&&",
+"381:&&",
 "||",
 [
 "testDump_sink",
@@ -8820,7 +8820,7 @@
 "sk-375-del",
 "srcl",
 "src/sink/sink.c",
-"375:d.entry_class = GSHSCENE_ENTRY_APPROXIMATED;",
+"382:d.entry_class = GSHSCENE_ENTRY_APPROXIMATED;",
 ";",
 [
 "testDump_sink",
@@ -8842,7 +8842,7 @@
 "sk-376-del",
 "srcl",
 "src/sink/sink.c",
-"376:d.reason = GSHSCENE_REASON_BLEND_SPACE;",
+"383:d.reason = GSHSCENE_REASON_BLEND_SPACE;",
 ";",
 [
 "testDump_sink",
@@ -8864,7 +8864,7 @@
 "sk-381-and",
 "srcl",
 "src/sink/sink.c",
-"381:&&",
+"388:&&",
 "||",
 [
 "testDump_sink",
@@ -8886,7 +8886,7 @@
 "sk-382-del",
 "srcl",
 "src/sink/sink.c",
-"382:d.entry_class = GSHSCENE_ENTRY_APPROXIMATED;",
+"389:d.entry_class = GSHSCENE_ENTRY_APPROXIMATED;",
 ";",
 [
 "testDump_sink",
@@ -8908,7 +8908,7 @@
 "sk-383-del",
 "srcl",
 "src/sink/sink.c",
-"383:d.reason = GSHSCENE_REASON_INTERPOLATION_SPACE;",
+"390:d.reason = GSHSCENE_REASON_INTERPOLATION_SPACE;",
 ";",
 [
 "testDump_sink",
@@ -8930,7 +8930,7 @@
 "sk-386-neg",
 "srcl",
 "src/sink/sink.c",
-"386:(image_paint)",
+"393:(image_paint)",
 "(!(image_paint))",
 [
 "testDump_sink",
@@ -8952,7 +8952,7 @@
 "sk-391-eq",
 "srcl",
 "src/sink/sink.c",
-"391:==",
+"398:==",
 "!=",
 [
 "testDump_sink",
@@ -8974,7 +8974,7 @@
 "sk-391-neg",
 "srcl",
 "src/sink/sink.c",
-"391:(gshscene_image_filter_of(item, instance_maps, instance_count, target_map, &filter) == GSHSCENE_OK)",
+"398:(gshscene_image_filter_of(item, instance_maps, instance_count, target_map, &filter) == GSHSCENE_OK)",
 "(!(gshscene_image_filter_of(item, instance_maps, instance_count, target_map, &filter) == GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -8996,7 +8996,7 @@
 "sk-396-neg",
 "srcl",
 "src/sink/sink.c",
-"396:(used & ~caps->image_filters)",
+"403:(used & ~caps->image_filters)",
 "(!(used & ~caps->image_filters))",
 [
 "testDump_sink",
@@ -9018,7 +9018,7 @@
 "sk-397-del",
 "srcl",
 "src/sink/sink.c",
-"397:d.entry_class = GSHSCENE_ENTRY_APPROXIMATED;",
+"404:d.entry_class = GSHSCENE_ENTRY_APPROXIMATED;",
 ";",
 [
 "testDump_sink",
@@ -9040,7 +9040,7 @@
 "sk-398-del",
 "srcl",
 "src/sink/sink.c",
-"398:d.reason = GSHSCENE_REASON_IMAGE_FILTER;",
+"405:d.reason = GSHSCENE_REASON_IMAGE_FILTER;",
 ";",
 [
 "testDump_sink",
@@ -9062,7 +9062,7 @@
 "sk-403-and",
 "srcl",
 "src/sink/sink.c",
-"403:&&",
+"410:&&",
 "||",
 [
 "testDump_sink",
@@ -9084,7 +9084,7 @@
 "sk-404-del",
 "srcl",
 "src/sink/sink.c",
-"404:d.entry_class = GSHSCENE_ENTRY_APPROXIMATED;",
+"411:d.entry_class = GSHSCENE_ENTRY_APPROXIMATED;",
 ";",
 [
 "testDump_sink",
@@ -9106,7 +9106,7 @@
 "sk-405-del",
 "srcl",
 "src/sink/sink.c",
-"405:d.reason = GSHSCENE_REASON_IMAGE_FILTER_SPACE;",
+"412:d.reason = GSHSCENE_REASON_IMAGE_FILTER_SPACE;",
 ";",
 [
 "testDump_sink",
@@ -9128,7 +9128,7 @@
 "sk-419-eq",
 "srcl",
 "src/sink/sink.c",
-"419:(item->kind == GSHSCENE_IT",
+"426:(item->kind == GSHSCENE_IT",
 "(item->kind != GSHSCENE_IT",
 [
 "testDump_sink",
@@ -9150,7 +9150,7 @@
 "sk-419-or",
 "srcl",
 "src/sink/sink.c",
-"419:||",
+"426:||",
 "&&",
 [
 "testDump_sink",
@@ -9172,7 +9172,7 @@
 "sk-419-eq2",
 "srcl",
 "src/sink/sink.c",
-"419: item->kind == GSHSCENE_IT",
+"426: item->kind == GSHSCENE_IT",
 " item->kind != GSHSCENE_IT",
 [
 "testDump_sink",
@@ -9194,7 +9194,7 @@
 "sk-420-eq",
 "srcl",
 "src/sink/sink.c",
-"420:==",
+"427:==",
 "!=",
 [
 "testDump_sink",
@@ -9216,7 +9216,7 @@
 "sk-421-eq",
 "srcl",
 "src/sink/sink.c",
-"421:==",
+"428:==",
 "!=",
 [
 "testDump_sink",
@@ -9238,7 +9238,7 @@
 "sk-423-del",
 "srcl",
 "src/sink/sink.c",
-"423:d.entry_class = GSHSCENE_ENTRY_REFUSED;",
+"430:d.entry_class = GSHSCENE_ENTRY_REFUSED;",
 ";",
 [
 "testDump_sink",
@@ -9260,7 +9260,7 @@
 "sk-424-del",
 "srcl",
 "src/sink/sink.c",
-"424:d.reason = GSHSCENE_REASON_PATTERN;",
+"431:d.reason = GSHSCENE_REASON_PATTERN;",
 ";",
 [
 "testDump_sink",
@@ -9282,7 +9282,7 @@
 "sk-432-eq",
 "srcl",
 "src/sink/sink.c",
-"432:urn kind == GSHSCENE",
+"439:urn kind == GSHSCENE",
 "urn kind != GSHSCENE",
 [
 "testDump_sink",
@@ -9304,7 +9304,7 @@
 "sk-432-eq2",
 "srcl",
 "src/sink/sink.c",
-"432:TER || kind == GSHSCENE_TA",
+"439:TER || kind == GSHSCENE_TA",
 "TER || kind != GSHSCENE_TA",
 [
 "testDump_sink",
@@ -9326,7 +9326,7 @@
 "sk-432-eq3",
 "srcl",
 "src/sink/sink.c",
-"432:URE || kind == GSHSCENE_TA",
+"439:URE || kind == GSHSCENE_TA",
 "URE || kind != GSHSCENE_TA",
 [
 "testDump_sink",
@@ -9348,7 +9348,7 @@
 "sk-436-lt",
 "srcl",
 "src/sink/sink.c",
-"436:<",
+"443:<",
 "<=",
 [
 "testDump_sink",
@@ -9370,7 +9370,7 @@
 "sk-437-ne",
 "srcl",
 "src/sink/sink.c",
-"437:!=",
+"444:!=",
 "==",
 [
 "testDump_sink",
@@ -9392,7 +9392,7 @@
 "sk-437-neg",
 "srcl",
 "src/sink/sink.c",
-"437:(bytes[i] != 0)",
+"444:(bytes[i] != 0)",
 "(!(bytes[i] != 0))",
 [
 "testDump_sink",
@@ -9414,7 +9414,7 @@
 "sk-445-eq",
 "srcl",
 "src/sink/sink.c",
-"445:x0 == 0 ",
+"452:x0 == 0 ",
 "x0 != 0 ",
 [
 "testDump_sink",
@@ -9436,7 +9436,7 @@
 "sk-445-eq2",
 "srcl",
 "src/sink/sink.c",
-"445:y0 == 0 ",
+"452:y0 == 0 ",
 "y0 != 0 ",
 [
 "testDump_sink",
@@ -9458,7 +9458,7 @@
 "sk-445-eq3",
 "srcl",
 "src/sink/sink.c",
-"445:x1 == 0 ",
+"452:x1 == 0 ",
 "x1 != 0 ",
 [
 "testDump_sink",
@@ -9480,7 +9480,7 @@
 "sk-445-eq4",
 "srcl",
 "src/sink/sink.c",
-"445:y1 == 0;",
+"452:y1 == 0;",
 "y1 != 0;",
 [
 "testDump_sink",
@@ -9502,7 +9502,7 @@
 "sk-450-ne",
 "srcl",
 "src/sink/sink.c",
-"450:im != 0 ",
+"457:im != 0 ",
 "im == 0 ",
 [
 "testDump_sink",
@@ -9524,7 +9524,7 @@
 "sk-450-or",
 "srcl",
 "src/sink/sink.c",
-"450:||",
+"457:||",
 "&&",
 [
 "testDump_sink",
@@ -9546,7 +9546,7 @@
 "sk-450-ne2",
 "srcl",
 "src/sink/sink.c",
-"450:nd != 0)",
+"457:nd != 0)",
 "nd == 0)",
 [
 "testDump_sink",
@@ -9568,7 +9568,7 @@
 "sk-450-neg",
 "srcl",
 "src/sink/sink.c",
-"450:(map->dim != 0 || map->kind != 0)",
+"457:(map->dim != 0 || map->kind != 0)",
 "(!(map->dim != 0 || map->kind != 0))",
 [
 "testDump_sink",
@@ -9590,7 +9590,7 @@
 "sk-453-lt",
 "srcl",
 "src/sink/sink.c",
-"453:<",
+"460:<",
 "<=",
 [
 "testDump_sink",
@@ -9612,7 +9612,7 @@
 "sk-454-lt",
 "srcl",
 "src/sink/sink.c",
-"454:<",
+"461:<",
 "<=",
 [
 "testDump_sink",
@@ -9634,7 +9634,7 @@
 "sk-455-ne",
 "srcl",
 "src/sink/sink.c",
-"455:!=",
+"462:!=",
 "==",
 [
 "testDump_sink",
@@ -9656,7 +9656,7 @@
 "sk-455-neg",
 "srcl",
 "src/sink/sink.c",
-"455:(map->m[i][j] != 0.0)",
+"462:(map->m[i][j] != 0.0)",
 "(!(map->m[i][j] != 0.0))",
 [
 "testDump_sink",
@@ -9678,7 +9678,7 @@
 "sk-459-ne",
 "srcl",
 "src/sink/sink.c",
-"459:!=",
+"466:!=",
 "==",
 [
 "testDump_sink",
@@ -9700,7 +9700,7 @@
 "sk-459-neg",
 "srcl",
 "src/sink/sink.c",
-"459:(map->t[i] != 0.0)",
+"466:(map->t[i] != 0.0)",
 "(!(map->t[i] != 0.0))",
 [
 "testDump_sink",
@@ -9722,7 +9722,7 @@
 "sk-471-eq",
 "srcl",
 "src/sink/sink.c",
-"471:==",
+"478:==",
 "!=",
 [
 "testDump_sink",
@@ -9744,7 +9744,7 @@
 "sk-471-ge",
 "srcl",
 "src/sink/sink.c",
-"471:>=",
+"478:>=",
 ">",
 [
 "testDump_sink",
@@ -9766,7 +9766,7 @@
 "sk-473-ge",
 "srcl",
 "src/sink/sink.c",
-"473:it >= GS",
+"480:it >= GS",
 "it > GS",
 [
 "testDump_sink",
@@ -9788,7 +9788,7 @@
 "sk-474-ret",
 "srcl",
 "src/sink/sink.c",
-"474:GSHSCENE_ERR_INVALID",
+"481:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -9810,7 +9810,7 @@
 "sk-476-eq",
 "srcl",
 "src/sink/sink.c",
-"476: (target->kind == GSHSCENE_TARGE",
+"483: (target->kind == GSHSCENE_TARGE",
 " (target->kind != GSHSCENE_TARGE",
 [
 "testDump_sink",
@@ -9832,7 +9832,7 @@
 "sk-476-or",
 "srcl",
 "src/sink/sink.c",
-"476:||",
+"483:||",
 "&&",
 [
 "testDump_sink",
@@ -9854,7 +9854,7 @@
 "sk-476-eq2",
 "srcl",
 "src/sink/sink.c",
-"476:| target->kind == GSHSCENE_TARGE",
+"483:| target->kind == GSHSCENE_TARGE",
 "| target->kind != GSHSCENE_TARGE",
 [
 "testDump_sink",
@@ -9876,7 +9876,7 @@
 "sk-476-neg",
 "srcl",
 "src/sink/sink.c",
-"476:(target->kind == GSHSCENE_TARGET_GPU_TEXTURE || target->kind == GSHSCENE_TARGET_GPU_SURFACE)",
+"483:(target->kind == GSHSCENE_TARGET_GPU_TEXTURE || target->kind == GSHSCENE_TARGET_GPU_SURFACE)",
 "(!(target->kind == GSHSCENE_TARGET_GPU_TEXTURE || target->kind == GSHSCENE_TARGET_GPU_SURFACE))",
 [
 "testDump_sink",
@@ -9898,7 +9898,7 @@
 "sk-477-ret",
 "srcl",
 "src/sink/sink.c",
-"477:GSHSCENE_ERR_UNSUPPORTED",
+"484:GSHSCENE_ERR_UNSUPPORTED",
 "GSHSCENE_ERR_INVALID",
 [
 "testDump_sink",
@@ -9920,7 +9920,7 @@
 "sk-480-neg",
 "srcl",
 "src/sink/sink.c",
-"480:(map_zero(&target->map))",
+"487:(map_zero(&target->map))",
 "(!(map_zero(&target->map)))",
 [
 "testDump_sink",
@@ -9942,7 +9942,7 @@
 "sk-481-del",
 "srcl",
 "src/sink/sink.c",
-"481:gshgeom_map_identity(2, &copy.map);",
+"488:gshgeom_map_identity(2, &copy.map);",
 ";",
 [
 "testDump_sink",
@@ -9964,7 +9964,7 @@
 "sk-482-ne",
 "srcl",
 "src/sink/sink.c",
-"482:im != 2 ",
+"489:im != 2 ",
 "im == 2 ",
 [
 "testDump_sink",
@@ -9986,7 +9986,7 @@
 "sk-482-or",
 "srcl",
 "src/sink/sink.c",
-"482:||",
+"489:||",
 "&&",
 [
 "testDump_sink",
@@ -10008,7 +10008,7 @@
 "sk-482-ne2",
 "srcl",
 "src/sink/sink.c",
-"482:p) != GS",
+"489:p) != GS",
 "p) == GS",
 [
 "testDump_sink",
@@ -10030,7 +10030,7 @@
 "sk-482-neg",
 "srcl",
 "src/sink/sink.c",
-"482:(target->map.dim != 2 || gshgeom_map_check(&target->map) != GSHGEOM_OK)",
+"489:(target->map.dim != 2 || gshgeom_map_check(&target->map) != GSHGEOM_OK)",
 "(!(target->map.dim != 2 || gshgeom_map_check(&target->map) != GSHGEOM_OK))",
 [
 "testDump_sink",
@@ -10052,7 +10052,7 @@
 "sk-483-ret",
 "srcl",
 "src/sink/sink.c",
-"483:GSHSCENE_ERR_INVALID",
+"490:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -10074,7 +10074,7 @@
 "sk-486-ne",
 "srcl",
 "src/sink/sink.c",
-"486:!=",
+"493:!=",
 "==",
 [
 "testDump_sink",
@@ -10096,7 +10096,7 @@
 "sk-486-neg",
 "srcl",
 "src/sink/sink.c",
-"486:(result != GSHSCENE_OK)",
+"493:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -10118,7 +10118,7 @@
 "sk-490-eq",
 "srcl",
 "src/sink/sink.c",
-"490:==",
+"497:==",
 "!=",
 [
 "testDump_sink",
@@ -10140,7 +10140,7 @@
 "sk-490-neg",
 "srcl",
 "src/sink/sink.c",
-"490:(target->kind == GSHSCENE_TARGET_STREAM)",
+"497:(target->kind == GSHSCENE_TARGET_STREAM)",
 "(!(target->kind == GSHSCENE_TARGET_STREAM))",
 [
 "testDump_sink",
@@ -10162,7 +10162,7 @@
 "sk-492-ne",
 "srcl",
 "src/sink/sink.c",
-"492:!=",
+"499:!=",
 "==",
 [
 "testDump_sink",
@@ -10184,7 +10184,7 @@
 "sk-493-ne",
 "srcl",
 "src/sink/sink.c",
-"493:!=",
+"500:!=",
 "==",
 [
 "testDump_sink",
@@ -10206,7 +10206,7 @@
 "sk-494-ret",
 "srcl",
 "src/sink/sink.c",
-"494:GSHSCENE_ERR_INVALID",
+"501:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -10228,7 +10228,7 @@
 "sk-501-ne",
 "srcl",
 "src/sink/sink.c",
-"501:((target->unit != GSHSCENE_UNIT_",
+"508:((target->unit != GSHSCENE_UNIT_",
 "((target->unit == GSHSCENE_UNIT_",
 [
 "testDump_sink",
@@ -10250,7 +10250,7 @@
 "sk-501-and",
 "srcl",
 "src/sink/sink.c",
-"501:&&",
+"508:&&",
 "||",
 [
 "testDump_sink",
@@ -10272,7 +10272,7 @@
 "sk-501-ne2",
 "srcl",
 "src/sink/sink.c",
-"501:& target->unit != GSHSCENE_UNIT_",
+"508:& target->unit != GSHSCENE_UNIT_",
 "& target->unit == GSHSCENE_UNIT_",
 [
 "testDump_sink",
@@ -10294,7 +10294,7 @@
 "sk-502-ne",
 "srcl",
 "src/sink/sink.c",
-"502:!=",
+"509:!=",
 "==",
 [
 "testDump_sink",
@@ -10316,7 +10316,7 @@
 "sk-503-ret",
 "srcl",
 "src/sink/sink.c",
-"503:GSHSCENE_ERR_INVALID",
+"510:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -10338,7 +10338,7 @@
 "sk-505-neg",
 "srcl",
 "src/sink/sink.c",
-"505:(target->aa != GSHSCENE_AA_BOX)",
+"512:(target->aa != GSHSCENE_AA_BOX)",
 "(!(target->aa != GSHSCENE_AA_BOX))",
 [
 "testDump_sink",
@@ -10360,7 +10360,7 @@
 "sk-506-ret",
 "srcl",
 "src/sink/sink.c",
-"506:GSHSCENE_ERR_UNSUPPORTED",
+"513:GSHSCENE_ERR_UNSUPPORTED",
 "GSHSCENE_ERR_INVALID",
 [
 "testDump_sink",
@@ -10382,7 +10382,7 @@
 "sk-508-neg",
 "srcl",
 "src/sink/sink.c",
-"508:(rect_zero(&target->extent))",
+"515:(rect_zero(&target->extent))",
 "(!(rect_zero(&target->extent)))",
 [
 "testDump_sink",
@@ -10404,7 +10404,7 @@
 "sk-510-del",
 "srcl",
 "src/sink/sink.c",
-"510:copy.extent.y1 = height;",
+"517:copy.extent.y1 = height;",
 ";",
 [
 "testDump_sink",
@@ -10426,7 +10426,7 @@
 "sk-511-ge",
 "srcl",
 "src/sink/sink.c",
-"511:>=",
+"518:>=",
 ">",
 [
 "testDump_sink",
@@ -10448,7 +10448,7 @@
 "sk-511-lt",
 "srcl",
 "src/sink/sink.c",
-"511:x0 < ta",
+"518:x0 < ta",
 "x0 <= ta",
 [
 "testDump_sink",
@@ -10470,7 +10470,7 @@
 "sk-511-le",
 "srcl",
 "src/sink/sink.c",
-"511:<=",
+"518:<=",
 "<",
 [
 "testDump_sink",
@@ -10492,7 +10492,7 @@
 "sk-512-lt",
 "srcl",
 "src/sink/sink.c",
-"512:y0 < ta",
+"519:y0 < ta",
 "y0 <= ta",
 [
 "testDump_sink",
@@ -10514,7 +10514,7 @@
 "sk-512-le",
 "srcl",
 "src/sink/sink.c",
-"512:<=",
+"519:<=",
 "<",
 [
 "testDump_sink",
@@ -10536,7 +10536,7 @@
 "sk-513-ret",
 "srcl",
 "src/sink/sink.c",
-"513:GSHSCENE_ERR_INVALID",
+"520:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -10558,7 +10558,7 @@
 "sk-515-neg",
 "srcl",
 "src/sink/sink.c",
-"515:(gshscene_color_space_is_target(&resolved))",
+"522:(gshscene_color_space_is_target(&resolved))",
 "(!(gshscene_color_space_is_target(&resolved)))",
 [
 "testDump_sink",
@@ -10580,7 +10580,7 @@
 "sk-517-and",
 "srcl",
 "src/sink/sink.c",
-"517:&&",
+"524:&&",
 "||",
 [
 "testDump_sink",
@@ -10602,7 +10602,7 @@
 "sk-517-ne",
 "srcl",
 "src/sink/sink.c",
-"517:!=",
+"524:!=",
 "==",
 [
 "testDump_sink",
@@ -10624,7 +10624,7 @@
 "sk-519-del",
 "srcl",
 "src/sink/sink.c",
-"519:result = gshscene_color_space_from_info(info, &resolved);",
+"526:result = gshscene_color_space_from_info(info, &resolved);",
 ";",
 [
 "testDump_sink",
@@ -10646,7 +10646,7 @@
 "sk-520-ne",
 "srcl",
 "src/sink/sink.c",
-"520:!=",
+"527:!=",
 "==",
 [
 "testDump_sink",
@@ -10668,7 +10668,7 @@
 "sk-520-neg",
 "srcl",
 "src/sink/sink.c",
-"520:(result != GSHSCENE_OK)",
+"527:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -10690,7 +10690,7 @@
 "sk-526-neg",
 "srcl",
 "src/sink/sink.c",
-"526:(gshscene_color_space_is_target(&resolved))",
+"533:(gshscene_color_space_is_target(&resolved))",
 "(!(gshscene_color_space_is_target(&resolved)))",
 [
 "testDump_sink",
@@ -10712,7 +10712,7 @@
 "sk-528-del",
 "srcl",
 "src/sink/sink.c",
-"528:resolved.primaries = GCOL_PRIMARIES_SRGB;",
+"535:resolved.primaries = GCOL_PRIMARIES_SRGB;",
 ";",
 [
 "testDump_sink",
@@ -10734,7 +10734,7 @@
 "sk-531-neg",
 "srcl",
 "src/sink/sink.c",
-"531:(out)",
+"538:(out)",
 "(!(out))",
 [
 "testDump_sink",
@@ -10756,7 +10756,7 @@
 "sk-544-neg",
 "srcl",
 "src/sink/sink.c",
-"544:(!ops || !out || !ops->name || !ops->caps || !ops->begin || !ops->destroy)",
+"551:(!ops || !out || !ops->name || !ops->caps || !ops->begin || !ops->destroy)",
 "(!(!ops || !out || !ops->name || !ops->caps || !ops->begin || !ops->destroy))",
 [
 "testDump_sink",
@@ -10778,7 +10778,7 @@
 "sk-545-ret",
 "srcl",
 "src/sink/sink.c",
-"545:GSHSCENE_ERR_INVALID",
+"552:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -10800,7 +10800,7 @@
 "sk-547-neg",
 "srcl",
 "src/sink/sink.c",
-"547:(!alloc)",
+"554:(!alloc)",
 "(!(!alloc))",
 [
 "testDump_sink",
@@ -10822,7 +10822,7 @@
 "sk-548-del",
 "srcl",
 "src/sink/sink.c",
-"548:alloc = gshscene_allocator_default();",
+"555:alloc = gshscene_allocator_default();",
 ";",
 [
 "testDump_sink",
@@ -10844,7 +10844,7 @@
 "sk-550-and",
 "srcl",
 "src/sink/sink.c",
-"550:&&",
+"557:&&",
 "||",
 [
 "testDump_sink",
@@ -10866,7 +10866,7 @@
 "sk-552-neg",
 "srcl",
 "src/sink/sink.c",
-"552:(!sink)",
+"559:(!sink)",
 "(!(!sink))",
 [
 "testDump_sink",
@@ -10888,7 +10888,7 @@
 "sk-555-del",
 "srcl",
 "src/sink/sink.c",
-"555:sink->busy = max_jobs > SIZE_MAX / sizeof(void *) ? NULL : gshscene_calloc(alloc, max_jobs, sizeof(void *));",
+"562:sink->busy = max_jobs > SIZE_MAX / sizeof(void *) ? NULL : gshscene_calloc(alloc, max_jobs, sizeof(void *));",
 ";",
 [
 "testDump_sink",
@@ -10910,7 +10910,7 @@
 "sk-556-neg",
 "srcl",
 "src/sink/sink.c",
-"556:(!sink->busy)",
+"563:(!sink->busy)",
 "(!(!sink->busy))",
 [
 "testDump_sink",
@@ -10932,7 +10932,7 @@
 "sk-557-del",
 "srcl",
 "src/sink/sink.c",
-"557:gshscene_free(alloc, sink);",
+"564:gshscene_free(alloc, sink);",
 ";",
 [
 "testDump_sink",
@@ -10954,7 +10954,7 @@
 "sk-560-ne",
 "srcl",
 "src/sink/sink.c",
-"560:!=",
+"567:!=",
 "==",
 [
 "testDump_sink",
@@ -10976,7 +10976,7 @@
 "sk-560-neg",
 "srcl",
 "src/sink/sink.c",
-"560:(GCU_MUTEX_CREATE(sink->lock) != 0)",
+"567:(GCU_MUTEX_CREATE(sink->lock) != 0)",
 "(!(GCU_MUTEX_CREATE(sink->lock) != 0))",
 [
 "testDump_sink",
@@ -10998,7 +10998,7 @@
 "sk-565-del",
 "srcl",
 "src/sink/sink.c",
-"565:sink->alloc = *alloc;",
+"572:sink->alloc = *alloc;",
 ";",
 [
 "testDump_sink",
@@ -11020,7 +11020,7 @@
 "sk-566-del",
 "srcl",
 "src/sink/sink.c",
-"566:sink->ops = *ops;",
+"573:sink->ops = *ops;",
 ";",
 [
 "testDump_sink",
@@ -11042,7 +11042,7 @@
 "sk-568-del",
 "srcl",
 "src/sink/sink.c",
-"568:sink->creator = gshscene_thread_token();",
+"575:sink->creator = gshscene_thread_token();",
 ";",
 [
 "testDump_sink",
@@ -11064,7 +11064,7 @@
 "sk-580-or",
 "srcl",
 "src/sink/sink.c",
-"580:||",
+"587:||",
 "&&",
 [
 "testDump_sink",
@@ -11086,7 +11086,7 @@
 "sk-580-eq",
 "srcl",
 "src/sink/sink.c",
-"580:==",
+"587:==",
 "!=",
 [
 "testDump_sink",
@@ -11108,7 +11108,7 @@
 "sk-587-ne",
 "srcl",
 "src/sink/sink.c",
-"587:!=",
+"594:!=",
 "==",
 [
 "testDump_sink",
@@ -11130,7 +11130,7 @@
 "sk-587-neg",
 "srcl",
 "src/sink/sink.c",
-"587:(result != GSHSCENE_OK)",
+"594:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -11152,7 +11152,7 @@
 "sk-592-del",
 "srcl",
 "src/sink/sink.c",
-"592:result = sink->ops.caps(sink->impl, copy ? copy : target, &c);",
+"599:result = sink->ops.caps(sink->impl, copy ? copy : target, &c);",
 ";",
 [
 "testDump_sink",
@@ -11174,7 +11174,7 @@
 "sk-593-ne",
 "srcl",
 "src/sink/sink.c",
-"593:!=",
+"600:!=",
 "==",
 [
 "testDump_sink",
@@ -11196,7 +11196,7 @@
 "sk-593-neg",
 "srcl",
 "src/sink/sink.c",
-"593:(result != GSHSCENE_OK)",
+"600:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -11218,7 +11218,7 @@
 "sk-597-and",
 "srcl",
 "src/sink/sink.c",
-"597:&&",
+"604:&&",
 "||",
 [
 "testDump_sink",
@@ -11240,7 +11240,7 @@
 "sk-600-eq",
 "srcl",
 "src/sink/sink.c",
-"600:==",
+"607:==",
 "!=",
 [
 "testDump_sink",
@@ -11262,7 +11262,7 @@
 "sk-601-ge",
 "srcl",
 "src/sink/sink.c",
-"601:>=",
+"608:>=",
 ">",
 [
 "testDump_sink",
@@ -11284,7 +11284,7 @@
 "sk-602-ne",
 "srcl",
 "src/sink/sink.c",
-"602:!=",
+"609:!=",
 "==",
 [
 "testDump_sink",
@@ -11306,7 +11306,7 @@
 "sk-611-neg",
 "srcl",
 "src/sink/sink.c",
-"611:(!sink || !target || !out)",
+"618:(!sink || !target || !out)",
 "(!(!sink || !target || !out))",
 [
 "testDump_sink",
@@ -11328,7 +11328,7 @@
 "sk-612-ret",
 "srcl",
 "src/sink/sink.c",
-"612:GSHSCENE_ERR_INVALID",
+"619:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -11350,7 +11350,7 @@
 "sk-617-eq",
 "srcl",
 "src/sink/sink.c",
-"617:==",
+"624:==",
 "!=",
 [
 "testDump_sink",
@@ -11372,7 +11372,7 @@
 "sk-617-neg",
 "srcl",
 "src/sink/sink.c",
-"617:(result == GSHSCENE_OK)",
+"624:(result == GSHSCENE_OK)",
 "(!(result == GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -11394,7 +11394,7 @@
 "sk-628-and",
 "srcl",
 "src/sink/sink.c",
-"628:&&",
+"635:&&",
 "||",
 [
 "testDump_sink",
@@ -11416,7 +11416,7 @@
 "sk-628-ne",
 "srcl",
 "src/sink/sink.c",
-"628:!=",
+"635:!=",
 "==",
 [
 "testDump_sink",
@@ -11438,7 +11438,7 @@
 "sk-629-ret",
 "srcl",
 "src/sink/sink.c",
-"629:GSHSCENE_ERR_INVALID",
+"636:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -11460,7 +11460,7 @@
 "sk-636-or",
 "srcl",
 "src/sink/sink.c",
-"636:||",
+"643:||",
 "&&",
 [
 "testDump_sink",
@@ -11482,7 +11482,7 @@
 "sk-636-neg",
 "srcl",
 "src/sink/sink.c",
-"636:(!sink || !out)",
+"643:(!sink || !out)",
 "(!(!sink || !out))",
 [
 "testDump_sink",
@@ -11504,7 +11504,7 @@
 "sk-637-ret",
 "srcl",
 "src/sink/sink.c",
-"637:GSHSCENE_ERR_INVALID",
+"644:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -11526,7 +11526,7 @@
 "sk-640-ne",
 "srcl",
 "src/sink/sink.c",
-"640:!=",
+"647:!=",
 "==",
 [
 "testDump_sink",
@@ -11548,7 +11548,7 @@
 "sk-640-neg",
 "srcl",
 "src/sink/sink.c",
-"640:(result != GSHSCENE_OK)",
+"647:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -11570,7 +11570,7 @@
 "sk-647-ne",
 "srcl",
 "src/sink/sink.c",
-"647:!=",
+"654:!=",
 "==",
 [
 "testDump_sink",
@@ -11592,7 +11592,7 @@
 "sk-647-neg",
 "srcl",
 "src/sink/sink.c",
-"647:(result != GSHSCENE_OK)",
+"654:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -11614,7 +11614,7 @@
 "sk-650-or",
 "srcl",
 "src/sink/sink.c",
-"650:||",
+"657:||",
 "&&",
 [
 "testDump_sink",
@@ -11636,7 +11636,7 @@
 "sk-650-neg",
 "srcl",
 "src/sink/sink.c",
-"650:(!(caps.flags & GSHSCENE_CAP_CALLER_MEMORY) || !sink->ops.workspace_bytes)",
+"657:(!(caps.flags & GSHSCENE_CAP_CALLER_MEMORY) || !sink->ops.workspace_bytes)",
 "(!(!(caps.flags & GSHSCENE_CAP_CALLER_MEMORY) || !sink->ops.workspace_bytes))",
 [
 "testDump_sink",
@@ -11658,7 +11658,7 @@
 "sk-657-neg",
 "srcl",
 "src/sink/sink.c",
-"657:(r.workspace)",
+"664:(r.workspace)",
 "(!(r.workspace))",
 [
 "testDump_sink",
@@ -11680,7 +11680,7 @@
 "sk-659-del",
 "srcl",
 "src/sink/sink.c",
-"659:result = sink->ops.workspace_bytes(sink->impl, &r, &bytes);",
+"666:result = sink->ops.workspace_bytes(sink->impl, &r, &bytes);",
 ";",
 [
 "testDump_sink",
@@ -11702,7 +11702,7 @@
 "sk-660-ne",
 "srcl",
 "src/sink/sink.c",
-"660:!=",
+"667:!=",
 "==",
 [
 "testDump_sink",
@@ -11724,7 +11724,7 @@
 "sk-660-neg",
 "srcl",
 "src/sink/sink.c",
-"660:(result != GSHSCENE_OK)",
+"667:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -11746,7 +11746,7 @@
 "sk-663-le",
 "srcl",
 "src/sink/sink.c",
-"663:<=",
+"670:<=",
 "<",
 [
 "testDump_sink",
@@ -11768,7 +11768,7 @@
 "sk-663-neg",
 "srcl",
 "src/sink/sink.c",
-"663:(bytes <= r.workspace_bytes)",
+"670:(bytes <= r.workspace_bytes)",
 "(!(bytes <= r.workspace_bytes))",
 [
 "testDump_sink",
@@ -11790,7 +11790,7 @@
 "sk-669-del",
 "srcl",
 "src/sink/sink.c",
-"669:r.workspace = NULL;",
+"676:r.workspace = NULL;",
 ";",
 [
 "testDump_sink",
@@ -11812,7 +11812,7 @@
 "sk-670-del",
 "srcl",
 "src/sink/sink.c",
-"670:r.workspace_bytes = 0;",
+"677:r.workspace_bytes = 0;",
 ";",
 [
 "testDump_sink",
@@ -11834,7 +11834,7 @@
 "sk-671-del",
 "srcl",
 "src/sink/sink.c",
-"671:result = sink->ops.workspace_bytes(sink->impl, &r, &bytes);",
+"678:result = sink->ops.workspace_bytes(sink->impl, &r, &bytes);",
 ";",
 [
 "testDump_sink",
@@ -11856,7 +11856,7 @@
 "sk-672-eq",
 "srcl",
 "src/sink/sink.c",
-"672:==",
+"679:==",
 "!=",
 [
 "testDump_sink",
@@ -11878,7 +11878,7 @@
 "sk-672-neg",
 "srcl",
 "src/sink/sink.c",
-"672:(result == GSHSCENE_OK)",
+"679:(result == GSHSCENE_OK)",
 "(!(result == GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -11900,7 +11900,7 @@
 "sk-684-eq",
 "srcl",
 "src/sink/sink.c",
-"684:==",
+"691:==",
 "!=",
 [
 "testDump_sink",
@@ -11922,7 +11922,7 @@
 "sk-684-neg",
 "srcl",
 "src/sink/sink.c",
-"684:(sink->busy[i] == surface)",
+"691:(sink->busy[i] == surface)",
 "(!(sink->busy[i] == surface))",
 [
 "testDump_sink",
@@ -11944,7 +11944,7 @@
 "sk-685-del",
 "srcl",
 "src/sink/sink.c",
-"685:result = GSHSCENE_ERR_INVALID;",
+"692:result = GSHSCENE_ERR_INVALID;",
 ";",
 [
 "testDump_sink",
@@ -11966,7 +11966,7 @@
 "sk-688-and",
 "srcl",
 "src/sink/sink.c",
-"688:&&",
+"695:&&",
 "||",
 [
 "testDump_sink",
@@ -11988,7 +11988,7 @@
 "sk-688-eq",
 "srcl",
 "src/sink/sink.c",
-"688:==",
+"695:==",
 "!=",
 [
 "testDump_sink",
@@ -12010,7 +12010,7 @@
 "sk-688-neg",
 "srcl",
 "src/sink/sink.c",
-"688:(!sink->busy[i] && free_slot == sink->max_jobs)",
+"695:(!sink->busy[i] && free_slot == sink->max_jobs)",
 "(!(!sink->busy[i] && free_slot == sink->max_jobs))",
 [
 "testDump_sink",
@@ -12032,7 +12032,7 @@
 "sk-689-del",
 "srcl",
 "src/sink/sink.c",
-"689:free_slot = i;",
+"696:free_slot = i;",
 ";",
 [
 "testDump_sink",
@@ -12054,7 +12054,7 @@
 "sk-692-eq",
 "srcl",
 "src/sink/sink.c",
-"692:==",
+"699:==",
 "!=",
 [
 "testDump_sink",
@@ -12076,7 +12076,7 @@
 "sk-692-neg",
 "srcl",
 "src/sink/sink.c",
-"692:(result == GSHSCENE_OK)",
+"699:(result == GSHSCENE_OK)",
 "(!(result == GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -12098,7 +12098,7 @@
 "sk-693-eq",
 "srcl",
 "src/sink/sink.c",
-"693:==",
+"700:==",
 "!=",
 [
 "testDump_sink",
@@ -12120,7 +12120,7 @@
 "sk-693-neg",
 "srcl",
 "src/sink/sink.c",
-"693:(free_slot == sink->max_jobs)",
+"700:(free_slot == sink->max_jobs)",
 "(!(free_slot == sink->max_jobs))",
 [
 "testDump_sink",
@@ -12142,7 +12142,7 @@
 "sk-694-del",
 "srcl",
 "src/sink/sink.c",
-"694:result = GSHSCENE_ERR_LIMIT;",
+"701:result = GSHSCENE_ERR_LIMIT;",
 ";",
 [
 "testDump_sink",
@@ -12164,7 +12164,7 @@
 "sk-696-del",
 "srcl",
 "src/sink/sink.c",
-"696:sink->busy[free_slot] = surface;",
+"703:sink->busy[free_slot] = surface;",
 ";",
 [
 "testDump_sink",
@@ -12186,7 +12186,7 @@
 "sk-697-del",
 "srcl",
 "src/sink/sink.c",
-"697:sink->in_flight++;",
+"704:sink->in_flight++;",
 ";",
 [
 "testDump_sink",
@@ -12208,7 +12208,7 @@
 "sk-700-del",
 "srcl",
 "src/sink/sink.c",
-"700:GCU_MUTEX_UNLOCK(sink->lock);",
+"707:GCU_MUTEX_UNLOCK(sink->lock);",
 ";",
 [
 "testDump_sink",
@@ -12230,7 +12230,7 @@
 "sk-707-eq",
 "srcl",
 "src/sink/sink.c",
-"707:==",
+"714:==",
 "!=",
 [
 "testDump_sink",
@@ -12252,7 +12252,7 @@
 "sk-707-neg",
 "srcl",
 "src/sink/sink.c",
-"707:(sink->busy[i] == surface)",
+"714:(sink->busy[i] == surface)",
 "(!(sink->busy[i] == surface))",
 [
 "testDump_sink",
@@ -12274,7 +12274,7 @@
 "sk-708-del",
 "srcl",
 "src/sink/sink.c",
-"708:sink->busy[i] = NULL;",
+"715:sink->busy[i] = NULL;",
 ";",
 [
 "testDump_sink",
@@ -12296,7 +12296,7 @@
 "sk-709-del",
 "srcl",
 "src/sink/sink.c",
-"709:sink->in_flight--;",
+"716:sink->in_flight--;",
 ";",
 [
 "testDump_sink",
@@ -12318,7 +12318,7 @@
 "sk-713-del",
 "srcl",
 "src/sink/sink.c",
-"713:GCU_MUTEX_UNLOCK(sink->lock);",
+"720:GCU_MUTEX_UNLOCK(sink->lock);",
 ";",
 [
 "testDump_sink",
@@ -12340,7 +12340,7 @@
 "sk-735-neg",
 "srcl",
 "src/sink/sink.c",
-"735:(job)",
+"742:(job)",
 "(!(job))",
 [
 "testDump_sink",
@@ -12362,7 +12362,7 @@
 "sk-745-neg",
 "srcl",
 "src/sink/sink.c",
-"745:(job)",
+"752:(job)",
 "(!(job))",
 [
 "testDump_sink",
@@ -12384,7 +12384,7 @@
 "sk-751-neg",
 "srcl",
 "src/sink/sink.c",
-"751:(job)",
+"758:(job)",
 "(!(job))",
 [
 "testDump_sink",
@@ -12406,7 +12406,7 @@
 "sk-757-neg",
 "srcl",
 "src/sink/sink.c",
-"757:(!job)",
+"764:(!job)",
 "(!(!job))",
 [
 "testDump_sink",
@@ -12428,7 +12428,7 @@
 "sk-760-neg",
 "srcl",
 "src/sink/sink.c",
-"760:(job->work > job->work_max)",
+"767:(job->work > job->work_max)",
 "(!(job->work > job->work_max))",
 [
 "testDump_sink",
@@ -12450,7 +12450,7 @@
 "sk-761-del",
 "srcl",
 "src/sink/sink.c",
-"761:job->work_max = job->work;",
+"768:job->work_max = job->work;",
 ";",
 [
 "testDump_sink",
@@ -12472,7 +12472,7 @@
 "sk-763-del",
 "srcl",
 "src/sink/sink.c",
-"763:job->work = 0;",
+"770:job->work = 0;",
 ";",
 [
 "testDump_sink",
@@ -12494,7 +12494,7 @@
 "sk-768-neg",
 "srcl",
 "src/sink/sink.c",
-"768:(!job)",
+"775:(!job)",
 "(!(!job))",
 [
 "testDump_sink",
@@ -12516,7 +12516,7 @@
 "sk-771-del",
 "srcl",
 "src/sink/sink.c",
-"771:gcu_atomic_size_store(&job->units_processed, units_processed);",
+"778:gcu_atomic_size_store(&job->units_processed, units_processed);",
 ";",
 [
 "testDump_sink",
@@ -12538,7 +12538,7 @@
 "sk-773-neg",
 "srcl",
 "src/sink/sink.c",
-"773:(job->request.progress)",
+"780:(job->request.progress)",
 "(!(job->request.progress))",
 [
 "testDump_sink",
@@ -12560,7 +12560,7 @@
 "sk-774-del",
 "srcl",
 "src/sink/sink.c",
-"774:job->request.progress(job->request.progress_ctx, job, units_processed);",
+"781:job->request.progress(job->request.progress_ctx, job, units_processed);",
 ";",
 [
 "testDump_sink",
@@ -12582,7 +12582,7 @@
 "sk-776-eq",
 "srcl",
 "src/sink/sink.c",
-"776:==",
+"783:==",
 "!=",
 [
 "testDump_sink",
@@ -12604,7 +12604,7 @@
 "sk-776-neg",
 "srcl",
 "src/sink/sink.c",
-"776:(job->caps.cancel_unit == GSHSCENE_CANCEL_BETWEEN_UNITS)",
+"783:(job->caps.cancel_unit == GSHSCENE_CANCEL_BETWEEN_UNITS)",
 "(!(job->caps.cancel_unit == GSHSCENE_CANCEL_BETWEEN_UNITS))",
 [
 "testDump_sink",
@@ -12626,7 +12626,7 @@
 "sk-783-and",
 "srcl",
 "src/sink/sink.c",
-"783:&&",
+"790:&&",
 "||",
 [
 "testDump_sink",
@@ -12648,7 +12648,7 @@
 "sk-783-neg",
 "srcl",
 "src/sink/sink.c",
-"783:(job && bytes > job->frame_bytes)",
+"790:(job && bytes > job->frame_bytes)",
 "(!(job && bytes > job->frame_bytes))",
 [
 "testDump_sink",
@@ -12670,7 +12670,7 @@
 "sk-784-del",
 "srcl",
 "src/sink/sink.c",
-"784:job->frame_bytes = bytes;",
+"791:job->frame_bytes = bytes;",
 ";",
 [
 "testDump_sink",
@@ -12692,7 +12692,7 @@
 "sk-790-lt",
 "srcl",
 "src/sink/sink.c",
-"790:<",
+"797:<",
 "<=",
 [
 "testDump_sink",
@@ -12714,7 +12714,7 @@
 "sk-791-ge",
 "srcl",
 "src/sink/sink.c",
-"791:>=",
+"798:>=",
 ">",
 [
 "testDump_sink",
@@ -12736,7 +12736,7 @@
 "sk-791-lt",
 "srcl",
 "src/sink/sink.c",
-"791:<",
+"798:<",
 "<=",
 [
 "testDump_sink",
@@ -12758,7 +12758,7 @@
 "sk-792-ge",
 "srcl",
 "src/sink/sink.c",
-"792:>=",
+"799:>=",
 ">",
 [
 "testDump_sink",
@@ -12780,7 +12780,7 @@
 "sk-792-and",
 "srcl",
 "src/sink/sink.c",
-"792:&&",
+"799:&&",
 "||",
 [
 "testDump_sink",
@@ -12802,7 +12802,7 @@
 "sk-793-ret",
 "srcl",
 "src/sink/sink.c",
-"793:GSHSCENE_ERR_INVALID",
+"800:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -12824,7 +12824,7 @@
 "sk-800-lt",
 "srcl",
 "src/sink/sink.c",
-"800:<",
+"807:<",
 "<=",
 [
 "testDump_sink",
@@ -12846,7 +12846,7 @@
 "sk-801-ge",
 "srcl",
 "src/sink/sink.c",
-"801:>=",
+"808:>=",
 ">",
 [
 "testDump_sink",
@@ -12868,7 +12868,7 @@
 "sk-801-lt",
 "srcl",
 "src/sink/sink.c",
-"801:<",
+"808:<",
 "<=",
 [
 "testDump_sink",
@@ -12890,7 +12890,7 @@
 "sk-802-ge",
 "srcl",
 "src/sink/sink.c",
-"802:>=",
+"809:>=",
 ">",
 [
 "testDump_sink",
@@ -12912,7 +12912,7 @@
 "sk-802-and",
 "srcl",
 "src/sink/sink.c",
-"802:&&",
+"809:&&",
 "||",
 [
 "testDump_sink",
@@ -12934,7 +12934,7 @@
 "sk-803-ret",
 "srcl",
 "src/sink/sink.c",
-"803:GSHSCENE_ERR_INVALID",
+"810:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -12956,7 +12956,7 @@
 "sk-810-or",
 "srcl",
 "src/sink/sink.c",
-"810:||",
+"817:||",
 "&&",
 [
 "testDump_sink",
@@ -12978,7 +12978,7 @@
 "sk-810-ne",
 "srcl",
 "src/sink/sink.c",
-"810:!=",
+"817:!=",
 "==",
 [
 "testDump_sink",
@@ -13000,7 +13000,7 @@
 "sk-810-neg",
 "srcl",
 "src/sink/sink.c",
-"810:(!job || gcu_atomic_int_load(&job->state) != GSHSCENE_JOB_RUNNING)",
+"817:(!job || gcu_atomic_int_load(&job->state) != GSHSCENE_JOB_RUNNING)",
 "(!(!job || gcu_atomic_int_load(&job->state) != GSHSCENE_JOB_RUNNING))",
 [
 "testDump_sink",
@@ -13022,7 +13022,7 @@
 "sk-813-neg",
 "srcl",
 "src/sink/sink.c",
-"813:(job->work > job->work_max)",
+"820:(job->work > job->work_max)",
 "(!(job->work > job->work_max))",
 [
 "testDump_sink",
@@ -13044,7 +13044,7 @@
 "sk-814-del",
 "srcl",
 "src/sink/sink.c",
-"814:job->work_max = job->work;",
+"821:job->work_max = job->work;",
 ";",
 [
 "testDump_sink",
@@ -13066,7 +13066,7 @@
 "sk-818-del",
 "srcl",
 "src/sink/sink.c",
-"818:s->units_total = job->units_total;",
+"825:s->units_total = job->units_total;",
 ";",
 [
 "testDump_sink",
@@ -13088,7 +13088,7 @@
 "sk-819-del",
 "srcl",
 "src/sink/sink.c",
-"819:s->units_processed = gcu_atomic_size_load(&job->units_processed);",
+"826:s->units_processed = gcu_atomic_size_load(&job->units_processed);",
 ";",
 [
 "testDump_sink",
@@ -13110,7 +13110,7 @@
 "sk-820-del",
 "srcl",
 "src/sink/sink.c",
-"820:s->units_done = gcu_atomic_size_load(&job->units_done);",
+"827:s->units_done = gcu_atomic_size_load(&job->units_done);",
 ";",
 [
 "testDump_sink",
@@ -13132,7 +13132,7 @@
 "sk-821-del",
 "srcl",
 "src/sink/sink.c",
-"821:s->frame_bytes = job->frame_bytes;",
+"828:s->frame_bytes = job->frame_bytes;",
 ";",
 [
 "testDump_sink",
@@ -13154,7 +13154,7 @@
 "sk-822-del",
 "srcl",
 "src/sink/sink.c",
-"822:s->work_max = job->work_max;",
+"829:s->work_max = job->work_max;",
 ";",
 [
 "testDump_sink",
@@ -13176,7 +13176,7 @@
 "sk-823-del",
 "srcl",
 "src/sink/sink.c",
-"823:s->static_bytes = job->sink->ops.static_bytes ? job->sink->ops.static_bytes(job->sink->impl) : 0;",
+"830:s->static_bytes = job->sink->ops.static_bytes ? job->sink->ops.static_bytes(job->sink->impl) : 0;",
 ";",
 [
 "testDump_sink",
@@ -13198,7 +13198,7 @@
 "sk-825-del",
 "srcl",
 "src/sink/sink.c",
-"825:result = s->result;",
+"832:result = s->result;",
 ";",
 [
 "testDump_sink",
@@ -13220,7 +13220,7 @@
 "sk-826-del",
 "srcl",
 "src/sink/sink.c",
-"826:job->result = (int)result;",
+"833:job->result = (int)result;",
 ";",
 [
 "testDump_sink",
@@ -13242,7 +13242,7 @@
 "sk-827-del",
 "srcl",
 "src/sink/sink.c",
-"827:gcu_atomic_int_store(&report->busy, 0);",
+"834:gcu_atomic_int_store(&report->busy, 0);",
 ";",
 [
 "testDump_sink",
@@ -13264,7 +13264,7 @@
 "sk-828-neg",
 "srcl",
 "src/sink/sink.c",
-"828:(job->holds_surface)",
+"835:(job->holds_surface)",
 "(!(job->holds_surface))",
 [
 "testDump_sink",
@@ -13286,7 +13286,7 @@
 "sk-829-del",
 "srcl",
 "src/sink/sink.c",
-"829:surface_give(job->sink, job->target.surface);",
+"836:surface_give(job->sink, job->target.surface);",
 ";",
 [
 "testDump_sink",
@@ -13308,7 +13308,7 @@
 "sk-831-neg",
 "srcl",
 "src/sink/sink.c",
-"831:(job->request.on_complete)",
+"838:(job->request.on_complete)",
 "(!(job->request.on_complete))",
 [
 "testDump_sink",
@@ -13330,7 +13330,7 @@
 "sk-832-del",
 "srcl",
 "src/sink/sink.c",
-"832:job->request.on_complete(job->request.on_complete_ctx, job, result);",
+"839:job->request.on_complete(job->request.on_complete_ctx, job, result);",
 ";",
 [
 "testDump_sink",
@@ -13352,7 +13352,7 @@
 "sk-834-del",
 "srcl",
 "src/sink/sink.c",
-"834:gcu_atomic_int_store(&job->state, GSHSCENE_JOB_DONE);",
+"841:gcu_atomic_int_store(&job->state, GSHSCENE_JOB_DONE);",
 ";",
 [
 "testDump_sink",
@@ -13374,7 +13374,7 @@
 "sk-854-lt",
 "srcl",
 "src/sink/sink.c",
-"854:<",
+"861:<",
 "<=",
 [
 "testDump_sink",
@@ -13396,7 +13396,7 @@
 "sk-856-ne",
 "srcl",
 "src/sink/sink.c",
-"856:!=",
+"863:!=",
 "==",
 [
 "testDump_sink",
@@ -13418,7 +13418,7 @@
 "sk-856-neg",
 "srcl",
 "src/sink/sink.c",
-"856:(gshscene_list_tie(list, i, &tie) != GSHSCENE_OK)",
+"863:(gshscene_list_tie(list, i, &tie) != GSHSCENE_OK)",
 "(!(gshscene_list_tie(list, i, &tie) != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -13440,7 +13440,7 @@
 "sk-859-del",
 "srcl",
 "src/sink/sink.c",
-"859:chain[count - 1] = tie->first;",
+"866:chain[count - 1] = tie->first;",
 ";",
 [
 "testDump_sink",
@@ -13462,7 +13462,7 @@
 "sk-862-ne",
 "srcl",
 "src/sink/sink.c",
-"862:!=",
+"869:!=",
 "==",
 [
 "testDump_sink",
@@ -13484,7 +13484,7 @@
 "sk-862-neg",
 "srcl",
 "src/sink/sink.c",
-"862:(result != GSHSCENE_OK)",
+"869:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -13506,7 +13506,7 @@
 "sk-878-ne",
 "srcl",
 "src/sink/sink.c",
-"878:(item->kind != GSHSCENE_IT",
+"885:(item->kind != GSHSCENE_IT",
 "(item->kind == GSHSCENE_IT",
 [
 "testDump_sink",
@@ -13528,7 +13528,7 @@
 "sk-878-and",
 "srcl",
 "src/sink/sink.c",
-"878:&&",
+"885:&&",
 "||",
 [
 "testDump_sink",
@@ -13550,7 +13550,7 @@
 "sk-878-ne2",
 "srcl",
 "src/sink/sink.c",
-"878: item->kind != GSHSCENE_IT",
+"885: item->kind != GSHSCENE_IT",
 " item->kind == GSHSCENE_IT",
 [
 "testDump_sink",
@@ -13572,7 +13572,7 @@
 "sk-879-ne",
 "srcl",
 "src/sink/sink.c",
-"879:n) != GS",
+"886:n) != GS",
 "n) == GS",
 [
 "testDump_sink",
@@ -13594,7 +13594,7 @@
 "sk-879-ne2",
 "srcl",
 "src/sink/sink.c",
-"879:ce != GS",
+"886:ce != GS",
 "ce == GS",
 [
 "testDump_sink",
@@ -13616,7 +13616,7 @@
 "sk-884-ne",
 "srcl",
 "src/sink/sink.c",
-"884:!=",
+"891:!=",
 "==",
 [
 "testDump_sink",
@@ -13638,7 +13638,7 @@
 "sk-884-neg",
 "srcl",
 "src/sink/sink.c",
-"884:(gshgeom_map_compose_chain(maps, count, &job->target.map, &composed) != GSHGEOM_OK)",
+"891:(gshgeom_map_compose_chain(maps, count, &job->target.map, &composed) != GSHGEOM_OK)",
 "(!(gshgeom_map_compose_chain(maps, count, &job->target.map, &composed) != GSHGEOM_OK))",
 [
 "testDump_sink",
@@ -13660,7 +13660,7 @@
 "sk-887-eq",
 "srcl",
 "src/sink/sink.c",
-"887:==",
+"894:==",
 "!=",
 [
 "testDump_sink",
@@ -13682,7 +13682,7 @@
 "sk-909-neg",
 "srcl",
 "src/sink/sink.c",
-"909:(!memory)",
+"916:(!memory)",
 "(!(!memory))",
 [
 "testDump_sink",
@@ -13704,7 +13704,7 @@
 "sk-917-ne",
 "srcl",
 "src/sink/sink.c",
-"917:!=",
+"924:!=",
 "==",
 [
 "testDump_sink",
@@ -13726,7 +13726,7 @@
 "sk-917-neg",
 "srcl",
 "src/sink/sink.c",
-"917:(result != GSHSCENE_OK)",
+"924:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -13748,7 +13748,7 @@
 "sk-921-del",
 "srcl",
 "src/sink/sink.c",
-"921:base[0] = 0;",
+"928:base[0] = 0;",
 ";",
 [
 "testDump_sink",
@@ -13770,7 +13770,7 @@
 "sk-923-ne",
 "srcl",
 "src/sink/sink.c",
-"923:!=",
+"930:!=",
 "==",
 [
 "testDump_sink",
@@ -13792,7 +13792,7 @@
 "sk-923-neg",
 "srcl",
 "src/sink/sink.c",
-"923:(result != GSHSCENE_OK)",
+"930:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -13814,7 +13814,7 @@
 "sk-931-neg",
 "srcl",
 "src/sink/sink.c",
-"931:(gshscene_expansion_next(&walk, &item, &chain, &count))",
+"938:(gshscene_expansion_next(&walk, &item, &chain, &count))",
 "(!(gshscene_expansion_next(&walk, &item, &chain, &count)))",
 [
 "testDump_sink",
@@ -13836,7 +13836,7 @@
 "sk-932-neg",
 "srcl",
 "src/sink/sink.c",
-"932:(gshscene_skip_step(&skip, item, count))",
+"939:(gshscene_skip_step(&skip, item, count))",
 "(!(gshscene_skip_step(&skip, item, count)))",
 [
 "testDump_sink",
@@ -13858,7 +13858,7 @@
 "sk-938-neg",
 "srcl",
 "src/sink/sink.c",
-"938:(d.entry_class)",
+"945:(d.entry_class)",
 "(!(d.entry_class))",
 [
 "testDump_sink",
@@ -13880,7 +13880,7 @@
 "sk-941-del",
 "srcl",
 "src/sink/sink.c",
-"941:result = gshscene_report_add(report, d.entry_class, d.reason, chain, count, (size_t)d.detail, 0.0);",
+"948:result = gshscene_report_add(report, d.entry_class, d.reason, chain, count, (size_t)d.detail, 0.0);",
 ";",
 [
 "testDump_sink",
@@ -13902,7 +13902,7 @@
 "sk-942-ne",
 "srcl",
 "src/sink/sink.c",
-"942:!=",
+"949:!=",
 "==",
 [
 "testDump_sink",
@@ -13924,7 +13924,7 @@
 "sk-942-neg",
 "srcl",
 "src/sink/sink.c",
-"942:(result != GSHSCENE_OK)",
+"949:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -13946,7 +13946,7 @@
 "sk-946-eq",
 "srcl",
 "src/sink/sink.c",
-"946:(item->kind == GSHSCENE_IT",
+"953:(item->kind == GSHSCENE_IT",
 "(item->kind != GSHSCENE_IT",
 [
 "testDump_sink",
@@ -13968,7 +13968,7 @@
 "sk-946-or",
 "srcl",
 "src/sink/sink.c",
-"946:||",
+"953:||",
 "&&",
 [
 "testDump_sink",
@@ -13990,7 +13990,7 @@
 "sk-946-eq2",
 "srcl",
 "src/sink/sink.c",
-"946: item->kind == GSHSCENE_IT",
+"953: item->kind == GSHSCENE_IT",
 " item->kind != GSHSCENE_IT",
 [
 "testDump_sink",
@@ -14012,7 +14012,7 @@
 "sk-947-eq",
 "srcl",
 "src/sink/sink.c",
-"947:==",
+"954:==",
 "!=",
 [
 "testDump_sink",
@@ -14034,7 +14034,7 @@
 "sk-948-eq",
 "srcl",
 "src/sink/sink.c",
-"948:==",
+"955:==",
 "!=",
 [
 "testDump_sink",
@@ -14056,7 +14056,7 @@
 "sk-951-eq",
 "srcl",
 "src/sink/sink.c",
-"951:ss == GS",
+"958:ss == GS",
 "ss != GS",
 [
 "testDump_sink",
@@ -14078,7 +14078,7 @@
 "sk-951-eq2",
 "srcl",
 "src/sink/sink.c",
-"951:on == GS",
+"958:on == GS",
 "on != GS",
 [
 "testDump_sink",
@@ -14100,7 +14100,7 @@
 "sk-953-eq",
 "srcl",
 "src/sink/sink.c",
-"953:==",
+"960:==",
 "!=",
 [
 "testDump_sink",
@@ -14122,7 +14122,7 @@
 "sk-953-neg",
 "srcl",
 "src/sink/sink.c",
-"953:(d.entry_class == GSHSCENE_ENTRY_REFUSED)",
+"960:(d.entry_class == GSHSCENE_ENTRY_REFUSED)",
 "(!(d.entry_class == GSHSCENE_ENTRY_REFUSED))",
 [
 "testDump_sink",
@@ -14144,7 +14144,7 @@
 "sk-954-del",
 "srcl",
 "src/sink/sink.c",
-"954:(*refused)++;",
+"961:(*refused)++;",
 ";",
 [
 "testDump_sink",
@@ -14166,7 +14166,7 @@
 "sk-955-neg",
 "srcl",
 "src/sink/sink.c",
-"955:(!tile_refused)",
+"962:(!tile_refused)",
 "(!(!tile_refused))",
 [
 "testDump_sink",
@@ -14188,7 +14188,7 @@
 "sk-956-del",
 "srcl",
 "src/sink/sink.c",
-"956:gshscene_skip_begin(&skip, item, count);",
+"963:gshscene_skip_begin(&skip, item, count);",
 ";",
 [
 "testDump_sink",
@@ -14210,7 +14210,7 @@
 "sk-962-eq",
 "srcl",
 "src/sink/sink.c",
-"962:==",
+"969:==",
 "!=",
 [
 "testDump_sink",
@@ -14232,7 +14232,7 @@
 "sk-964-neg",
 "srcl",
 "src/sink/sink.c",
-"964:(notice)",
+"971:(notice)",
 "(!(notice))",
 [
 "testDump_sink",
@@ -14254,7 +14254,7 @@
 "sk-965-del",
 "srcl",
 "src/sink/sink.c",
-"965:result = gshscene_report_add(report, GSHSCENE_ENTRY_NOTICE, notice, chain, count, 0, 0.0);",
+"972:result = gshscene_report_add(report, GSHSCENE_ENTRY_NOTICE, notice, chain, count, 0, 0.0);",
 ";",
 [
 "testDump_sink",
@@ -14276,7 +14276,7 @@
 "sk-966-ne",
 "srcl",
 "src/sink/sink.c",
-"966:!=",
+"973:!=",
 "==",
 [
 "testDump_sink",
@@ -14298,7 +14298,7 @@
 "sk-966-neg",
 "srcl",
 "src/sink/sink.c",
-"966:(result != GSHSCENE_OK)",
+"973:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -14320,7 +14320,7 @@
 "sk-972-neg",
 "srcl",
 "src/sink/sink.c",
-"972:(!tile_refused && plan_route(job, item, maps, outer + 1, &route) && route.entry_class)",
+"979:(!tile_refused && plan_route(job, item, maps, outer + 1, &route) && route.entry_class)",
 "(!(!tile_refused && plan_route(job, item, maps, outer + 1, &route) && route.entry_class))",
 [
 "testDump_sink",
@@ -14342,7 +14342,7 @@
 "sk-979-eq",
 "srcl",
 "src/sink/sink.c",
-"979:==",
+"986:==",
 "!=",
 [
 "testDump_sink",
@@ -14364,7 +14364,7 @@
 "sk-979-neg",
 "srcl",
 "src/sink/sink.c",
-"979:(route.entry_class == GSHSCENE_ENTRY_REFUSED)",
+"986:(route.entry_class == GSHSCENE_ENTRY_REFUSED)",
 "(!(route.entry_class == GSHSCENE_ENTRY_REFUSED))",
 [
 "testDump_sink",
@@ -14386,7 +14386,7 @@
 "sk-980-del",
 "srcl",
 "src/sink/sink.c",
-"980:(*refused)++;",
+"987:(*refused)++;",
 ";",
 [
 "testDump_sink",
@@ -14408,7 +14408,7 @@
 "sk-981-del",
 "srcl",
 "src/sink/sink.c",
-"981:gshscene_skip_begin(&skip, item, count);",
+"988:gshscene_skip_begin(&skip, item, count);",
 ";",
 [
 "testDump_sink",
@@ -14430,7 +14430,7 @@
 "sk-985-eq",
 "srcl",
 "src/sink/sink.c",
-"985:==",
+"992:==",
 "!=",
 [
 "testDump_sink",
@@ -14452,7 +14452,7 @@
 "sk-985-or",
 "srcl",
 "src/sink/sink.c",
-"985:||",
+"992:||",
 "&&",
 [
 "testDump_sink",
@@ -14474,7 +14474,7 @@
 "sk-986-eq",
 "srcl",
 "src/sink/sink.c",
-"986:==",
+"993:==",
 "!=",
 [
 "testDump_sink",
@@ -14496,7 +14496,7 @@
 "sk-986-and",
 "srcl",
 "src/sink/sink.c",
-"986:&&",
+"993:&&",
 "||",
 [
 "testDump_sink",
@@ -14518,7 +14518,7 @@
 "sk-988-eq",
 "srcl",
 "src/sink/sink.c",
-"988:==",
+"995:==",
 "!=",
 [
 "testDump_sink",
@@ -14540,7 +14540,7 @@
 "sk-989-del",
 "srcl",
 "src/sink/sink.c",
-"989:maps[outer] = is_mask ? item->group.soft_mask_map : item->map;",
+"996:maps[outer] = is_mask ? item->group.soft_mask_map : item->map;",
 ";",
 [
 "testDump_sink",
@@ -14562,7 +14562,7 @@
 "sk-990-del",
 "srcl",
 "src/sink/sink.c",
-"990:base[count] = outer + 1;",
+"997:base[count] = outer + 1;",
 ";",
 [
 "testDump_sink",
@@ -14584,7 +14584,7 @@
 "sk-995-ne",
 "srcl",
 "src/sink/sink.c",
-"995:!=",
+"1002:!=",
 "==",
 [
 "testDump_sink",
@@ -14606,7 +14606,7 @@
 "sk-995-neg",
 "srcl",
 "src/sink/sink.c",
-"995:(result != GSHSCENE_OK)",
+"1002:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -14628,7 +14628,7 @@
 "sk-998-neg",
 "srcl",
 "src/sink/sink.c",
-"998:(pattern)",
+"1005:(pattern)",
 "(!(pattern))",
 [
 "testDump_sink",
@@ -14650,7 +14650,7 @@
 "sk-1003-del",
 "srcl",
 "src/sink/sink.c",
-"1003:base[count] = outer + 2;",
+"1010:base[count] = outer + 2;",
 ";",
 [
 "testDump_sink",
@@ -14672,7 +14672,7 @@
 "sk-1004-del",
 "srcl",
 "src/sink/sink.c",
-"1004:memcpy(key, chain, count * sizeof *chain);",
+"1011:memcpy(key, chain, count * sizeof *chain);",
 ";",
 [
 "testDump_sink",
@@ -14694,7 +14694,7 @@
 "sk-1005-del",
 "srcl",
 "src/sink/sink.c",
-"1005:result = plan_ties(report, gshscene_resource_picture(item->paint.resource->u.pattern.tile), key, count + 1);",
+"1012:result = plan_ties(report, gshscene_resource_picture(item->paint.resource->u.pattern.tile), key, count + 1);",
 ";",
 [
 "testDump_sink",
@@ -14716,7 +14716,7 @@
 "sk-1006-ne",
 "srcl",
 "src/sink/sink.c",
-"1006:!=",
+"1013:!=",
 "==",
 [
 "testDump_sink",
@@ -14738,7 +14738,7 @@
 "sk-1006-neg",
 "srcl",
 "src/sink/sink.c",
-"1006:(result != GSHSCENE_OK)",
+"1013:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -14760,7 +14760,7 @@
 "sk-1020-del",
 "srcl",
 "src/sink/sink.c",
-"1020:job->request = *request;",
+"1027:job->request = *request;",
 ";",
 [
 "testDump_sink",
@@ -14782,7 +14782,7 @@
 "sk-1022-del",
 "srcl",
 "src/sink/sink.c",
-"1022:job->request.target = &job->target;",
+"1029:job->request.target = &job->target;",
 ";",
 [
 "testDump_sink",
@@ -14804,7 +14804,7 @@
 "sk-1025-del",
 "srcl",
 "src/sink/sink.c",
-"1025:gcu_atomic_size_init(&job->units_processed, 0);",
+"1032:gcu_atomic_size_init(&job->units_processed, 0);",
 ";",
 [
 "testDump_sink",
@@ -14826,7 +14826,7 @@
 "sk-1026-del",
 "srcl",
 "src/sink/sink.c",
-"1026:gcu_atomic_size_init(&job->units_done, 0);",
+"1033:gcu_atomic_size_init(&job->units_done, 0);",
 ";",
 [
 "testDump_sink",
@@ -14848,7 +14848,7 @@
 "sk-1027-del",
 "srcl",
 "src/sink/sink.c",
-"1027:job->units_total = gshscene_list_expansion(request->list);",
+"1034:job->units_total = gshscene_list_expansion(request->list);",
 ";",
 [
 "testDump_sink",
@@ -14870,7 +14870,7 @@
 "sk-1029-del",
 "srcl",
 "src/sink/sink.c",
-"1029:job->work_max = 0;",
+"1036:job->work_max = 0;",
 ";",
 [
 "testDump_sink",
@@ -14892,7 +14892,7 @@
 "sk-1030-del",
 "srcl",
 "src/sink/sink.c",
-"1030:job->frame_bytes = 0;",
+"1037:job->frame_bytes = 0;",
 ";",
 [
 "testDump_sink",
@@ -14914,7 +14914,7 @@
 "sk-1034-del",
 "srcl",
 "src/sink/sink.c",
-"1034:gcu_atomic_int_init(&job->state, GSHSCENE_JOB_RUNNING);",
+"1041:gcu_atomic_int_init(&job->state, GSHSCENE_JOB_RUNNING);",
 ";",
 [
 "testDump_sink",
@@ -14936,7 +14936,7 @@
 "sk-1044-or",
 "srcl",
 "src/sink/sink.c",
-"1044:||",
+"1051:||",
 "&&",
 [
 "testDump_sink",
@@ -14958,7 +14958,7 @@
 "sk-1044-neg",
 "srcl",
 "src/sink/sink.c",
-"1044:(!sink || !job)",
+"1051:(!sink || !job)",
 "(!(!sink || !job))",
 [
 "testDump_sink",
@@ -14980,7 +14980,7 @@
 "sk-1045-ret",
 "srcl",
 "src/sink/sink.c",
-"1045:GSHSCENE_ERR_INVALID",
+"1052:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -15002,7 +15002,7 @@
 "sk-1048-ne",
 "srcl",
 "src/sink/sink.c",
-"1048:!=",
+"1055:!=",
 "==",
 [
 "testDump_sink",
@@ -15024,7 +15024,7 @@
 "sk-1048-neg",
 "srcl",
 "src/sink/sink.c",
-"1048:(result != GSHSCENE_OK)",
+"1055:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -15046,7 +15046,7 @@
 "sk-1055-ne",
 "srcl",
 "src/sink/sink.c",
-"1055:!=",
+"1062:!=",
 "==",
 [
 "testDump_sink",
@@ -15068,7 +15068,7 @@
 "sk-1055-neg",
 "srcl",
 "src/sink/sink.c",
-"1055:(result != GSHSCENE_OK)",
+"1062:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -15090,7 +15090,7 @@
 "sk-1058-neg",
 "srcl",
 "src/sink/sink.c",
-"1058:(!thread_ok(sink, &caps))",
+"1065:(!thread_ok(sink, &caps))",
 "(!(!thread_ok(sink, &caps)))",
 [
 "testDump_sink",
@@ -15112,7 +15112,7 @@
 "sk-1059-ret",
 "srcl",
 "src/sink/sink.c",
-"1059:GSHSCENE_ERR_INVALID",
+"1066:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -15134,7 +15134,7 @@
 "sk-1061-eq",
 "srcl",
 "src/sink/sink.c",
-"1061:==",
+"1068:==",
 "!=",
 [
 "testDump_sink",
@@ -15156,7 +15156,7 @@
 "sk-1061-neg",
 "srcl",
 "src/sink/sink.c",
-"1061:(gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_RUNNING)",
+"1068:(gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_RUNNING)",
 "(!(gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_RUNNING))",
 [
 "testDump_sink",
@@ -15178,7 +15178,7 @@
 "sk-1062-ret",
 "srcl",
 "src/sink/sink.c",
-"1062:GSHSCENE_ERR_INVALID",
+"1069:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -15200,7 +15200,7 @@
 "sk-1065-neg",
 "srcl",
 "src/sink/sink.c",
-"1065:(!gcu_atomic_int_compare_exchange(&request->report->busy, &idle, 1))",
+"1072:(!gcu_atomic_int_compare_exchange(&request->report->busy, &idle, 1))",
 "(!(!gcu_atomic_int_compare_exchange(&request->report->busy, &idle, 1)))",
 [
 "testDump_sink",
@@ -15222,7 +15222,7 @@
 "sk-1066-ret",
 "srcl",
 "src/sink/sink.c",
-"1066:GSHSCENE_ERR_INVALID",
+"1073:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -15244,7 +15244,7 @@
 "sk-1068-del",
 "srcl",
 "src/sink/sink.c",
-"1068:result = surface_take(sink, copy.surface);",
+"1075:result = surface_take(sink, copy.surface);",
 ";",
 [
 "testDump_sink",
@@ -15266,7 +15266,7 @@
 "sk-1069-ne",
 "srcl",
 "src/sink/sink.c",
-"1069:!=",
+"1076:!=",
 "==",
 [
 "testDump_sink",
@@ -15288,7 +15288,7 @@
 "sk-1069-neg",
 "srcl",
 "src/sink/sink.c",
-"1069:(result != GSHSCENE_OK)",
+"1076:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -15310,7 +15310,7 @@
 "sk-1070-del",
 "srcl",
 "src/sink/sink.c",
-"1070:gcu_atomic_int_store(&request->report->busy, 0);",
+"1077:gcu_atomic_int_store(&request->report->busy, 0);",
 ";",
 [
 "testDump_sink",
@@ -15332,7 +15332,7 @@
 "sk-1073-del",
 "srcl",
 "src/sink/sink.c",
-"1073:gshscene_report_clear(request->report);",
+"1080:gshscene_report_clear(request->report);",
 ";",
 [
 "testDump_sink",
@@ -15354,7 +15354,7 @@
 "sk-1074-del",
 "srcl",
 "src/sink/sink.c",
-"1074:job_start(job, sink, request, &copy, &caps, &space);",
+"1081:job_start(job, sink, request, &copy, &caps, &space);",
 ";",
 [
 "testDump_sink",
@@ -15376,7 +15376,7 @@
 "sk-1075-del",
 "srcl",
 "src/sink/sink.c",
-"1075:job->holds_surface = 1;",
+"1082:job->holds_surface = 1;",
 ";",
 [
 "testDump_sink",
@@ -15398,7 +15398,7 @@
 "sk-1078-neg",
 "srcl",
 "src/sink/sink.c",
-"1078:(gshscene_job_checkpoint(job))",
+"1085:(gshscene_job_checkpoint(job))",
 "(!(gshscene_job_checkpoint(job)))",
 [
 "testDump_sink",
@@ -15420,7 +15420,7 @@
 "sk-1079-str",
 "srcl",
 "src/sink/sink.c",
-"1079:, \"canc",
+"1086:, \"canc",
 ", \"Zanc",
 [
 "testDump_sink",
@@ -15442,7 +15442,7 @@
 "sk-1081-neg",
 "srcl",
 "src/sink/sink.c",
-"1081:(copy.flags & GSHSCENE_TARGET_SEAMLESS)",
+"1088:(copy.flags & GSHSCENE_TARGET_SEAMLESS)",
 "(!(copy.flags & GSHSCENE_TARGET_SEAMLESS))",
 [
 "testDump_sink",
@@ -15464,7 +15464,7 @@
 "sk-1082-del",
 "srcl",
 "src/sink/sink.c",
-"1082:result = gshscene_report_add(request->report, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_SEAMLESS, NULL, 0, 0, 0.0);",
+"1089:result = gshscene_report_add(request->report, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_SEAMLESS, NULL, 0, 0, 0.0);",
 ";",
 [
 "testDump_sink",
@@ -15486,7 +15486,7 @@
 "sk-1083-ne",
 "srcl",
 "src/sink/sink.c",
-"1083:!=",
+"1090:!=",
 "==",
 [
 "testDump_sink",
@@ -15508,7 +15508,7 @@
 "sk-1083-str",
 "srcl",
 "src/sink/sink.c",
-"1083:, \"the ",
+"1090:, \"the ",
 ", \"Zhe ",
 [
 "testDump_sink",
@@ -15530,7 +15530,7 @@
 "sk-1085-neg",
 "srcl",
 "src/sink/sink.c",
-"1085:(request->flags & GSHSCENE_RENDER_CALLER_MEMORY)",
+"1092:(request->flags & GSHSCENE_RENDER_CALLER_MEMORY)",
 "(!(request->flags & GSHSCENE_RENDER_CALLER_MEMORY))",
 [
 "testDump_sink",
@@ -15552,7 +15552,7 @@
 "sk-1086-or",
 "srcl",
 "src/sink/sink.c",
-"1086:||",
+"1093:||",
 "&&",
 [
 "testDump_sink",
@@ -15574,7 +15574,7 @@
 "sk-1086-neg",
 "srcl",
 "src/sink/sink.c",
-"1086:(!(caps.flags & GSHSCENE_CAP_CALLER_MEMORY) || !sink->ops.workspace_bytes)",
+"1093:(!(caps.flags & GSHSCENE_CAP_CALLER_MEMORY) || !sink->ops.workspace_bytes)",
 "(!(!(caps.flags & GSHSCENE_CAP_CALLER_MEMORY) || !sink->ops.workspace_bytes))",
 [
 "testDump_sink",
@@ -15596,7 +15596,7 @@
 "sk-1087-del",
 "srcl",
 "src/sink/sink.c",
-"1087:result = gshscene_report_add(request->report, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_CALLER_MEMORY, NULL, 0, 0, 0.0);",
+"1094:result = gshscene_report_add(request->report, GSHSCENE_ENTRY_REFUSED, GSHSCENE_REASON_CALLER_MEMORY, NULL, 0, 0, 0.0);",
 ";",
 [
 "testDump_sink",
@@ -15618,7 +15618,7 @@
 "sk-1088-str",
 "srcl",
 "src/sink/sink.c",
-"1088:, \"the ",
+"1095:, \"the ",
 ", \"Zhe ",
 [
 "testDump_sink",
@@ -15640,7 +15640,7 @@
 "sk-1093-del",
 "srcl",
 "src/sink/sink.c",
-"1093:result = sink->ops.workspace_bytes(sink->impl, &job->request, &need);",
+"1100:result = sink->ops.workspace_bytes(sink->impl, &job->request, &need);",
 ";",
 [
 "testDump_sink",
@@ -15662,7 +15662,7 @@
 "sk-1094-neg",
 "srcl",
 "src/sink/sink.c",
-"1094:(result != GSHSCENE_OK)",
+"1101:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -15684,7 +15684,7 @@
 "sk-1095-str",
 "srcl",
 "src/sink/sink.c",
-"1095:, \"the ",
+"1102:, \"the ",
 ", \"Zhe ",
 [
 "testDump_sink",
@@ -15706,7 +15706,7 @@
 "sk-1097-lt",
 "srcl",
 "src/sink/sink.c",
-"1097:<",
+"1104:<",
 "<=",
 [
 "testDump_sink",
@@ -15728,7 +15728,7 @@
 "sk-1097-neg",
 "srcl",
 "src/sink/sink.c",
-"1097:(request->workspace_bytes < need)",
+"1104:(request->workspace_bytes < need)",
 "(!(request->workspace_bytes < need))",
 [
 "testDump_sink",
@@ -15750,7 +15750,7 @@
 "sk-1099-str",
 "srcl",
 "src/sink/sink.c",
-"1099:  \"the ",
+"1106:  \"the ",
 "  \"Zhe ",
 [
 "testDump_sink",
@@ -15772,7 +15772,7 @@
 "sk-1101-del",
 "srcl",
 "src/sink/sink.c",
-"1101:request->report->summary.workspace_needed = need;",
+"1108:request->report->summary.workspace_needed = need;",
 ";",
 [
 "testDump_sink",
@@ -15794,7 +15794,7 @@
 "sk-1104-del",
 "srcl",
 "src/sink/sink.c",
-"1104:result = plan(job, &refused);",
+"1111:result = plan(job, &refused);",
 ";",
 [
 "testDump_sink",
@@ -15816,7 +15816,7 @@
 "sk-1105-ne",
 "srcl",
 "src/sink/sink.c",
-"1105:!=",
+"1112:!=",
 "==",
 [
 "testDump_sink",
@@ -15838,7 +15838,7 @@
 "sk-1105-neg",
 "srcl",
 "src/sink/sink.c",
-"1105:(result != GSHSCENE_OK)",
+"1112:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -15860,7 +15860,7 @@
 "sk-1106-str",
 "srcl",
 "src/sink/sink.c",
-"1106:, \"the ",
+"1113:, \"the ",
 ", \"Zhe ",
 [
 "testDump_sink",
@@ -15882,7 +15882,7 @@
 "sk-1108-and",
 "srcl",
 "src/sink/sink.c",
-"1108:&&",
+"1115:&&",
 "||",
 [
 "testDump_sink",
@@ -15904,7 +15904,7 @@
 "sk-1108-neg",
 "srcl",
 "src/sink/sink.c",
-"1108:(refused && (request->flags & GSHSCENE_RENDER_STRICT))",
+"1115:(refused && (request->flags & GSHSCENE_RENDER_STRICT))",
 "(!(refused && (request->flags & GSHSCENE_RENDER_STRICT)))",
 [
 "testDump_sink",
@@ -15926,7 +15926,7 @@
 "sk-1109-str",
 "srcl",
 "src/sink/sink.c",
-"1109:, \"stri",
+"1116:, \"stri",
 ", \"Ztri",
 [
 "testDump_sink",
@@ -15948,7 +15948,7 @@
 "sk-1111-del",
 "srcl",
 "src/sink/sink.c",
-"1111:result = sink->ops.begin(sink->impl, job);",
+"1118:result = sink->ops.begin(sink->impl, job);",
 ";",
 [
 "testDump_sink",
@@ -15970,7 +15970,7 @@
 "sk-1112-ne",
 "srcl",
 "src/sink/sink.c",
-"1112:!=",
+"1119:!=",
 "==",
 [
 "testDump_sink",
@@ -15992,7 +15992,7 @@
 "sk-1112-and",
 "srcl",
 "src/sink/sink.c",
-"1112:&&",
+"1119:&&",
 "||",
 [
 "testDump_sink",
@@ -16014,7 +16014,7 @@
 "sk-1112-eq",
 "srcl",
 "src/sink/sink.c",
-"1112:==",
+"1119:==",
 "!=",
 [
 "testDump_sink",
@@ -16036,7 +16036,7 @@
 "sk-1112-neg",
 "srcl",
 "src/sink/sink.c",
-"1112:(result != GSHSCENE_OK && gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_RUNNING)",
+"1119:(result != GSHSCENE_OK && gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_RUNNING)",
 "(!(result != GSHSCENE_OK && gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_RUNNING))",
 [
 "testDump_sink",
@@ -16058,7 +16058,7 @@
 "sk-1113-str",
 "srcl",
 "src/sink/sink.c",
-"1113:, \"the ",
+"1120:, \"the ",
 ", \"Zhe ",
 [
 "testDump_sink",
@@ -16080,7 +16080,7 @@
 "sk-1115-eq",
 "srcl",
 "src/sink/sink.c",
-"1115:==",
+"1122:==",
 "!=",
 [
 "testDump_sink",
@@ -16102,7 +16102,7 @@
 "sk-1115-neg",
 "srcl",
 "src/sink/sink.c",
-"1115:(gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_DONE)",
+"1122:(gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_DONE)",
 "(!(gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_DONE))",
 [
 "testDump_sink",
@@ -16124,7 +16124,7 @@
 "sk-1122-or",
 "srcl",
 "src/sink/sink.c",
-"1122:||",
+"1129:||",
 "&&",
 [
 "testDump_sink",
@@ -16146,7 +16146,7 @@
 "sk-1122-neg",
 "srcl",
 "src/sink/sink.c",
-"1122:(!job || !out)",
+"1129:(!job || !out)",
 "(!(!job || !out))",
 [
 "testDump_sink",
@@ -16168,7 +16168,7 @@
 "sk-1123-ret",
 "srcl",
 "src/sink/sink.c",
-"1123:GSHSCENE_ERR_INVALID",
+"1130:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -16190,7 +16190,7 @@
 "sk-1126-ne",
 "srcl",
 "src/sink/sink.c",
-"1126:!=",
+"1133:!=",
 "==",
 [
 "testDump_sink",
@@ -16212,7 +16212,7 @@
 "sk-1126-neg",
 "srcl",
 "src/sink/sink.c",
-"1126:(state != GSHSCENE_JOB_IDLE && job->sink && !thread_ok(job->sink, &job->caps))",
+"1133:(state != GSHSCENE_JOB_IDLE && job->sink && !thread_ok(job->sink, &job->caps))",
 "(!(state != GSHSCENE_JOB_IDLE && job->sink && !thread_ok(job->sink, &job->caps)))",
 [
 "testDump_sink",
@@ -16234,7 +16234,7 @@
 "sk-1127-ret",
 "srcl",
 "src/sink/sink.c",
-"1127:GSHSCENE_ERR_INVALID",
+"1134:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -16256,7 +16256,7 @@
 "sk-1130-del",
 "srcl",
 "src/sink/sink.c",
-"1130:s.state = (GSHSCENE_Job_State)state;",
+"1137:s.state = (GSHSCENE_Job_State)state;",
 ";",
 [
 "testDump_sink",
@@ -16278,7 +16278,7 @@
 "sk-1131-eq",
 "srcl",
 "src/sink/sink.c",
-"1131:==",
+"1138:==",
 "!=",
 [
 "testDump_sink",
@@ -16300,7 +16300,7 @@
 "sk-1131-del",
 "srcl",
 "src/sink/sink.c",
-"1131:s.result = state == GSHSCENE_JOB_DONE ? (GSHSCENE_Result)job->result : GSHSCENE_OK;",
+"1138:s.result = state == GSHSCENE_JOB_DONE ? (GSHSCENE_Result)job->result : GSHSCENE_OK;",
 ";",
 [
 "testDump_sink",
@@ -16322,7 +16322,7 @@
 "sk-1132-ne",
 "srcl",
 "src/sink/sink.c",
-"1132:!=",
+"1139:!=",
 "==",
 [
 "testDump_sink",
@@ -16344,7 +16344,7 @@
 "sk-1132-neg",
 "srcl",
 "src/sink/sink.c",
-"1132:(state != GSHSCENE_JOB_IDLE)",
+"1139:(state != GSHSCENE_JOB_IDLE)",
 "(!(state != GSHSCENE_JOB_IDLE))",
 [
 "testDump_sink",
@@ -16366,7 +16366,7 @@
 "sk-1133-del",
 "srcl",
 "src/sink/sink.c",
-"1133:s.units_total = job->units_total;",
+"1140:s.units_total = job->units_total;",
 ";",
 [
 "testDump_sink",
@@ -16388,7 +16388,7 @@
 "sk-1134-del",
 "srcl",
 "src/sink/sink.c",
-"1134:s.units_processed = gcu_atomic_size_load(&job->units_processed);",
+"1141:s.units_processed = gcu_atomic_size_load(&job->units_processed);",
 ";",
 [
 "testDump_sink",
@@ -16410,7 +16410,7 @@
 "sk-1135-del",
 "srcl",
 "src/sink/sink.c",
-"1135:s.units_done = gcu_atomic_size_load(&job->units_done);",
+"1142:s.units_done = gcu_atomic_size_load(&job->units_done);",
 ";",
 [
 "testDump_sink",
@@ -16432,7 +16432,7 @@
 "sk-1136-del",
 "srcl",
 "src/sink/sink.c",
-"1136:s.work_max = job->work_max;",
+"1143:s.work_max = job->work_max;",
 ";",
 [
 "testDump_sink",
@@ -16454,7 +16454,7 @@
 "sk-1143-neg",
 "srcl",
 "src/sink/sink.c",
-"1143:(!sink || !job)",
+"1150:(!sink || !job)",
 "(!(!sink || !job))",
 [
 "testDump_sink",
@@ -16476,7 +16476,7 @@
 "sk-1147-eq",
 "srcl",
 "src/sink/sink.c",
-"1147:==",
+"1154:==",
 "!=",
 [
 "testDump_sink",
@@ -16498,7 +16498,7 @@
 "sk-1147-or",
 "srcl",
 "src/sink/sink.c",
-"1147:||",
+"1154:||",
 "&&",
 [
 "testDump_sink",
@@ -16520,7 +16520,7 @@
 "sk-1147-ne",
 "srcl",
 "src/sink/sink.c",
-"1147:!=",
+"1154:!=",
 "==",
 [
 "testDump_sink",
@@ -16542,7 +16542,7 @@
 "sk-1147-neg",
 "srcl",
 "src/sink/sink.c",
-"1147:(state == GSHSCENE_JOB_IDLE || job->sink != sink)",
+"1154:(state == GSHSCENE_JOB_IDLE || job->sink != sink)",
 "(!(state == GSHSCENE_JOB_IDLE || job->sink != sink))",
 [
 "testDump_sink",
@@ -16564,7 +16564,7 @@
 "sk-1148-ret",
 "srcl",
 "src/sink/sink.c",
-"1148:GSHSCENE_ERR_INVALID",
+"1155:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -16586,7 +16586,7 @@
 "sk-1150-neg",
 "srcl",
 "src/sink/sink.c",
-"1150:(!(job->caps.flags & GSHSCENE_CAP_CAN_BLOCK))",
+"1157:(!(job->caps.flags & GSHSCENE_CAP_CAN_BLOCK))",
 "(!(!(job->caps.flags & GSHSCENE_CAP_CAN_BLOCK)))",
 [
 "testDump_sink",
@@ -16608,7 +16608,7 @@
 "sk-1151-ret",
 "srcl",
 "src/sink/sink.c",
-"1151:GSHSCENE_ERR_UNSUPPORTED",
+"1158:GSHSCENE_ERR_UNSUPPORTED",
 "GSHSCENE_ERR_INVALID",
 [
 "testDump_sink",
@@ -16630,7 +16630,7 @@
 "sk-1153-neg",
 "srcl",
 "src/sink/sink.c",
-"1153:(!thread_ok(sink, &job->caps))",
+"1160:(!thread_ok(sink, &job->caps))",
 "(!(!thread_ok(sink, &job->caps)))",
 [
 "testDump_sink",
@@ -16652,7 +16652,7 @@
 "sk-1154-ret",
 "srcl",
 "src/sink/sink.c",
-"1154:GSHSCENE_ERR_INVALID",
+"1161:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -16674,7 +16674,7 @@
 "sk-1156-eq",
 "srcl",
 "src/sink/sink.c",
-"1156:==",
+"1163:==",
 "!=",
 [
 "testDump_sink",
@@ -16696,7 +16696,7 @@
 "sk-1156-neg",
 "srcl",
 "src/sink/sink.c",
-"1156:(state == GSHSCENE_JOB_RUNNING)",
+"1163:(state == GSHSCENE_JOB_RUNNING)",
 "(!(state == GSHSCENE_JOB_RUNNING))",
 [
 "testDump_sink",
@@ -16718,7 +16718,7 @@
 "sk-1157-neg",
 "srcl",
 "src/sink/sink.c",
-"1157:(!sink->ops.wait)",
+"1164:(!sink->ops.wait)",
 "(!(!sink->ops.wait))",
 [
 "testDump_sink",
@@ -16740,7 +16740,7 @@
 "sk-1161-ne",
 "srcl",
 "src/sink/sink.c",
-"1161:!=",
+"1168:!=",
 "==",
 [
 "testDump_sink",
@@ -16762,7 +16762,7 @@
 "sk-1161-eq",
 "srcl",
 "src/sink/sink.c",
-"1161:==",
+"1168:==",
 "!=",
 [
 "testDump_sink",
@@ -16784,7 +16784,7 @@
 "sk-1161-neg",
 "srcl",
 "src/sink/sink.c",
-"1161:(result != GSHSCENE_OK && gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_RUNNING)",
+"1168:(result != GSHSCENE_OK && gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_RUNNING)",
 "(!(result != GSHSCENE_OK && gcu_atomic_int_load(&job->state) == GSHSCENE_JOB_RUNNING))",
 [
 "testDump_sink",
@@ -16806,7 +16806,7 @@
 "sk-1162-del",
 "srcl",
 "src/sink/sink.c",
-"1162:gshscene_job_complete(job, result, NULL, 0, \"the wait failed\");",
+"1169:gshscene_job_complete(job, result, NULL, 0, \"the wait failed\");",
 ";",
 [
 "testDump_sink",
@@ -16828,7 +16828,7 @@
 "sk-1162-str",
 "srcl",
 "src/sink/sink.c",
-"1162:, \"the ",
+"1169:, \"the ",
 ", \"Zhe ",
 [
 "testDump_sink",
@@ -16850,7 +16850,7 @@
 "sk-1169-or",
 "srcl",
 "src/sink/sink.c",
-"1169:||",
+"1176:||",
 "&&",
 [
 "testDump_sink",
@@ -16872,7 +16872,7 @@
 "sk-1169-neg",
 "srcl",
 "src/sink/sink.c",
-"1169:(!sink || !request)",
+"1176:(!sink || !request)",
 "(!(!sink || !request))",
 [
 "testDump_sink",
@@ -16894,7 +16894,7 @@
 "sk-1170-ret",
 "srcl",
 "src/sink/sink.c",
-"1170:GSHSCENE_ERR_INVALID",
+"1177:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -16916,7 +16916,7 @@
 "sk-1174-ne",
 "srcl",
 "src/sink/sink.c",
-"1174:!=",
+"1181:!=",
 "==",
 [
 "testDump_sink",
@@ -16938,7 +16938,7 @@
 "sk-1174-neg",
 "srcl",
 "src/sink/sink.c",
-"1174:(result != GSHSCENE_OK)",
+"1181:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -16960,7 +16960,7 @@
 "sk-1177-neg",
 "srcl",
 "src/sink/sink.c",
-"1177:(!(caps.flags & GSHSCENE_CAP_CAN_BLOCK))",
+"1184:(!(caps.flags & GSHSCENE_CAP_CAN_BLOCK))",
 "(!(!(caps.flags & GSHSCENE_CAP_CAN_BLOCK)))",
 [
 "testDump_sink",
@@ -16982,7 +16982,7 @@
 "sk-1178-ret",
 "srcl",
 "src/sink/sink.c",
-"1178:GSHSCENE_ERR_UNSUPPORTED",
+"1185:GSHSCENE_ERR_UNSUPPORTED",
 "GSHSCENE_ERR_INVALID",
 [
 "testDump_sink",
@@ -17004,7 +17004,7 @@
 "sk-1181-del",
 "srcl",
 "src/sink/sink.c",
-"1181:memset(&job, 0, sizeof job);",
+"1188:memset(&job, 0, sizeof job);",
 ";",
 [
 "testDump_sink",
@@ -17026,7 +17026,7 @@
 "sk-1182-del",
 "srcl",
 "src/sink/sink.c",
-"1182:result = gshscene_sink_begin(sink, request, &job);",
+"1189:result = gshscene_sink_begin(sink, request, &job);",
 ";",
 [
 "testDump_sink",
@@ -17048,7 +17048,7 @@
 "sk-1183-eq",
 "srcl",
 "src/sink/sink.c",
-"1183:==",
+"1190:==",
 "!=",
 [
 "testDump_sink",
@@ -17070,7 +17070,7 @@
 "sk-1183-neg",
 "srcl",
 "src/sink/sink.c",
-"1183:(gcu_atomic_int_load(&job.state) == GSHSCENE_JOB_IDLE)",
+"1190:(gcu_atomic_int_load(&job.state) == GSHSCENE_JOB_IDLE)",
 "(!(gcu_atomic_int_load(&job.state) == GSHSCENE_JOB_IDLE))",
 [
 "testDump_sink",
@@ -17092,7 +17092,7 @@
 "sk-1193-ne",
 "srcl",
 "src/sink/sink.c",
-"1193:el != b-",
+"1200:el != b-",
 "el == b-",
 [
 "testDump_sink",
@@ -17114,7 +17114,7 @@
 "sk-1193-ne2",
 "srcl",
 "src/sink/sink.c",
-"1193:pe != b-",
+"1200:pe != b-",
 "pe == b-",
 [
 "testDump_sink",
@@ -17136,7 +17136,7 @@
 "sk-1193-ne3",
 "srcl",
 "src/sink/sink.c",
-"1193:ut != b-",
+"1200:ut != b-",
 "ut == b-",
 [
 "testDump_sink",
@@ -17158,7 +17158,7 @@
 "sk-1194-ne",
 "srcl",
 "src/sink/sink.c",
-"1194:nt != b-",
+"1201:nt != b-",
 "nt == b-",
 [
 "testDump_sink",
@@ -17180,7 +17180,7 @@
 "sk-1194-ne2",
 "srcl",
 "src/sink/sink.c",
-"1194:rm != b-",
+"1201:rm != b-",
 "rm == b-",
 [
 "testDump_sink",
@@ -17202,7 +17202,7 @@
 "sk-1197-lt",
 "srcl",
 "src/sink/sink.c",
-"1197:<",
+"1204:<",
 "<=",
 [
 "testDump_sink",
@@ -17224,7 +17224,7 @@
 "sk-1198-ne",
 "srcl",
 "src/sink/sink.c",
-"1198:!=",
+"1205:!=",
 "==",
 [
 "testDump_sink",
@@ -17246,7 +17246,7 @@
 "sk-1198-neg",
 "srcl",
 "src/sink/sink.c",
-"1198:(a->bits_per_channel[i] != b->bits_per_channel[i])",
+"1205:(a->bits_per_channel[i] != b->bits_per_channel[i])",
 "(!(a->bits_per_channel[i] != b->bits_per_channel[i]))",
 [
 "testDump_sink",
@@ -17268,7 +17268,7 @@
 "sk-1206-ne",
 "srcl",
 "src/sink/sink.c",
-"1206:!=",
+"1213:!=",
 "==",
 [
 "testDump_sink",
@@ -17290,7 +17290,7 @@
 "sk-1206-neg",
 "srcl",
 "src/sink/sink.c",
-"1206:(!sink || !job || !out || job->sink != sink)",
+"1213:(!sink || !job || !out || job->sink != sink)",
 "(!(!sink || !job || !out || job->sink != sink))",
 [
 "testDump_sink",
@@ -17312,7 +17312,7 @@
 "sk-1207-ret",
 "srcl",
 "src/sink/sink.c",
-"1207:GSHSCENE_ERR_INVALID",
+"1214:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -17334,7 +17334,7 @@
 "sk-1209-or",
 "srcl",
 "src/sink/sink.c",
-"1209:||",
+"1216:||",
 "&&",
 [
 "testDump_sink",
@@ -17356,7 +17356,7 @@
 "sk-1209-neg",
 "srcl",
 "src/sink/sink.c",
-"1209:(!(job->caps.flags & GSHSCENE_CAP_READBACK) || !sink->ops.readback)",
+"1216:(!(job->caps.flags & GSHSCENE_CAP_READBACK) || !sink->ops.readback)",
 "(!(!(job->caps.flags & GSHSCENE_CAP_READBACK) || !sink->ops.readback))",
 [
 "testDump_sink",
@@ -17378,7 +17378,7 @@
 "sk-1210-ret",
 "srcl",
 "src/sink/sink.c",
-"1210:GSHSCENE_ERR_UNSUPPORTED",
+"1217:GSHSCENE_ERR_UNSUPPORTED",
 "GSHSCENE_ERR_INVALID",
 [
 "testDump_sink",
@@ -17400,7 +17400,7 @@
 "sk-1212-ne",
 "srcl",
 "src/sink/sink.c",
-"1212:!=",
+"1219:!=",
 "==",
 [
 "testDump_sink",
@@ -17422,7 +17422,7 @@
 "sk-1214-ret",
 "srcl",
 "src/sink/sink.c",
-"1214:GSHSCENE_ERR_INVALID",
+"1221:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -17444,7 +17444,7 @@
 "sk-1219-ne",
 "srcl",
 "src/sink/sink.c",
-"1219:(out) != e->x1",
+"1226:(out) != e->x1",
 "(out) == e->x1",
 [
 "testDump_sink",
@@ -17466,7 +17466,7 @@
 "sk-1219-ne2",
 "srcl",
 "src/sink/sink.c",
-"1219:(out) != e->y1",
+"1226:(out) != e->y1",
 "(out) == e->y1",
 [
 "testDump_sink",
@@ -17488,7 +17488,7 @@
 "sk-1221-ret",
 "srcl",
 "src/sink/sink.c",
-"1221:GSHSCENE_ERR_INVALID",
+"1228:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -17510,7 +17510,7 @@
 "sk-1227-neg",
 "srcl",
 "src/sink/sink.c",
-"1227:(!sink || !list || !target || !gshscene_list_is_closed(list))",
+"1234:(!sink || !list || !target || !gshscene_list_is_closed(list))",
 "(!(!sink || !list || !target || !gshscene_list_is_closed(list)))",
 [
 "testDump_sink",
@@ -17532,7 +17532,7 @@
 "sk-1228-ret",
 "srcl",
 "src/sink/sink.c",
-"1228:GSHSCENE_ERR_INVALID",
+"1235:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -17554,7 +17554,7 @@
 "sk-1233-ne",
 "srcl",
 "src/sink/sink.c",
-"1233:!=",
+"1240:!=",
 "==",
 [
 "testDump_sink",
@@ -17576,7 +17576,7 @@
 "sk-1233-neg",
 "srcl",
 "src/sink/sink.c",
-"1233:(result != GSHSCENE_OK)",
+"1240:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -17598,7 +17598,7 @@
 "sk-1236-neg",
 "srcl",
 "src/sink/sink.c",
-"1236:(!thread_ok(sink, &caps))",
+"1243:(!thread_ok(sink, &caps))",
 "(!(!thread_ok(sink, &caps)))",
 [
 "testDump_sink",
@@ -17620,7 +17620,7 @@
 "sk-1237-ret",
 "srcl",
 "src/sink/sink.c",
-"1237:GSHSCENE_ERR_INVALID",
+"1244:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -17642,7 +17642,7 @@
 "sk-1239-or",
 "srcl",
 "src/sink/sink.c",
-"1239:||",
+"1246:||",
 "&&",
 [
 "testDump_sink",
@@ -17664,7 +17664,7 @@
 "sk-1239-neg",
 "srcl",
 "src/sink/sink.c",
-"1239:(!(caps.flags & GSHSCENE_CAP_PREPARE) || !sink->ops.prepare)",
+"1246:(!(caps.flags & GSHSCENE_CAP_PREPARE) || !sink->ops.prepare)",
 "(!(!(caps.flags & GSHSCENE_CAP_PREPARE) || !sink->ops.prepare))",
 [
 "testDump_sink",
@@ -17686,7 +17686,7 @@
 "sk-1247-ne",
 "srcl",
 "src/sink/sink.c",
-"1247:!=",
+"1254:!=",
 "==",
 [
 "testDump_sink",
@@ -17708,7 +17708,7 @@
 "sk-1251-neg",
 "srcl",
 "src/sink/sink.c",
-"1251:(!sink)",
+"1258:(!sink)",
 "(!(!sink))",
 [
 "testDump_sink",
@@ -17730,7 +17730,7 @@
 "sk-1252-ret",
 "srcl",
 "src/sink/sink.c",
-"1252:GSHSCENE_ERR_INVALID",
+"1259:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -17752,7 +17752,7 @@
 "sk-1254-and",
 "srcl",
 "src/sink/sink.c",
-"1254:&&",
+"1261:&&",
 "||",
 [
 "testDump_sink",
@@ -17774,7 +17774,7 @@
 "sk-1254-ne",
 "srcl",
 "src/sink/sink.c",
-"1254:!=",
+"1261:!=",
 "==",
 [
 "testDump_sink",
@@ -17796,7 +17796,7 @@
 "sk-1254-neg",
 "srcl",
 "src/sink/sink.c",
-"1254:(sink_affine(sink) && gshscene_thread_token() != sink->creator)",
+"1261:(sink_affine(sink) && gshscene_thread_token() != sink->creator)",
 "(!(sink_affine(sink) && gshscene_thread_token() != sink->creator))",
 [
 "testDump_sink",
@@ -17818,7 +17818,7 @@
 "sk-1255-ret",
 "srcl",
 "src/sink/sink.c",
-"1255:GSHSCENE_ERR_INVALID",
+"1262:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -17840,7 +17840,7 @@
 "sk-1261-or",
 "srcl",
 "src/sink/sink.c",
-"1261:||",
+"1268:||",
 "&&",
 [
 "testDump_sink",
@@ -17862,7 +17862,7 @@
 "sk-1261-neg",
 "srcl",
 "src/sink/sink.c",
-"1261:(!sink || !out)",
+"1268:(!sink || !out)",
 "(!(!sink || !out))",
 [
 "testDump_sink",
@@ -17884,7 +17884,7 @@
 "sk-1262-ret",
 "srcl",
 "src/sink/sink.c",
-"1262:GSHSCENE_ERR_INVALID",
+"1269:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -17906,7 +17906,7 @@
 "sk-1269-neg",
 "srcl",
 "src/sink/sink.c",
-"1269:(!sink)",
+"1276:(!sink)",
 "(!(!sink))",
 [
 "testDump_sink",
@@ -17928,7 +17928,7 @@
 "sk-1272-and",
 "srcl",
 "src/sink/sink.c",
-"1272:&&",
+"1279:&&",
 "||",
 [
 "testDump_sink",
@@ -17950,7 +17950,7 @@
 "sk-1272-ne",
 "srcl",
 "src/sink/sink.c",
-"1272:!=",
+"1279:!=",
 "==",
 [
 "testDump_sink",
@@ -17972,7 +17972,7 @@
 "sk-1272-neg",
 "srcl",
 "src/sink/sink.c",
-"1272:(sink_affine(sink) && gshscene_thread_token() != sink->creator)",
+"1279:(sink_affine(sink) && gshscene_thread_token() != sink->creator)",
 "(!(sink_affine(sink) && gshscene_thread_token() != sink->creator))",
 [
 "testDump_sink",
@@ -17994,7 +17994,7 @@
 "sk-1273-ret",
 "srcl",
 "src/sink/sink.c",
-"1273:GSHSCENE_ERR_INVALID",
+"1280:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -18016,7 +18016,7 @@
 "sk-1277-del",
 "srcl",
 "src/sink/sink.c",
-"1277:GCU_MUTEX_UNLOCK(sink->lock);",
+"1284:GCU_MUTEX_UNLOCK(sink->lock);",
 ";",
 [
 "testDump_sink",
@@ -18038,7 +18038,7 @@
 "sk-1278-neg",
 "srcl",
 "src/sink/sink.c",
-"1278:(in_flight)",
+"1285:(in_flight)",
 "(!(in_flight))",
 [
 "testDump_sink",
@@ -18060,7 +18060,7 @@
 "sk-1279-ret",
 "srcl",
 "src/sink/sink.c",
-"1279:GSHSCENE_ERR_INVALID",
+"1286:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -18082,7 +18082,7 @@
 "sk-1281-del",
 "srcl",
 "src/sink/sink.c",
-"1281:sink->ops.destroy(sink->impl);",
+"1288:sink->ops.destroy(sink->impl);",
 ";",
 [
 "testDump_sink",
@@ -18104,7 +18104,7 @@
 "sk-1284-del",
 "srcl",
 "src/sink/sink.c",
-"1284:gshscene_free(&alloc, sink->busy);",
+"1291:gshscene_free(&alloc, sink->busy);",
 ";",
 [
 "testDump_sink",
@@ -18126,7 +18126,7 @@
 "sk-1285-del",
 "srcl",
 "src/sink/sink.c",
-"1285:gshscene_free(&alloc, sink);",
+"1292:gshscene_free(&alloc, sink);",
 ";",
 [
 "testDump_sink",
@@ -18302,7 +18302,7 @@
 "rp-153-str",
 "srcl",
 "src/sink/report.c",
-"153:n \"unkn",
+"155:n \"unkn",
 "n \"Znkn",
 [
 "testDump_sink",
@@ -18324,7 +18324,7 @@
 "rp-157-eq",
 "srcl",
 "src/sink/report.c",
-"157:==",
+"159:==",
 "!=",
 [
 "testDump_sink",
@@ -18346,7 +18346,7 @@
 "rp-157-neg",
 "srcl",
 "src/sink/report.c",
-"157:(source == GSHSCENE_PLACEHOLDER_SOURCE_COLR)",
+"159:(source == GSHSCENE_PLACEHOLDER_SOURCE_COLR)",
 "(!(source == GSHSCENE_PLACEHOLDER_SOURCE_COLR))",
 [
 "testDump_sink",
@@ -18368,7 +18368,7 @@
 "rp-160-str",
 "srcl",
 "src/sink/report.c",
-"160:c",
+"162:c",
 "Z",
 [
 "testDump_sink",
@@ -18390,7 +18390,7 @@
 "rp-162-str",
 "srcl",
 "src/sink/report.c",
-"162:n \"colr",
+"164:n \"colr",
 "n \"Zolr",
 [
 "testDump_sink",
@@ -18412,7 +18412,7 @@
 "rp-164-str",
 "srcl",
 "src/sink/report.c",
-"164:c",
+"166:c",
 "Z",
 [
 "testDump_sink",
@@ -18434,7 +18434,7 @@
 "rp-169-str",
 "srcl",
 "src/sink/report.c",
-"169:n \"unkn",
+"171:n \"unkn",
 "n \"Znkn",
 [
 "testDump_sink",
@@ -18456,7 +18456,7 @@
 "rp-174-neg",
 "srcl",
 "src/sink/report.c",
-"174:(!out)",
+"176:(!out)",
 "(!(!out))",
 [
 "testDump_sink",
@@ -18478,7 +18478,7 @@
 "rp-175-ret",
 "srcl",
 "src/sink/report.c",
-"175:GSHSCENE_ERR_INVALID",
+"177:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -18500,7 +18500,7 @@
 "rp-177-neg",
 "srcl",
 "src/sink/report.c",
-"177:(!alloc)",
+"179:(!alloc)",
 "(!(!alloc))",
 [
 "testDump_sink",
@@ -18522,7 +18522,7 @@
 "rp-178-del",
 "srcl",
 "src/sink/report.c",
-"178:alloc = gshscene_allocator_default();",
+"180:alloc = gshscene_allocator_default();",
 ";",
 [
 "testDump_sink",
@@ -18544,7 +18544,7 @@
 "rp-181-neg",
 "srcl",
 "src/sink/report.c",
-"181:(!report)",
+"183:(!report)",
 "(!(!report))",
 [
 "testDump_sink",
@@ -18566,7 +18566,7 @@
 "rp-184-del",
 "srcl",
 "src/sink/report.c",
-"184:report->alloc = *alloc;",
+"186:report->alloc = *alloc;",
 ";",
 [
 "testDump_sink",
@@ -18588,7 +18588,7 @@
 "rp-185-and",
 "srcl",
 "src/sink/report.c",
-"185:&&",
+"187:&&",
 "||",
 [
 "testDump_sink",
@@ -18610,7 +18610,7 @@
 "rp-187-del",
 "srcl",
 "src/sink/report.c",
-"187:gshscene_report_clear(report);",
+"189:gshscene_report_clear(report);",
 ";",
 [
 "testDump_sink",
@@ -18632,7 +18632,7 @@
 "rp-193-neg",
 "srcl",
 "src/sink/report.c",
-"193:(!report)",
+"195:(!report)",
 "(!(!report))",
 [
 "testDump_sink",
@@ -18654,7 +18654,7 @@
 "rp-197-del",
 "srcl",
 "src/sink/report.c",
-"197:gshscene_free(&alloc, report->items);",
+"199:gshscene_free(&alloc, report->items);",
 ";",
 [
 "testDump_sink",
@@ -18676,7 +18676,7 @@
 "rp-198-del",
 "srcl",
 "src/sink/report.c",
-"198:gshscene_free(&alloc, report->pool);",
+"200:gshscene_free(&alloc, report->pool);",
 ";",
 [
 "testDump_sink",
@@ -18698,7 +18698,7 @@
 "rp-199-del",
 "srcl",
 "src/sink/report.c",
-"199:gshscene_free(&alloc, report->scratch);",
+"201:gshscene_free(&alloc, report->scratch);",
 ";",
 [
 "testDump_sink",
@@ -18720,7 +18720,7 @@
 "rp-200-del",
 "srcl",
 "src/sink/report.c",
-"200:gshscene_free(&alloc, report);",
+"202:gshscene_free(&alloc, report);",
 ";",
 [
 "testDump_sink",
@@ -18742,7 +18742,7 @@
 "rp-204-del",
 "srcl",
 "src/sink/report.c",
-"204:report->count = 0;",
+"206:report->count = 0;",
 ";",
 [
 "testDump_sink",
@@ -18764,7 +18764,7 @@
 "rp-205-del",
 "srcl",
 "src/sink/report.c",
-"205:report->pool_used = 0;",
+"207:report->pool_used = 0;",
 ";",
 [
 "testDump_sink",
@@ -18786,7 +18786,7 @@
 "rp-207-del",
 "srcl",
 "src/sink/report.c",
-"207:report->summary.failure.reason = \"\";",
+"209:report->summary.failure.reason = \"\";",
 ";",
 [
 "testDump_sink",
@@ -18808,7 +18808,7 @@
 "rp-211-or",
 "srcl",
 "src/sink/report.c",
-"211:||",
+"213:||",
 "&&",
 [
 "testDump_sink",
@@ -18830,7 +18830,7 @@
 "rp-211-neg",
 "srcl",
 "src/sink/report.c",
-"211:(!report || gcu_atomic_int_load(&report->busy))",
+"213:(!report || gcu_atomic_int_load(&report->busy))",
 "(!(!report || gcu_atomic_int_load(&report->busy)))",
 [
 "testDump_sink",
@@ -18852,7 +18852,7 @@
 "rp-212-ret",
 "srcl",
 "src/sink/report.c",
-"212:GSHSCENE_ERR_INVALID",
+"214:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -18874,7 +18874,7 @@
 "rp-214-del",
 "srcl",
 "src/sink/report.c",
-"214:gshscene_report_clear(report);",
+"216:gshscene_report_clear(report);",
 ";",
 [
 "testDump_sink",
@@ -18896,7 +18896,7 @@
 "rp-220-neg",
 "srcl",
 "src/sink/report.c",
-"220:(more <= report->pool_capacity - report->pool_used)",
+"222:(more <= report->pool_capacity - report->pool_used)",
 "(!(more <= report->pool_capacity - report->pool_used))",
 [
 "testDump_sink",
@@ -18918,7 +18918,7 @@
 "rp-224-neg",
 "srcl",
 "src/sink/report.c",
-"224:(want - report->pool_used < more)",
+"226:(want - report->pool_used < more)",
 "(!(want - report->pool_used < more))",
 [
 "testDump_sink",
@@ -18940,7 +18940,7 @@
 "rp-225-neg",
 "srcl",
 "src/sink/report.c",
-"225:(want > SIZE_MAX / 2 / sizeof(size_t))",
+"227:(want > SIZE_MAX / 2 / sizeof(size_t))",
 "(!(want > SIZE_MAX / 2 / sizeof(size_t)))",
 [
 "testDump_sink",
@@ -18962,7 +18962,7 @@
 "rp-228-del",
 "srcl",
 "src/sink/report.c",
-"228:want *= 2;",
+"230:want *= 2;",
 ";",
 [
 "testDump_sink",
@@ -18984,7 +18984,7 @@
 "rp-231-neg",
 "srcl",
 "src/sink/report.c",
-"231:(!pool)",
+"233:(!pool)",
 "(!(!pool))",
 [
 "testDump_sink",
@@ -19006,7 +19006,7 @@
 "rp-234-del",
 "srcl",
 "src/sink/report.c",
-"234:report->pool = pool;",
+"236:report->pool = pool;",
 ";",
 [
 "testDump_sink",
@@ -19028,7 +19028,7 @@
 "rp-235-del",
 "srcl",
 "src/sink/report.c",
-"235:report->pool_capacity = want;",
+"237:report->pool_capacity = want;",
 ";",
 [
 "testDump_sink",
@@ -19050,7 +19050,7 @@
 "rp-242-ge",
 "srcl",
 "src/sink/report.c",
-"242:>=",
+"244:>=",
 ">",
 [
 "testDump_sink",
@@ -19072,7 +19072,7 @@
 "rp-242-neg",
 "srcl",
 "src/sink/report.c",
-"242:(report->count >= report->max_entries)",
+"244:(report->count >= report->max_entries)",
 "(!(report->count >= report->max_entries))",
 [
 "testDump_sink",
@@ -19094,7 +19094,7 @@
 "rp-243-del",
 "srcl",
 "src/sink/report.c",
-"243:s->counted++;",
+"245:s->counted++;",
 ";",
 [
 "testDump_sink",
@@ -19116,7 +19116,7 @@
 "rp-244-del",
 "srcl",
 "src/sink/report.c",
-"244:s->by_class[entry_class]++;",
+"246:s->by_class[entry_class]++;",
 ";",
 [
 "testDump_sink",
@@ -19138,7 +19138,7 @@
 "rp-245-del",
 "srcl",
 "src/sink/report.c",
-"245:s->overflowed = 1;",
+"247:s->overflowed = 1;",
 ";",
 [
 "testDump_sink",
@@ -19160,7 +19160,7 @@
 "rp-248-eq",
 "srcl",
 "src/sink/report.c",
-"248:==",
+"250:==",
 "!=",
 [
 "testDump_sink",
@@ -19182,7 +19182,7 @@
 "rp-248-neg",
 "srcl",
 "src/sink/report.c",
-"248:(report->count == report->capacity)",
+"250:(report->count == report->capacity)",
 "(!(report->count == report->capacity))",
 [
 "testDump_sink",
@@ -19204,7 +19204,7 @@
 "rp-250-neg",
 "srcl",
 "src/sink/report.c",
-"250:(want > report->max_entries)",
+"252:(want > report->max_entries)",
 "(!(want > report->max_entries))",
 [
 "testDump_sink",
@@ -19226,7 +19226,7 @@
 "rp-255-neg",
 "srcl",
 "src/sink/report.c",
-"255:(!items)",
+"257:(!items)",
 "(!(!items))",
 [
 "testDump_sink",
@@ -19248,7 +19248,7 @@
 "rp-258-del",
 "srcl",
 "src/sink/report.c",
-"258:report->items = items;",
+"260:report->items = items;",
 ";",
 [
 "testDump_sink",
@@ -19270,7 +19270,7 @@
 "rp-259-del",
 "srcl",
 "src/sink/report.c",
-"259:report->capacity = want;",
+"261:report->capacity = want;",
 ";",
 [
 "testDump_sink",
@@ -19292,7 +19292,7 @@
 "rp-262-ne",
 "srcl",
 "src/sink/report.c",
-"262:!=",
+"264:!=",
 "==",
 [
 "testDump_sink",
@@ -19314,7 +19314,7 @@
 "rp-262-neg",
 "srcl",
 "src/sink/report.c",
-"262:(result != GSHSCENE_OK)",
+"264:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -19336,7 +19336,7 @@
 "rp-266-del",
 "srcl",
 "src/sink/report.c",
-"266:item->entry_class = (uint32_t)entry_class;",
+"268:item->entry_class = (uint32_t)entry_class;",
 ";",
 [
 "testDump_sink",
@@ -19358,7 +19358,7 @@
 "rp-268-del",
 "srcl",
 "src/sink/report.c",
-"268:item->chain = report->pool_used;",
+"270:item->chain = report->pool_used;",
 ";",
 [
 "testDump_sink",
@@ -19380,7 +19380,7 @@
 "rp-269-del",
 "srcl",
 "src/sink/report.c",
-"269:item->chain_count = chain_count;",
+"271:item->chain_count = chain_count;",
 ";",
 [
 "testDump_sink",
@@ -19402,7 +19402,7 @@
 "rp-273-neg",
 "srcl",
 "src/sink/report.c",
-"273:(chain_count)",
+"275:(chain_count)",
 "(!(chain_count))",
 [
 "testDump_sink",
@@ -19424,7 +19424,7 @@
 "rp-276-del",
 "srcl",
 "src/sink/report.c",
-"276:report->pool_used += chain_count;",
+"278:report->pool_used += chain_count;",
 ";",
 [
 "testDump_sink",
@@ -19446,7 +19446,7 @@
 "rp-277-del",
 "srcl",
 "src/sink/report.c",
-"277:report->count++;",
+"279:report->count++;",
 ";",
 [
 "testDump_sink",
@@ -19468,7 +19468,7 @@
 "rp-278-del",
 "srcl",
 "src/sink/report.c",
-"278:s->counted++;",
+"280:s->counted++;",
 ";",
 [
 "testDump_sink",
@@ -19490,7 +19490,7 @@
 "rp-279-del",
 "srcl",
 "src/sink/report.c",
-"279:s->by_class[entry_class]++;",
+"281:s->by_class[entry_class]++;",
 ";",
 [
 "testDump_sink",
@@ -19512,7 +19512,7 @@
 "rp-284-le",
 "srcl",
 "src/sink/report.c",
-"284:<=",
+"286:<=",
 "<",
 [
 "testDump_sink",
@@ -19534,7 +19534,7 @@
 "rp-284-neg",
 "srcl",
 "src/sink/report.c",
-"284:(bytes <= report->scratch_bytes && report->scratch)",
+"286:(bytes <= report->scratch_bytes && report->scratch)",
 "(!(bytes <= report->scratch_bytes && report->scratch))",
 [
 "testDump_sink",
@@ -19556,7 +19556,7 @@
 "rp-288-neg",
 "srcl",
 "src/sink/report.c",
-"288:(!grown)",
+"290:(!grown)",
 "(!(!grown))",
 [
 "testDump_sink",
@@ -19578,7 +19578,7 @@
 "rp-291-del",
 "srcl",
 "src/sink/report.c",
-"291:report->scratch = grown;",
+"293:report->scratch = grown;",
 ";",
 [
 "testDump_sink",
@@ -19600,7 +19600,7 @@
 "rp-292-del",
 "srcl",
 "src/sink/report.c",
-"292:report->scratch_bytes = bytes;",
+"294:report->scratch_bytes = bytes;",
 ";",
 [
 "testDump_sink",
@@ -19622,7 +19622,7 @@
 "rp-299-lt",
 "srcl",
 "src/sink/report.c",
-"299:<",
+"301:<",
 "<=",
 [
 "testDump_sink",
@@ -19644,7 +19644,7 @@
 "rp-300-neg",
 "srcl",
 "src/sink/report.c",
-"300:(a[i] != b[i])",
+"302:(a[i] != b[i])",
 "(!(a[i] != b[i]))",
 [
 "testDump_sink",
@@ -19666,7 +19666,7 @@
 "rp-304-ne",
 "srcl",
 "src/sink/report.c",
-"304:!=",
+"306:!=",
 "==",
 [
 "testDump_sink",
@@ -19688,7 +19688,7 @@
 "rp-304-neg",
 "srcl",
 "src/sink/report.c",
-"304:(na != nb)",
+"306:(na != nb)",
 "(!(na != nb))",
 [
 "testDump_sink",
@@ -19710,7 +19710,7 @@
 "rp-314-ne",
 "srcl",
 "src/sink/report.c",
-"314:!=",
+"316:!=",
 "==",
 [
 "testDump_sink",
@@ -19732,7 +19732,7 @@
 "rp-314-neg",
 "srcl",
 "src/sink/report.c",
-"314:(c != 0)",
+"316:(c != 0)",
 "(!(c != 0))",
 [
 "testDump_sink",
@@ -19754,7 +19754,7 @@
 "rp-317-ne",
 "srcl",
 "src/sink/report.c",
-"317:!=",
+"319:!=",
 "==",
 [
 "testDump_sink",
@@ -19776,7 +19776,7 @@
 "rp-317-neg",
 "srcl",
 "src/sink/report.c",
-"317:(a->entry_class != b->entry_class)",
+"319:(a->entry_class != b->entry_class)",
 "(!(a->entry_class != b->entry_class))",
 [
 "testDump_sink",
@@ -19798,7 +19798,7 @@
 "rp-320-ne",
 "srcl",
 "src/sink/report.c",
-"320:!=",
+"322:!=",
 "==",
 [
 "testDump_sink",
@@ -19820,7 +19820,7 @@
 "rp-320-neg",
 "srcl",
 "src/sink/report.c",
-"320:(a->reason != b->reason)",
+"322:(a->reason != b->reason)",
 "(!(a->reason != b->reason))",
 [
 "testDump_sink",
@@ -19842,7 +19842,7 @@
 "rp-331-lt",
 "srcl",
 "src/sink/report.c",
-"331:<",
+"333:<",
 "<=",
 [
 "testDump_sink",
@@ -19864,7 +19864,7 @@
 "rp-332-del",
 "srcl",
 "src/sink/report.c",
-"332:report->items[i].key = report->items[i].chain_count ? report->pool + report->items[i].chain : NULL;",
+"334:report->items[i].key = report->items[i].chain_count ? report->pool + report->items[i].chain : NULL;",
 ";",
 [
 "testDump_sink",
@@ -19886,7 +19886,7 @@
 "rp-334-neg",
 "srcl",
 "src/sink/report.c",
-"334:(report->count > 1)",
+"336:(report->count > 1)",
 "(!(report->count > 1))",
 [
 "testDump_sink",
@@ -19908,7 +19908,7 @@
 "rp-335-del",
 "srcl",
 "src/sink/report.c",
-"335:qsort(report->items, report->count, sizeof *report->items, item_compare);",
+"337:qsort(report->items, report->count, sizeof *report->items, item_compare);",
 ";",
 [
 "testDump_sink",
@@ -19930,7 +19930,7 @@
 "rp-337-eq",
 "srcl",
 "src/sink/report.c",
-"337:==",
+"339:==",
 "!=",
 [
 "testDump_sink",
@@ -19952,7 +19952,7 @@
 "rp-337-and",
 "srcl",
 "src/sink/report.c",
-"337:&&",
+"339:&&",
 "||",
 [
 "testDump_sink",
@@ -19974,7 +19974,7 @@
 "rp-337-neg",
 "srcl",
 "src/sink/report.c",
-"337:(result == GSHSCENE_OK && report->summary.overflowed)",
+"339:(result == GSHSCENE_OK && report->summary.overflowed)",
 "(!(result == GSHSCENE_OK && report->summary.overflowed))",
 [
 "testDump_sink",
@@ -19996,7 +19996,7 @@
 "rp-338-del",
 "srcl",
 "src/sink/report.c",
-"338:result = GSHSCENE_ERR_LIMIT;",
+"340:result = GSHSCENE_ERR_LIMIT;",
 ";",
 [
 "testDump_sink",
@@ -20018,7 +20018,7 @@
 "rp-339-neg",
 "srcl",
 "src/sink/report.c",
-"339:(!reason)",
+"341:(!reason)",
 "(!(!reason))",
 [
 "testDump_sink",
@@ -20040,7 +20040,7 @@
 "rp-340-del",
 "srcl",
 "src/sink/report.c",
-"340:reason = \"the report's entry cap was passed\";",
+"342:reason = \"the report's entry cap was passed\";",
 ";",
 [
 "testDump_sink",
@@ -20062,7 +20062,7 @@
 "rp-340-str",
 "srcl",
 "src/sink/report.c",
-"340:= \"the ",
+"342:= \"the ",
 "= \"Zhe ",
 [
 "testDump_sink",
@@ -20084,7 +20084,7 @@
 "rp-343-del",
 "srcl",
 "src/sink/report.c",
-"343:report->summary.result = result;",
+"345:report->summary.result = result;",
 ";",
 [
 "testDump_sink",
@@ -20106,7 +20106,7 @@
 "rp-344-del",
 "srcl",
 "src/sink/report.c",
-"344:report->summary.failure.result = result;",
+"346:report->summary.failure.result = result;",
 ";",
 [
 "testDump_sink",
@@ -20128,7 +20128,7 @@
 "rp-346-ne",
 "srcl",
 "src/sink/report.c",
-"346:!=",
+"348:!=",
 "==",
 [
 "testDump_sink",
@@ -20150,7 +20150,7 @@
 "rp-346-eq",
 "srcl",
 "src/sink/report.c",
-"346:==",
+"348:==",
 "!=",
 [
 "testDump_sink",
@@ -20172,7 +20172,7 @@
 "rp-346-neg",
 "srcl",
 "src/sink/report.c",
-"346:(result != GSHSCENE_OK && chain_count && pool_reserve(report, chain_count) == GSHSCENE_OK)",
+"348:(result != GSHSCENE_OK && chain_count && pool_reserve(report, chain_count) == GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK && chain_count && pool_reserve(report, chain_count) == GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -20194,7 +20194,7 @@
 "rp-347-del",
 "srcl",
 "src/sink/report.c",
-"347:report->failure_chain = report->pool_used;",
+"349:report->failure_chain = report->pool_used;",
 ";",
 [
 "testDump_sink",
@@ -20216,7 +20216,7 @@
 "rp-350-del",
 "srcl",
 "src/sink/report.c",
-"350:report->summary.failure.chain_count = chain_count;",
+"352:report->summary.failure.chain_count = chain_count;",
 ";",
 [
 "testDump_sink",
@@ -20238,7 +20238,7 @@
 "rp-359-ge",
 "srcl",
 "src/sink/report.c",
-"359:>=",
+"361:>=",
 ">",
 [
 "testDump_sink",
@@ -20260,7 +20260,7 @@
 "rp-359-neg",
 "srcl",
 "src/sink/report.c",
-"359:(!report || !out || index >= report->count)",
+"361:(!report || !out || index >= report->count)",
 "(!(!report || !out || index >= report->count))",
 [
 "testDump_sink",
@@ -20282,7 +20282,7 @@
 "rp-363-del",
 "srcl",
 "src/sink/report.c",
-"363:out->entry_class = (GSHSCENE_Entry_Class)item->entry_class;",
+"365:out->entry_class = (GSHSCENE_Entry_Class)item->entry_class;",
 ";",
 [
 "testDump_sink",
@@ -20304,7 +20304,7 @@
 "rp-364-del",
 "srcl",
 "src/sink/report.c",
-"364:out->reason = (GSHSCENE_Reason)item->reason;",
+"366:out->reason = (GSHSCENE_Reason)item->reason;",
 ";",
 [
 "testDump_sink",
@@ -20326,7 +20326,7 @@
 "rp-365-del",
 "srcl",
 "src/sink/report.c",
-"365:out->chain = item->chain_count ? report->pool + item->chain : NULL;",
+"367:out->chain = item->chain_count ? report->pool + item->chain : NULL;",
 ";",
 [
 "testDump_sink",
@@ -20348,7 +20348,7 @@
 "rp-366-del",
 "srcl",
 "src/sink/report.c",
-"366:out->chain_count = item->chain_count;",
+"368:out->chain_count = item->chain_count;",
 ";",
 [
 "testDump_sink",
@@ -20370,7 +20370,7 @@
 "rp-367-del",
 "srcl",
 "src/sink/report.c",
-"367:out->second = item->second;",
+"369:out->second = item->second;",
 ";",
 [
 "testDump_sink",
@@ -20392,7 +20392,7 @@
 "rp-368-del",
 "srcl",
 "src/sink/report.c",
-"368:out->depth = item->depth;",
+"370:out->depth = item->depth;",
 ";",
 [
 "testDump_sink",
@@ -20414,7 +20414,7 @@
 "rp-373-neg",
 "srcl",
 "src/sink/report.c",
-"373:(!report || !out)",
+"375:(!report || !out)",
 "(!(!report || !out))",
 [
 "testDump_sink",
@@ -20436,7 +20436,7 @@
 "rp-377-del",
 "srcl",
 "src/sink/report.c",
-"377:out->failure.chain = out->failure.chain_count ? report->pool + report->failure_chain : NULL;",
+"379:out->failure.chain = out->failure.chain_count ? report->pool + report->failure_chain : NULL;",
 ";",
 [
 "testDump_sink",
@@ -20458,7 +20458,7 @@
 "rp-383-neg",
 "srcl",
 "src/sink/report.c",
-"383:(!report || !version || !out_node || !out_path || !out_count || index >= report->count)",
+"385:(!report || !version || !out_node || !out_path || !out_count || index >= report->count)",
 "(!(!report || !version || !out_node || !out_path || !out_count || index >= report->count))",
 [
 "testDump_sink",
@@ -20480,7 +20480,7 @@
 "rp-384-ret",
 "srcl",
 "src/sink/report.c",
-"384:GSHSCENE_ERR_INVALID",
+"386:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -20502,7 +20502,7 @@
 "rp-387-eq",
 "srcl",
 "src/sink/report.c",
-"387:==",
+"389:==",
 "!=",
 [
 "testDump_sink",
@@ -20524,7 +20524,7 @@
 "rp-387-or",
 "srcl",
 "src/sink/report.c",
-"387:||",
+"389:||",
 "&&",
 [
 "testDump_sink",
@@ -20546,7 +20546,7 @@
 "rp-387-lt",
 "srcl",
 "src/sink/report.c",
-"387:<",
+"389:<",
 "<=",
 [
 "testDump_sink",
@@ -20568,7 +20568,7 @@
 "rp-387-neg",
 "srcl",
 "src/sink/report.c",
-"387:(item->chain_count == 0 || capacity < item->chain_count)",
+"389:(item->chain_count == 0 || capacity < item->chain_count)",
 "(!(item->chain_count == 0 || capacity < item->chain_count))",
 [
 "testDump_sink",
@@ -20590,7 +20590,7 @@
 "rp-388-ret",
 "srcl",
 "src/sink/report.c",
-"388:GSHSCENE_ERR_INVALID",
+"390:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -20612,7 +20612,7 @@
 "rp-395-ne",
 "srcl",
 "src/sink/report.c",
-"395:!=",
+"397:!=",
 "==",
 [
 "testDump_sink",
@@ -20634,7 +20634,7 @@
 "rp-395-neg",
 "srcl",
 "src/sink/report.c",
-"395:(result != GSHSCENE_OK)",
+"397:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -20656,7 +20656,7 @@
 "rp-398-lt",
 "srcl",
 "src/sink/report.c",
-"398:<",
+"400:<",
 "<=",
 [
 "testDump_sink",
@@ -20678,7 +20678,7 @@
 "rp-398-neg",
 "srcl",
 "src/sink/report.c",
-"398:(i + 1 < item->chain_count)",
+"400:(i + 1 < item->chain_count)",
 "(!(i + 1 < item->chain_count))",
 [
 "testDump_sink",
@@ -20700,7 +20700,7 @@
 "rp-400-ne",
 "srcl",
 "src/sink/report.c",
-"400:o) != GS",
+"402:o) != GS",
 "o) == GS",
 [
 "testDump_sink",
@@ -20722,7 +20722,7 @@
 "rp-400-or",
 "srcl",
 "src/sink/report.c",
-"400:||",
+"402:||",
 "&&",
 [
 "testDump_sink",
@@ -20744,7 +20744,7 @@
 "rp-400-ne2",
 "srcl",
 "src/sink/report.c",
-"400:nd != GS",
+"402:nd != GS",
 "nd == GS",
 [
 "testDump_sink",
@@ -20766,7 +20766,7 @@
 "rp-400-neg",
 "srcl",
 "src/sink/report.c",
-"400:(gshscene_version_node(version, node, &info) != GSHSCENE_OK || info.node.kind != GSHSCENE_NODE_INSTANCE)",
+"402:(gshscene_version_node(version, node, &info) != GSHSCENE_OK || info.node.kind != GSHSCENE_NODE_INSTANCE)",
 "(!(gshscene_version_node(version, node, &info) != GSHSCENE_OK || info.node.kind != GSHSCENE_NODE_INSTANCE))",
 [
 "testDump_sink",
@@ -20788,7 +20788,7 @@
 "rp-403-del",
 "srcl",
 "src/sink/report.c",
-"403:table = info.node.target;",
+"405:table = info.node.target;",
 ";",
 [
 "testDump_sink",
@@ -20810,7 +20810,7 @@
 "rp-405-del",
 "srcl",
 "src/sink/report.c",
-"405:out_path[i] = node;",
+"407:out_path[i] = node;",
 ";",
 [
 "testDump_sink",
@@ -20832,7 +20832,7 @@
 "rp-415-neg",
 "srcl",
 "src/sink/report.c",
-"415:(!report)",
+"417:(!report)",
 "(!(!report))",
 [
 "testDump_sink",
@@ -20854,7 +20854,7 @@
 "rp-419-del",
 "srcl",
 "src/sink/report.c",
-"419:gshgeom_hash_u32(&h, REPORT_FORMAT);",
+"421:gshgeom_hash_u32(&h, REPORT_FORMAT);",
 ";",
 [
 "testDump_sink",
@@ -20876,7 +20876,7 @@
 "rp-419-hwu32",
 "srcl",
 "src/sink/report.c",
-"419:gshgeom_hash_u32(",
+"421:gshgeom_hash_u32(",
 "gshgeom_hash_u64(",
 [
 "testDump_sink",
@@ -20898,7 +20898,7 @@
 "rp-420-del",
 "srcl",
 "src/sink/report.c",
-"420:gshgeom_hash_u32(&h, REPORT_TAG);",
+"422:gshgeom_hash_u32(&h, REPORT_TAG);",
 ";",
 [
 "testDump_sink",
@@ -20920,7 +20920,7 @@
 "rp-420-hwu32",
 "srcl",
 "src/sink/report.c",
-"420:gshgeom_hash_u32(",
+"422:gshgeom_hash_u32(",
 "gshgeom_hash_u64(",
 [
 "testDump_sink",
@@ -20942,7 +20942,7 @@
 "rp-421-del",
 "srcl",
 "src/sink/report.c",
-"421:gshgeom_hash_u32(&h, (uint32_t)s->result);",
+"423:gshgeom_hash_u32(&h, (uint32_t)s->result);",
 ";",
 [
 "testDump_sink",
@@ -20964,7 +20964,7 @@
 "rp-421-hwu32",
 "srcl",
 "src/sink/report.c",
-"421:gshgeom_hash_u32(",
+"423:gshgeom_hash_u32(",
 "gshgeom_hash_u64(",
 [
 "testDump_sink",
@@ -20986,7 +20986,7 @@
 "rp-422-del",
 "srcl",
 "src/sink/report.c",
-"422:gshgeom_hash_u64(&h, (uint64_t)s->units_total);",
+"424:gshgeom_hash_u64(&h, (uint64_t)s->units_total);",
 ";",
 [
 "testDump_sink",
@@ -21008,7 +21008,7 @@
 "rp-422-hwu64",
 "srcl",
 "src/sink/report.c",
-"422:gshgeom_hash_u64(",
+"424:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testDump_sink",
@@ -21030,7 +21030,7 @@
 "rp-423-del",
 "srcl",
 "src/sink/report.c",
-"423:gshgeom_hash_u64(&h, (uint64_t)s->units_processed);",
+"425:gshgeom_hash_u64(&h, (uint64_t)s->units_processed);",
 ";",
 [
 "testDump_sink",
@@ -21052,7 +21052,7 @@
 "rp-424-del",
 "srcl",
 "src/sink/report.c",
-"424:gshgeom_hash_u64(&h, (uint64_t)s->units_done);",
+"426:gshgeom_hash_u64(&h, (uint64_t)s->units_done);",
 ";",
 [
 "testDump_sink",
@@ -21074,7 +21074,7 @@
 "rp-424-hwu64",
 "srcl",
 "src/sink/report.c",
-"424:gshgeom_hash_u64(",
+"426:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testDump_sink",
@@ -21096,7 +21096,7 @@
 "rp-425-del",
 "srcl",
 "src/sink/report.c",
-"425:gshgeom_hash_u64(&h, (uint64_t)s->counted);",
+"427:gshgeom_hash_u64(&h, (uint64_t)s->counted);",
 ";",
 [
 "testDump_sink",
@@ -21118,7 +21118,7 @@
 "rp-425-hwu64",
 "srcl",
 "src/sink/report.c",
-"425:gshgeom_hash_u64(",
+"427:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testDump_sink",
@@ -21140,7 +21140,7 @@
 "rp-426-ne",
 "srcl",
 "src/sink/report.c",
-"426:!=",
+"428:!=",
 "==",
 [
 "testDump_sink",
@@ -21162,7 +21162,7 @@
 "rp-426-del",
 "srcl",
 "src/sink/report.c",
-"426:gshgeom_hash_u8(&h, (uint8_t)(s->overflowed != 0));",
+"428:gshgeom_hash_u8(&h, (uint8_t)(s->overflowed != 0));",
 ";",
 [
 "testDump_sink",
@@ -21184,7 +21184,7 @@
 "rp-428-del",
 "srcl",
 "src/sink/report.c",
-"428:gshgeom_hash_u64(&h, (uint64_t)s->by_class[c]);",
+"430:gshgeom_hash_u64(&h, (uint64_t)s->by_class[c]);",
 ";",
 [
 "testDump_sink",
@@ -21206,7 +21206,7 @@
 "rp-430-del",
 "srcl",
 "src/sink/report.c",
-"430:gshgeom_hash_u64(&h, s->static_bytes);",
+"432:gshgeom_hash_u64(&h, s->static_bytes);",
 ";",
 [
 "testDump_sink",
@@ -21228,7 +21228,7 @@
 "rp-431-del",
 "srcl",
 "src/sink/report.c",
-"431:gshgeom_hash_u64(&h, s->work_max);",
+"433:gshgeom_hash_u64(&h, s->work_max);",
 ";",
 [
 "testDump_sink",
@@ -21250,7 +21250,7 @@
 "rp-431-hwu64",
 "srcl",
 "src/sink/report.c",
-"431:gshgeom_hash_u64(",
+"433:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testDump_sink",
@@ -21272,7 +21272,7 @@
 "rp-432-del",
 "srcl",
 "src/sink/report.c",
-"432:gshgeom_hash_u32(&h, (uint32_t)s->failure.result);",
+"434:gshgeom_hash_u32(&h, (uint32_t)s->failure.result);",
 ";",
 [
 "testDump_sink",
@@ -21294,7 +21294,7 @@
 "rp-432-hwu32",
 "srcl",
 "src/sink/report.c",
-"432:gshgeom_hash_u32(",
+"434:gshgeom_hash_u32(",
 "gshgeom_hash_u64(",
 [
 "testDump_sink",
@@ -21316,7 +21316,7 @@
 "rp-433-del",
 "srcl",
 "src/sink/report.c",
-"433:gshgeom_hash_u64(&h, (uint64_t)s->failure.chain_count);",
+"435:gshgeom_hash_u64(&h, (uint64_t)s->failure.chain_count);",
 ";",
 [
 "testDump_sink",
@@ -21338,7 +21338,7 @@
 "rp-433-hwu64",
 "srcl",
 "src/sink/report.c",
-"433:gshgeom_hash_u64(",
+"435:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testDump_sink",
@@ -21360,7 +21360,7 @@
 "rp-434-lt",
 "srcl",
 "src/sink/report.c",
-"434:<",
+"436:<",
 "<=",
 [
 "testDump_sink",
@@ -21382,7 +21382,7 @@
 "rp-435-del",
 "srcl",
 "src/sink/report.c",
-"435:gshgeom_hash_u64(&h, (uint64_t)report->pool[report->failure_chain + i]);",
+"437:gshgeom_hash_u64(&h, (uint64_t)report->pool[report->failure_chain + i]);",
 ";",
 [
 "testDump_sink",
@@ -21404,7 +21404,7 @@
 "rp-435-hwu64",
 "srcl",
 "src/sink/report.c",
-"435:gshgeom_hash_u64(",
+"437:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testDump_sink",
@@ -21426,7 +21426,7 @@
 "rp-437-del",
 "srcl",
 "src/sink/report.c",
-"437:gshgeom_hash_u64(&h, (uint64_t)report->count);",
+"439:gshgeom_hash_u64(&h, (uint64_t)report->count);",
 ";",
 [
 "testDump_sink",
@@ -21448,7 +21448,7 @@
 "rp-437-hwu64",
 "srcl",
 "src/sink/report.c",
-"437:gshgeom_hash_u64(",
+"439:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testDump_sink",
@@ -21470,7 +21470,7 @@
 "rp-438-lt",
 "srcl",
 "src/sink/report.c",
-"438:<",
+"440:<",
 "<=",
 [
 "testDump_sink",
@@ -21492,7 +21492,7 @@
 "rp-440-del",
 "srcl",
 "src/sink/report.c",
-"440:gshgeom_hash_u8(&h, (uint8_t)item->entry_class);",
+"442:gshgeom_hash_u8(&h, (uint8_t)item->entry_class);",
 ";",
 [
 "testDump_sink",
@@ -21514,7 +21514,7 @@
 "rp-440-hwu8",
 "srcl",
 "src/sink/report.c",
-"440:gshgeom_hash_u8(",
+"442:gshgeom_hash_u8(",
 "gshgeom_hash_u32(",
 [
 "testDump_sink",
@@ -21536,7 +21536,7 @@
 "rp-441-del",
 "srcl",
 "src/sink/report.c",
-"441:gshgeom_hash_u32(&h, item->reason);",
+"443:gshgeom_hash_u32(&h, item->reason);",
 ";",
 [
 "testDump_sink",
@@ -21558,7 +21558,7 @@
 "rp-441-hwu32",
 "srcl",
 "src/sink/report.c",
-"441:gshgeom_hash_u32(",
+"443:gshgeom_hash_u32(",
 "gshgeom_hash_u64(",
 [
 "testDump_sink",
@@ -21580,7 +21580,7 @@
 "rp-442-del",
 "srcl",
 "src/sink/report.c",
-"442:gshgeom_hash_u64(&h, (uint64_t)item->chain_count);",
+"444:gshgeom_hash_u64(&h, (uint64_t)item->chain_count);",
 ";",
 [
 "testDump_sink",
@@ -21602,7 +21602,7 @@
 "rp-442-hwu64",
 "srcl",
 "src/sink/report.c",
-"442:gshgeom_hash_u64(",
+"444:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testDump_sink",
@@ -21624,7 +21624,7 @@
 "rp-443-lt",
 "srcl",
 "src/sink/report.c",
-"443:<",
+"445:<",
 "<=",
 [
 "testDump_sink",
@@ -21646,7 +21646,7 @@
 "rp-444-del",
 "srcl",
 "src/sink/report.c",
-"444:gshgeom_hash_u64(&h, (uint64_t)report->pool[item->chain + k]);",
+"446:gshgeom_hash_u64(&h, (uint64_t)report->pool[item->chain + k]);",
 ";",
 [
 "testDump_sink",
@@ -21668,7 +21668,7 @@
 "rp-444-hwu64",
 "srcl",
 "src/sink/report.c",
-"444:gshgeom_hash_u64(",
+"446:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testDump_sink",
@@ -21690,7 +21690,7 @@
 "rp-446-del",
 "srcl",
 "src/sink/report.c",
-"446:gshgeom_hash_u64(&h, (uint64_t)item->second);",
+"448:gshgeom_hash_u64(&h, (uint64_t)item->second);",
 ";",
 [
 "testDump_sink",
@@ -21712,7 +21712,7 @@
 "rp-446-hwu64",
 "srcl",
 "src/sink/report.c",
-"446:gshgeom_hash_u64(",
+"448:gshgeom_hash_u64(",
 "gshgeom_hash_u32(",
 [
 "testDump_sink",
@@ -21734,7 +21734,7 @@
 "rp-447-del",
 "srcl",
 "src/sink/report.c",
-"447:gshgeom_hash_f64(&h, item->depth);",
+"449:gshgeom_hash_f64(&h, item->depth);",
 ";",
 [
 "testDump_sink",
@@ -21756,7 +21756,7 @@
 "rp-454-eq",
 "srcl",
 "src/sink/report.c",
-"454:==",
+"456:==",
 "!=",
 [
 "testDump_sink",
@@ -21778,7 +21778,7 @@
 "rp-454-neg",
 "srcl",
 "src/sink/report.c",
-"454:(count == 0)",
+"456:(count == 0)",
 "(!(count == 0))",
 [
 "testDump_sink",
@@ -21800,7 +21800,7 @@
 "rp-455-del",
 "srcl",
 "src/sink/report.c",
-"455:fputc('-', out);",
+"457:fputc('-', out);",
 ";",
 [
 "testDump_sink",
@@ -21822,7 +21822,7 @@
 "rp-458-lt",
 "srcl",
 "src/sink/report.c",
-"458:<",
+"460:<",
 "<=",
 [
 "testDump_sink",
@@ -21844,7 +21844,7 @@
 "rp-464-or",
 "srcl",
 "src/sink/report.c",
-"464:||",
+"466:||",
 "&&",
 [
 "testDump_sink",
@@ -21866,7 +21866,7 @@
 "rp-464-neg",
 "srcl",
 "src/sink/report.c",
-"464:(!report || !out)",
+"466:(!report || !out)",
 "(!(!report || !out))",
 [
 "testDump_sink",
@@ -21888,7 +21888,7 @@
 "rp-465-ret",
 "srcl",
 "src/sink/report.c",
-"465:GSHSCENE_ERR_INVALID",
+"467:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -21910,7 +21910,7 @@
 "rp-469-str",
 "srcl",
 "src/sink/report.c",
-"469:g",
+"471:g",
 "Z",
 [
 "testDump_sink",
@@ -21932,7 +21932,7 @@
 "rp-475-ne",
 "srcl",
 "src/sink/report.c",
-"475:!=",
+"477:!=",
 "==",
 [
 "testDump_sink",
@@ -21954,7 +21954,7 @@
 "rp-475-neg",
 "srcl",
 "src/sink/report.c",
-"475:(s->result != GSHSCENE_OK)",
+"477:(s->result != GSHSCENE_OK)",
 "(!(s->result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -21976,7 +21976,7 @@
 "rp-476-del",
 "srcl",
 "src/sink/report.c",
-"476:fprintf(out, \"failure result=%d chain=\", (int)s->failure.result);",
+"478:fprintf(out, \"failure result=%d chain=\", (int)s->failure.result);",
 ";",
 [
 "testDump_sink",
@@ -21998,7 +21998,7 @@
 "rp-476-str",
 "srcl",
 "src/sink/report.c",
-"476:, \"fail",
+"478:, \"fail",
 ", \"Zail",
 [
 "testDump_sink",
@@ -22020,7 +22020,7 @@
 "rp-477-del",
 "srcl",
 "src/sink/report.c",
-"477:chain_dump(out, report->pool + report->failure_chain, s->failure.chain_count);",
+"479:chain_dump(out, report->pool + report->failure_chain, s->failure.chain_count);",
 ";",
 [
 "testDump_sink",
@@ -22042,7 +22042,7 @@
 "rp-478-del",
 "srcl",
 "src/sink/report.c",
-"478:fprintf(out, \" reason=%s\\n\", s->failure.reason);",
+"480:fprintf(out, \" reason=%s\\n\", s->failure.reason);",
 ";",
 [
 "testDump_sink",
@@ -22064,7 +22064,7 @@
 "rp-480-lt",
 "srcl",
 "src/sink/report.c",
-"480:<",
+"482:<",
 "<=",
 [
 "testDump_sink",
@@ -22086,7 +22086,7 @@
 "rp-482-del",
 "srcl",
 "src/sink/report.c",
-"482:fprintf(out, \"E class=%u reason=%u chain=\", (unsigned)item->entry_class, (unsigned)item->reason);",
+"484:fprintf(out, \"E class=%u reason=%u chain=\", (unsigned)item->entry_class, (unsigned)item->reason);",
 ";",
 [
 "testDump_sink",
@@ -22108,7 +22108,7 @@
 "rp-482-str",
 "srcl",
 "src/sink/report.c",
-"482:E",
+"484:E",
 "Z",
 [
 "testDump_sink",
@@ -22130,7 +22130,7 @@
 "rp-483-del",
 "srcl",
 "src/sink/report.c",
-"483:chain_dump(out, report->pool + item->chain, item->chain_count);",
+"485:chain_dump(out, report->pool + item->chain, item->chain_count);",
 ";",
 [
 "testDump_sink",
@@ -22152,7 +22152,7 @@
 "rp-484-del",
 "srcl",
 "src/sink/report.c",
-"484:fprintf(out, \" second=%\" PRIu64 \" depth=%016\" PRIx64 \"\\n\", (uint64_t)item->second, gshgeom_f64_bits(item->depth));",
+"486:fprintf(out, \" second=%\" PRIu64 \" depth=%016\" PRIx64 \"\\n\", (uint64_t)item->second, gshgeom_f64_bits(item->depth));",
 ";",
 [
 "testDump_sink",
@@ -22174,7 +22174,7 @@
 "rp-484-wd",
 "srcl",
 "src/sink/report.c",
-"484:%016",
+"486:%016",
 "%",
 [
 "testDump_sink",
@@ -22196,7 +22196,7 @@
 "rp-486-eq",
 "srcl",
 "src/sink/report.c",
-"486:==",
+"488:==",
 "!=",
 [
 "testDump_sink",
@@ -22218,7 +22218,7 @@
 "rp-486-and",
 "srcl",
 "src/sink/report.c",
-"486:&&",
+"488:&&",
 "||",
 [
 "testDump_sink",
@@ -32756,7 +32756,7 @@
 "ds-1508-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1508:emit_text(run, run->line, &failed);",
+"1517:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -32778,7 +32778,7 @@
 "ds-1509-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1509:==",
+"1518:==",
 "!=",
 [
 "testDump_sink",
@@ -32800,7 +32800,7 @@
 "ds-1511-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1511:emit_text(run, run->line, &failed);",
+"1520:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -32822,7 +32822,7 @@
 "ds-1563-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1563:emit_text(run, run->line, &failed);",
+"1572:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -32844,7 +32844,7 @@
 "ds-1649-and",
 "srcl",
 "src/sink/dump_sink.c",
-"1649:&&",
+"1658:&&",
 "||",
 [
 "testDump_sink",
@@ -32866,7 +32866,7 @@
 "ds-1696-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1696:emit_text(run, run->line, &failed);",
+"1706:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -32888,7 +32888,7 @@
 "ds-1697-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1697:>kind == GSHSC",
+"1707:>kind == GSHSC",
 ">kind != GSHSC",
 [
 "testDump_sink",
@@ -32910,7 +32910,7 @@
 "ds-1697-and",
 "srcl",
 "src/sink/dump_sink.c",
-"1697:&&",
+"1707:&&",
 "||",
 [
 "testDump_sink",
@@ -32932,7 +32932,7 @@
 "ds-1697-eq2",
 "srcl",
 "src/sink/dump_sink.c",
-"1697:.kind == GSHSC",
+"1707:.kind == GSHSC",
 ".kind != GSHSC",
 [
 "testDump_sink",
@@ -32954,7 +32954,7 @@
 "ds-1699-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1699:emit_text(run, run->line, &failed);",
+"1709:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -32976,7 +32976,7 @@
 "ds-1756-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"1756:!=",
+"1766:!=",
 "==",
 [
 "testDump_sink",
@@ -32998,7 +32998,7 @@
 "ds-1756-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1756:(r != GSHSCENE_OK)",
+"1766:(r != GSHSCENE_OK)",
 "(!(r != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -33020,7 +33020,7 @@
 "ds-2104-and",
 "srcl",
 "src/sink/dump_sink.c",
-"2104:&&",
+"2114:&&",
 "||",
 [
 "testDump_sink",
@@ -36254,7 +36254,7 @@
 "ds-1448-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1448:(notice)",
+"1456:(notice)",
 "(!(notice))",
 [
 "testDump_sink",
@@ -36276,7 +36276,7 @@
 "ds-1449-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1449:snprintf(run->line, LINE_BYTES, \" X class=%d reason=%d\\n\", (int)GSHSCENE_ENTRY_NOTICE, (int)notice);",
+"1457:snprintf(run->line, LINE_BYTES, \" X class=%d reason=%d\\n\", (int)GSHSCENE_ENTRY_NOTICE, (int)notice);",
 ";",
 [
 "testDump_sink",
@@ -36298,7 +36298,7 @@
 "ds-1450-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1450:emit_text(run, run->line, &failed);",
+"1458:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -36320,7 +36320,7 @@
 "ds-1455-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1455:s) == GS",
+"1463:s) == GS",
 "s) != GS",
 [
 "testDump_sink",
@@ -36342,7 +36342,7 @@
 "ds-1455-eq2",
 "srcl",
 "src/sink/dump_sink.c",
-"1455:ce == GS",
+"1463:ce == GS",
 "ce != GS",
 [
 "testDump_sink",
@@ -36364,7 +36364,7 @@
 "ds-1456-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"1456:!=",
+"1464:!=",
 "==",
 [
 "testDump_sink",
@@ -36386,7 +36386,7 @@
 "ds-1463-or",
 "srcl",
 "src/sink/dump_sink.c",
-"1463:||",
+"1471:||",
 "&&",
 [
 "testDump_sink",
@@ -36408,7 +36408,7 @@
 "ds-1464-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1464:(!bad)",
+"1472:(!bad)",
 "(!(!bad))",
 [
 "testDump_sink",
@@ -36430,7 +36430,7 @@
 "ds-1467-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1467:centerline.empty = model.empty;",
+"1475:centerline.empty = model.empty;",
 ";",
 [
 "testDump_sink",
@@ -36452,7 +36452,7 @@
 "ds-1468-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1468:centerline.min.x = model.x0;",
+"1476:centerline.min.x = model.x0;",
 ";",
 [
 "testDump_sink",
@@ -36474,7 +36474,7 @@
 "ds-1469-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1469:centerline.min.y = model.y0;",
+"1477:centerline.min.y = model.y0;",
 ";",
 [
 "testDump_sink",
@@ -36496,7 +36496,7 @@
 "ds-1470-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1470:centerline.max.x = model.x1;",
+"1478:centerline.max.x = model.x1;",
 ";",
 [
 "testDump_sink",
@@ -36518,7 +36518,7 @@
 "ds-1471-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1471:centerline.max.y = model.y1;",
+"1479:centerline.max.y = model.y1;",
 ";",
 [
 "testDump_sink",
@@ -36540,7 +36540,7 @@
 "ds-1472-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"1472:!=",
+"1480:!=",
 "==",
 [
 "testDump_sink",
@@ -36562,7 +36562,7 @@
 "ds-1472-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1472:bad = gshscene_stroke_bounds(item->style, &centerline, &map, run->job->target.unit, &b) != GSHSCENE_OK;",
+"1480:bad = gshscene_stroke_bounds(item->style, &centerline, &map, run->job->target.unit, &b) != GSHSCENE_OK;",
 ";",
 [
 "testDump_sink",
@@ -36584,7 +36584,7 @@
 "ds-1475-or",
 "srcl",
 "src/sink/dump_sink.c",
-"1475:ad || (l",
+"1483:ad || (l",
 "ad && (l",
 [
 "testDump_sink",
@@ -36606,7 +36606,7 @@
 "ds-1475-gt",
 "srcl",
 "src/sink/dump_sink.c",
-"1475:it > 0.",
+"1483:it > 0.",
 "it >= 0.",
 [
 "testDump_sink",
@@ -36628,7 +36628,7 @@
 "ds-1475-or2",
 "srcl",
 "src/sink/dump_sink.c",
-"1475:it || b.",
+"1483:it || b.",
 "it && b.",
 [
 "testDump_sink",
@@ -36650,7 +36650,7 @@
 "ds-1475-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1475:(bad || (limit > 0.0 && !b.empty && (b.max.x - b.min.x > limit || b.max.y - b.min.y > limit)))",
+"1483:(bad || (limit > 0.0 && !b.empty && (b.max.x - b.min.x > limit || b.max.y - b.min.y > limit)))",
 "(!(bad || (limit > 0.0 && !b.empty && (b.max.x - b.min.x > limit || b.max.y - b.min.y > limit))))",
 [
 "testDump_sink",
@@ -36672,7 +36672,7 @@
 "ds-1482-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1482:==",
+"1490:==",
 "!=",
 [
 "testDump_sink",
@@ -36694,7 +36694,7 @@
 "ds-1482-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1482:(sr == GSHSCENE_ERR_LIMIT)",
+"1490:(sr == GSHSCENE_ERR_LIMIT)",
 "(!(sr == GSHSCENE_ERR_LIMIT))",
 [
 "testDump_sink",
@@ -36716,7 +36716,7 @@
 "ds-1485-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"1485:!=",
+"1493:!=",
 "==",
 [
 "testDump_sink",
@@ -36738,7 +36738,7 @@
 "ds-1485-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1485:(sr != GSHSCENE_OK)",
+"1493:(sr != GSHSCENE_OK)",
 "(!(sr != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -36760,7 +36760,7 @@
 "ds-1488-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1488:(stopped)",
+"1496:(stopped)",
 "(!(stopped))",
 [
 "testDump_sink",
@@ -36782,7 +36782,7 @@
 "ds-1492-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1492:(has_outline)",
+"1500:(has_outline)",
 "(!(has_outline))",
 [
 "testDump_sink",
@@ -36804,7 +36804,7 @@
 "ds-1493-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1493:snprintf(outline_text, sizeof outline_text, \"%016\" PRIx64, outline_hash);",
+"1501:snprintf(outline_text, sizeof outline_text, \"%016\" PRIx64, outline_hash);",
 ";",
 [
 "testDump_sink",
@@ -36826,7 +36826,7 @@
 "ds-1493-wd",
 "srcl",
 "src/sink/dump_sink.c",
-"1493:%016",
+"1501:%016",
 "%",
 [
 "testDump_sink",
@@ -36848,7 +36848,7 @@
 "ds-1499-wd",
 "srcl",
 "src/sink/dump_sink.c",
-"1499:%s:%016\" P",
+"1507:%s:%016\" P",
 "%s:%\" P",
 [
 "testDump_sink",
@@ -36870,7 +36870,7 @@
 "ds-1499-wd2",
 "srcl",
 "src/sink/dump_sink.c",
-"1499:ap=%016\" P",
+"1507:ap=%016\" P",
 "ap=%\" P",
 [
 "testDump_sink",
@@ -36892,7 +36892,7 @@
 "ds-1502-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1502:emit_text(run, run->line, &failed);",
+"1510:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -36914,7 +36914,7 @@
 "ds-1503-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1503:==",
+"1512:==",
 "!=",
 [
 "testDump_sink",
@@ -36936,7 +36936,7 @@
 "ds-1503-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1503:(item->paint.kind == GSHSCENE_PAINT_GRADIENT)",
+"1512:(item->paint.kind == GSHSCENE_PAINT_GRADIENT)",
 "(!(item->paint.kind == GSHSCENE_PAINT_GRADIENT))",
 [
 "testDump_sink",
@@ -36958,7 +36958,7 @@
 "ds-1504-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1504:snprintf(run->line, LINE_BYTES, \" grad=%\" PRIu64, gshscene_resource_id(item->paint.resource));",
+"1513:snprintf(run->line, LINE_BYTES, \" grad=%\" PRIu64, gshscene_resource_id(item->paint.resource));",
 ";",
 [
 "testDump_sink",
@@ -36980,7 +36980,7 @@
 "ds-1505-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1505:emit_text(run, run->line, &failed);",
+"1514:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -37002,7 +37002,7 @@
 "ds-1506-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1506:==",
+"1515:==",
 "!=",
 [
 "testDump_sink",
@@ -37024,7 +37024,7 @@
 "ds-1506-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1506:(item->paint.kind == GSHSCENE_PAINT_IMAGE)",
+"1515:(item->paint.kind == GSHSCENE_PAINT_IMAGE)",
 "(!(item->paint.kind == GSHSCENE_PAINT_IMAGE))",
 [
 "testDump_sink",
@@ -37046,7 +37046,7 @@
 "ds-1507-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1507:snprintf(run->line, LINE_BYTES, \" img=%\" PRIu64, gshscene_resource_id(item->paint.resource));",
+"1516:snprintf(run->line, LINE_BYTES, \" img=%\" PRIu64, gshscene_resource_id(item->paint.resource));",
 ";",
 [
 "testDump_sink",
@@ -37068,7 +37068,7 @@
 "ds-1509-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1509:(item->paint.kind == GSHSCENE_PAINT_PATTERN)",
+"1518:(item->paint.kind == GSHSCENE_PAINT_PATTERN)",
 "(!(item->paint.kind == GSHSCENE_PAINT_PATTERN))",
 [
 "testDump_sink",
@@ -37090,7 +37090,7 @@
 "ds-1510-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1510:snprintf(run->line, LINE_BYTES, \" pat=%\" PRIu64, gshscene_resource_id(item->paint.resource));",
+"1519:snprintf(run->line, LINE_BYTES, \" pat=%\" PRIu64, gshscene_resource_id(item->paint.resource));",
 ";",
 [
 "testDump_sink",
@@ -37112,7 +37112,7 @@
 "ds-1515-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1515:(b.empty)",
+"1524:(b.empty)",
 "(!(b.empty))",
 [
 "testDump_sink",
@@ -37134,7 +37134,7 @@
 "ds-1516-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1516:snprintf(run->line, LINE_BYTES, \" box=- expand=%u outline=%s\\n\", (unsigned)expand, outline_text);",
+"1525:snprintf(run->line, LINE_BYTES, \" box=- expand=%u outline=%s\\n\", (unsigned)expand, outline_text);",
 ";",
 [
 "testDump_sink",
@@ -37156,7 +37156,7 @@
 "ds-1523-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1523:emit_text(run, run->line, &failed);",
+"1532:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -37178,7 +37178,7 @@
 "ds-1524-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1524:path_records(run, item->resource, &map, &failed);",
+"1533:path_records(run, item->resource, &map, &failed);",
 ";",
 [
 "testDump_sink",
@@ -37200,7 +37200,7 @@
 "ds-1526-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1526:(r == GS",
+"1535:(r == GS",
 "(r != GS",
 [
 "testDump_sink",
@@ -37222,7 +37222,7 @@
 "ds-1526-and",
 "srcl",
 "src/sink/dump_sink.c",
-"1526:&&",
+"1535:&&",
 "||",
 [
 "testDump_sink",
@@ -37244,7 +37244,7 @@
 "ds-1526-eq2",
 "srcl",
 "src/sink/dump_sink.c",
-"1526:nd == GS",
+"1535:nd == GS",
 "nd != GS",
 [
 "testDump_sink",
@@ -37266,7 +37266,7 @@
 "ds-1526-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1526:(r == GSHSCENE_OK && item->paint.kind == GSHSCENE_PAINT_GRADIENT)",
+"1535:(r == GSHSCENE_OK && item->paint.kind == GSHSCENE_PAINT_GRADIENT)",
 "(!(r == GSHSCENE_OK && item->paint.kind == GSHSCENE_PAINT_GRADIENT))",
 [
 "testDump_sink",
@@ -37288,7 +37288,7 @@
 "ds-1527-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1527:r = gradient_record(run, item->paint.resource, &failed);",
+"1536:r = gradient_record(run, item->paint.resource, &failed);",
 ";",
 [
 "testDump_sink",
@@ -37310,7 +37310,7 @@
 "ds-1528-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1528:(r == GS",
+"1537:(r == GS",
 "(r != GS",
 [
 "testDump_sink",
@@ -37332,7 +37332,7 @@
 "ds-1528-and",
 "srcl",
 "src/sink/dump_sink.c",
-"1528:&&",
+"1537:&&",
 "||",
 [
 "testDump_sink",
@@ -37354,7 +37354,7 @@
 "ds-1528-eq2",
 "srcl",
 "src/sink/dump_sink.c",
-"1528:nd == GS",
+"1537:nd == GS",
 "nd != GS",
 [
 "testDump_sink",
@@ -37376,7 +37376,7 @@
 "ds-1528-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1528:(r == GSHSCENE_OK && item->paint.kind == GSHSCENE_PAINT_IMAGE)",
+"1537:(r == GSHSCENE_OK && item->paint.kind == GSHSCENE_PAINT_IMAGE)",
 "(!(r == GSHSCENE_OK && item->paint.kind == GSHSCENE_PAINT_IMAGE))",
 [
 "testDump_sink",
@@ -37398,7 +37398,7 @@
 "ds-1529-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1529:r = image_paint_record(run, item->paint.resource, &failed);",
+"1538:r = image_paint_record(run, item->paint.resource, &failed);",
 ";",
 [
 "testDump_sink",
@@ -37420,7 +37420,7 @@
 "ds-1530-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1530:(r == GS",
+"1539:(r == GS",
 "(r != GS",
 [
 "testDump_sink",
@@ -37442,7 +37442,7 @@
 "ds-1530-and",
 "srcl",
 "src/sink/dump_sink.c",
-"1530:&&",
+"1539:&&",
 "||",
 [
 "testDump_sink",
@@ -37464,7 +37464,7 @@
 "ds-1530-eq2",
 "srcl",
 "src/sink/dump_sink.c",
-"1530:nd == GS",
+"1539:nd == GS",
 "nd != GS",
 [
 "testDump_sink",
@@ -37486,7 +37486,7 @@
 "ds-1530-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1530:(r == GSHSCENE_OK && item->paint.kind == GSHSCENE_PAINT_PATTERN)",
+"1539:(r == GSHSCENE_OK && item->paint.kind == GSHSCENE_PAINT_PATTERN)",
 "(!(r == GSHSCENE_OK && item->paint.kind == GSHSCENE_PAINT_PATTERN))",
 [
 "testDump_sink",
@@ -37508,7 +37508,7 @@
 "ds-1531-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1531:r = pattern_record(run, item->paint.resource, &failed);",
+"1540:r = pattern_record(run, item->paint.resource, &failed);",
 ";",
 [
 "testDump_sink",
@@ -37530,7 +37530,7 @@
 "ds-1533-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"1533:!=",
+"1542:!=",
 "==",
 [
 "testDump_sink",
@@ -37552,7 +37552,7 @@
 "ds-1533-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1533:(r != GSHSCENE_OK)",
+"1542:(r != GSHSCENE_OK)",
 "(!(r != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -37574,7 +37574,7 @@
 "ds-1536-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1536:(run->raster)",
+"1545:(run->raster)",
 "(!(run->raster))",
 [
 "testDump_sink",
@@ -37596,7 +37596,7 @@
 "ds-1557-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1557:emit_text(run, run->line, &failed);",
+"1566:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -37618,7 +37618,7 @@
 "ds-1558-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1558:(composed)",
+"1567:(composed)",
 "(!(composed))",
 [
 "testDump_sink",
@@ -37640,7 +37640,7 @@
 "ds-1559-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1559:snprintf(run->line, LINE_BYTES, \"%016\" PRIx64, gshgeom_map_hash(&map));",
+"1568:snprintf(run->line, LINE_BYTES, \"%016\" PRIx64, gshgeom_map_hash(&map));",
 ";",
 [
 "testDump_sink",
@@ -37662,7 +37662,7 @@
 "ds-1559-wd",
 "srcl",
 "src/sink/dump_sink.c",
-"1559:%016",
+"1568:%016",
 "%",
 [
 "testDump_sink",
@@ -37684,7 +37684,7 @@
 "ds-1564-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1564:emit_text(run, \" box=\", &failed);",
+"1573:emit_text(run, \" box=\", &failed);",
 ";",
 [
 "testDump_sink",
@@ -37706,7 +37706,7 @@
 "ds-1568-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1568:model.x0 = p->box[0];",
+"1577:model.x0 = p->box[0];",
 ";",
 [
 "testDump_sink",
@@ -37728,7 +37728,7 @@
 "ds-1569-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1569:model.y0 = p->box[1];",
+"1578:model.y0 = p->box[1];",
 ";",
 [
 "testDump_sink",
@@ -37750,7 +37750,7 @@
 "ds-1570-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1570:model.x1 = p->box[2];",
+"1579:model.x1 = p->box[2];",
 ";",
 [
 "testDump_sink",
@@ -37772,7 +37772,7 @@
 "ds-1571-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1571:model.y1 = p->box[3];",
+"1580:model.y1 = p->box[3];",
 ";",
 [
 "testDump_sink",
@@ -37794,7 +37794,7 @@
 "ds-1572-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1572:(!composed || model.empty || box_map(&map, &model, &box))",
+"1581:(!composed || model.empty || box_map(&map, &model, &box))",
 "(!(!composed || model.empty || box_map(&map, &model, &box)))",
 [
 "testDump_sink",
@@ -37816,7 +37816,7 @@
 "ds-1573-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1573:emit_text(run, \"-\\n\", &failed);",
+"1582:emit_text(run, \"-\\n\", &failed);",
 ";",
 [
 "testDump_sink",
@@ -37838,7 +37838,7 @@
 "ds-1577-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1577:emit_text(run, run->line, &failed);",
+"1586:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -37860,7 +37860,7 @@
 "ds-1589-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"1589:!=",
+"1598:!=",
 "==",
 [
 "testDump_sink",
@@ -37882,7 +37882,7 @@
 "ds-1590-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1590:emit_text(run, \"U \", &failed);",
+"1599:emit_text(run, \"U \", &failed);",
 ";",
 [
 "testDump_sink",
@@ -37904,7 +37904,7 @@
 "ds-1590-str",
 "srcl",
 "src/sink/dump_sink.c",
-"1590:U",
+"1599:U",
 "Z",
 [
 "testDump_sink",
@@ -37926,7 +37926,7 @@
 "ds-1591-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1591:emit_chain(run, chain, count, &failed);",
+"1600:emit_chain(run, chain, count, &failed);",
 ";",
 [
 "testDump_sink",
@@ -37948,7 +37948,7 @@
 "ds-1592-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1592:(gshscene_skip_step(&run->skip, item, count))",
+"1601:(gshscene_skip_step(&run->skip, item, count))",
 "(!(gshscene_skip_step(&run->skip, item, count)))",
 [
 "testDump_sink",
@@ -37970,7 +37970,7 @@
 "ds-1594-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1594:emit_text(run, run->line, &failed);",
+"1603:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -37992,7 +37992,7 @@
 "ds-1597-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1597:(instance_maps(run, count))",
+"1606:(instance_maps(run, count))",
 "(!(instance_maps(run, count)))",
 [
 "testDump_sink",
@@ -38014,7 +38014,7 @@
 "ds-1602-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1602:==",
+"1611:==",
 "!=",
 [
 "testDump_sink",
@@ -38036,7 +38036,7 @@
 "ds-1602-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1602:(item->kind == GSHSCENE_ITEM_PLACEHOLDER)",
+"1611:(item->kind == GSHSCENE_ITEM_PLACEHOLDER)",
 "(!(item->kind == GSHSCENE_ITEM_PLACEHOLDER))",
 [
 "testDump_sink",
@@ -38058,7 +38058,7 @@
 "ds-1605-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1605:==",
+"1614:==",
 "!=",
 [
 "testDump_sink",
@@ -38080,7 +38080,7 @@
 "ds-1605-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1605:(d.entry_class == GSHSCENE_ENTRY_REFUSED)",
+"1614:(d.entry_class == GSHSCENE_ENTRY_REFUSED)",
 "(!(d.entry_class == GSHSCENE_ENTRY_REFUSED))",
 [
 "testDump_sink",
@@ -38102,7 +38102,7 @@
 "ds-1606-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1606:snprintf(run->line, LINE_BYTES, \" X class=%d reason=%d\\n\", (int)d.entry_class, (int)d.reason);",
+"1615:snprintf(run->line, LINE_BYTES, \" X class=%d reason=%d\\n\", (int)d.entry_class, (int)d.reason);",
 ";",
 [
 "testDump_sink",
@@ -38124,7 +38124,7 @@
 "ds-1607-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1607:emit_text(run, run->line, &failed);",
+"1616:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -38146,7 +38146,7 @@
 "ds-1608-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1608:gshscene_skip_begin(&run->skip, item, count);",
+"1617:gshscene_skip_begin(&run->skip, item, count);",
 ";",
 [
 "testDump_sink",
@@ -38168,7 +38168,7 @@
 "ds-1609-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1609:run->skip_reason = d.reason;",
+"1618:run->skip_reason = d.reason;",
 ";",
 [
 "testDump_sink",
@@ -38190,7 +38190,7 @@
 "ds-1621-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1621:(notice)",
+"1630:(notice)",
 "(!(notice))",
 [
 "testDump_sink",
@@ -38212,7 +38212,7 @@
 "ds-1622-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1622:snprintf(run->line, LINE_BYTES, \" X class=%d reason=%d\\n\", (int)GSHSCENE_ENTRY_NOTICE, (int)notice);",
+"1631:snprintf(run->line, LINE_BYTES, \" X class=%d reason=%d\\n\", (int)GSHSCENE_ENTRY_NOTICE, (int)notice);",
 ";",
 [
 "testDump_sink",
@@ -38234,7 +38234,7 @@
 "ds-1623-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1623:emit_text(run, run->line, &failed);",
+"1632:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -38256,7 +38256,7 @@
 "ds-1629-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1629:==",
+"1638:==",
 "!=",
 [
 "testDump_sink",
@@ -38278,7 +38278,7 @@
 "ds-1629-and",
 "srcl",
 "src/sink/dump_sink.c",
-"1629:&&",
+"1638:&&",
 "||",
 [
 "testDump_sink",
@@ -38300,7 +38300,7 @@
 "ds-1630-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1630:==",
+"1639:==",
 "!=",
 [
 "testDump_sink",
@@ -38322,7 +38322,7 @@
 "ds-1632-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1632:==",
+"1641:==",
 "!=",
 [
 "testDump_sink",
@@ -38344,7 +38344,7 @@
 "ds-1633-and",
 "srcl",
 "src/sink/dump_sink.c",
-"1633:&&",
+"1642:&&",
 "||",
 [
 "testDump_sink",
@@ -38366,7 +38366,7 @@
 "ds-1633-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1633:==",
+"1642:==",
 "!=",
 [
 "testDump_sink",
@@ -38388,7 +38388,7 @@
 "ds-1633-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1633:(routed && route.entry_class == GSHSCENE_ENTRY_REFUSED)",
+"1642:(routed && route.entry_class == GSHSCENE_ENTRY_REFUSED)",
 "(!(routed && route.entry_class == GSHSCENE_ENTRY_REFUSED))",
 [
 "testDump_sink",
@@ -38410,7 +38410,7 @@
 "ds-1634-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1634:snprintf(run->line, LINE_BYTES, \" X class=%d reason=%d\\n\", (int)route.entry_class, (int)route.reason);",
+"1643:snprintf(run->line, LINE_BYTES, \" X class=%d reason=%d\\n\", (int)route.entry_class, (int)route.reason);",
 ";",
 [
 "testDump_sink",
@@ -38432,7 +38432,7 @@
 "ds-1635-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1635:emit_text(run, run->line, &failed);",
+"1644:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -38454,7 +38454,7 @@
 "ds-1636-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1636:gshscene_skip_begin(&run->skip, item, count);",
+"1645:gshscene_skip_begin(&run->skip, item, count);",
 ";",
 [
 "testDump_sink",
@@ -38476,7 +38476,7 @@
 "ds-1637-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1637:run->skip_reason = (GSHSCENE_Reason)route.reason;",
+"1646:run->skip_reason = (GSHSCENE_Reason)route.reason;",
 ";",
 [
 "testDump_sink",
@@ -38498,7 +38498,7 @@
 "ds-1641-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1641:nd == GS",
+"1650:nd == GS",
 "nd != GS",
 [
 "testDump_sink",
@@ -38520,7 +38520,7 @@
 "ds-1641-and",
 "srcl",
 "src/sink/dump_sink.c",
-"1641:&&",
+"1650:&&",
 "||",
 [
 "testDump_sink",
@@ -38542,7 +38542,7 @@
 "ds-1641-eq2",
 "srcl",
 "src/sink/dump_sink.c",
-"1641:e) == GS",
+"1650:e) == GS",
 "e) != GS",
 [
 "testDump_sink",
@@ -38564,7 +38564,7 @@
 "ds-1643-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1643:>kind == GSHSC",
+"1652:>kind == GSHSC",
 ">kind != GSHSC",
 [
 "testDump_sink",
@@ -38586,7 +38586,7 @@
 "ds-1643-and",
 "srcl",
 "src/sink/dump_sink.c",
-"1643:&&",
+"1652:&&",
 "||",
 [
 "testDump_sink",
@@ -38608,7 +38608,7 @@
 "ds-1643-eq2",
 "srcl",
 "src/sink/dump_sink.c",
-"1643:.kind == GSHSC",
+"1652:.kind == GSHSC",
 ".kind != GSHSC",
 [
 "testDump_sink",
@@ -38630,7 +38630,7 @@
 "ds-1644-and",
 "srcl",
 "src/sink/dump_sink.c",
-"1644:&&",
+"1653:&&",
 "||",
 [
 "testDump_sink",
@@ -38652,7 +38652,7 @@
 "ds-1646-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1646:nd == GS",
+"1655:nd == GS",
 "nd != GS",
 [
 "testDump_sink",
@@ -38674,7 +38674,7 @@
 "ds-1646-and",
 "srcl",
 "src/sink/dump_sink.c",
-"1646:&&",
+"1655:&&",
 "||",
 [
 "testDump_sink",
@@ -38696,7 +38696,7 @@
 "ds-1646-eq2",
 "srcl",
 "src/sink/dump_sink.c",
-"1646:e) == GS",
+"1655:e) == GS",
 "e) != GS",
 [
 "testDump_sink",
@@ -38718,7 +38718,7 @@
 "ds-1648-or",
 "srcl",
 "src/sink/dump_sink.c",
-"1648:||",
+"1657:||",
 "&&",
 [
 "testDump_sink",
@@ -38740,7 +38740,7 @@
 "ds-1649-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1649:(!bad && hatched)",
+"1658:(!bad && hatched)",
 "(!(!bad && hatched))",
 [
 "testDump_sink",
@@ -38762,7 +38762,7 @@
 "ds-1653-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1653:region.min.x = model.x0;",
+"1662:region.min.x = model.x0;",
 ";",
 [
 "testDump_sink",
@@ -38784,7 +38784,7 @@
 "ds-1654-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1654:region.min.y = model.y0;",
+"1663:region.min.y = model.y0;",
 ";",
 [
 "testDump_sink",
@@ -38806,7 +38806,7 @@
 "ds-1655-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1655:region.max.x = model.x1;",
+"1664:region.max.x = model.x1;",
 ";",
 [
 "testDump_sink",
@@ -38828,7 +38828,7 @@
 "ds-1656-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1656:region.max.y = model.y1;",
+"1665:region.max.y = model.y1;",
 ";",
 [
 "testDump_sink",
@@ -38850,7 +38850,7 @@
 "ds-1658-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"1658:!=",
+"1667:!=",
 "==",
 [
 "testDump_sink",
@@ -38872,7 +38872,7 @@
 "ds-1658-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1658:bad = gshscene_hatch_bounds(gshscene_hatch_style(item->paint.resource), &region, &map, run->job->target.unit, &hb) != GSHSCENE_OK;",
+"1667:bad = gshscene_hatch_bounds(gshscene_hatch_style(item->paint.resource), &region, &map, run->job->target.unit, &hb) != GSHSCENE_OK;",
 ";",
 [
 "testDump_sink",
@@ -38894,7 +38894,7 @@
 "ds-1660-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1660:box.x0 = hb.min.x;",
+"1669:box.x0 = hb.min.x;",
 ";",
 [
 "testDump_sink",
@@ -38916,7 +38916,7 @@
 "ds-1661-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1661:box.y0 = hb.min.y;",
+"1670:box.y0 = hb.min.y;",
 ";",
 [
 "testDump_sink",
@@ -38938,7 +38938,7 @@
 "ds-1662-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1662:box.x1 = hb.max.x;",
+"1671:box.x1 = hb.max.x;",
 ";",
 [
 "testDump_sink",
@@ -38960,7 +38960,7 @@
 "ds-1663-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1663:box.y1 = hb.max.y;",
+"1672:box.y1 = hb.max.y;",
 ";",
 [
 "testDump_sink",
@@ -38982,7 +38982,7 @@
 "ds-1666-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1666:(plane)",
+"1675:(plane)",
 "(!(plane))",
 [
 "testDump_sink",
@@ -39004,7 +39004,7 @@
 "ds-1671-or",
 "srcl",
 "src/sink/dump_sink.c",
-"1671:ad || (l",
+"1680:ad || (l",
 "ad && (l",
 [
 "testDump_sink",
@@ -39026,7 +39026,7 @@
 "ds-1671-gt",
 "srcl",
 "src/sink/dump_sink.c",
-"1671:it > 0.",
+"1680:it > 0.",
 "it >= 0.",
 [
 "testDump_sink",
@@ -39048,7 +39048,7 @@
 "ds-1671-gt2",
 "srcl",
 "src/sink/dump_sink.c",
-"1671:x0 > li",
+"1680:x0 > li",
 "x0 >= li",
 [
 "testDump_sink",
@@ -39070,7 +39070,7 @@
 "ds-1671-or2",
 "srcl",
 "src/sink/dump_sink.c",
-"1671:it || bo",
+"1680:it || bo",
 "it && bo",
 [
 "testDump_sink",
@@ -39092,7 +39092,7 @@
 "ds-1671-gt3",
 "srcl",
 "src/sink/dump_sink.c",
-"1671:y0 > li",
+"1680:y0 > li",
 "y0 >= li",
 [
 "testDump_sink",
@@ -39114,7 +39114,7 @@
 "ds-1671-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1671:(bad || (limit > 0.0 && !box.empty && (box.x1 - box.x0 > limit || box.y1 - box.y0 > limit)))",
+"1680:(bad || (limit > 0.0 && !box.empty && (box.x1 - box.x0 > limit || box.y1 - box.y0 > limit)))",
 "(!(bad || (limit > 0.0 && !box.empty && (box.x1 - box.x0 > limit || box.y1 - box.y0 > limit))))",
 [
 "testDump_sink",
@@ -39136,7 +39136,7 @@
 "ds-1675-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1675:emit_text(run, run->line, &failed);",
+"1684:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -39158,7 +39158,7 @@
 "ds-1677-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"1677:!=",
+"1686:!=",
 "==",
 [
 "testDump_sink",
@@ -39180,7 +39180,7 @@
 "ds-1677-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1677:(r != GSHSCENE_OK)",
+"1686:(r != GSHSCENE_OK)",
 "(!(r != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -39202,7 +39202,7 @@
 "ds-1680-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1680:(request->flags & GSHSCENE_RENDER_STRICT)",
+"1689:(request->flags & GSHSCENE_RENDER_STRICT)",
 "(!(request->flags & GSHSCENE_RENDER_STRICT))",
 [
 "testDump_sink",
@@ -39224,7 +39224,7 @@
 "ds-1683-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1683:gshscene_skip_begin(&run->skip, item, count);",
+"1692:gshscene_skip_begin(&run->skip, item, count);",
 ";",
 [
 "testDump_sink",
@@ -39246,7 +39246,7 @@
 "ds-1684-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1684:run->skip_reason = GSHSCENE_REASON_RESOURCE_LIMIT;",
+"1693:run->skip_reason = GSHSCENE_REASON_RESOURCE_LIMIT;",
 ";",
 [
 "testDump_sink",
@@ -39268,7 +39268,7 @@
 "ds-1687-wd",
 "srcl",
 "src/sink/dump_sink.c",
-"1687:%s:%016\" P",
+"1696:%s:%016\" P",
 "%s:%\" P",
 [
 "testDump_sink",
@@ -39290,7 +39290,7 @@
 "ds-1687-wd2",
 "srcl",
 "src/sink/dump_sink.c",
-"1687:ap=%016\" P",
+"1696:ap=%016\" P",
 "ap=%\" P",
 [
 "testDump_sink",
@@ -39312,7 +39312,7 @@
 "ds-1688-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1688:==",
+"1697:==",
 "!=",
 [
 "testDump_sink",
@@ -39334,7 +39334,7 @@
 "ds-1690-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1690:emit_text(run, run->line, &failed);",
+"1699:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -39356,7 +39356,7 @@
 "ds-1691-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1691:>kind == GSHSC",
+"1701:>kind == GSHSC",
 ">kind != GSHSC",
 [
 "testDump_sink",
@@ -39378,7 +39378,7 @@
 "ds-1691-and",
 "srcl",
 "src/sink/dump_sink.c",
-"1691:&&",
+"1701:&&",
 "||",
 [
 "testDump_sink",
@@ -39400,7 +39400,7 @@
 "ds-1691-eq2",
 "srcl",
 "src/sink/dump_sink.c",
-"1691:.kind == GSHSC",
+"1701:.kind == GSHSC",
 ".kind != GSHSC",
 [
 "testDump_sink",
@@ -39422,7 +39422,7 @@
 "ds-1691-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1691:(item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT)",
+"1701:(item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT)",
 "(!(item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT))",
 [
 "testDump_sink",
@@ -39444,7 +39444,7 @@
 "ds-1692-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1692:snprintf(run->line, LINE_BYTES, \" grad=%\" PRIu64, gshscene_resource_id(item->paint.resource));",
+"1702:snprintf(run->line, LINE_BYTES, \" grad=%\" PRIu64, gshscene_resource_id(item->paint.resource));",
 ";",
 [
 "testDump_sink",
@@ -39466,7 +39466,7 @@
 "ds-1693-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1693:emit_text(run, run->line, &failed);",
+"1703:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -39488,7 +39488,7 @@
 "ds-1694-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1694:>kind == GSHSC",
+"1704:>kind == GSHSC",
 ">kind != GSHSC",
 [
 "testDump_sink",
@@ -39510,7 +39510,7 @@
 "ds-1694-and",
 "srcl",
 "src/sink/dump_sink.c",
-"1694:&&",
+"1704:&&",
 "||",
 [
 "testDump_sink",
@@ -39532,7 +39532,7 @@
 "ds-1694-eq2",
 "srcl",
 "src/sink/dump_sink.c",
-"1694:.kind == GSHSC",
+"1704:.kind == GSHSC",
 ".kind != GSHSC",
 [
 "testDump_sink",
@@ -39554,7 +39554,7 @@
 "ds-1694-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1694:(item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_IMAGE)",
+"1704:(item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_IMAGE)",
 "(!(item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_IMAGE))",
 [
 "testDump_sink",
@@ -39576,7 +39576,7 @@
 "ds-1695-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1695:snprintf(run->line, LINE_BYTES, \" img=%\" PRIu64, gshscene_resource_id(item->paint.resource));",
+"1705:snprintf(run->line, LINE_BYTES, \" img=%\" PRIu64, gshscene_resource_id(item->paint.resource));",
 ";",
 [
 "testDump_sink",
@@ -39598,7 +39598,7 @@
 "ds-1697-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1697:(item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_PATTERN)",
+"1707:(item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_PATTERN)",
 "(!(item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_PATTERN))",
 [
 "testDump_sink",
@@ -39620,7 +39620,7 @@
 "ds-1698-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1698:snprintf(run->line, LINE_BYTES, \" pat=%\" PRIu64, gshscene_resource_id(item->paint.resource));",
+"1708:snprintf(run->line, LINE_BYTES, \" pat=%\" PRIu64, gshscene_resource_id(item->paint.resource));",
 ";",
 [
 "testDump_sink",
@@ -39642,7 +39642,7 @@
 "ds-1700-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1700:copies_record(run, item, count, &box, &failed);",
+"1710:copies_record(run, item, count, &box, &failed);",
 ";",
 [
 "testDump_sink",
@@ -39664,7 +39664,7 @@
 "ds-1701-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1701:(hatched)",
+"1711:(hatched)",
 "(!(hatched))",
 [
 "testDump_sink",
@@ -39686,7 +39686,7 @@
 "ds-1708-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1708:==",
+"1718:==",
 "!=",
 [
 "testDump_sink",
@@ -39708,7 +39708,7 @@
 "ds-1708-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1708:(hr == GSHSCENE_ERR_LIMIT)",
+"1718:(hr == GSHSCENE_ERR_LIMIT)",
 "(!(hr == GSHSCENE_ERR_LIMIT))",
 [
 "testDump_sink",
@@ -39730,7 +39730,7 @@
 "ds-1711-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"1711:!=",
+"1721:!=",
 "==",
 [
 "testDump_sink",
@@ -39752,7 +39752,7 @@
 "ds-1711-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1711:(hr != GSHSCENE_OK)",
+"1721:(hr != GSHSCENE_OK)",
 "(!(hr != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -39774,7 +39774,7 @@
 "ds-1714-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1714:(hhas)",
+"1724:(hhas)",
 "(!(hhas))",
 [
 "testDump_sink",
@@ -39796,7 +39796,7 @@
 "ds-1715-wd",
 "srcl",
 "src/sink/dump_sink.c",
-"1715:%016",
+"1725:%016",
 "%",
 [
 "testDump_sink",
@@ -39818,7 +39818,7 @@
 "ds-1721-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1721:emit_text(run, run->line, &failed);",
+"1731:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -39840,7 +39840,7 @@
 "ds-1723-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1723:emit_text(run, \" box=\", &failed);",
+"1733:emit_text(run, \" box=\", &failed);",
 ";",
 [
 "testDump_sink",
@@ -39862,7 +39862,7 @@
 "ds-1724-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1724:(plane)",
+"1734:(plane)",
 "(!(plane))",
 [
 "testDump_sink",
@@ -39884,7 +39884,7 @@
 "ds-1726-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1726:(box.empty)",
+"1736:(box.empty)",
 "(!(box.empty))",
 [
 "testDump_sink",
@@ -39906,7 +39906,7 @@
 "ds-1727-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1727:emit_text(run, \"-\\n\", &failed);",
+"1737:emit_text(run, \"-\\n\", &failed);",
 ";",
 [
 "testDump_sink",
@@ -39928,7 +39928,7 @@
 "ds-1729-wd",
 "srcl",
 "src/sink/dump_sink.c",
-"1729:, \"%016\" P",
+"1739:, \"%016\" P",
 ", \"%\" P",
 [
 "testDump_sink",
@@ -39950,7 +39950,7 @@
 "ds-1729-wd2",
 "srcl",
 "src/sink/dump_sink.c",
-"1729:6\" PRIx64 \" %016\" PRIx64 \" %",
+"1739:6\" PRIx64 \" %016\" PRIx64 \" %",
 "6\" PRIx64 \" %\" PRIx64 \" %",
 [
 "testDump_sink",
@@ -39972,7 +39972,7 @@
 "ds-1729-wd3",
 "srcl",
 "src/sink/dump_sink.c",
-"1729:6\" PRIx64 \" %016\" PRIx64 \" %",
+"1739:6\" PRIx64 \" %016\" PRIx64 \" %",
 "6\" PRIx64 \" %\" PRIx64 \" %",
 [
 "testDump_sink",
@@ -39994,7 +39994,7 @@
 "ds-1729-wd4",
 "srcl",
 "src/sink/dump_sink.c",
-"1729:6\" PRIx64 \" %016\" PRIx64 \"\\n",
+"1739:6\" PRIx64 \" %016\" PRIx64 \"\\n",
 "6\" PRIx64 \" %\" PRIx64 \"\\n",
 [
 "testDump_sink",
@@ -40016,7 +40016,7 @@
 "ds-1731-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1731:emit_text(run, run->line, &failed);",
+"1741:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -40038,7 +40038,7 @@
 "ds-1733-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1733:>kind == GSHSC",
+"1743:>kind == GSHSC",
 ">kind != GSHSC",
 [
 "testDump_sink",
@@ -40060,7 +40060,7 @@
 "ds-1733-and",
 "srcl",
 "src/sink/dump_sink.c",
-"1733:&&",
+"1743:&&",
 "||",
 [
 "testDump_sink",
@@ -40082,7 +40082,7 @@
 "ds-1733-eq2",
 "srcl",
 "src/sink/dump_sink.c",
-"1733:.kind == GSHSC",
+"1743:.kind == GSHSC",
 ".kind != GSHSC",
 [
 "testDump_sink",
@@ -40104,7 +40104,7 @@
 "ds-1733-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1733:(item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT)",
+"1743:(item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT)",
 "(!(item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT))",
 [
 "testDump_sink",
@@ -40126,7 +40126,7 @@
 "ds-1735-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"1735:!=",
+"1745:!=",
 "==",
 [
 "testDump_sink",
@@ -40148,7 +40148,7 @@
 "ds-1735-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1735:(r != GSHSCENE_OK)",
+"1745:(r != GSHSCENE_OK)",
 "(!(r != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -40170,7 +40170,7 @@
 "ds-1738-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1738:>kind == GSHSC",
+"1748:>kind == GSHSC",
 ">kind != GSHSC",
 [
 "testDump_sink",
@@ -40192,7 +40192,7 @@
 "ds-1738-and",
 "srcl",
 "src/sink/dump_sink.c",
-"1738:&&",
+"1748:&&",
 "||",
 [
 "testDump_sink",
@@ -40214,7 +40214,7 @@
 "ds-1738-eq2",
 "srcl",
 "src/sink/dump_sink.c",
-"1738:.kind == GSHSC",
+"1748:.kind == GSHSC",
 ".kind != GSHSC",
 [
 "testDump_sink",
@@ -40236,7 +40236,7 @@
 "ds-1738-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1738:(item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_IMAGE)",
+"1748:(item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_IMAGE)",
 "(!(item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_IMAGE))",
 [
 "testDump_sink",
@@ -40258,7 +40258,7 @@
 "ds-1740-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"1740:!=",
+"1750:!=",
 "==",
 [
 "testDump_sink",
@@ -40280,7 +40280,7 @@
 "ds-1740-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1740:(r != GSHSCENE_OK)",
+"1750:(r != GSHSCENE_OK)",
 "(!(r != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -40302,7 +40302,7 @@
 "ds-1743-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1743:>kind == GSHSC",
+"1753:>kind == GSHSC",
 ">kind != GSHSC",
 [
 "testDump_sink",
@@ -40324,7 +40324,7 @@
 "ds-1743-and",
 "srcl",
 "src/sink/dump_sink.c",
-"1743:&&",
+"1753:&&",
 "||",
 [
 "testDump_sink",
@@ -40346,7 +40346,7 @@
 "ds-1743-eq2",
 "srcl",
 "src/sink/dump_sink.c",
-"1743:.kind == GSHSC",
+"1753:.kind == GSHSC",
 ".kind != GSHSC",
 [
 "testDump_sink",
@@ -40368,7 +40368,7 @@
 "ds-1743-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1743:(item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_PATTERN)",
+"1753:(item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_PATTERN)",
 "(!(item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_PATTERN))",
 [
 "testDump_sink",
@@ -40390,7 +40390,7 @@
 "ds-1745-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"1745:!=",
+"1755:!=",
 "==",
 [
 "testDump_sink",
@@ -40412,7 +40412,7 @@
 "ds-1745-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1745:(r != GSHSCENE_OK)",
+"1755:(r != GSHSCENE_OK)",
 "(!(r != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -40434,7 +40434,7 @@
 "ds-1748-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1748:(hatched)",
+"1758:(hatched)",
 "(!(hatched))",
 [
 "testDump_sink",
@@ -40456,7 +40456,7 @@
 "ds-1750-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"1750:!=",
+"1760:!=",
 "==",
 [
 "testDump_sink",
@@ -40478,7 +40478,7 @@
 "ds-1750-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1750:(r != GSHSCENE_OK)",
+"1760:(r != GSHSCENE_OK)",
 "(!(r != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -40500,7 +40500,7 @@
 "ds-1754-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1754:nd == GS",
+"1764:nd == GS",
 "nd != GS",
 [
 "testDump_sink",
@@ -40522,7 +40522,7 @@
 "ds-1754-eq2",
 "srcl",
 "src/sink/dump_sink.c",
-"1754:e) == GS",
+"1764:e) == GS",
 "e) != GS",
 [
 "testDump_sink",
@@ -40544,7 +40544,7 @@
 "ds-1754-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1754:(item->kind == GSHSCENE_ITEM_CLIP_PUSH && gshscene_resource_kind(item->resource) == GSHSCENE_RESOURCE_CLIP_UNION)",
+"1764:(item->kind == GSHSCENE_ITEM_CLIP_PUSH && gshscene_resource_kind(item->resource) == GSHSCENE_RESOURCE_CLIP_UNION)",
 "(!(item->kind == GSHSCENE_ITEM_CLIP_PUSH && gshscene_resource_kind(item->resource) == GSHSCENE_RESOURCE_CLIP_UNION))",
 [
 "testDump_sink",
@@ -40566,7 +40566,7 @@
 "ds-1760-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1760:path_records(run, item->resource, &map, &failed);",
+"1770:path_records(run, item->resource, &map, &failed);",
 ";",
 [
 "testDump_sink",
@@ -40588,7 +40588,7 @@
 "ds-1761-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1761:(routed)",
+"1771:(routed)",
 "(!(routed))",
 [
 "testDump_sink",
@@ -40610,7 +40610,7 @@
 "ds-1763-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"1763:!=",
+"1773:!=",
 "==",
 [
 "testDump_sink",
@@ -40632,7 +40632,7 @@
 "ds-1763-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1763:(r != GSHSCENE_OK)",
+"1773:(r != GSHSCENE_OK)",
 "(!(r != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -40654,7 +40654,7 @@
 "ds-1768-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1768:==",
+"1778:==",
 "!=",
 [
 "testDump_sink",
@@ -40676,7 +40676,7 @@
 "ds-1768-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1768:(item->kind == GSHSCENE_ITEM_FILL)",
+"1778:(item->kind == GSHSCENE_ITEM_FILL)",
 "(!(item->kind == GSHSCENE_ITEM_FILL))",
 [
 "testDump_sink",
@@ -40698,7 +40698,7 @@
 "ds-1769-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1769:(pixel)",
+"1779:(pixel)",
 "(!(pixel))",
 [
 "testDump_sink",
@@ -40720,7 +40720,7 @@
 "ds-1770-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1770:draw_rect(run, r, mark_of(chain, count), &failed);",
+"1780:draw_rect(run, r, mark_of(chain, count), &failed);",
 ";",
 [
 "testDump_sink",
@@ -40742,7 +40742,7 @@
 "ds-1776-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1776:memset(b, 0, sizeof *b);",
+"1786:memset(b, 0, sizeof *b);",
 ";",
 [
 "testDump_sink",
@@ -40764,7 +40764,7 @@
 "ds-1783-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1783:(gshscene_group_pdf_default(item->group.isolation, item->group.knockout, item->group.soft_mask))",
+"1793:(gshscene_group_pdf_default(item->group.isolation, item->group.knockout, item->group.soft_mask))",
 "(!(gshscene_group_pdf_default(item->group.isolation, item->group.knockout, item->group.soft_mask)))",
 [
 "testDump_sink",
@@ -40786,7 +40786,7 @@
 "ds-1784-wd",
 "srcl",
 "src/sink/dump_sink.c",
-"1784:%016",
+"1794:%016",
 "%",
 [
 "testDump_sink",
@@ -40808,7 +40808,7 @@
 "ds-1788-wd",
 "srcl",
 "src/sink/dump_sink.c",
-"1788:ty=%016\" P",
+"1798:ty=%016\" P",
 "ty=%\" P",
 [
 "testDump_sink",
@@ -40830,7 +40830,7 @@
 "ds-1788-wd2",
 "srcl",
 "src/sink/dump_sink.c",
-"1788:sk=%016\" P",
+"1798:sk=%016\" P",
 "sk=%\" P",
 [
 "testDump_sink",
@@ -40852,7 +40852,7 @@
 "ds-1791-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1791:(item->group.soft_mask)",
+"1801:(item->group.soft_mask)",
 "(!(item->group.soft_mask))",
 [
 "testDump_sink",
@@ -40874,7 +40874,7 @@
 "ds-1794-wd",
 "srcl",
 "src/sink/dump_sink.c",
-"1794:%016",
+"1804:%016",
 "%",
 [
 "testDump_sink",
@@ -40896,7 +40896,7 @@
 "ds-1797-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1797:emit_text(run, run->line, &failed);",
+"1807:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -40918,7 +40918,7 @@
 "ds-1798-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1798:(item->group.soft_mask)",
+"1808:(item->group.soft_mask)",
 "(!(item->group.soft_mask))",
 [
 "testDump_sink",
@@ -40940,7 +40940,7 @@
 "ds-1800-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"1800:!=",
+"1810:!=",
 "==",
 [
 "testDump_sink",
@@ -40962,7 +40962,7 @@
 "ds-1800-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1800:(mr != GSHSCENE_OK)",
+"1810:(mr != GSHSCENE_OK)",
 "(!(mr != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -40984,7 +40984,7 @@
 "ds-1806-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1806:memset(b, 0, sizeof *b);",
+"1816:memset(b, 0, sizeof *b);",
 ";",
 [
 "testDump_sink",
@@ -41006,7 +41006,7 @@
 "ds-1807-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1807:b->group = 1;",
+"1817:b->group = 1;",
 ";",
 [
 "testDump_sink",
@@ -41028,7 +41028,7 @@
 "ds-1810-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1810:b->clip_whole = run->whole;",
+"1820:b->clip_whole = run->whole;",
 ";",
 [
 "testDump_sink",
@@ -41050,7 +41050,7 @@
 "ds-1811-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1811:b->mark = mark_of(chain, count);",
+"1821:b->mark = mark_of(chain, count);",
 ";",
 [
 "testDump_sink",
@@ -41072,7 +41072,7 @@
 "ds-1812-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1812:run->groups_open++;",
+"1822:run->groups_open++;",
 ";",
 [
 "testDump_sink",
@@ -41094,7 +41094,7 @@
 "ds-1817-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1817:==",
+"1827:==",
 "!=",
 [
 "testDump_sink",
@@ -41116,7 +41116,7 @@
 "ds-1817-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1817:emit_text(run, item->kind == GSHSCENE_ITEM_CLIP_POP ? \" c\\n\" : \" g\\n\", &failed);",
+"1827:emit_text(run, item->kind == GSHSCENE_ITEM_CLIP_POP ? \" c\\n\" : \" g\\n\", &failed);",
 ";",
 [
 "testDump_sink",
@@ -41138,7 +41138,7 @@
 "ds-1818-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1818:==",
+"1828:==",
 "!=",
 [
 "testDump_sink",
@@ -41160,7 +41160,7 @@
 "ds-1818-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1818:(run->block_count == 0)",
+"1828:(run->block_count == 0)",
 "(!(run->block_count == 0))",
 [
 "testDump_sink",
@@ -41182,7 +41182,7 @@
 "ds-1822-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1822:(b.group)",
+"1832:(b.group)",
 "(!(b.group))",
 [
 "testDump_sink",
@@ -41204,7 +41204,7 @@
 "ds-1823-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1823:run->groups_open--;",
+"1833:run->groups_open--;",
 ";",
 [
 "testDump_sink",
@@ -41226,7 +41226,7 @@
 "ds-1824-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1824:(pixel && b.has_gathered)",
+"1834:(pixel && b.has_gathered)",
 "(!(pixel && b.has_gathered))",
 [
 "testDump_sink",
@@ -41248,7 +41248,7 @@
 "ds-1827-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1827:(!g)",
+"1837:(!g)",
 "(!(!g))",
 [
 "testDump_sink",
@@ -41270,7 +41270,7 @@
 "ds-1828-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1828:stamp(run, r, b.mark, &failed);",
+"1838:stamp(run, r, b.mark, &failed);",
 ";",
 [
 "testDump_sink",
@@ -41292,7 +41292,7 @@
 "ds-1829-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1829:(!rect_empty(r))",
+"1839:(!rect_empty(r))",
 "(!(!rect_empty(r)))",
 [
 "testDump_sink",
@@ -41314,7 +41314,7 @@
 "ds-1830-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1830:g->gathered = g->has_gathered ? rect_join(g->gathered, r) : r;",
+"1840:g->gathered = g->has_gathered ? rect_join(g->gathered, r) : r;",
 ";",
 [
 "testDump_sink",
@@ -41336,7 +41336,7 @@
 "ds-1831-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1831:g->has_gathered = 1;",
+"1841:g->has_gathered = 1;",
 ";",
 [
 "testDump_sink",
@@ -41358,7 +41358,7 @@
 "ds-1838-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1838:hex(run, \" I res=picture:\", gshscene_resource_hash(item->resource), &failed);",
+"1848:hex(run, \" I res=picture:\", gshscene_resource_hash(item->resource), &failed);",
 ";",
 [
 "testDump_sink",
@@ -41380,7 +41380,7 @@
 "ds-1839-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1839:emit_text(run, \"\\n\", &failed);",
+"1849:emit_text(run, \"\\n\", &failed);",
 ";",
 [
 "testDump_sink",
@@ -41402,7 +41402,7 @@
 "ds-1854-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1854:==",
+"1864:==",
 "!=",
 [
 "testDump_sink",
@@ -41424,7 +41424,7 @@
 "ds-1854-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1854:(ds->pending[i] == run)",
+"1864:(ds->pending[i] == run)",
 "(!(ds->pending[i] == run))",
 [
 "testDump_sink",
@@ -41446,7 +41446,7 @@
 "ds-1855-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1855:ds->pending[i] = ds->pending[--ds->pending_count];",
+"1865:ds->pending[i] = ds->pending[--ds->pending_count];",
 ";",
 [
 "testDump_sink",
@@ -41468,7 +41468,7 @@
 "ds-1859-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1859:GCU_MUTEX_UNLOCK(ds->lock);",
+"1869:GCU_MUTEX_UNLOCK(ds->lock);",
 ";",
 [
 "testDump_sink",
@@ -41490,7 +41490,7 @@
 "ds-1865-str",
 "srcl",
 "src/sink/dump_sink.c",
-"1865:, \"E re",
+"1875:, \"E re",
 ", \"Z re",
 [
 "testDump_sink",
@@ -41512,7 +41512,7 @@
 "ds-1867-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1867:emit_text(run, run->line, &failed);",
+"1877:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -41534,7 +41534,7 @@
 "ds-1868-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1868:==",
+"1878:==",
 "!=",
 [
 "testDump_sink",
@@ -41556,7 +41556,7 @@
 "ds-1868-and",
 "srcl",
 "src/sink/dump_sink.c",
-"1868:&&",
+"1878:&&",
 "||",
 [
 "testDump_sink",
@@ -41578,7 +41578,7 @@
 "ds-1868-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"1868:!=",
+"1878:!=",
 "==",
 [
 "testDump_sink",
@@ -41600,7 +41600,7 @@
 "ds-1868-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1868:(result == GSHSCENE_OK && failed != GSHSCENE_OK)",
+"1878:(result == GSHSCENE_OK && failed != GSHSCENE_OK)",
 "(!(result == GSHSCENE_OK && failed != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -41622,7 +41622,7 @@
 "ds-1869-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1869:result = failed;",
+"1879:result = failed;",
 ";",
 [
 "testDump_sink",
@@ -41644,7 +41644,7 @@
 "ds-1873-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1873:pending_remove(ds, run);",
+"1883:pending_remove(ds, run);",
 ";",
 [
 "testDump_sink",
@@ -41666,7 +41666,7 @@
 "ds-1874-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1874:gshscene_job_set_impl_value(job, run->hash);",
+"1884:gshscene_job_set_impl_value(job, run->hash);",
 ";",
 [
 "testDump_sink",
@@ -41688,7 +41688,7 @@
 "ds-1875-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1875:gshscene_job_set_frame_bytes(job, run->bytes);",
+"1885:gshscene_job_set_frame_bytes(job, run->bytes);",
 ";",
 [
 "testDump_sink",
@@ -41710,7 +41710,7 @@
 "ds-1877-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1877:==",
+"1887:==",
 "!=",
 [
 "testDump_sink",
@@ -41732,7 +41732,7 @@
 "ds-1878-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1878:==",
+"1888:==",
 "!=",
 [
 "testDump_sink",
@@ -41754,7 +41754,7 @@
 "ds-1878-str",
 "srcl",
 "src/sink/dump_sink.c",
-"1878:? \"canc",
+"1888:? \"canc",
 "? \"Zanc",
 [
 "testDump_sink",
@@ -41776,7 +41776,7 @@
 "ds-1879-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1879:==",
+"1889:==",
 "!=",
 [
 "testDump_sink",
@@ -41798,7 +41798,7 @@
 "ds-1879-str",
 "srcl",
 "src/sink/dump_sink.c",
-"1879:? \"stri",
+"1889:? \"stri",
 "? \"Ztri",
 [
 "testDump_sink",
@@ -41820,7 +41820,7 @@
 "ds-1880-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1880:==",
+"1890:==",
 "!=",
 [
 "testDump_sink",
@@ -41842,7 +41842,7 @@
 "ds-1880-str",
 "srcl",
 "src/sink/dump_sink.c",
-"1880:? \"the ",
+"1890:? \"the ",
 "? \"Zhe ",
 [
 "testDump_sink",
@@ -41864,7 +41864,7 @@
 "ds-1881-str",
 "srcl",
 "src/sink/dump_sink.c",
-"1881:: \"the ",
+"1891:: \"the ",
 ": \"Zhe ",
 [
 "testDump_sink",
@@ -41886,7 +41886,7 @@
 "ds-1890-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1890:(!run->started)",
+"1900:(!run->started)",
 "(!(!run->started))",
 [
 "testDump_sink",
@@ -41908,7 +41908,7 @@
 "ds-1891-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1891:run->started = 1;",
+"1901:run->started = 1;",
 ";",
 [
 "testDump_sink",
@@ -41930,7 +41930,7 @@
 "ds-1892-str",
 "srcl",
 "src/sink/dump_sink.c",
-"1892:g",
+"1902:g",
 "Z",
 [
 "testDump_sink",
@@ -41952,7 +41952,7 @@
 "ds-1892-wd",
 "srcl",
 "src/sink/dump_sink.c",
-"1892:%016",
+"1902:%016",
 "%",
 [
 "testDump_sink",
@@ -41974,7 +41974,7 @@
 "ds-1895-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1895:emit_text(run, run->line, &failed);",
+"1905:emit_text(run, run->line, &failed);",
 ";",
 [
 "testDump_sink",
@@ -41996,7 +41996,7 @@
 "ds-1896-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"1896:!=",
+"1906:!=",
 "==",
 [
 "testDump_sink",
@@ -42018,7 +42018,7 @@
 "ds-1896-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1896:(failed != GSHSCENE_OK)",
+"1906:(failed != GSHSCENE_OK)",
 "(!(failed != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -42040,7 +42040,7 @@
 "ds-1897-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1897:finish(run, failed);",
+"1907:finish(run, failed);",
 ";",
 [
 "testDump_sink",
@@ -42062,7 +42062,7 @@
 "ds-1905-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1905:==",
+"1915:==",
 "!=",
 [
 "testDump_sink",
@@ -42084,7 +42084,7 @@
 "ds-1905-or",
 "srcl",
 "src/sink/dump_sink.c",
-"1905:||",
+"1915:||",
 "&&",
 [
 "testDump_sink",
@@ -42106,7 +42106,7 @@
 "ds-1905-lt",
 "srcl",
 "src/sink/dump_sink.c",
-"1905:<",
+"1915:<",
 "<=",
 [
 "testDump_sink",
@@ -42128,7 +42128,7 @@
 "ds-1905-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1905:(limit == 0 || steps < limit)",
+"1915:(limit == 0 || steps < limit)",
 "(!(limit == 0 || steps < limit))",
 [
 "testDump_sink",
@@ -42150,7 +42150,7 @@
 "ds-1906-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1906:(!gshscene_expansion_next(&run->walk, &item, &chain, &count))",
+"1916:(!gshscene_expansion_next(&run->walk, &item, &chain, &count))",
 "(!(!gshscene_expansion_next(&run->walk, &item, &chain, &count)))",
 [
 "testDump_sink",
@@ -42172,7 +42172,7 @@
 "ds-1907-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1907:finish(run, GSHSCENE_OK);",
+"1917:finish(run, GSHSCENE_OK);",
 ";",
 [
 "testDump_sink",
@@ -42194,7 +42194,7 @@
 "ds-1910-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1910:steps++;",
+"1920:steps++;",
 ";",
 [
 "testDump_sink",
@@ -42216,7 +42216,7 @@
 "ds-1911-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1911:gshscene_job_work(run->job, 1);",
+"1921:gshscene_job_work(run->job, 1);",
 ";",
 [
 "testDump_sink",
@@ -42238,7 +42238,7 @@
 "ds-1913-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"1913:!=",
+"1923:!=",
 "==",
 [
 "testDump_sink",
@@ -42260,7 +42260,7 @@
 "ds-1913-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1913:(r != GSHSCENE_OK)",
+"1923:(r != GSHSCENE_OK)",
 "(!(r != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -42282,7 +42282,7 @@
 "ds-1914-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1914:finish(run, r);",
+"1924:finish(run, r);",
 ";",
 [
 "testDump_sink",
@@ -42304,7 +42304,7 @@
 "ds-1917-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1917:run->processed++;",
+"1927:run->processed++;",
 ";",
 [
 "testDump_sink",
@@ -42326,7 +42326,7 @@
 "ds-1918-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1918:==",
+"1928:==",
 "!=",
 [
 "testDump_sink",
@@ -42348,7 +42348,7 @@
 "ds-1918-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1918:(run->groups_open == 0)",
+"1928:(run->groups_open == 0)",
 "(!(run->groups_open == 0))",
 [
 "testDump_sink",
@@ -42370,7 +42370,7 @@
 "ds-1919-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1919:run->done = run->processed;",
+"1929:run->done = run->processed;",
 ";",
 [
 "testDump_sink",
@@ -42392,7 +42392,7 @@
 "ds-1921-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1921:(gshscene_job_unit(run->job, run->processed, run->done))",
+"1931:(gshscene_job_unit(run->job, run->processed, run->done))",
 "(!(gshscene_job_unit(run->job, run->processed, run->done)))",
 [
 "testDump_sink",
@@ -42414,7 +42414,7 @@
 "ds-1922-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1922:finish(run, GSHSCENE_ERR_CANCELLED);",
+"1932:finish(run, GSHSCENE_ERR_CANCELLED);",
 ";",
 [
 "testDump_sink",
@@ -42436,7 +42436,7 @@
 "ds-1940-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1940:(request->flags & GSHSCENE_RENDER_CALLER_MEMORY)",
+"1950:(request->flags & GSHSCENE_RENDER_CALLER_MEMORY)",
 "(!(request->flags & GSHSCENE_RENDER_CALLER_MEMORY))",
 [
 "testDump_sink",
@@ -42458,7 +42458,7 @@
 "ds-1943-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1943:==",
+"1953:==",
 "!=",
 [
 "testDump_sink",
@@ -42480,7 +42480,7 @@
 "ds-1943-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1943:memory = need == SIZE_MAX ? NULL : gshscene_alloc(&ds->alloc, need);",
+"1953:memory = need == SIZE_MAX ? NULL : gshscene_alloc(&ds->alloc, need);",
 ";",
 [
 "testDump_sink",
@@ -42502,7 +42502,7 @@
 "ds-1944-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1944:(!memory)",
+"1954:(!memory)",
 "(!(!memory))",
 [
 "testDump_sink",
@@ -42524,7 +42524,7 @@
 "ds-1951-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1951:memset(run, 0, sizeof *run);",
+"1961:memset(run, 0, sizeof *run);",
 ";",
 [
 "testDump_sink",
@@ -42546,7 +42546,7 @@
 "ds-1954-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1954:run->blocks = carve(&cursor, blocks * sizeof(Block));",
+"1964:run->blocks = carve(&cursor, blocks * sizeof(Block));",
 ";",
 [
 "testDump_sink",
@@ -42568,7 +42568,7 @@
 "ds-1955-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1955:run->stop = carve(&cursor, levels * sizeof(size_t));",
+"1965:run->stop = carve(&cursor, levels * sizeof(size_t));",
 ";",
 [
 "testDump_sink",
@@ -42590,7 +42590,7 @@
 "ds-1956-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1956:run->line = carve(&cursor, LINE_BYTES);",
+"1966:run->line = carve(&cursor, LINE_BYTES);",
 ";",
 [
 "testDump_sink",
@@ -42612,7 +42612,7 @@
 "ds-1957-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1957:run->gradients = carve(&cursor, fills * sizeof(uint64_t));",
+"1967:run->gradients = carve(&cursor, fills * sizeof(uint64_t));",
 ";",
 [
 "testDump_sink",
@@ -42634,7 +42634,7 @@
 "ds-1958-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1958:run->stops = carve(&cursor, stops * sizeof(GSHSCENE_Resolved_Stop));",
+"1968:run->stops = carve(&cursor, stops * sizeof(GSHSCENE_Resolved_Stop));",
 ";",
 [
 "testDump_sink",
@@ -42656,7 +42656,7 @@
 "ds-1959-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1959:run->stop_capacity = stops;",
+"1969:run->stop_capacity = stops;",
 ";",
 [
 "testDump_sink",
@@ -42678,7 +42678,7 @@
 "ds-1960-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1960:run->styles = carve(&cursor, strokes * sizeof(uint64_t));",
+"1970:run->styles = carve(&cursor, strokes * sizeof(uint64_t));",
 ";",
 [
 "testDump_sink",
@@ -42700,7 +42700,7 @@
 "ds-1961-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1961:arena_init(&run->glyphs, carve(&cursor, GLYPH_BYTES), GLYPH_BYTES);",
+"1971:arena_init(&run->glyphs, carve(&cursor, GLYPH_BYTES), GLYPH_BYTES);",
 ";",
 [
 "testDump_sink",
@@ -42722,7 +42722,7 @@
 "ds-1965-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1965:arena_init(&run->strokes, carve(&cursor, expansion_bytes), expansion_bytes);",
+"1975:arena_init(&run->strokes, carve(&cursor, expansion_bytes), expansion_bytes);",
 ";",
 [
 "testDump_sink",
@@ -42744,7 +42744,7 @@
 "ds-1966-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1966:arena_init(&run->centerlines, carve(&cursor, centerline_bytes), centerline_bytes);",
+"1976:arena_init(&run->centerlines, carve(&cursor, centerline_bytes), centerline_bytes);",
 ";",
 [
 "testDump_sink",
@@ -42766,7 +42766,7 @@
 "ds-1967-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1967:run->sink = ds;",
+"1977:run->sink = ds;",
 ";",
 [
 "testDump_sink",
@@ -42788,7 +42788,7 @@
 "ds-1968-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1968:run->job = job;",
+"1978:run->job = job;",
 ";",
 [
 "testDump_sink",
@@ -42810,7 +42810,7 @@
 "ds-1969-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1969:run->memory = memory;",
+"1979:run->memory = memory;",
 ";",
 [
 "testDump_sink",
@@ -42832,7 +42832,7 @@
 "ds-1970-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1970:run->bytes = need;",
+"1980:run->bytes = need;",
 ";",
 [
 "testDump_sink",
@@ -42854,7 +42854,7 @@
 "ds-1971-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1971:run->hash = GSHGEOM_FNV_OFFSET_BASIS;",
+"1981:run->hash = GSHGEOM_FNV_OFFSET_BASIS;",
 ";",
 [
 "testDump_sink",
@@ -42876,7 +42876,7 @@
 "ds-1972-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"1972:!=",
+"1982:!=",
 "==",
 [
 "testDump_sink",
@@ -42898,7 +42898,7 @@
 "ds-1972-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1972:(gshscene_expansion_init(&run->walk, request->list, walk_memory, gshscene_expansion_bytes(request->list)) != GSHSCENE_OK)",
+"1982:(gshscene_expansion_init(&run->walk, request->list, walk_memory, gshscene_expansion_bytes(request->list)) != GSHSCENE_OK)",
 "(!(gshscene_expansion_init(&run->walk, request->list, walk_memory, gshscene_expansion_bytes(request->list)) != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -42920,7 +42920,7 @@
 "ds-1977-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1977:==",
+"1987:==",
 "!=",
 [
 "testDump_sink",
@@ -42942,7 +42942,7 @@
 "ds-1977-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1977:(target->kind == GSHSCENE_TARGET_RASTER)",
+"1987:(target->kind == GSHSCENE_TARGET_RASTER)",
 "(!(target->kind == GSHSCENE_TARGET_RASTER))",
 [
 "testDump_sink",
@@ -42964,7 +42964,7 @@
 "ds-1978-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1978:run->raster = target->surface;",
+"1988:run->raster = target->surface;",
 ";",
 [
 "testDump_sink",
@@ -42986,7 +42986,7 @@
 "ds-1979-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1979:run->area = target->damage ? rect_meet(target->extent, *target->damage) : target->extent;",
+"1989:run->area = target->damage ? rect_meet(target->extent, *target->damage) : target->extent;",
 ";",
 [
 "testDump_sink",
@@ -43008,7 +43008,7 @@
 "ds-1980-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1980:run->whole = target->extent;",
+"1990:run->whole = target->extent;",
 ";",
 [
 "testDump_sink",
@@ -43030,7 +43030,7 @@
 "ds-1981-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1981:run->out = ds->config.log;",
+"1991:run->out = ds->config.log;",
 ";",
 [
 "testDump_sink",
@@ -43052,7 +43052,7 @@
 "ds-1983-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1983:run->out = target->surface;",
+"1993:run->out = target->surface;",
 ";",
 [
 "testDump_sink",
@@ -43074,7 +43074,7 @@
 "ds-1984-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1984:run->whole.x0 = run->whole.y0 = -((int64_t)1 << 40);",
+"1994:run->whole.x0 = run->whole.y0 = -((int64_t)1 << 40);",
 ";",
 [
 "testDump_sink",
@@ -43096,7 +43096,7 @@
 "ds-1985-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1985:run->whole.x1 = run->whole.y1 = (int64_t)1 << 40;",
+"1995:run->whole.x1 = run->whole.y1 = (int64_t)1 << 40;",
 ";",
 [
 "testDump_sink",
@@ -43118,7 +43118,7 @@
 "ds-1987-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1987:gshscene_job_set_impl_state(job, run);",
+"1997:gshscene_job_set_impl_state(job, run);",
 ";",
 [
 "testDump_sink",
@@ -43140,7 +43140,7 @@
 "ds-1988-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"1988:==",
+"1998:==",
 "!=",
 [
 "testDump_sink",
@@ -43162,7 +43162,7 @@
 "ds-1988-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"1988:(ds->config.completion == GSHSCENE_DUMP_SINK_DEFERRED)",
+"1998:(ds->config.completion == GSHSCENE_DUMP_SINK_DEFERRED)",
 "(!(ds->config.completion == GSHSCENE_DUMP_SINK_DEFERRED))",
 [
 "testDump_sink",
@@ -43184,7 +43184,7 @@
 "ds-1991-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1991:ds->pending[ds->pending_count++] = run;",
+"2001:ds->pending[ds->pending_count++] = run;",
 ";",
 [
 "testDump_sink",
@@ -43206,7 +43206,7 @@
 "ds-1992-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1992:GCU_MUTEX_UNLOCK(ds->lock);",
+"2002:GCU_MUTEX_UNLOCK(ds->lock);",
 ";",
 [
 "testDump_sink",
@@ -43228,7 +43228,7 @@
 "ds-1995-del",
 "srcl",
 "src/sink/dump_sink.c",
-"1995:advance(run, 0);",
+"2005:advance(run, 0);",
 ";",
 [
 "testDump_sink",
@@ -43250,7 +43250,7 @@
 "ds-2002-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2002:(run)",
+"2012:(run)",
 "(!(run))",
 [
 "testDump_sink",
@@ -43272,7 +43272,7 @@
 "ds-2003-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2003:advance(run, 0);",
+"2013:advance(run, 0);",
 ";",
 [
 "testDump_sink",
@@ -43294,7 +43294,7 @@
 "ds-2009-or",
 "srcl",
 "src/sink/dump_sink.c",
-"2009:||",
+"2019:||",
 "&&",
 [
 "testDump_sink",
@@ -43316,7 +43316,7 @@
 "ds-2009-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2009:(!sink || !gshscene_dump_sink_is(sink))",
+"2019:(!sink || !gshscene_dump_sink_is(sink))",
 "(!(!sink || !gshscene_dump_sink_is(sink)))",
 [
 "testDump_sink",
@@ -43338,7 +43338,7 @@
 "ds-2010-ret",
 "srcl",
 "src/sink/dump_sink.c",
-"2010:GSHSCENE_ERR_INVALID",
+"2020:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -43360,7 +43360,7 @@
 "ds-2013-and",
 "srcl",
 "src/sink/dump_sink.c",
-"2013:&&",
+"2023:&&",
 "||",
 [
 "testDump_sink",
@@ -43382,7 +43382,7 @@
 "ds-2013-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"2013:!=",
+"2023:!=",
 "==",
 [
 "testDump_sink",
@@ -43404,7 +43404,7 @@
 "ds-2013-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2013:(sink->ops.thread_affine && gshscene_thread_token() != sink->creator)",
+"2023:(sink->ops.thread_affine && gshscene_thread_token() != sink->creator)",
 "(!(sink->ops.thread_affine && gshscene_thread_token() != sink->creator))",
 [
 "testDump_sink",
@@ -43426,7 +43426,7 @@
 "ds-2014-ret",
 "srcl",
 "src/sink/dump_sink.c",
-"2014:GSHSCENE_ERR_INVALID",
+"2024:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -43448,7 +43448,7 @@
 "ds-2019-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2019:GCU_MUTEX_UNLOCK(ds->lock);",
+"2029:GCU_MUTEX_UNLOCK(ds->lock);",
 ";",
 [
 "testDump_sink",
@@ -43470,7 +43470,7 @@
 "ds-2021-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2021:(i < count)",
+"2031:(i < count)",
 "(!(i < count))",
 [
 "testDump_sink",
@@ -43492,7 +43492,7 @@
 "ds-2024-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2024:GCU_MUTEX_UNLOCK(ds->lock);",
+"2034:GCU_MUTEX_UNLOCK(ds->lock);",
 ";",
 [
 "testDump_sink",
@@ -43514,7 +43514,7 @@
 "ds-2025-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2025:(!run)",
+"2035:(!run)",
 "(!(!run))",
 [
 "testDump_sink",
@@ -43536,7 +43536,7 @@
 "ds-2028-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2028:(advance(run, ds->config.step_units))",
+"2038:(advance(run, ds->config.step_units))",
 "(!(advance(run, ds->config.step_units)))",
 [
 "testDump_sink",
@@ -43558,7 +43558,7 @@
 "ds-2031-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2031:i++;",
+"2041:i++;",
 ";",
 [
 "testDump_sink",
@@ -43580,7 +43580,7 @@
 "ds-2034-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2034:(out_running)",
+"2044:(out_running)",
 "(!(out_running))",
 [
 "testDump_sink",
@@ -43602,7 +43602,7 @@
 "ds-2037-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2037:GCU_MUTEX_UNLOCK(ds->lock);",
+"2047:GCU_MUTEX_UNLOCK(ds->lock);",
 ";",
 [
 "testDump_sink",
@@ -43624,7 +43624,7 @@
 "ds-2051-lt",
 "srcl",
 "src/sink/dump_sink.c",
-"2051:<",
+"2061:<",
 "<=",
 [
 "testDump_sink",
@@ -43646,7 +43646,7 @@
 "ds-2063-lt",
 "srcl",
 "src/sink/dump_sink.c",
-"2063:<",
+"2073:<",
 "<=",
 [
 "testDump_sink",
@@ -43668,7 +43668,7 @@
 "ds-2064-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"2064:==",
+"2074:==",
 "!=",
 [
 "testDump_sink",
@@ -43690,7 +43690,7 @@
 "ds-2064-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2064:(ds->cache[i].id == id)",
+"2074:(ds->cache[i].id == id)",
 "(!(ds->cache[i].id == id))",
 [
 "testDump_sink",
@@ -43712,7 +43712,7 @@
 "ds-2068-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"2068:==",
+"2078:==",
 "!=",
 [
 "testDump_sink",
@@ -43734,7 +43734,7 @@
 "ds-2068-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2068:(ds->cache_count == ds->cache_capacity)",
+"2078:(ds->cache_count == ds->cache_capacity)",
 "(!(ds->cache_count == ds->cache_capacity))",
 [
 "testDump_sink",
@@ -43756,7 +43756,7 @@
 "ds-2071-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2071:(!grown)",
+"2081:(!grown)",
 "(!(!grown))",
 [
 "testDump_sink",
@@ -43778,7 +43778,7 @@
 "ds-2074-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2074:ds->cache = grown;",
+"2084:ds->cache = grown;",
 ";",
 [
 "testDump_sink",
@@ -43800,7 +43800,7 @@
 "ds-2075-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2075:ds->cache_capacity = want;",
+"2085:ds->cache_capacity = want;",
 ";",
 [
 "testDump_sink",
@@ -43822,7 +43822,7 @@
 "ds-2077-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2077:ds->cache[ds->cache_count].id = id;",
+"2087:ds->cache[ds->cache_count].id = id;",
 ";",
 [
 "testDump_sink",
@@ -43844,7 +43844,7 @@
 "ds-2078-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2078:ds->cache[ds->cache_count].resource = gshscene_resource_retain(resource);",
+"2088:ds->cache[ds->cache_count].resource = gshscene_resource_retain(resource);",
 ";",
 [
 "testDump_sink",
@@ -43866,7 +43866,7 @@
 "ds-2079-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2079:ds->cache_count++;",
+"2089:ds->cache_count++;",
 ";",
 [
 "testDump_sink",
@@ -43888,7 +43888,7 @@
 "ds-2080-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2080:ds->static_bytes += gshscene_resource_bytes(resource);",
+"2090:ds->static_bytes += gshscene_resource_bytes(resource);",
 ";",
 [
 "testDump_sink",
@@ -43910,7 +43910,7 @@
 "ds-2087-lt",
 "srcl",
 "src/sink/dump_sink.c",
-"2087:<",
+"2097:<",
 "<=",
 [
 "testDump_sink",
@@ -43932,7 +43932,7 @@
 "ds-2089-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"2089:!=",
+"2099:!=",
 "==",
 [
 "testDump_sink",
@@ -43954,7 +43954,7 @@
 "ds-2089-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2089:(gshscene_list_item(list, i, &item) != GSHSCENE_OK)",
+"2099:(gshscene_list_item(list, i, &item) != GSHSCENE_OK)",
 "(!(gshscene_list_item(list, i, &item) != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -43976,7 +43976,7 @@
 "ds-2092-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2092:(!item->resource)",
+"2102:(!item->resource)",
 "(!(!item->resource))",
 [
 "testDump_sink",
@@ -43998,7 +43998,7 @@
 "ds-2097-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"2097:lt == GS",
+"2107:lt == GS",
 "lt != GS",
 [
 "testDump_sink",
@@ -44020,7 +44020,7 @@
 "ds-2097-and",
 "srcl",
 "src/sink/dump_sink.c",
-"2097:&&",
+"2107:&&",
 "||",
 [
 "testDump_sink",
@@ -44042,7 +44042,7 @@
 "ds-2097-eq2",
 "srcl",
 "src/sink/dump_sink.c",
-"2097:n) == GS",
+"2107:n) == GS",
 "n) != GS",
 [
 "testDump_sink",
@@ -44064,7 +44064,7 @@
 "ds-2097-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2097:(result == GSHSCENE_OK && gshscene_resource_glyph_run(item->resource, &run) == GSHSCENE_OK)",
+"2107:(result == GSHSCENE_OK && gshscene_resource_glyph_run(item->resource, &run) == GSHSCENE_OK)",
 "(!(result == GSHSCENE_OK && gshscene_resource_glyph_run(item->resource, &run) == GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -44086,7 +44086,7 @@
 "ds-2098-lt",
 "srcl",
 "src/sink/dump_sink.c",
-"2098:<",
+"2108:<",
 "<=",
 [
 "testDump_sink",
@@ -44108,7 +44108,7 @@
 "ds-2098-and",
 "srcl",
 "src/sink/dump_sink.c",
-"2098:&&",
+"2108:&&",
 "||",
 [
 "testDump_sink",
@@ -44130,7 +44130,7 @@
 "ds-2098-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"2098:==",
+"2108:==",
 "!=",
 [
 "testDump_sink",
@@ -44152,7 +44152,7 @@
 "ds-2099-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2099:(run.glyphs[g].outline)",
+"2109:(run.glyphs[g].outline)",
 "(!(run.glyphs[g].outline))",
 [
 "testDump_sink",
@@ -44174,7 +44174,7 @@
 "ds-2100-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2100:result = cache_hold(ds, run.glyphs[g].outline);",
+"2110:result = cache_hold(ds, run.glyphs[g].outline);",
 ";",
 [
 "testDump_sink",
@@ -44196,7 +44196,7 @@
 "ds-2104-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"2104:lt == GS",
+"2114:lt == GS",
 "lt != GS",
 [
 "testDump_sink",
@@ -44218,7 +44218,7 @@
 "ds-2104-eq2",
 "srcl",
 "src/sink/dump_sink.c",
-"2104:nd == GS",
+"2114:nd == GS",
 "nd != GS",
 [
 "testDump_sink",
@@ -44240,7 +44240,7 @@
 "ds-2104-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2104:(result == GSHSCENE_OK && item->kind == GSHSCENE_ITEM_INSTANCE)",
+"2114:(result == GSHSCENE_OK && item->kind == GSHSCENE_ITEM_INSTANCE)",
 "(!(result == GSHSCENE_OK && item->kind == GSHSCENE_ITEM_INSTANCE))",
 [
 "testDump_sink",
@@ -44262,7 +44262,7 @@
 "ds-2105-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2105:result = cache_list(ds, gshscene_resource_picture(item->resource));",
+"2115:result = cache_list(ds, gshscene_resource_picture(item->resource));",
 ";",
 [
 "testDump_sink",
@@ -44284,7 +44284,7 @@
 "ds-2107-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"2107:!=",
+"2117:!=",
 "==",
 [
 "testDump_sink",
@@ -44306,7 +44306,7 @@
 "ds-2107-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2107:(result != GSHSCENE_OK)",
+"2117:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -44328,7 +44328,7 @@
 "ds-2119-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2119:GCU_MUTEX_UNLOCK(ds->lock);",
+"2129:GCU_MUTEX_UNLOCK(ds->lock);",
 ";",
 [
 "testDump_sink",
@@ -44350,7 +44350,7 @@
 "ds-2128-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"2128:==",
+"2138:==",
 "!=",
 [
 "testDump_sink",
@@ -44372,7 +44372,7 @@
 "ds-2128-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2128:(ds->cache[i].id == id)",
+"2138:(ds->cache[i].id == id)",
 "(!(ds->cache[i].id == id))",
 [
 "testDump_sink",
@@ -44394,7 +44394,7 @@
 "ds-2129-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2129:released = ds->cache[i].resource;",
+"2139:released = ds->cache[i].resource;",
 ";",
 [
 "testDump_sink",
@@ -44416,7 +44416,7 @@
 "ds-2130-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2130:ds->static_bytes -= gshscene_resource_bytes(released);",
+"2140:ds->static_bytes -= gshscene_resource_bytes(released);",
 ";",
 [
 "testDump_sink",
@@ -44438,7 +44438,7 @@
 "ds-2131-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2131:ds->cache[i] = ds->cache[--ds->cache_count];",
+"2141:ds->cache[i] = ds->cache[--ds->cache_count];",
 ";",
 [
 "testDump_sink",
@@ -44460,7 +44460,7 @@
 "ds-2135-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2135:GCU_MUTEX_UNLOCK(ds->lock);",
+"2145:GCU_MUTEX_UNLOCK(ds->lock);",
 ";",
 [
 "testDump_sink",
@@ -44482,7 +44482,7 @@
 "ds-2136-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2136:gshscene_resource_release(released);",
+"2146:gshscene_resource_release(released);",
 ";",
 [
 "testDump_sink",
@@ -44504,7 +44504,7 @@
 "ds-2144-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2144:GCU_MUTEX_UNLOCK(ds->lock);",
+"2154:GCU_MUTEX_UNLOCK(ds->lock);",
 ";",
 [
 "testDump_sink",
@@ -44526,7 +44526,7 @@
 "ds-2150-lt",
 "srcl",
 "src/sink/dump_sink.c",
-"2150:<",
+"2160:<",
 "<=",
 [
 "testDump_sink",
@@ -44548,7 +44548,7 @@
 "ds-2151-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2151:gshscene_resource_release(ds->cache[i].resource);",
+"2161:gshscene_resource_release(ds->cache[i].resource);",
 ";",
 [
 "testDump_sink",
@@ -44570,7 +44570,7 @@
 "ds-2155-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2155:gshscene_free(&alloc, ds->cache);",
+"2165:gshscene_free(&alloc, ds->cache);",
 ";",
 [
 "testDump_sink",
@@ -44592,7 +44592,7 @@
 "ds-2156-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2156:gshscene_free(&alloc, ds->pending);",
+"2166:gshscene_free(&alloc, ds->pending);",
 ";",
 [
 "testDump_sink",
@@ -44614,7 +44614,7 @@
 "ds-2157-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2157:gshscene_free(&alloc, ds);",
+"2167:gshscene_free(&alloc, ds);",
 ";",
 [
 "testDump_sink",
@@ -44636,7 +44636,7 @@
 "ds-2163-and",
 "srcl",
 "src/sink/dump_sink.c",
-"2163:&&",
+"2173:&&",
 "||",
 [
 "testDump_sink",
@@ -44658,7 +44658,7 @@
 "ds-2163-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"2163:==",
+"2173:==",
 "!=",
 [
 "testDump_sink",
@@ -44680,7 +44680,7 @@
 "ds-2168-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2168:(!out)",
+"2178:(!out)",
 "(!(!out))",
 [
 "testDump_sink",
@@ -44702,7 +44702,7 @@
 "ds-2169-ret",
 "srcl",
 "src/sink/dump_sink.c",
-"2169:GSHSCENE_ERR_INVALID",
+"2179:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -44724,7 +44724,7 @@
 "ds-2172-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2172:(config)",
+"2182:(config)",
 "(!(config))",
 [
 "testDump_sink",
@@ -44746,7 +44746,7 @@
 "ds-2173-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2173:c = *config;",
+"2183:c = *config;",
 ";",
 [
 "testDump_sink",
@@ -44768,7 +44768,7 @@
 "ds-2175-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2175:gshscene_dump_sink_config_default(&c);",
+"2185:gshscene_dump_sink_config_default(&c);",
 ";",
 [
 "testDump_sink",
@@ -44790,7 +44790,7 @@
 "ds-2178-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"2178:!=",
+"2188:!=",
 "==",
 [
 "testDump_sink",
@@ -44812,7 +44812,7 @@
 "ds-2179-lt",
 "srcl",
 "src/sink/dump_sink.c",
-"2179:<",
+"2189:<",
 "<=",
 [
 "testDump_sink",
@@ -44834,7 +44834,7 @@
 "ds-2180-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2180:(c._reserved[i])",
+"2190:(c._reserved[i])",
 "(!(c._reserved[i]))",
 [
 "testDump_sink",
@@ -44856,7 +44856,7 @@
 "ds-2181-ret",
 "srcl",
 "src/sink/dump_sink.c",
-"2181:GSHSCENE_ERR_INVALID",
+"2191:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -44878,7 +44878,7 @@
 "ds-2184-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2184:(c.records & ~(uint32_t)GSHSCENE_DUMP_RECORDS_ALL)",
+"2194:(c.records & ~(uint32_t)GSHSCENE_DUMP_RECORDS_ALL)",
 "(!(c.records & ~(uint32_t)GSHSCENE_DUMP_RECORDS_ALL))",
 [
 "testDump_sink",
@@ -44900,7 +44900,7 @@
 "ds-2185-ret",
 "srcl",
 "src/sink/dump_sink.c",
-"2185:GSHSCENE_ERR_INVALID",
+"2195:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -44922,7 +44922,7 @@
 "ds-2188-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"2188:!=",
+"2198:!=",
 "==",
 [
 "testDump_sink",
@@ -44944,7 +44944,7 @@
 "ds-2189-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"2189:ck != ((",
+"2199:ck != ((",
 "ck == ((",
 [
 "testDump_sink",
@@ -44966,7 +44966,7 @@
 "ds-2189-ne2",
 "srcl",
 "src/sink/dump_sink.c",
-"2189:K) != 0)",
+"2199:K) != 0)",
 "K) == 0)",
 [
 "testDump_sink",
@@ -44988,7 +44988,7 @@
 "ds-2191-ge",
 "srcl",
 "src/sink/dump_sink.c",
-"2191:on >= GS",
+"2201:on >= GS",
 "on > GS",
 [
 "testDump_sink",
@@ -45010,7 +45010,7 @@
 "ds-2191-ge2",
 "srcl",
 "src/sink/dump_sink.c",
-"2191:nt >= 0.",
+"2201:nt >= 0.",
 "nt > 0.",
 [
 "testDump_sink",
@@ -45032,7 +45032,7 @@
 "ds-2192-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"2192:==",
+"2202:==",
 "!=",
 [
 "testDump_sink",
@@ -45054,7 +45054,7 @@
 "ds-2192-and",
 "srcl",
 "src/sink/dump_sink.c",
-"2192:NE && !c",
+"2202:NE && !c",
 "NE || !c",
 [
 "testDump_sink",
@@ -45076,7 +45076,7 @@
 "ds-2192-and2",
 "srcl",
 "src/sink/dump_sink.c",
-"2192:og && !c",
+"2202:og && !c",
 "og || !c",
 [
 "testDump_sink",
@@ -45098,7 +45098,7 @@
 "ds-2193-eq",
 "srcl",
 "src/sink/dump_sink.c",
-"2193:==",
+"2203:==",
 "!=",
 [
 "testDump_sink",
@@ -45120,7 +45120,7 @@
 "ds-2194-ret",
 "srcl",
 "src/sink/dump_sink.c",
-"2194:GSHSCENE_ERR_INVALID",
+"2204:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -45142,7 +45142,7 @@
 "ds-2196-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2196:(!alloc)",
+"2206:(!alloc)",
 "(!(!alloc))",
 [
 "testDump_sink",
@@ -45164,7 +45164,7 @@
 "ds-2197-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2197:alloc = gshscene_allocator_default();",
+"2207:alloc = gshscene_allocator_default();",
 ";",
 [
 "testDump_sink",
@@ -45186,7 +45186,7 @@
 "ds-2199-and",
 "srcl",
 "src/sink/dump_sink.c",
-"2199:&&",
+"2209:&&",
 "||",
 [
 "testDump_sink",
@@ -45208,7 +45208,7 @@
 "ds-2201-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2201:(!ds)",
+"2211:(!ds)",
 "(!(!ds))",
 [
 "testDump_sink",
@@ -45230,7 +45230,7 @@
 "ds-2204-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2204:ds->alloc = *alloc;",
+"2214:ds->alloc = *alloc;",
 ";",
 [
 "testDump_sink",
@@ -45252,7 +45252,7 @@
 "ds-2205-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2205:ds->config = c;",
+"2215:ds->config = c;",
 ";",
 [
 "testDump_sink",
@@ -45274,7 +45274,7 @@
 "ds-2207-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2207:(!ds->pending)",
+"2217:(!ds->pending)",
 "(!(!ds->pending))",
 [
 "testDump_sink",
@@ -45296,7 +45296,7 @@
 "ds-2208-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2208:gshscene_free(alloc, ds);",
+"2218:gshscene_free(alloc, ds);",
 ";",
 [
 "testDump_sink",
@@ -45318,7 +45318,7 @@
 "ds-2211-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"2211:!=",
+"2221:!=",
 "==",
 [
 "testDump_sink",
@@ -45340,7 +45340,7 @@
 "ds-2211-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2211:(GCU_MUTEX_CREATE(ds->lock) != 0)",
+"2221:(GCU_MUTEX_CREATE(ds->lock) != 0)",
 "(!(GCU_MUTEX_CREATE(ds->lock) != 0))",
 [
 "testDump_sink",
@@ -45362,7 +45362,7 @@
 "ds-2212-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2212:gshscene_free(alloc, ds->pending);",
+"2222:gshscene_free(alloc, ds->pending);",
 ";",
 [
 "testDump_sink",
@@ -45384,7 +45384,7 @@
 "ds-2213-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2213:gshscene_free(alloc, ds);",
+"2223:gshscene_free(alloc, ds);",
 ";",
 [
 "testDump_sink",
@@ -45406,7 +45406,7 @@
 "ds-2217-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2217:ops.name = \"dump\";",
+"2227:ops.name = \"dump\";",
 ";",
 [
 "testDump_sink",
@@ -45428,7 +45428,7 @@
 "ds-2217-str",
 "srcl",
 "src/sink/dump_sink.c",
-"2217:d",
+"2227:d",
 "Z",
 [
 "testDump_sink",
@@ -45450,7 +45450,7 @@
 "ds-2218-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"2218:!=",
+"2228:!=",
 "==",
 [
 "testDump_sink",
@@ -45472,7 +45472,7 @@
 "ds-2218-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2218:ops.thread_affine = affine != 0;",
+"2228:ops.thread_affine = affine != 0;",
 ";",
 [
 "testDump_sink",
@@ -45494,7 +45494,7 @@
 "ds-2219-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2219:ops.caps = op_caps;",
+"2229:ops.caps = op_caps;",
 ";",
 [
 "testDump_sink",
@@ -45516,7 +45516,7 @@
 "ds-2220-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2220:ops.workspace_bytes = op_workspace_bytes;",
+"2230:ops.workspace_bytes = op_workspace_bytes;",
 ";",
 [
 "testDump_sink",
@@ -45538,7 +45538,7 @@
 "ds-2221-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2221:ops.begin = op_begin;",
+"2231:ops.begin = op_begin;",
 ";",
 [
 "testDump_sink",
@@ -45560,7 +45560,7 @@
 "ds-2222-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2222:ops.wait = op_wait;",
+"2232:ops.wait = op_wait;",
 ";",
 [
 "testDump_sink",
@@ -45582,7 +45582,7 @@
 "ds-2223-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2223:ops.readback = op_readback;",
+"2233:ops.readback = op_readback;",
 ";",
 [
 "testDump_sink",
@@ -45604,7 +45604,7 @@
 "ds-2224-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2224:ops.prepare = op_prepare;",
+"2234:ops.prepare = op_prepare;",
 ";",
 [
 "testDump_sink",
@@ -45626,7 +45626,7 @@
 "ds-2225-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2225:ops.evict = op_evict;",
+"2235:ops.evict = op_evict;",
 ";",
 [
 "testDump_sink",
@@ -45648,7 +45648,7 @@
 "ds-2226-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2226:ops.static_bytes = op_static_bytes;",
+"2236:ops.static_bytes = op_static_bytes;",
 ";",
 [
 "testDump_sink",
@@ -45670,7 +45670,7 @@
 "ds-2227-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2227:ops.destroy = op_destroy;",
+"2237:ops.destroy = op_destroy;",
 ";",
 [
 "testDump_sink",
@@ -45692,7 +45692,7 @@
 "ds-2229-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"2229:!=",
+"2239:!=",
 "==",
 [
 "testDump_sink",
@@ -45714,7 +45714,7 @@
 "ds-2229-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2229:(result != GSHSCENE_OK)",
+"2239:(result != GSHSCENE_OK)",
 "(!(result != GSHSCENE_OK))",
 [
 "testDump_sink",
@@ -45736,7 +45736,7 @@
 "ds-2230-del",
 "srcl",
 "src/sink/dump_sink.c",
-"2230:op_destroy(ds);",
+"2240:op_destroy(ds);",
 ";",
 [
 "testDump_sink",
@@ -45758,7 +45758,7 @@
 "ds-2238-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2238:(!job || !out || !gshscene_dump_sink_is(job->sink))",
+"2248:(!job || !out || !gshscene_dump_sink_is(job->sink))",
 "(!(!job || !out || !gshscene_dump_sink_is(job->sink)))",
 [
 "testDump_sink",
@@ -45780,7 +45780,7 @@
 "ds-2239-ret",
 "srcl",
 "src/sink/dump_sink.c",
-"2239:GSHSCENE_ERR_INVALID",
+"2249:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
@@ -45802,7 +45802,7 @@
 "ds-2242-ne",
 "srcl",
 "src/sink/dump_sink.c",
-"2242:s) != GS",
+"2252:s) != GS",
 "s) == GS",
 [
 "testDump_sink",
@@ -45824,7 +45824,7 @@
 "ds-2242-or",
 "srcl",
 "src/sink/dump_sink.c",
-"2242:||",
+"2252:||",
 "&&",
 [
 "testDump_sink",
@@ -45846,7 +45846,7 @@
 "ds-2242-ne2",
 "srcl",
 "src/sink/dump_sink.c",
-"2242:te != GS",
+"2252:te != GS",
 "te == GS",
 [
 "testDump_sink",
@@ -45868,7 +45868,7 @@
 "ds-2242-neg",
 "srcl",
 "src/sink/dump_sink.c",
-"2242:(gshscene_job_poll(job, &status) != GSHSCENE_OK || status.state != GSHSCENE_JOB_DONE)",
+"2252:(gshscene_job_poll(job, &status) != GSHSCENE_OK || status.state != GSHSCENE_JOB_DONE)",
 "(!(gshscene_job_poll(job, &status) != GSHSCENE_OK || status.state != GSHSCENE_JOB_DONE))",
 [
 "testDump_sink",
@@ -45890,7 +45890,7 @@
 "ds-2243-ret",
 "srcl",
 "src/sink/dump_sink.c",
-"2243:GSHSCENE_ERR_INVALID",
+"2253:GSHSCENE_ERR_INVALID",
 "GSHSCENE_ERR_LIMIT",
 [
 "testDump_sink",
