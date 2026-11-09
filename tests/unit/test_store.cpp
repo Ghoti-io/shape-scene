@@ -33,6 +33,7 @@
 #include <cstring>
 #include <set>
 #include <thread>
+#include <memory>
 #include <vector>
 
 using namespace scene;
@@ -429,11 +430,32 @@ TEST(StoreHandles, IdsAscendFromOneAndAreNeverReused) {
     EXPECT_TRUE(ids.insert(id).second);
     gshscene_resource_release(r);  // freed at once: its memory may be reused, its id may not
   }
-  EXPECT_EQ(*ids.begin(), 1u);
+  EXPECT_EQ(*ids.begin() & 0xFFFFFFFFull, 1u) << "the low half counts the store's resources from one";
+  EXPECT_NE(*ids.begin() >> 32, 0u) << "the high half is the store's serial, from one";
   // The same content again, after its last release, is a new resource with a new id.
   const GSHSCENE_Resource * a = intern_square(s.store, 0.0);
   EXPECT_GT(gshscene_resource_id(a), last);
   gshscene_resource_release(a);
+}
+
+// A sink's caches are keyed by the id, so two stores that fed one sink must not issue the same id for different resources.
+TEST(StoreHandles, NoTwoStoresOfTheProcessIssueTheSameId) {
+  std::set<uint64_t> ids;
+  std::vector<std::unique_ptr<StoreHolder>> stores;
+  for (int k = 0; k < 6; k++) {
+    stores.emplace_back(new StoreHolder());
+    for (int i = 0; i < 20; i++) {
+      const GSHSCENE_Resource * r = intern_square(stores.back()->store, (double)(i + 3 * k)); // some content is the same in two stores
+      EXPECT_TRUE(ids.insert(gshscene_resource_id(r)).second) << "store " << k << " resource " << i;
+      gshscene_resource_release(r);
+    }
+  }
+  EXPECT_EQ(ids.size(), 120u);
+  std::set<uint64_t> serials;
+  for (uint64_t id : ids) {
+    serials.insert(id >> 32);
+  }
+  EXPECT_EQ(serials.size(), 6u) << "one high half for each store";
 }
 
 TEST(StoreHandles, RetainAndReleaseCountAndNullIsIgnored) {

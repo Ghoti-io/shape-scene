@@ -1458,14 +1458,14 @@ TEST(GradientPlan, TheTestSinkWritesEachGradientOnceWithItsResolvedStops) {
   EXPECT_EQ(count_of(r.dump, "\nr "), 7u);
   char line[256];
   std::snprintf(line, sizeof line, "\nR %llu %016llx space=1:2:0000000000000000 stops=2\n",
-      (unsigned long long)gshscene_resource_id(g.get()), (unsigned long long)gshscene_resource_hash(g.get()));
+      (unsigned long long)dump_id(g.get()), (unsigned long long)gshscene_resource_hash(g.get()));
   EXPECT_NE(r.dump.find(line), std::string::npos) << r.dump;
   // The stops in stored order, resolved: the foreground (its alpha halved) first, copied exactly (same space).
   EXPECT_NE(r.dump.find("\nr 0000000000000000 3ff0000000000000 3fe0000000000000 0000000000000000 3fe0000000000000\n"),
       std::string::npos) << r.dump;
   EXPECT_NE(r.dump.find("\nr 3ff0000000000000 3fd0000000000000 3fe0000000000000 3fe8000000000000 3ff0000000000000\n"),
       std::string::npos);
-  std::snprintf(line, sizeof line, " grad=%llu box=", (unsigned long long)gshscene_resource_id(h.get()));
+  std::snprintf(line, sizeof line, " grad=%llu box=", (unsigned long long)dump_id(h.get()));
   EXPECT_EQ(count_of(r.dump, line), 3u);
   // A second render resolves again: the record is per render.
   ASSERT_EQ(r.run(l.list), GSHSCENE_OK);

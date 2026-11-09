@@ -27,6 +27,7 @@
 
 #include "alloc_tracker.h"
 #include "glyph_test_provider.h"
+#include "test_helpers.h"
 
 #include <algorithm>
 #include <cstdint>

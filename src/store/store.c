@@ -65,6 +65,22 @@ void gshscene_store_unref(GSHSCENE_Store * store) {
 
 /* --- create and destroy ---------------------------------------------------- */
 
+/** The stores made so far in this process: the serial of the next is this plus one, and the count stops short of 2^32 - 1. */
+static GCU_Atomic_Size g_stores;
+
+/** The serial of a new store, 1 and up and never issued twice in the process; 0 when the 2^32 - 2 that fit an id are gone. */
+static uint64_t next_serial(void) {
+  size_t seen = gcu_atomic_size_load(&g_stores);
+  for (;;) {
+    if ((uint64_t)seen >= 0xFFFFFFFEull) {
+      return 0;
+    }
+    if (gcu_atomic_size_compare_exchange(&g_stores, &seen, seen + 1u)) {
+      return (uint64_t)seen + 1u;
+    }
+  }
+}
+
 GSHSCENE_Result gshscene_store_create_with_index_hash(const GSHSCENE_Allocator * alloc,
     const GSHSCENE_Limits * limits, GSHSCENE_Index_Hash_Fn index_hash, void * index_ctx,
     GSHSCENE_Store ** out) {
@@ -80,6 +96,11 @@ GSHSCENE_Result gshscene_store_create_with_index_hash(const GSHSCENE_Allocator *
   GSHSCENE_Store * store = gshscene_calloc(alloc, 1, sizeof *store);
   if (!store) {
     return GSHSCENE_ERR_OOM;
+  }
+  store->serial = next_serial();
+  if (store->serial == 0) {
+    gshscene_free(alloc, store);
+    return GSHSCENE_ERR_LIMIT; /* the ids of a process hold 2^32 - 2 stores */
   }
   store->alloc = *alloc;
   gshscene_limits_effective(limits, &store->limits);
@@ -249,12 +270,12 @@ GSHSCENE_Result gshscene_store_intern(
     *out = found;
     return GSHSCENE_OK;
   }
-  if (store->live >= store->limits.max_resources || !fits(store, probe->bytes)) {
+  if (store->live >= store->limits.max_resources || !fits(store, probe->bytes) || store->next_id >= 0xFFFFFFFFull) {
     GCU_MUTEX_UNLOCK(store->lock);
     gshscene_store_discard_resource(built);
     return GSHSCENE_ERR_LIMIT;
   }
-  built->id = ++store->next_id;
+  built->id = (store->serial << 32) | ++store->next_id;
   size_t slot = index & (store->bucket_count - 1);
   built->next = store->buckets[slot];
   store->buckets[slot] = built;

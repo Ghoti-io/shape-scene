@@ -552,9 +552,9 @@ TEST(DumpSink, TheGradientRecordsOnAStreamAreTheGenerators) {
   const GSHSCENE_Resource * ga = intern(a, {{0.0, first}, {0.5, fg}, {1.0, pal}});
   const GSHSCENE_Resource * gb = intern(b, {{0.0, solid(1, 0, 0)}, {1.0, solid(0, 0, 1, 0.5)}});
   const GSHSCENE_Resource * gd = intern(d, {{0.0, solid(1, 0, 0)}, {1.0, solid(0, 0, 1)}});
-  ASSERT_EQ(gshscene_resource_id(ga), 2u) << "the generator's ids: a fresh store, in this order";
-  ASSERT_EQ(gshscene_resource_id(gb), 3u);
-  ASSERT_EQ(gshscene_resource_id(gd), 4u);
+  ASSERT_EQ(dump_id(ga), 2u) << "the generator's ids: a fresh store, in this order";
+  ASSERT_EQ(dump_id(gb), 3u);
+  ASSERT_EQ(dump_id(gd), 4u);
   EXPECT_EQ(gshscene_resource_hash(ga), sink_known::kGradientAHash);
   EXPECT_EQ(gshscene_resource_hash(gb), sink_known::kGradientBHash);
   GSHSCENE_List * l = s.open();
@@ -623,8 +623,8 @@ const GSHSCENE_List * stroke_list(Scene & s) {
   const GSHSCENE_Resource * sb = intern_style(b);
   const GSHSCENE_Resource * sz = intern_style(z);
   const GSHSCENE_Resource * sc = intern_style(c, {1.0, 2.0, 3.0});
-  EXPECT_EQ(gshscene_resource_id(sa), 1u) << "the generator's ids: a fresh store, in this order";
-  EXPECT_EQ(gshscene_resource_id(sc), 4u);
+  EXPECT_EQ(dump_id(sa), 1u) << "the generator's ids: a fresh store, in this order";
+  EXPECT_EQ(dump_id(sc), 4u);
   GSHSCENE_Paint red = solid(1, 0, 0);
   GSHSCENE_Paint blue = solid(0, 0, 1, 0.5);
   GSHSCENE_List * l = s.open();
@@ -1397,8 +1397,8 @@ TEST(DumpSink, AStyleIsRecordedOncePerRenderAndAnEmptyOrGradientStrokeIsSpelledA
   };
   EXPECT_EQ(count("\nQ "), 1u) << "one style, three strokes: one record (S20)\n" << out;
   EXPECT_EQ(count(" K res="), 3u) << out;
-  EXPECT_EQ(count(" grad=" + std::to_string(gshscene_resource_id(gradient)) + " box="), 1u) << out;
-  EXPECT_EQ(count("\nR " + std::to_string(gshscene_resource_id(gradient)) + " "), 1u) << "the gradient's record" << out;
+  EXPECT_EQ(count(" grad=" + std::to_string(dump_id(gradient)) + " box="), 1u) << out;
+  EXPECT_EQ(count("\nR " + std::to_string(dump_id(gradient)) + " "), 1u) << "the gradient's record" << out;
   EXPECT_EQ(count(" box=- expand=0 outline="), 1u) << "an empty centerline has an empty box" << out;
   EXPECT_EQ(count("\nd 0000000000000000\nd 4000000000000000\n"), 1u) << "the dashes in sixteen digits" << out;
 }
@@ -2306,7 +2306,7 @@ TEST(DumpSink, AnImageAndItsPaintAreRecordedOnceAndEveryFillNamesItsPaint) {
     at = end + 1;
   }
   size_t images = 0, paints = 0, fills = 0;
-  std::string image_id = std::to_string(gshscene_resource_id(image));
+  std::string image_id = std::to_string(dump_id(image));
   for (const std::string & line : lines) {
     if (line.rfind("M ", 0) == 0) {
       images++;
@@ -2323,8 +2323,8 @@ TEST(DumpSink, AnImageAndItsPaintAreRecordedOnceAndEveryFillNamesItsPaint) {
   EXPECT_EQ(images, 1u) << "the image once, however many paints and fills name it";
   EXPECT_EQ(paints, 2u) << "each paint once";
   EXPECT_EQ(fills, 4u);
-  EXPECT_NE(stream->bytes.find(" img=" + std::to_string(gshscene_resource_id(linear)) + " "), std::string::npos);
-  EXPECT_NE(stream->bytes.find(" img=" + std::to_string(gshscene_resource_id(nearest)) + " "), std::string::npos);
+  EXPECT_NE(stream->bytes.find(" img=" + std::to_string(dump_id(linear)) + " "), std::string::npos);
+  EXPECT_NE(stream->bytes.find(" img=" + std::to_string(dump_id(nearest)) + " "), std::string::npos);
 }
 
 // The writer-like sink has no reflection: a REFLECT image fill is refused there and nothing of the image is written; the
@@ -2543,7 +2543,7 @@ TEST(DumpSink, APatternAndItsTileAreRecordedOncePerHandleAndARefusedUnitWritesNe
       if (line.rfind("V ", 0) == 0) {
         tiles++;
         char want[96];
-        std::snprintf(want, sizeof want, "V %llu %016llx items=1", (unsigned long long)gshscene_resource_id(tile),
+        std::snprintf(want, sizeof want, "V %llu %016llx items=1", (unsigned long long)dump_id(tile),
             (unsigned long long)gshscene_resource_hash(tile));
         EXPECT_EQ(line, want);
       } else if (line.rfind("Z ", 0) == 0) {
@@ -2575,15 +2575,15 @@ TEST(DumpSink, APatternAndItsTileAreRecordedOncePerHandleAndARefusedUnitWritesNe
     char want_a[512], want_b[512];
     std::snprintf(want_a, sizeof want_a,
         "Z %llu %016llx tile=%llu cell=%016llx %016llx %016llx %016llx step=%016llx %016llx repeat=11 map=%016llx tint=-\n",
-        (unsigned long long)gshscene_resource_id(pa), (unsigned long long)gshscene_resource_hash(pa),
-        (unsigned long long)gshscene_resource_id(tile), 0ull, 0ull, (unsigned long long)gshgeom_f64_bits(4.0),
+        (unsigned long long)dump_id(pa), (unsigned long long)gshscene_resource_hash(pa),
+        (unsigned long long)dump_id(tile), 0ull, 0ull, (unsigned long long)gshgeom_f64_bits(4.0),
         (unsigned long long)gshgeom_f64_bits(3.0), (unsigned long long)gshgeom_f64_bits(5.0),
         (unsigned long long)gshgeom_f64_bits(6.0), (unsigned long long)gshgeom_map_hash(&a.map));
     std::snprintf(want_b, sizeof want_b,
         "Z %llu %016llx tile=%llu cell=%016llx %016llx %016llx %016llx step=%016llx %016llx repeat=10 map=%016llx tint=0 "
         "%016llx %016llx %016llx %016llx 0:0:0000000000000000 0\n",
-        (unsigned long long)gshscene_resource_id(pb), (unsigned long long)gshscene_resource_hash(pb),
-        (unsigned long long)gshscene_resource_id(tile), 0ull, 0ull, (unsigned long long)gshgeom_f64_bits(4.0),
+        (unsigned long long)dump_id(pb), (unsigned long long)gshscene_resource_hash(pb),
+        (unsigned long long)dump_id(tile), 0ull, 0ull, (unsigned long long)gshgeom_f64_bits(4.0),
         (unsigned long long)gshgeom_f64_bits(3.0), (unsigned long long)gshgeom_f64_bits(5.0),
         (unsigned long long)gshgeom_f64_bits(3.0) /* y does not repeat in b: its step is kept as the height (PT3) */,
         (unsigned long long)gshgeom_map_hash(&b.map),
@@ -2592,14 +2592,14 @@ TEST(DumpSink, APatternAndItsTileAreRecordedOncePerHandleAndARefusedUnitWritesNe
     char want_c[512];
     std::snprintf(want_c, sizeof want_c,
         "Z %llu %016llx tile=%llu cell=%016llx %016llx %016llx %016llx step=%016llx %016llx repeat=11 map=%016llx tint=-\n",
-        (unsigned long long)gshscene_resource_id(pc), (unsigned long long)gshscene_resource_hash(pc),
-        (unsigned long long)gshscene_resource_id(tile), (unsigned long long)gshgeom_f64_bits(0.5), 0ull,
+        (unsigned long long)dump_id(pc), (unsigned long long)gshscene_resource_hash(pc),
+        (unsigned long long)dump_id(tile), (unsigned long long)gshgeom_f64_bits(0.5), 0ull,
         (unsigned long long)gshgeom_f64_bits(4.0), (unsigned long long)gshgeom_f64_bits(3.0),
         (unsigned long long)gshgeom_f64_bits(5.0), (unsigned long long)gshgeom_f64_bits(6.0),
         (unsigned long long)gshgeom_map_hash(&c.map));
     EXPECT_EQ(z_lines, std::string(want_a) + want_b + want_c) << configuration << ": the records are the fields, in the order the file states";
-    EXPECT_NE(text.find(" pat=" + std::to_string(gshscene_resource_id(pa)) + " "), std::string::npos);
-    EXPECT_NE(text.find(" pat=" + std::to_string(gshscene_resource_id(pb)) + " "), std::string::npos);
+    EXPECT_NE(text.find(" pat=" + std::to_string(dump_id(pa)) + " "), std::string::npos);
+    EXPECT_NE(text.find(" pat=" + std::to_string(dump_id(pb)) + " "), std::string::npos);
   }
 }
 
@@ -2988,7 +2988,7 @@ TEST(DumpSink, AMaskRecordIsExactlyItsFieldsAndTheGroupLineNamesItsMaskAndPlacem
     return std::to_string((unsigned)sp.primaries) + ":" + std::to_string((unsigned)sp.transfer) + ":" + x(sp.gamma);
   };
   std::string want;
-  want += "W " + std::to_string(gshscene_resource_id(ms)) + " " + h(gshscene_resource_hash(ms)) + " picture=" +
+  want += "W " + std::to_string(dump_id(ms)) + " " + h(gshscene_resource_hash(ms)) + " picture=" +
           h(gshscene_resource_hash(pic)) + " mode=2 coeff=1 acts=1 rspace=" + space(stitched.render_space) + " lspace=" +
           space(stitched.space) + " backdrop=" + x(0.25) + " " + x(0.5) + " " + x(0.75) + " bspace=" + space(stitched.backdrop_space) + "\n";
   want += "w kind=3 c0=" + x(0) + " c1=" + x(0) + " n=" + x(0) + " samples=0 pieces=2\n";
@@ -2997,10 +2997,10 @@ TEST(DumpSink, AMaskRecordIsExactlyItsFieldsAndTheGroupLineNamesItsMaskAndPlacem
   want += "p lo=" + x(0.5) + " hi=" + x(1.0) + " e0=" + x(0.25) + " e1=" + x(0.0) + " leaf=2 c0=" + x(0) + " c1=" + x(0) + " n=" + x(0) +
           " samples=3\n";
   want += "s " + x(0.0) + "\ns " + x(0.25) + "\ns " + x(1.0) + "\n";
- std::string power_record = "W " + std::to_string(gshscene_resource_id(mp)) + " " + h(gshscene_resource_hash(mp)) + " picture=" +
+ std::string power_record = "W " + std::to_string(dump_id(mp)) + " " + h(gshscene_resource_hash(mp)) + " picture=" +
       h(gshscene_resource_hash(pic)) + " mode=1 coeff=0 acts=0 rspace=0:0:" + x(0) + " lspace=0:0:" + x(0) + " backdrop=" + x(0) + " " +
       x(0) + " " + x(0) + " bspace=0:0:" + x(0) + "\nw kind=1 c0=" + x(0.125) + " c1=" + x(0.875) + " n=" + x(2.0) + " samples=0 pieces=0\n";
-  std::string table_record = "W " + std::to_string(gshscene_resource_id(mt)) + " " + h(gshscene_resource_hash(mt)) + " picture=" +
+  std::string table_record = "W " + std::to_string(dump_id(mt)) + " " + h(gshscene_resource_hash(mt)) + " picture=" +
       h(gshscene_resource_hash(pic)) + " mode=1 coeff=0 acts=0 rspace=0:0:" + x(0) + " lspace=0:0:" + x(0) + " backdrop=" + x(0) + " " +
       x(0) + " " + x(0) + " bspace=0:0:" + x(0) + "\nw kind=2 c0=" + x(0) + " c1=" + x(0) + " n=" + x(0) + " samples=2 pieces=0\ns " +
       x(0.0) + "\ns " + x(0.75) + "\n";
@@ -3461,7 +3461,7 @@ TEST(DumpSink, TheHatchRecordStatesTheResourceSoReadingItBackGivesAnEqualHatch) 
   // parse the records of hatch_b back into a hatch: its style by the Q record, its families by the h and d lines
   const std::vector<std::string> lines = lines_of(stream->bytes);
   char want[64];
-  std::snprintf(want, sizeof want, "H %llu ", (unsigned long long)gshscene_resource_id(w.hatch_b));
+  std::snprintf(want, sizeof want, "H %llu ", (unsigned long long)dump_id(w.hatch_b));
   size_t at = 0;
   for (; at < lines.size() && lines[at].rfind(want, 0) != 0; at++) {
   }
@@ -3475,7 +3475,7 @@ TEST(DumpSink, TheHatchRecordStatesTheResourceSoReadingItBackGivesAnEqualHatch) 
                 &entry, &families),
       16);
   EXPECT_EQ(hash, gshscene_resource_hash(w.hatch_b));
-  EXPECT_EQ(style_id, gshscene_resource_id(w.style));
+  EXPECT_EQ(style_id, dump_id(w.style));
   ASSERT_EQ(families, 2u);
   std::vector<GSHSCENE_Hatch_Family> back(2);
   std::vector<std::vector<double>> back_dashes(2);

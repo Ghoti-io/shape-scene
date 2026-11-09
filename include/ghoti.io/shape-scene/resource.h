@@ -480,7 +480,13 @@ GSHSCENE_API void gshscene_resource_release(const GSHSCENE_Resource * resource);
 /** @brief The resource's kind; ::GSHSCENE_RESOURCE_KIND_COUNT for NULL. */
 GSHSCENE_API GSHSCENE_Resource_Kind gshscene_resource_kind(const GSHSCENE_Resource * resource);
 
-/** @brief The resource's id, never issued twice by its store; 0 for NULL. */
+/**
+ * @brief The resource's id, never issued twice by any store of the process; 0 for NULL.
+ *
+ * The high half is the store's serial among the stores of the process (from 1) and the low half counts the resources it has made, so
+ * a sink that keys a cache on the id cannot confuse the resources of two stores.  A store refuses a resource past 2^32 - 1 of its
+ * own, and a process a store past its 2^32 - 2nd.
+ */
 GSHSCENE_API uint64_t gshscene_resource_id(const GSHSCENE_Resource * resource);
 
 /** @brief The content hash, as the file comment spells it; the offset basis for NULL. */

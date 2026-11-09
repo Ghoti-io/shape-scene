@@ -168,7 +168,8 @@ struct GSHSCENE_Store {
   GCU_MUTEX_T lock;
   struct GSHSCENE_Resource ** buckets;
   size_t bucket_count; /* a power of two */
-  uint64_t next_id;
+  uint64_t serial;  /* this store among the stores of the process, from 1: the high half of every id it issues */
+  uint64_t next_id; /* the resources it has made: the low half */
   uint64_t next_token;
   uint64_t live;
   uint64_t bytes; /* accounted bytes of the live resources */

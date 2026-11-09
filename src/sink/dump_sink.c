@@ -171,6 +171,12 @@ struct Dump_Sink {
 
 /* --- the configuration -------------------------------------------------------- */
 
+/** The number a resource goes by in a dump: its place in its store, the low half of its id.  The high half names the store, and which
+ * store a resource is in depends on how many the process made before, which a dump (and the hash over it) must not. */
+static uint64_t dump_id(const GSHSCENE_Resource * resource) {
+  return gshscene_resource_id(resource) & 0xFFFFFFFFull;
+}
+
 /** Fill @p caps, which the caller has zero-filled. */
 static void caps_full(GSHSCENE_Sink_Caps * caps, int readback) {
   /* Every kind: it records each, a stroke included (S20). */
@@ -974,7 +980,7 @@ static GSHSCENE_Result glyph_records(Run * run, const GSHSCENE_Item * item, cons
  * conversion, against the list's foreground and palette and the target's space.
  */
 static GSHSCENE_Result gradient_record(Run * run, const GSHSCENE_Resource * gradient, GSHSCENE_Result * failed) {
-  uint64_t id = gshscene_resource_id(gradient);
+  uint64_t id = dump_id(gradient);
   for (size_t i = 0; i < run->gradient_count; i++) {
     if (run->gradients[i] == id) {
       return GSHSCENE_OK;
@@ -1010,7 +1016,7 @@ static GSHSCENE_Result gradient_record(Run * run, const GSHSCENE_Resource * grad
  * hash, never the picture's items, as a writer emits an `SMask` once and names it by handle.
  */
 static GSHSCENE_Result mask_record(Run * run, const GSHSCENE_Resource * mask, GSHSCENE_Result * failed) {
-  uint64_t id = gshscene_resource_id(mask);
+  uint64_t id = dump_id(mask);
   for (size_t i = 0; i < run->gradient_count; i++) {
     if (run->gradients[i] == id) {
       return GSHSCENE_OK;
@@ -1064,13 +1070,13 @@ static GSHSCENE_Result image_paint_record(Run * run, const GSHSCENE_Resource * p
   if (gshscene_resource_image_paint(paint, &p) != GSHSCENE_OK) {
     return GSHSCENE_ERR_INTERNAL;
   }
-  uint64_t paint_id = gshscene_resource_id(paint);
+  uint64_t paint_id = dump_id(paint);
   for (size_t i = 0; i < run->gradient_count; i++) {
     if (run->gradients[i] == paint_id) {
       return GSHSCENE_OK;
     }
   }
-  uint64_t image_id = gshscene_resource_id(p.image);
+  uint64_t image_id = dump_id(p.image);
   int image_known = 0;
   for (size_t i = 0; i < run->gradient_count; i++) {
     image_known = image_known || run->gradients[i] == image_id;
@@ -1120,13 +1126,13 @@ static GSHSCENE_Result pattern_record(Run * run, const GSHSCENE_Resource * patte
   if (gshscene_resource_pattern(pattern, &p) != GSHSCENE_OK) {
     return GSHSCENE_ERR_INTERNAL;
   }
-  uint64_t pattern_id = gshscene_resource_id(pattern);
+  uint64_t pattern_id = dump_id(pattern);
   for (size_t i = 0; i < run->gradient_count; i++) {
     if (run->gradients[i] == pattern_id) {
       return GSHSCENE_OK;
     }
   }
-  uint64_t tile_id = gshscene_resource_id(p.tile);
+  uint64_t tile_id = dump_id(p.tile);
   int tile_known = 0;
   for (size_t i = 0; i < run->gradient_count; i++) {
     tile_known = tile_known || run->gradients[i] == tile_id;
@@ -1162,7 +1168,7 @@ static GSHSCENE_Result pattern_record(Run * run, const GSHSCENE_Resource * patte
  * the style's dump spells them, then a `d` line per dash, as a writer emits a style once.
  */
 static GSHSCENE_Result style_record(Run * run, const GSHSCENE_Resource * style, GSHSCENE_Result * failed) {
-  uint64_t id = gshscene_resource_id(style);
+  uint64_t id = dump_id(style);
   for (size_t i = 0; i < run->style_count; i++) {
     if (run->styles[i] == id) {
       return GSHSCENE_OK;
@@ -1198,7 +1204,7 @@ static GSHSCENE_Result hatch_record(Run * run, const GSHSCENE_Resource * hatch, 
   if (gshscene_resource_hatch(hatch, &h) != GSHSCENE_OK) {
     return GSHSCENE_ERR_INTERNAL;
   }
-  uint64_t id = gshscene_resource_id(hatch);
+  uint64_t id = dump_id(hatch);
   for (size_t i = 0; i < run->gradient_count; i++) {
     if (run->gradients[i] == id) {
       return GSHSCENE_OK;
@@ -1212,7 +1218,7 @@ static GSHSCENE_Result hatch_record(Run * run, const GSHSCENE_Resource * hatch, 
   snprintf(run->line, LINE_BYTES,
       "H %" PRIu64 " %016" PRIx64 " unit=%u nesting=%u style=%" PRIu64 " map=%016" PRIx64 " ink=%u %016" PRIx64 " %016" PRIx64
       " %016" PRIx64 " %016" PRIx64 " %u:%u:%016" PRIx64 " %u families=%" PRIu64 "\n",
-      id, gshscene_resource_hash(hatch), (unsigned)h.angle_unit, (unsigned)h.nesting, gshscene_resource_id(h.style),
+      id, gshscene_resource_hash(hatch), (unsigned)h.angle_unit, (unsigned)h.nesting, dump_id(h.style),
       gshgeom_map_hash(&h.map), (unsigned)h.ink.kind, gshgeom_f64_bits(h.ink.rgba[0]), gshgeom_f64_bits(h.ink.rgba[1]),
       gshgeom_f64_bits(h.ink.rgba[2]), gshgeom_f64_bits(h.ink.rgba[3]), (unsigned)h.ink.space.primaries,
       (unsigned)h.ink.space.transfer, gshgeom_f64_bits(h.ink.space.gamma), h.ink.entry, (uint64_t)h.family_count);
@@ -1506,17 +1512,17 @@ static GSHSCENE_Result stroke_unit(Run * run, const GSHSCENE_Item * item, const 
       gshscene_stroke_required(item, run->maps, count - 1, &run->job->target.map) & ~run->job->caps.stroke_native;
   snprintf(run->line, LINE_BYTES, " K res=%s:%016" PRIx64 " style=%" PRIu64 " map=%016" PRIx64,
       gshscene_resource_kind_string(gshscene_resource_kind(item->resource)), gshscene_resource_hash(item->resource),
-      gshscene_resource_id(item->style), gshgeom_map_hash(&map));
+      dump_id(item->style), gshgeom_map_hash(&map));
   emit_text(run, run->line, &failed);
   emit_antialias(run, item, &failed);
   if (item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
-    snprintf(run->line, LINE_BYTES, " grad=%" PRIu64, gshscene_resource_id(item->paint.resource));
+    snprintf(run->line, LINE_BYTES, " grad=%" PRIu64, dump_id(item->paint.resource));
     emit_text(run, run->line, &failed);
   } else if (item->paint.kind == GSHSCENE_PAINT_IMAGE) {
-    snprintf(run->line, LINE_BYTES, " img=%" PRIu64, gshscene_resource_id(item->paint.resource));
+    snprintf(run->line, LINE_BYTES, " img=%" PRIu64, dump_id(item->paint.resource));
     emit_text(run, run->line, &failed);
   } else if (item->paint.kind == GSHSCENE_PAINT_PATTERN) {
-    snprintf(run->line, LINE_BYTES, " pat=%" PRIu64, gshscene_resource_id(item->paint.resource));
+    snprintf(run->line, LINE_BYTES, " pat=%" PRIu64, dump_id(item->paint.resource));
     emit_text(run, run->line, &failed);
     Box sbox = {b.empty, b.min.x, b.min.y, b.max.x, b.max.y};
     copies_record(run, item, count, &sbox, &failed);
@@ -1699,13 +1705,13 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
       emit_text(run, run->line, &failed);
       emit_antialias(run, item, &failed);
       if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_GRADIENT) {
-        snprintf(run->line, LINE_BYTES, " grad=%" PRIu64, gshscene_resource_id(item->paint.resource));
+        snprintf(run->line, LINE_BYTES, " grad=%" PRIu64, dump_id(item->paint.resource));
         emit_text(run, run->line, &failed);
       } else if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_IMAGE) {
-        snprintf(run->line, LINE_BYTES, " img=%" PRIu64, gshscene_resource_id(item->paint.resource));
+        snprintf(run->line, LINE_BYTES, " img=%" PRIu64, dump_id(item->paint.resource));
         emit_text(run, run->line, &failed);
       } else if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_PATTERN) {
-        snprintf(run->line, LINE_BYTES, " pat=%" PRIu64, gshscene_resource_id(item->paint.resource));
+        snprintf(run->line, LINE_BYTES, " pat=%" PRIu64, dump_id(item->paint.resource));
         emit_text(run, run->line, &failed);
         copies_record(run, item, count, &box, &failed);
       } else if (hatched) {
@@ -1723,9 +1729,9 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
         }
         if (hhas) {
           snprintf(run->line, LINE_BYTES, " hatch=%" PRIu64 " lines=%" PRIu64 " pieces=%016" PRIx64,
-              gshscene_resource_id(item->paint.resource), hlines, hhash);
+              dump_id(item->paint.resource), hlines, hhash);
         } else {
-          snprintf(run->line, LINE_BYTES, " hatch=%" PRIu64 " lines=%" PRIu64 " pieces=-", gshscene_resource_id(item->paint.resource),
+          snprintf(run->line, LINE_BYTES, " hatch=%" PRIu64 " lines=%" PRIu64 " pieces=-", dump_id(item->paint.resource),
               hlines);
         }
         emit_text(run, run->line, &failed);
