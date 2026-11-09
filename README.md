@@ -51,8 +51,8 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
   one function every sink calls at draw time; a group has a blend space, an opacity, a composite
   operator (a Porter-Duff operator, or one of W3C's fifteen blend modes, numbered as COLRv1 numbers
   them: a per-draw blend is a group of one) and an ordering context; PDF's non-isolated and knockout groups
-  and a soft mask (a mask resource and its placement) are defined on the group, and refused by every sink until it
-  composites them. Exact references (`tools/composite-oracle.py`,
+  and a soft mask (a mask resource and its placement) are defined on the group, and a sink that does not composite them
+  refuses them with a reason (`shape-cpu` composites all three). Exact references (`tools/composite-oracle.py`,
   `tools/gradient-oracle.py`) and committed known answers define what two sinks must agree on.
 - **Arcs and named primitives** (`primitive.h`; PS1 to PS4 and PR1 to PR13 in `documentation/design.md`). A path resource holds, copies,
   compares, hashes and dumps arcs as the geometry library does, and `gshscene_store_intern_primitive` makes a rect, a rounded rect or an
@@ -65,6 +65,19 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
   or its shape by the value at its pop. The planning pass enters a mask's picture and refuses a mask by
   the features a sink lacks (`MASK_FEATURE`). `tools/composite-oracle.py` restates the rules in exact
   rationals and `tests/mask_vectors.h` commits known answers.
+- **Antialiasing of an item** (`list.h`). A fill and a stroke carry an `antialias`: the area of the shape in the pixel by default,
+  or `GSHSCENE_ANTIALIAS_NONE`, which covers a pixel whole or not at all by its center, with a stated rule for a center on an
+  edge, so that abutting shapes leave no gap and no overlap (SVG's `shape-rendering: crispEdges`, Canvas's pixel-aligned
+  drawing). It is on the item, not on a group, and a sink says by a capability whether it draws it.
+- **Hatches** (`hatch.h`). A hatch resource is the pattern-definition lines of a CAD hatch (an angle, an origin, an offset along and
+  across, and a dash pattern for each family, a stroke style for the pen and an ink); a fill painted with it draws the
+  families' lines trimmed to the fill's region, dashed and stroked. It is geometry, not a raster pattern: a plotter follows the
+  lines and a CAD writer emits the entity.
+- **Clip unions** (`clip_union.h`). A clip of several shapes, each with its own map and fill rule (SVG's `<clipPath>` of
+  several children, the glyphs of a PDF text clip), is the exact union of their regions, named by a clip push like any region.
+  `examples/clip_union.c`.
+- **Glyph path provider** (`glyph_provider.h`, `glyph.h`). A face resource binds a font's glyphs to the waist through a provider
+  whose header names no floating type, so that a sink draws a run from a font without including a font header.
 - **Hash and dump** of every resource and list, in `shape-geometry`'s spelling (FNV-1a 64 over
   little-endian fields), the same on every target.
 - **Limits** on everything a caller can make unbounded, each asserted by its bound, including the
@@ -116,6 +129,16 @@ a rectangle with an image, recognizes a drawn image as a writer does and shows w
 without the pattern capability, and a sink that cannot draw a unit in the tile, make of a pattern fill;
 `examples/mask.c` makes an SVG-style luminance mask and a PDF-style soft mask and shows the numbers every sink shares and
 the reasons a sink without a feature is refused with.
+
+## Not implemented
+
+- A stroke style's width profile is named and reserved; no sink draws one.
+- GPU target kinds are reserved; there is no GPU sink.
+- The seam-free flag of a render is reserved and refused.
+- A pattern's tile is clipped to its cell; a tile that draws outside the cell (SVG's `overflow: visible` on a pattern) is not
+  drawn there.
+- No filter effects (blur, shadows), no mesh gradients, and no file format of its own: the dump is a debugging spelling, and a
+  document is the business of a front end.
 
 ## Building
 
