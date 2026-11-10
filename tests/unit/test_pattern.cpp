@@ -169,7 +169,7 @@ TEST(Pattern, HashAndDumpAreWhatTheIndependentGeneratorSays) {
   GSHGEOM_Map design;
   gshgeom_map_design_to_model(2.5, 10, 20, &design);
   GSHGEOM_Map tr = translate(1.5, -2.25);
-  GSHSCENE_Pattern p[5];
+  GSHSCENE_Pattern p[6];
   for (auto & x : p) {
     x = w.base();
   }
@@ -207,10 +207,11 @@ TEST(Pattern, HashAndDumpAreWhatTheIndependentGeneratorSays) {
   p[4].y_step = 0.3;
   p[4].repeat_x = 0;
   p[4].map = tr;
-  const char * const dumps[5] = {known::kPatternDump0, known::kPatternDump1, known::kPatternDump2, known::kPatternDump3,
-      known::kPatternDump4};
-  std::vector<Ref> held(5);
-  for (int i = 0; i < 5; i++) {
+  p[5].overflow = 1;  // PT15: the defaults but for the field
+  const char * const dumps[6] = {known::kPatternDump0, known::kPatternDump1, known::kPatternDump2, known::kPatternDump3,
+      known::kPatternDump4, known::kPatternDump5};
+  std::vector<Ref> held(6);
+  for (int i = 0; i < 6; i++) {
     SCOPED_TRACE(i);
     ASSERT_EQ(w.intern(p[i], &held[(size_t)i]), GSHSCENE_OK);
     EXPECT_EQ(gshscene_resource_kind(held[(size_t)i].get()), GSHSCENE_RESOURCE_PATTERN);

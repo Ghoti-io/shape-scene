@@ -149,6 +149,8 @@ const char * gshscene_reason_string(GSHSCENE_Reason reason) {
       return "union-overlap";
     case GSHSCENE_REASON_ANTIALIAS:
       return "antialias";
+    case GSHSCENE_REASON_PATTERN_OVERFLOW:
+      return "pattern-overflow";
     case GSHSCENE_REASON_COUNT:
       break;
   }

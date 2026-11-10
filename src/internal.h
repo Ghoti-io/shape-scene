@@ -138,6 +138,8 @@ struct GSHSCENE_Resource {
       size_t depth;                   /* PT11: the tile's picture depth, which a list that names the pattern counts */
       int foreground;                 /* the tile (or a picture nested in it) or the tint reads the foreground (PT12) */
       uint32_t palette_need;          /* the largest palette entry the tile or the tint names, plus one; 0 for none (PT12) */
+      int extent_state;               /* PT15: 0 not asked (overflow 0), 1 `extent` is the cell widened to the tile's content, 2 the content's box is unknown */
+      double extent[4];               /* PT15: {left, top, right, bottom} in pattern space, when `extent_state` is 1 */
     } pattern;
     struct {
       GSHSCENE_Clip_Member * members; /* count of them, canonical order (CU8); each member's resource is retained */

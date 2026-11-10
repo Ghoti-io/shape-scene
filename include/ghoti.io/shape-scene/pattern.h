@@ -121,6 +121,18 @@
  * picture, at intern, and in a retained scene.  A pattern adds no outset to a fill's or stroke's bounds.  A changed
  * pattern or tile damages the nodes that paint with it; a changed foreground or palette damages those whose tile names it.
  *
+ * ### A tile that draws past its cell (PT15)
+ *
+ * `overflow` 0, the default, clips each copy to its cell, as PT7 and PT6 say.  `overflow` 1 is SVG 2's `overflow="visible"` on a
+ * `<pattern>`: the tile is drawn unclipped at every lattice position, the copies composited in lattice order, later over earlier, and what
+ * is painted is still limited to the fill or stroke that uses the pattern.  A copy reaches a pixel when its **extent** does: the cell widened
+ * to the box of everything the tile paints (::gshscene_pattern_extent), so the copies a use draws are those whose extent meets its
+ * bounds, and the cells overlap (PT7's form, never PT6's sum) whenever the extent is wider than a step.  The tile's box is a conservative
+ * bound; it never changes a pixel, only how many copies are looked at.  The attribute is not drawn by any of resvg, Inkscape, Chrome or
+ * Firefox (they clip), so the definition is SVG 2's text and the gate a hand-derived reference.  The field is in the hash and the dump only when
+ * 1, so a clipped pattern is the handle, hash and text it was.  A sink says it draws it with ::GSHSCENE_CAP_PATTERN_OVERFLOW; without it, or
+ * with a tile whose extent is not known, the unit is drawn clipped and reported `APPROXIMATED`, `PATTERN_OVERFLOW`.
+ *
  * ### Sinks (PT13, PT14)
  *
  * A sink says it draws patterns with ::GSHSCENE_CAP_PATTERN; without it the planning pass refuses a unit painted with a pattern
@@ -168,6 +180,8 @@ typedef struct GSHSCENE_Pattern {
   uint32_t has_tint;              ///< 1: the pattern is uncolored and takes `tint`; 0: colored.
   /** A `SOLID`, `FOREGROUND` or `PALETTE` paint, meaningful only with `has_tint` 1 (and the zero paint otherwise); copied. */
   GSHSCENE_Paint tint;
+  /** 0 (the default) clips every copy to its cell; 1 draws the tile unclipped (PT15, SVG 2's `overflow="visible"`). */
+  uint32_t overflow;
 } GSHSCENE_Pattern;
 
 /** Fill @p pattern with the defaults: no tile, the cell `(0, 0, 1, 1)`, both steps 1, both repeats 1, the identity map, no tint.  NULL is ignored. */
@@ -208,6 +222,19 @@ GSHSCENE_API GSHSCENE_Result gshscene_resource_pattern(const GSHSCENE_Resource *
  * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, an index out of range).
  */
 GSHSCENE_API GSHSCENE_Result gshscene_pattern_cell(const GSHSCENE_Pattern * pattern, int64_t i, int64_t j, double out[4]);
+
+/**
+ * @brief The extent of a pattern (PT15): `out = {left, top, right, bottom}` in pattern space, the box that a copy's drawing is clipped to.
+ *
+ * The cell `[x, x + w] x [y, y + h]` for a pattern whose `overflow` is 0.  For one whose `overflow` is 1, the cell widened to hold everything the
+ * tile can paint (a conservative box: each fill's region and each stroke's region outset by its pen, under the maps of the instances that
+ * hold them; clips and masks are ignored), found once when the pattern is interned.  The copy `(i, j)`'s extent is this box translated by
+ * `(i x_step, j y_step)`.
+ *
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, not a pattern); ::GSHSCENE_ERR_LIMIT (`overflow` is 1 and the tile's extent is not known:
+ *   a stroke with a device width, a hatch, a bound the maps cannot take, a tile nested past the walk's levels).  Written only on success.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_pattern_extent(const GSHSCENE_Resource * pattern, double out[4]);
 
 /**
  * @brief Whether the cells overlap (PT7): `x_step < w` on an axis that repeats in x, or `y_step < h` on one that repeats in y, by exact comparison of the stored doubles.  0

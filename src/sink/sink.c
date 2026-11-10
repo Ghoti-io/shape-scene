@@ -431,6 +431,15 @@ GSHSCENE_Disposition gshscene_caps_disposition(const GSHSCENE_Sink_Caps * caps, 
     d.entry_class = GSHSCENE_ENTRY_REFUSED;
     d.reason = GSHSCENE_REASON_PATTERN;
   }
+  /* PT15: a pattern whose tile may draw past its cell, drawn by a sink that clips the tile to the cell, or whose extent is not known.  After the
+   * refusals, which win; a tile refused whole is refused whether it overflows or not. */
+  if (!d.entry_class && caps && item && (item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE) &&
+      item->paint.kind == GSHSCENE_PAINT_PATTERN && item->paint.resource &&
+      item->paint.resource->kind == GSHSCENE_RESOURCE_PATTERN && item->paint.resource->u.pattern.p.overflow &&
+      (!(caps->flags & GSHSCENE_CAP_PATTERN_OVERFLOW) || item->paint.resource->u.pattern.extent_state != 1)) {
+    d.entry_class = GSHSCENE_ENTRY_APPROXIMATED;
+    d.reason = GSHSCENE_REASON_PATTERN_OVERFLOW;
+  }
   return d;
 }
 

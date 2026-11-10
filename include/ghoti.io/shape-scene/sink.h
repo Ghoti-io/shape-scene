@@ -451,7 +451,13 @@ typedef struct GSHSCENE_Target {
  * planning pass reports such an item `APPROXIMATED`, `ANTIALIAS`.
  */
 #define GSHSCENE_CAP_ANTIALIAS_NONE_TOP_LEFT (UINT32_C(1) << 20)
-#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 21) - 1) ///< Every flag defined.
+/**
+ * A sink draws a pattern whose `overflow` is 1 as pattern.h's PT15 says: the tile unclipped at every copy, later copies over earlier.  Without it
+ * the sink clips the tile to its cell and the planning pass reports the unit `APPROXIMATED`, `PATTERN_OVERFLOW`.  A sink that has it still
+ * draws such a pattern clipped, with the same report, when the extent of the tile is not known (::gshscene_pattern_extent).
+ */
+#define GSHSCENE_CAP_PATTERN_OVERFLOW (UINT32_C(1) << 21)
+#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 22) - 1) ///< Every flag defined.
 /** @} */
 
 /**

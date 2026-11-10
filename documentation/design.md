@@ -444,6 +444,16 @@ retained scene's validation. A pattern adds no outset: a fill's or stroke's boun
 node's paint by handle, so a changed pattern or tile damages the nodes that paint with it and nothing else, and a changed
 foreground or palette damages the fills whose tile or tint reads it, through instances, masks and nested patterns.
 
+**A tile that draws past its cell (PT15).** `overflow` 1 is SVG 2's `overflow="visible"` on a `<pattern>`: the tile is drawn unclipped at
+every lattice position, the copies composited in lattice order, later over earlier, and what is painted is still limited to the fill that uses
+the pattern. Which copies reach a pixel is decided by the pattern's *extent*, the cell widened to the box of everything the tile paints, found
+once when the pattern is interned from each fill's region and each stroke's region outset by its pen under the maps of the instances that hold
+them. Clips and masks are ignored (a box too large costs copies, never pixels); a stroke with a device width, a hatch and a bound the maps cannot
+take have no known extent, and the unit is then drawn clipped and reported `APPROXIMATED`, `PATTERN_OVERFLOW`, as it is for a sink without
+`CAP_PATTERN_OVERFLOW`. The field is in the hash and the dump only when 1, so a clipped pattern is the handle and the text it always was.
+Resvg, Inkscape, Chrome and Firefox all clip the tile whatever the attribute says, so no oracle draws it; the definition is SVG 2's text and the
+gates are references derived by hand.
+
 **Sinks (PT13, PT14).** Without `CAP_PATTERN` the planning pass refuses a unit painted with a pattern, `PATTERN`, on every sink,
 before the target is touched. With it, a unit in the tile that the caps refuse is reported with the chain extended by its index in
 the tile, once and not once per copy, and refuses the unit painted with the pattern as well: a pattern with a missing part is not

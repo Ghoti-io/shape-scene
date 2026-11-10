@@ -106,7 +106,7 @@ static GSHSCENE_Result canonical(const GSHSCENE_Store * store, const GSHSCENE_Pa
       return GSHSCENE_ERR_INVALID;
     }
   }
-  if (in->repeat_x > 1u || in->repeat_y > 1u || in->has_tint > 1u) {
+  if (in->repeat_x > 1u || in->repeat_y > 1u || in->has_tint > 1u || in->overflow > 1u) {
     return GSHSCENE_ERR_INVALID;
   }
   if (in->w < 0.0 || in->h < 0.0 || in->x_step < 0.0 || in->y_step < 0.0) {
@@ -164,6 +164,7 @@ static GSHSCENE_Result canonical(const GSHSCENE_Store * store, const GSHSCENE_Pa
     out->map.t[i] = plus_zero(map.t[i]);
   }
   out->has_tint = in->has_tint;
+  out->overflow = in->overflow;
   if (in->has_tint) {
     out->tint = tint;
     for (int i = 0; i < 4; i++) {
@@ -199,6 +200,9 @@ static uint64_t content_hash(const GSHSCENE_Pattern * p) {
     gshscene_space_hash(&h, &p->tint.space);
     gshgeom_hash_u32(&h, p->tint.entry);
   }
+  if (p->overflow) {
+    gshgeom_hash_u8(&h, 1); /* PT15: written only when set, so that a pattern that clips has the hash it always had */
+  }
   return gshgeom_hash_value(&h);
 }
 
@@ -213,7 +217,7 @@ int gshscene_pattern_matches(const GSHSCENE_Resource * resource, const void * so
   const GSHSCENE_Pattern * b = &((const Source *)source)->p;
   if (a->tile != b->tile || !bits_equal(a->x, b->x) || !bits_equal(a->y, b->y) || !bits_equal(a->w, b->w) ||
       !bits_equal(a->h, b->h) || !bits_equal(a->x_step, b->x_step) || !bits_equal(a->y_step, b->y_step) ||
-      a->repeat_x != b->repeat_x || a->repeat_y != b->repeat_y || a->has_tint != b->has_tint ||
+      a->repeat_x != b->repeat_x || a->repeat_y != b->repeat_y || a->has_tint != b->has_tint || a->overflow != b->overflow ||
       a->map.dim != b->map.dim || a->map.kind != b->map.kind) {
     return 0;
   }
@@ -307,6 +311,174 @@ static void scan_tile(const GSHSCENE_List * list, int * foreground, uint32_t * p
   }
 }
 
+/* --- PT15: the extent of a pattern whose tile may draw past its cell ---------------------------------- */
+
+static void box_add(GSHGEOM_Bounds * acc, const GSHGEOM_Bounds * b) {
+  if (b->empty) {
+    return;
+  }
+  if (acc->empty) {
+    *acc = *b;
+    acc->empty = 0;
+    return;
+  }
+  acc->min.x = b->min.x < acc->min.x ? b->min.x : acc->min.x;
+  acc->min.y = b->min.y < acc->min.y ? b->min.y : acc->min.y;
+  acc->max.x = b->max.x > acc->max.x ? b->max.x : acc->max.x;
+  acc->max.y = b->max.y > acc->max.y ? b->max.y : acc->max.y;
+}
+
+/** The box of @p in under @p map (the four corners mapped), or a non-OK result when a corner cannot be had. */
+static GSHSCENE_Result box_mapped(const GSHGEOM_Map * map, const GSHGEOM_Bounds * in, GSHGEOM_Bounds * out) {
+  memset(out, 0, sizeof *out);
+  out->empty = 1;
+  if (in->empty) {
+    return GSHSCENE_OK;
+  }
+  const double xs[2] = {in->min.x, in->max.x};
+  const double ys[2] = {in->min.y, in->max.y};
+  for (int a = 0; a < 2; a++) {
+    for (int c = 0; c < 2; c++) {
+      GSHGEOM_Point q;
+      if (gshgeom_map_apply_point(map, (GSHGEOM_Point){xs[a], ys[c], 0.0}, &q) != GSHGEOM_OK || !gshscene_finite(q.x) ||
+          !gshscene_finite(q.y)) {
+        return GSHSCENE_ERR_LIMIT;
+      }
+      GSHGEOM_Bounds pt;
+      memset(&pt, 0, sizeof pt);
+      pt.min.x = pt.max.x = q.x;
+      pt.min.y = pt.max.y = q.y;
+      box_add(out, &pt);
+    }
+  }
+  return GSHSCENE_OK;
+}
+
+/**
+ * PT15: a conservative box, in the tile's own space, of everything the tile can paint: each fill's region and each stroke's
+ * region outset by its pen (SK10), under the maps of the instances that hold it.  Clips and masks are ignored (a box that is too large costs
+ * copies, never pixels).  ::GSHSCENE_OK with @p box possibly empty, or a non-OK result when some unit's extent is not known: a
+ * device-width pen (its outset depends on the whole chain to the target), a hatch, a bound the maps cannot take, or a tile
+ * nested past the levels the walk has.
+ */
+static GSHSCENE_Result tile_box(const GSHSCENE_Resource * tile_resource, GSHGEOM_Bounds * box) {
+  const GSHSCENE_List * tile = gshscene_resource_picture(tile_resource);
+  memset(box, 0, sizeof *box);
+  box->empty = 1;
+  if (gshscene_expansion_bytes(tile) > GSHSCENE_PATTERN_CHECK_LEVELS * (sizeof(const GSHSCENE_List *) + sizeof(size_t))) {
+    return GSHSCENE_ERR_LIMIT;
+  }
+  uint64_t memory[GSHSCENE_PATTERN_CHECK_LEVELS * 2];
+  GSHGEOM_Map maps[GSHSCENE_PATTERN_CHECK_MAPS];
+  size_t base[GSHSCENE_PATTERN_CHECK_LEVELS + 1];
+  base[0] = 0;
+  GSHSCENE_Expansion walk;
+  if (gshscene_expansion_init(&walk, tile, memory, sizeof memory) != GSHSCENE_OK) {
+    return GSHSCENE_ERR_LIMIT;
+  }
+  walk.plan = 1;
+  const GSHSCENE_Item * unit;
+  const size_t * chain;
+  size_t count;
+  while (gshscene_expansion_next(&walk, &unit, &chain, &count)) {
+    if (count > GSHSCENE_PATTERN_CHECK_LEVELS) {
+      return GSHSCENE_ERR_LIMIT;
+    }
+    const size_t prefix = base[count - 1];
+    if (prefix + 2 > GSHSCENE_PATTERN_CHECK_MAPS) {
+      return GSHSCENE_ERR_LIMIT;
+    }
+    if (unit->kind == GSHSCENE_ITEM_FILL || unit->kind == GSHSCENE_ITEM_STROKE) {
+      if (unit->paint.kind == GSHSCENE_PAINT_HATCH) {
+        return GSHSCENE_ERR_UNSUPPORTED;
+      }
+      GSHGEOM_Bounds centerline;
+      GSHGEOM_Map composed;
+      maps[prefix] = unit->map;
+      if (gshscene_centerline_box(unit->resource, &centerline) != GSHSCENE_OK ||
+          gshgeom_map_compose_chain(maps, prefix + 1u, NULL, &composed) != GSHGEOM_OK) {
+        return GSHSCENE_ERR_UNSUPPORTED;
+      }
+      GSHGEOM_Bounds b;
+      if (unit->kind == GSHSCENE_ITEM_STROKE) {
+        if (!unit->style || unit->style->kind != GSHSCENE_RESOURCE_STROKE_STYLE ||
+            unit->style->u.stroke.s.width_space == (uint32_t)GSHSCENE_STROKE_WIDTH_DEVICE ||
+            gshscene_stroke_bounds(unit->style, &centerline, &composed, 0, &b) != GSHSCENE_OK) {
+          return GSHSCENE_ERR_UNSUPPORTED;
+        }
+      } else if (box_mapped(&composed, &centerline, &b) != GSHSCENE_OK) {
+        return GSHSCENE_ERR_UNSUPPORTED;
+      }
+      box_add(box, &b);
+    }
+    /* The maps a level adds, as the planning pass adds them and gshscene_pattern_tile_refused does. */
+    if (unit->kind == GSHSCENE_ITEM_INSTANCE) {
+      maps[prefix] = unit->map;
+      base[count] = prefix + 1;
+    } else if (unit->kind == GSHSCENE_ITEM_GROUP_PUSH && unit->group.soft_mask) {
+      maps[prefix] = unit->group.soft_mask_map;
+      base[count] = prefix + 1;
+    } else if ((unit->kind == GSHSCENE_ITEM_FILL || unit->kind == GSHSCENE_ITEM_STROKE) &&
+               unit->paint.kind == GSHSCENE_PAINT_PATTERN) {
+      maps[prefix] = unit->map;
+      maps[prefix + 1] = unit->paint.resource->u.pattern.p.map;
+      base[count] = prefix + 2;
+    }
+  }
+  return GSHSCENE_OK;
+}
+
+/** PT15: the extent of @p r (a pattern resource being built), once, at intern. */
+static void compute_extent(GSHSCENE_Resource * r) {
+  const GSHSCENE_Pattern * p = &r->u.pattern.p;
+  r->u.pattern.extent_state = 0;
+  if (!p->overflow) {
+    return;
+  }
+  GSHGEOM_Bounds box;
+  const double cell[4] = {p->x, p->y, p->x + p->w, p->y + p->h};
+  if (tile_box(p->tile, &box) != GSHSCENE_OK) {
+    r->u.pattern.extent_state = 2;
+    return;
+  }
+  double e[4] = {cell[0], cell[1], cell[2], cell[3]};
+  if (!box.empty) {
+    e[0] = box.min.x < e[0] ? box.min.x : e[0];
+    e[1] = box.min.y < e[1] ? box.min.y : e[1];
+    e[2] = box.max.x > e[2] ? box.max.x : e[2];
+    e[3] = box.max.y > e[3] ? box.max.y : e[3];
+  }
+  for (int i = 0; i < 4; i++) {
+    if (!gshscene_finite(e[i])) {
+      r->u.pattern.extent_state = 2;
+      return;
+    }
+    r->u.pattern.extent[i] = e[i];
+  }
+  r->u.pattern.extent_state = 1;
+}
+
+GSHSCENE_Result gshscene_pattern_extent(const GSHSCENE_Resource * resource, double out[4]) {
+  if (!resource || !out || resource->kind != GSHSCENE_RESOURCE_PATTERN) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  const GSHSCENE_Pattern * p = &resource->u.pattern.p;
+  if (!p->overflow) {
+    out[0] = p->x;
+    out[1] = p->y;
+    out[2] = p->x + p->w;
+    out[3] = p->y + p->h;
+    return GSHSCENE_OK;
+  }
+  if (resource->u.pattern.extent_state != 1) {
+    return GSHSCENE_ERR_LIMIT;
+  }
+  for (int i = 0; i < 4; i++) {
+    out[i] = resource->u.pattern.extent[i];
+  }
+  return GSHSCENE_OK;
+}
+
 static GSHSCENE_Result build(GSHSCENE_Store * store, const void * source, GSHSCENE_Resource ** out) {
   const Source * s = (const Source *)source;
   GSHSCENE_Resource * resource = gshscene_store_new_resource(store, GSHSCENE_RESOURCE_PATTERN);
@@ -327,6 +499,7 @@ static GSHSCENE_Result build(GSHSCENE_Store * store, const void * source, GSHSCE
   }
   resource->u.pattern.foreground = foreground;
   resource->u.pattern.palette_need = need;
+  compute_extent(resource);
   *out = resource;
   return GSHSCENE_OK;
 }
@@ -373,16 +546,20 @@ int gshscene_pattern_dump(const GSHSCENE_Resource * resource, FILE * out) {
     return -1;
   }
   if (!p->has_tint) {
-    if (fputs("-\n", out) == EOF) {
+    if (fputs("-", out) == EOF) {
       return -1;
     }
   } else {
     const GSHSCENE_Paint * t = &p->tint;
     if (fprintf(out, "%u %016llx %016llx %016llx %016llx ", (unsigned)t->kind, HEX(gshgeom_f64_bits(t->rgba[0])),
             HEX(gshgeom_f64_bits(t->rgba[1])), HEX(gshgeom_f64_bits(t->rgba[2])), HEX(gshgeom_f64_bits(t->rgba[3]))) < 0 ||
-        gshscene_space_dump(out, &t->space) < 0 || fprintf(out, " %u\n", t->entry) < 0) {
+        gshscene_space_dump(out, &t->space) < 0 || fprintf(out, " %u", t->entry) < 0) {
       return -1;
     }
+  }
+  /* PT15: named only when set, so that the dump of a pattern that clips is the text it always was. */
+  if (fputs(p->overflow ? " overflow=1\n" : "\n", out) == EOF) {
+    return -1;
   }
   return gshscene_list_dump(gshscene_resource_picture(p->tile), out) == GSHSCENE_OK ? 0 : -1;
 }

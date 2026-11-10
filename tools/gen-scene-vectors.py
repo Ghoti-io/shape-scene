@@ -1314,7 +1314,7 @@ KIND_PATTERN = 12
 PAINT_PATTERN = 5
 
 
-def pattern(tile, cell, steps, repeat, mhash, tint=None):
+def pattern(tile, cell, steps, repeat, mhash, tint=None, overflow=False):
     """A pattern over the picture hashed @p tile.  A tint is (paint kind, rgba, space, entry); the cell and steps as given
     (the store keeps -0 as +0, so the cases write +0).  A step on an axis that does not repeat is never read, so the store
     keeps the size there (one spelling, PT3): the case gives the step it passes and this states what is kept."""
@@ -1328,10 +1328,13 @@ def pattern(tile, cell, steps, repeat, mhash, tint=None):
         kind, rgba, space, entry = tint
         out += u8(1) + u8(kind) + b"".join(f64(v) for v in rgba) + space_bytes(space) + u32(entry)
         tint_text = "%d %s %s" % (kind, " ".join("%016x" % bits(v) for v in rgba), space_text(space)) + " %d" % entry
+    if overflow:
+        out += u8(1)  # PT15: written only when set
     digest = fnv(out)
-    dump = "gshscene.resource 1 kind=pattern hash=%016x\npattern cell=%s step=%s repeat=%d%d map=%016x tile=%016x tint=%s\n" % (
+    dump = "gshscene.resource 1 kind=pattern hash=%016x\npattern cell=%s step=%s repeat=%d%d map=%016x tile=%016x tint=%s" % (
         digest, " ".join("%016x" % bits(v) for v in cell), " ".join("%016x" % bits(v) for v in steps), repeat[0], repeat[1],
         mhash, tile, tint_text)
+    dump += (" overflow=1" if overflow else "") + "\n"
     dump += list_dump(PICTURE_ITEMS)
     return dict(hash=digest, dump=dump)
 
@@ -1347,6 +1350,8 @@ PATTERNS = [
     pattern(PICTURE_RES, (0.0, 0.0, 0.0, 3.0), (0.0, 0.0), (0, 0), IDENTITY, tint=(PAINT_PALETTE, (0.0, 0.0, 0.0, 1.0), TARGET, 2)),
     # the ends of G14's band
     pattern(PICTURE_RES, (2.0 ** -64, 2.0 ** 64, 0.1, 0.3), (0.1, 0.3), (0, 1), TRANSLATE),
+    # a tile that draws past its cell (PT15): the defaults but for the field, so that the one byte it adds is all that differs
+    pattern(PICTURE_RES, (0.0, 0.0, 1.0, 1.0), (1.0, 1.0), (1, 1), IDENTITY, overflow=True),
 ]
 PATTERN_LIST_ITEMS = [
     fill(KIND_PATH, SQ_RES, IDENTITY, 0, (0.0, 0.0, 0.0, 1.0), paint=PAINT_PATTERN, grad=PATTERNS[0]["hash"]),

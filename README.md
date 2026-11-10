@@ -135,8 +135,10 @@ the reasons a sink without a feature is refused with.
 - A stroke style's width profile is named and reserved; no sink draws one.
 - GPU target kinds are reserved; there is no GPU sink.
 - The seam-free flag of a render is reserved and refused.
-- A pattern's tile is clipped to its cell; a tile that draws outside the cell (SVG's `overflow: visible` on a pattern) is not
-  drawn there.
+- A pattern's tile is clipped to its cell unless the pattern's `overflow` is 1 (SVG 2's `overflow="visible"`): then it is drawn
+  unclipped at every copy, later over earlier, by a sink with `CAP_PATTERN_OVERFLOW`; another sink clips it and the planning pass
+  says so (`APPROXIMATED`, `PATTERN_OVERFLOW`), as it does for a tile whose extent is not known. No renderer measured draws the
+  attribute (resvg, Inkscape, Chrome and Firefox clip), so the reference is SVG 2's text.
 - No filter effects (blur, shadows), no mesh gradients, and no file format of its own: the dump is a debugging spelling, and a
   document is the business of a front end.
 

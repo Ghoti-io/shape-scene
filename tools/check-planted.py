@@ -4975,6 +4975,47 @@ PLANTS += [
 ]
 
 
+# A pattern whose tile may draw past its cell (pattern.h, PT15): the field and its check, its one spelling when it is 0 (handle, hash and dump),
+# the extent found at intern (the cell widened to what the tile paints: a fill under its maps, a stroke by its pen, an instance, and what is not
+# known) and the planning pass's disposition.  Run alone with PLANT_ONLY='^pov-'.  The equality of two patterns that differ only in the field is
+# decided by the hash first, so a plant of `gshscene_pattern_matches` alone could be seen only with a hash collision and is not made.
+POT = ["testPattern_overflow"]
+PAT_C = "src/resource/pattern.c"
+HPAT = "include/ghoti.io/shape-scene/pattern.h"
+PLANTS += [
+    ('pov-hdr-cap-bit', 'hdr', HS, '#define GSHSCENE_CAP_PATTERN_OVERFLOW (UINT32_C(1) << 21)', '#define GSHSCENE_CAP_PATTERN_OVERFLOW (UINT32_C(1) << 20)', POT + ["testAntialias"]),
+    ('pov-hdr-reason', 'hdr', HRP, '  GSHSCENE_REASON_PATTERN_OVERFLOW = 44,', '  GSHSCENE_REASON_PATTERN_OVERFLOW = 54,', POT + ["testReport"]),
+    ('pov-report-name', 'src', 'src/sink/report.c', '      return "pattern-overflow";', '      return "pattern_overflow";', POT + ["testReport"]),
+    ('pov-check', 'src', PAT_C, 'in->has_tint > 1u || in->overflow > 1u) {', 'in->has_tint > 1u || in->overflow > 2u) {', POT),
+    ('pov-store', 'src', PAT_C, '  out->overflow = in->overflow;\n', '', POT),
+    ('pov-hash-dropped', 'src', PAT_C, '  if (p->overflow) {\n    gshgeom_hash_u8(&h, 1);', '  if (0) {\n    gshgeom_hash_u8(&h, 1);', POT),
+    ('pov-hash-default-spelled', 'src', PAT_C, '  if (p->overflow) {\n    gshgeom_hash_u8(&h, 1);', '  if (1) {\n    gshgeom_hash_u8(&h, 1);', POT + ["testPattern"]),
+    ('pov-dump-dropped', 'src', PAT_C, 'fputs(p->overflow ? " overflow=1\\n" : "\\n", out)', 'fputs("\\n", out)', POT),
+    ('pov-dump-default-spelled', 'src', PAT_C, 'fputs(p->overflow ? " overflow=1\\n" : "\\n", out)', 'fputs(" overflow=1\\n", out)', POT + ["testPattern"]),
+    ('pov-extent-clipped-asks', 'src', PAT_C, '  const GSHSCENE_Pattern * p = &resource->u.pattern.p;\n  if (!p->overflow) {\n    out[0] = p->x;', '  const GSHSCENE_Pattern * p = &resource->u.pattern.p;\n  if (0) {\n    out[0] = p->x;', POT),
+    ('pov-extent-left-cell', 'src', PAT_C, 'e[0] = box.min.x < e[0] ? box.min.x : e[0];', 'e[0] = box.min.x;', POT),
+    ('pov-extent-top-cell', 'src', PAT_C, 'e[1] = box.min.y < e[1] ? box.min.y : e[1];', 'e[1] = box.min.y;', POT),
+    ('pov-extent-right-cell', 'src', PAT_C, 'e[2] = box.max.x > e[2] ? box.max.x : e[2];', 'e[2] = box.max.x;', POT),
+    ('pov-extent-bottom-cell', 'src', PAT_C, 'e[3] = box.max.y > e[3] ? box.max.y : e[3];', 'e[3] = box.max.y;', POT),
+    ('pov-extent-right-ignored', 'src', PAT_C, 'e[2] = box.max.x > e[2] ? box.max.x : e[2];', '(void)e[2];', POT),
+    ('pov-extent-bottom-ignored', 'src', PAT_C, 'e[3] = box.max.y > e[3] ? box.max.y : e[3];', '(void)e[3];', POT),
+    ('pov-extent-empty-box', 'src', PAT_C, '  if (!box.empty) {\n    e[0]', '  if (box.empty) {\n    e[0]', POT),
+    ('pov-box-fill-map', 'src', PAT_C, 'gshgeom_map_compose_chain(maps, prefix + 1u, NULL, &composed)', 'gshgeom_map_compose_chain(maps, prefix, NULL, &composed)', POT),
+    ('pov-box-stroke-pen', 'src', PAT_C, 'gshscene_stroke_bounds(unit->style, &centerline, &composed, 0, &b) != GSHSCENE_OK) {', 'box_mapped(&composed, &centerline, &b) != GSHSCENE_OK) {', POT),
+    ('pov-box-device-known', 'src', PAT_C, 'unit->style->u.stroke.s.width_space == (uint32_t)GSHSCENE_STROKE_WIDTH_DEVICE ||\n            gshscene_stroke_bounds', 'gshscene_stroke_bounds', POT),
+    ('pov-box-hatch-known', 'src', PAT_C, '      if (unit->paint.kind == GSHSCENE_PAINT_HATCH) {\n        return GSHSCENE_ERR_UNSUPPORTED;\n      }', '', POT),
+    ('pov-box-instance-map', 'src', PAT_C, '    if (unit->kind == GSHSCENE_ITEM_INSTANCE) {\n      maps[prefix] = unit->map;\n      base[count] = prefix + 1;\n    } else if (unit->kind == GSHSCENE_ITEM_GROUP_PUSH && unit->group.soft_mask) {\n      maps[prefix] = unit->group.soft_mask_map;\n      base[count] = prefix + 1;\n    } else if ((unit->kind == GSHSCENE_ITEM_FILL || unit->kind == GSHSCENE_ITEM_STROKE) &&\n               unit->paint.kind == GSHSCENE_PAINT_PATTERN) {\n      maps[prefix] = unit->map;\n      maps[prefix + 1] = unit->paint.resource->u.pattern.p.map;\n      base[count] = prefix + 2;\n    }\n  }\n  return GSHSCENE_OK;\n}\n\n/** PT15: the extent', '    if (unit->kind == GSHSCENE_ITEM_INSTANCE) {\n      maps[prefix] = unit->map;\n      base[count] = prefix;\n    } else if (unit->kind == GSHSCENE_ITEM_GROUP_PUSH && unit->group.soft_mask) {\n      maps[prefix] = unit->group.soft_mask_map;\n      base[count] = prefix + 1;\n    } else if ((unit->kind == GSHSCENE_ITEM_FILL || unit->kind == GSHSCENE_ITEM_STROKE) &&\n               unit->paint.kind == GSHSCENE_PAINT_PATTERN) {\n      maps[prefix] = unit->map;\n      maps[prefix + 1] = unit->paint.resource->u.pattern.p.map;\n      base[count] = prefix + 2;\n    }\n  }\n  return GSHSCENE_OK;\n}\n\n/** PT15: the extent', POT),
+    ('pov-plan-cap-ignored', 'src', SK, '(!(caps->flags & GSHSCENE_CAP_PATTERN_OVERFLOW) ||', '(0 ||', POT),
+    ('pov-plan-cap-inverted', 'src', SK, '(!(caps->flags & GSHSCENE_CAP_PATTERN_OVERFLOW) ||', '((caps->flags & GSHSCENE_CAP_PATTERN_OVERFLOW) ||', POT),
+    ('pov-plan-unknown-extent', 'src', SK, 'item->paint.resource->u.pattern.extent_state != 1)) {', '0)) {', POT),
+    ('pov-plan-clipped-approximated', 'src', SK, 'item->paint.resource->u.pattern.p.overflow &&\n      (!(caps->flags & GSHSCENE_CAP_PATTERN_OVERFLOW)', '1 &&\n      (!(caps->flags & GSHSCENE_CAP_PATTERN_OVERFLOW)', POT),
+    ('pov-plan-class', 'src', SK, '    d.entry_class = GSHSCENE_ENTRY_APPROXIMATED;\n    d.reason = GSHSCENE_REASON_PATTERN_OVERFLOW;', '    d.entry_class = GSHSCENE_ENTRY_REFUSED;\n    d.reason = GSHSCENE_REASON_PATTERN_OVERFLOW;', POT),
+    ('pov-plan-reason', 'src', SK, '    d.reason = GSHSCENE_REASON_PATTERN_OVERFLOW;', '    d.reason = GSHSCENE_REASON_PATTERN_RESAMPLED;', POT),
+    ('pov-plan-after-tile-refusal', 'src', SK, '  if (!d.entry_class && caps && item && (item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE) &&\n      item->paint.kind == GSHSCENE_PAINT_PATTERN && item->paint.resource &&\n      item->paint.resource->kind == GSHSCENE_RESOURCE_PATTERN && item->paint.resource->u.pattern.p.overflow &&', '  if (caps && item && (item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE) &&\n      item->paint.kind == GSHSCENE_PAINT_PATTERN && item->paint.resource &&\n      item->paint.resource->kind == GSHSCENE_RESOURCE_PATTERN && item->paint.resource->u.pattern.p.overflow &&', POT),
+    ('pov-dump-sink-cap', 'src', DS, '      GSHSCENE_CAP_PATTERN_OVERFLOW |\n', '', ["testDump_sink"]),
+]
+
+
 # The hatch's other sites: the paint's record, the refusals of a stroke and a plane, the notice, the foreground and the palette, the bounds, the
 # damage, the capability and its refusals, and the test sink's fields.
 HXT = ['testHatch', 'testList', 'testNode', 'testScene', 'testDump_sink', 'testSink', 'testStroke', 'testPattern', 'testGradient']

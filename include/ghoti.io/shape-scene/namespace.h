@@ -216,6 +216,7 @@
 #define gshscene_hatch_bounds GHOTIIO_SHAPE_SCENE(gshscene_hatch_bounds)
 #define gshscene_hatch_required GHOTIIO_SHAPE_SCENE(gshscene_hatch_required)
 #define gshscene_pattern_cell GHOTIIO_SHAPE_SCENE(gshscene_pattern_cell)
+#define gshscene_pattern_extent GHOTIIO_SHAPE_SCENE(gshscene_pattern_extent)
 #define gshscene_pattern_init GHOTIIO_SHAPE_SCENE(gshscene_pattern_init)
 #define gshscene_pattern_notice GHOTIIO_SHAPE_SCENE(gshscene_pattern_notice)
 #define gshscene_pattern_overlaps GHOTIIO_SHAPE_SCENE(gshscene_pattern_overlaps)
