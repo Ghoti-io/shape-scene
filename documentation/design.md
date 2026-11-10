@@ -577,12 +577,18 @@ inside when `w(c) != 0` (nonzero) or `w(c)` is odd (even-odd), and the pixel's c
 outside. That is the whole definition and it is exact: no tolerance, no rounding, and the same answer from every sink that
 implements it.
 
-It is the **top-left rule** because it is the question "is `c + (e, e^2)` inside?" for an infinitely small `e > 0`: the point
-is moved right in `x` first and then down in `y`, so it is never on an edge or a vertex of integer coordinates. A center on a
-non-horizontal edge is inside when the shape is on the right of the edge (a left edge) and outside when it is on the left (a
-right edge); on a horizontal edge it is inside when the shape is below it (a top edge) and outside when it is above (a bottom
-edge); at a vertex the same point decides, which is what makes the corners of a rectangle on the pixel grid follow the edges
-they join. Two shapes that share an edge neither overlap nor leave a gap at the centers on it, and a rectangle with whole-pixel
+The tie has two answers and the item says which (`GSHSCENE_ANTIALIAS_NONE`, `GSHSCENE_ANTIALIAS_NONE_TOP_LEFT`). The definition
+above is the **top-left rule** (`NONE_TOP_LEFT`) because it is the question "is `c + (e, e^2)` inside?" for an infinitely small
+`e > 0`: the point is moved right in `x` first and then down in `y`, so it is never on an edge or a vertex of integer coordinates.
+A center on a non-horizontal edge is inside when the shape is on the right of the edge (a left edge) and outside when it is on the
+left (a right edge); on a horizontal edge it is inside when the shape is below it (a top edge) and outside when it is above (a
+bottom edge); at a vertex the same point decides, which is what makes the corners of a rectangle on the pixel grid follow the edges
+they join. The **bottom-right rule** (`NONE`, the default) asks "is `c - (e, e^2)` inside?": an edge straddles `c` when exactly one
+of `p.y < c.y` and `q.y < c.y` holds, and counts when `x_e >= c.x`; a center on a right or bottom edge is inside and one on a left
+or top edge is outside. It is the default because the renderers an SVG is compared with, Skia, its descendants (resvg's tiny-skia,
+a browser's `crispEdges`), decide it that way, while Cairo decides the top-left; the standards say nothing about a tie, and Blend2D
+has no mode without antialiasing to ask (measured with a square whose edges pass through pixel centers: Cairo paints columns 10 to
+19 of 10.5 to 20.5, Skia 11 to 20). Two shapes that share an edge neither overlap nor leave a gap at the centers on it, and a rectangle with whole-pixel
 corners covers exactly its pixels. A stroke of an aligned style (SK5) decides its body, aligned part and clip each by the rule and
 combines the three whole-or-nothing coverages as SK5 does, which is the union of the body with the aligned part met with the clip
 (or with its complement).
@@ -592,11 +598,11 @@ with the clips in force, the paint, the opacity, the operator, the layer of a gr
 caps, joins, dashes, alignment) is the style's, and is the sink's own geometry; what the rule fixes is the decision at each center
 given that geometry.
 
-**What a sink says (AA5).** `GSHSCENE_CAP_ANTIALIAS_NONE` means the sink draws the mode as AA2 and AA3 say. A sink without it
+**What a sink says (AA5).** `GSHSCENE_CAP_ANTIALIAS_NONE` means the sink draws `NONE` as AA2 and AA3 say, and `GSHSCENE_CAP_ANTIALIAS_NONE_TOP_LEFT` that it draws `NONE_TOP_LEFT`, two bits because a sink may have one. A sink without the bit of an item's mode
 draws the item antialiased, and the planning pass reports it `APPROXIMATED` with the reason `GSHSCENE_REASON_ANTIALIAS`; the item is
 drawn, so a strict render does not fail on it. Among the planning pass's decisions it follows every refusal and comes first among
 the approximations (the clip's, the blend space's, the gradient's, the image's). The test sink claims the capability, since it
-records items by handle, and records the mode in its stream as ` aa=1` after the head of the item's record, only when it is not the
+records items by handle, and records the mode in its stream as ` aa=1` or ` aa=2` after the head of the item's record, only when it is not the
 default.
 
 **Spelling (AA6).** The default is spelled by nothing, so every list, scene and dump that has no such item is what it was before the

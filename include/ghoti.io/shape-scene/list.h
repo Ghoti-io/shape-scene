@@ -101,8 +101,8 @@
  * ### Antialiasing of an item (AA1 to AA6)
  *
  * **AA1.**  A fill and a stroke carry an `antialias`, a ::GSHSCENE_Antialias, zero by default: ::GSHSCENE_ANTIALIAS_AREA, the
- * coverage `k` of N7 and SK5, the area of the shape inside the pixel.  ::GSHSCENE_ANTIALIAS_NONE asks for no antialiasing, the
- * rule below.  Every other item kind has it zero (a clip's edge is a sink's own, ::GSHSCENE_CAP_CLIP_AA), and a group has none: an
+ * coverage `k` of N7 and SK5, the area of the shape inside the pixel.  ::GSHSCENE_ANTIALIAS_NONE and ::GSHSCENE_ANTIALIAS_NONE_TOP_LEFT ask for no antialiasing, the
+ * rule below, and differ only in AA3's tie.  Every other item kind has it zero (a clip's edge is a sink's own, ::GSHSCENE_CAP_CLIP_AA), and a group has none: an
  * item says it of its own shape, so that a fill and a stroke of one path may differ and a group is not a second way to say it.
  * A fill painted with a gradient, an image, a pattern or a hatch takes it on the fill; the paint is then drawn through the
  * coverage the rule gives.  The items inside a pattern's tile or a mask's picture carry their own.
@@ -120,13 +120,18 @@
  * parts of SK5 by this rule and combines the three coverages as SK5 does, which on whole-or-nothing values is the set union of the
  * body with the aligned part met with the clip (or its complement).
  *
- * **AA3 Ties.**  The rule is the same as asking whether the point `c + (e, e^2)` is inside, for an infinitely small `e > 0`
- * (to the right in `x` first, then below in `y`), which is why no center is ever on an edge: it is the **top-left rule**.  A center
- * on a non-horizontal edge is inside when the interior is on the right of that edge (a left edge) and outside when it is on the
- * left (a right edge); a center on a horizontal edge is inside when the interior is below it (a top edge; device y points down)
- * and outside when it is above it (a bottom edge); a center at a vertex is decided by the same point `c + (e, e^2)`.  Two shapes
- * that share an edge therefore neither overlap nor leave a gap at the centers on it, and a shape of whole pixels (a
- * rectangle with corners on the pixel grid) covers exactly its pixels.
+ * **AA3 Ties.**  The rule above is the same as asking whether the point `c + (e, e^2)` is inside, for an infinitely small `e > 0`
+ * (to the right in `x` first, then below in `y`), which is why no center is ever on an edge, when the mode is
+ * ::GSHSCENE_ANTIALIAS_NONE_TOP_LEFT: the **top-left rule**.  A center on a non-horizontal edge is inside when the interior is on
+ * the right of that edge (a left edge) and outside when it is on the left (a right edge); a center on a horizontal edge is inside
+ * when the interior is below it (a top edge; device y points down) and outside when it is above it (a bottom edge); a center at a
+ * vertex is decided by the same point.  The mode ::GSHSCENE_ANTIALIAS_NONE decides the other way, by the point `c - (e, e^2)`
+ * (to the left in `x` first, then above in `y`): the **bottom-right rule**, which is the rule of the renderers built on Skia (a
+ * browser's `crispEdges`, resvg), where the top-left rule is Cairo's.  Neither is the standards' (SVG's `crispEdges` says nothing
+ * about a tie); the default is the bottom-right so that an SVG meets the renderers it is compared with.  In the formulas above the
+ * bottom-right rule counts a straddling edge when `p.y < c.y <= q.y` (or the reverse) and counts it when `x_e >= c.x`.  Under
+ * either rule two shapes that share an edge neither overlap nor leave a gap at the centers on it, and a shape of whole pixels (a
+ * rectangle with corners on the pixel grid) covers exactly its pixels.  The mode is a property of the item, so a list may hold both.
  *
  * **AA4 Then as any coverage.**  The coverage `k` of AA2 goes where an antialiased `k` goes, unchanged in kind: N7's product with
  * the clips in force, the paint, the opacity, the operator, the group's layer, a mask.  Nothing else about the item changes; a
@@ -340,7 +345,8 @@ typedef enum GSHSCENE_Isolation {
  */
 typedef enum GSHSCENE_Antialias {
   GSHSCENE_ANTIALIAS_AREA = 0, ///< The default: the coverage is the area of the shape inside the pixel (N7, SK5).
-  GSHSCENE_ANTIALIAS_NONE = 1, ///< AA2: the pixel is covered whole when its center is inside the shape, else not at all; a tie is the top-left rule (AA3).  A sink without ::GSHSCENE_CAP_ANTIALIAS_NONE is approximated, `ANTIALIAS` (AA5).
+  GSHSCENE_ANTIALIAS_NONE = 1, ///< AA2: the pixel is covered whole when its center is inside the shape, else not at all; a tie is the bottom-right rule (AA3).  A sink without ::GSHSCENE_CAP_ANTIALIAS_NONE is approximated, `ANTIALIAS` (AA5).
+  GSHSCENE_ANTIALIAS_NONE_TOP_LEFT = 2, ///< AA2 as ::GSHSCENE_ANTIALIAS_NONE but a tie is the top-left rule (AA3).  A sink without ::GSHSCENE_CAP_ANTIALIAS_NONE_TOP_LEFT is approximated, `ANTIALIAS` (AA5).
   GSHSCENE_ANTIALIAS_COUNT     ///< Closes the enum.
 } GSHSCENE_Antialias;
 

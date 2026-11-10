@@ -67,7 +67,7 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
   rationals and `tests/mask_vectors.h` commits known answers.
 - **Antialiasing of an item** (`list.h`). A fill and a stroke carry an `antialias`: the area of the shape in the pixel by default,
   or `GSHSCENE_ANTIALIAS_NONE`, which covers a pixel whole or not at all by its center, with a stated rule for a center on an
-  edge, so that abutting shapes leave no gap and no overlap (SVG's `shape-rendering: crispEdges`, Canvas's pixel-aligned
+  edge (the bottom-right rule that Skia-based renderers use; `GSHSCENE_ANTIALIAS_NONE_TOP_LEFT` is the mirror, Cairo's), so that abutting shapes leave no gap and no overlap (SVG's `shape-rendering: crispEdges`, Canvas's pixel-aligned
   drawing). It is on the item, not on a group, and a sink says by a capability whether it draws it.
 - **Hatches** (`hatch.h`). A hatch resource is the pattern-definition lines of a CAD hatch (an angle, an origin, an offset along and
   across, and a dash pattern for each family, a stroke style for the pen and an ink); a fill painted with it draws the

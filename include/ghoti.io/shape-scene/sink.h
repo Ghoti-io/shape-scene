@@ -441,11 +441,17 @@ typedef struct GSHSCENE_Target {
 #define GSHSCENE_CAP_CLIP_UNION_GENERAL (UINT32_C(1) << 18)
 /**
  * A sink draws a fill or a stroke whose `antialias` is ::GSHSCENE_ANTIALIAS_NONE as list.h's AA2 and AA3 say, a pixel covered whole
- * when its center is inside and not at all otherwise (AA5); without it the sink draws the item antialiased and the planning pass
+ * when its center is inside and not at all otherwise, a tie going to the bottom and right (AA5); without it the sink draws the item antialiased and the planning pass
  * reports it `APPROXIMATED`, `ANTIALIAS`.
  */
 #define GSHSCENE_CAP_ANTIALIAS_NONE (UINT32_C(1) << 19)
-#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 20) - 1) ///< Every flag defined.
+/**
+ * A sink draws an item whose `antialias` is ::GSHSCENE_ANTIALIAS_NONE_TOP_LEFT as AA2 and AA3 say: the same rule as
+ * ::GSHSCENE_CAP_ANTIALIAS_NONE with a tie decided the other way.  The two are separate because a sink may have one only; without it the
+ * planning pass reports such an item `APPROXIMATED`, `ANTIALIAS`.
+ */
+#define GSHSCENE_CAP_ANTIALIAS_NONE_TOP_LEFT (UINT32_C(1) << 20)
+#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 21) - 1) ///< Every flag defined.
 /** @} */
 
 /**

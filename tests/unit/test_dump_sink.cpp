@@ -1666,7 +1666,7 @@ TEST(DumpSink, JobsInFlightAreBounded) {
 TEST(DumpSink, TheConfigurationIsValidated) {
   GSHSCENE_Sink * sink = nullptr;
   std::vector<std::function<void(GSHSCENE_Dump_Sink_Config &)>> bad = {
-      [](GSHSCENE_Dump_Sink_Config & c) { c.raster_caps.flags |= 1u << 20; },
+      [](GSHSCENE_Dump_Sink_Config & c) { c.raster_caps.flags |= 1u << 21; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.stream_caps.cancel_unit = 0; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.stream_caps.cancel_unit = GSHSCENE_CANCEL_UNIT_COUNT; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.raster_caps.work_measure = nullptr; },
@@ -1732,7 +1732,7 @@ TEST(DumpSink, TheConfigurationIsValidated) {
   uint32_t common = GSHSCENE_CAP_CAN_BLOCK | GSHSCENE_CAP_CALLER_MEMORY | GSHSCENE_CAP_GLYPHS_FROM_FONT |
       GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_BLEND_SPACES | GSHSCENE_CAP_GRADIENT_SPACES | GSHSCENE_CAP_PREPARE |
       GSHSCENE_CAP_STROKE_RUNS | GSHSCENE_CAP_IMAGE_FILTER_SPACES | GSHSCENE_CAP_GROUP_SOFT_MASK | GSHSCENE_CAP_PATTERN |
-      GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL | GSHSCENE_CAP_HATCH | GSHSCENE_CAP_ANTIALIAS_NONE;
+      GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL | GSHSCENE_CAP_HATCH | GSHSCENE_CAP_ANTIALIAS_NONE | GSHSCENE_CAP_ANTIALIAS_NONE_TOP_LEFT;
   EXPECT_EQ(d.raster_caps.flags, common | GSHSCENE_CAP_READBACK);
   EXPECT_EQ(d.stream_caps.flags, common);
   // Not a test sink, not a test sink's job.

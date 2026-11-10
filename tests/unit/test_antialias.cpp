@@ -82,10 +82,12 @@ const uint32_t kBase = GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_BLEND_SPACES | GSHSCE
 TEST(Antialias, TheValuesAreEnumerationAndFlagsArePinned) {
   EXPECT_EQ((int)GSHSCENE_ANTIALIAS_AREA, 0);
   EXPECT_EQ((int)GSHSCENE_ANTIALIAS_NONE, 1);
-  EXPECT_EQ((int)GSHSCENE_ANTIALIAS_COUNT, 2);
+  EXPECT_EQ((int)GSHSCENE_ANTIALIAS_NONE_TOP_LEFT, 2);
+  EXPECT_EQ((int)GSHSCENE_ANTIALIAS_COUNT, 3);
   EXPECT_EQ(GSHSCENE_CAP_ANTIALIAS_NONE, UINT32_C(1) << 19);
+  EXPECT_EQ(GSHSCENE_CAP_ANTIALIAS_NONE_TOP_LEFT, UINT32_C(1) << 20);
   EXPECT_EQ(GSHSCENE_CAP_FLAGS_ALL & GSHSCENE_CAP_ANTIALIAS_NONE, GSHSCENE_CAP_ANTIALIAS_NONE);
-  EXPECT_EQ(GSHSCENE_CAP_FLAGS_ALL, 0xfffffu) << "twenty flags";
+  EXPECT_EQ(GSHSCENE_CAP_FLAGS_ALL, 0x1fffffu) << "twenty-one flags";
   EXPECT_EQ((int)GSHSCENE_REASON_ANTIALIAS, 43);
   EXPECT_STREQ(gshscene_reason_string(GSHSCENE_REASON_ANTIALIAS), "antialias");
 }
@@ -358,6 +360,45 @@ TEST(Antialias, ASinkWithoutTheCapabilityApproximatesAFillOrAStrokeThatAsksForNo
     EXPECT_EQ((int)dispose(without, item_at(l.list, i)).entry_class, 0) << i << ": the default is drawn by every sink";
     EXPECT_EQ((int)dispose(with, item_at(l.list, i)).entry_class, 0) << i;
   }
+}
+
+// AA3, AA5: the two modes differ only in the tie, are two modes for the list (equality, hash, dump) and are two capabilities, each of
+// which serves its own mode only.
+TEST(Antialias, TheTwoTiesAreTwoModesAndTwoCapabilities) {
+  scene::StoreHolder s;
+  scene::ListHolder l(s.store);
+  scene::Ref sq(scene::intern_square(s.store));
+  ASSERT_EQ(gshscene_list_fill_antialias(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, GSHSCENE_ANTIALIAS_NONE, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill_antialias(l.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, GSHSCENE_ANTIALIAS_NONE_TOP_LEFT, 0, 0.0),
+      GSHSCENE_OK);
+  const GSHSCENE_Sink_Caps none = caps_with(kBase);
+  const GSHSCENE_Sink_Caps bottom_right = caps_with(kBase | GSHSCENE_CAP_ANTIALIAS_NONE);
+  const GSHSCENE_Sink_Caps top_left = caps_with(kBase | GSHSCENE_CAP_ANTIALIAS_NONE_TOP_LEFT);
+  const GSHSCENE_Sink_Caps both = caps_with(kBase | GSHSCENE_CAP_ANTIALIAS_NONE | GSHSCENE_CAP_ANTIALIAS_NONE_TOP_LEFT);
+  auto approximated = [&](const GSHSCENE_Sink_Caps & caps, size_t i) {
+    const GSHSCENE_Disposition d = dispose(caps, item_at(l.list, i));
+    return d.entry_class == GSHSCENE_ENTRY_APPROXIMATED && d.reason == GSHSCENE_REASON_ANTIALIAS;
+  };
+  EXPECT_TRUE(approximated(none, 0));
+  EXPECT_TRUE(approximated(none, 1));
+  EXPECT_FALSE(approximated(bottom_right, 0));
+  EXPECT_TRUE(approximated(bottom_right, 1)) << "the bottom-right capability does not draw the top-left mode";
+  EXPECT_TRUE(approximated(top_left, 0)) << "the top-left capability does not draw the bottom-right mode";
+  EXPECT_FALSE(approximated(top_left, 1));
+  EXPECT_FALSE(approximated(both, 0));
+  EXPECT_FALSE(approximated(both, 1));
+  // two modes for the list: not equal, not the same hash, and the dump spells each
+  scene::ListHolder a(s.store), b(s.store);
+  ASSERT_EQ(gshscene_list_fill_antialias(a.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, GSHSCENE_ANTIALIAS_NONE, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill_antialias(b.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, GSHSCENE_ANTIALIAS_NONE_TOP_LEFT, 0, 0.0),
+      GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_equal(a.list, b.list), 0);
+  EXPECT_NE(gshscene_list_hash(a.list), gshscene_list_hash(b.list));
+  EXPECT_NE(scene::dump_list(a.list).find(" aa=1"), std::string::npos);
+  EXPECT_NE(scene::dump_list(b.list).find(" aa=2"), std::string::npos);
+  // the enumeration ends after the second
+  EXPECT_EQ(gshscene_list_fill_antialias(a.list, sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, (GSHSCENE_Antialias)GSHSCENE_ANTIALIAS_COUNT, 0, 0.0),
+      GSHSCENE_ERR_INVALID);
 }
 
 TEST(Antialias, TheApproximationFollowsEveryRefusalAndPrecedesTheOtherApproximations) {

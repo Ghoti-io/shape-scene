@@ -198,7 +198,7 @@ TEST(Sink, CapsThatBreakTheContractAreInternal) {
   EXPECT_EQ(gshscene_sink_caps(nullptr, &surface->target, &out), GSHSCENE_ERR_INVALID);
   GSHSCENE_Sink_Caps good = ms.mock.caps;
   std::vector<std::function<void(GSHSCENE_Sink_Caps &)>> bad = {
-      [](GSHSCENE_Sink_Caps & c) { c.flags |= 1u << 20; }, // past every flag defined (S19 took 9 to 11, S20 12 and 13, S21 14, S22 15, S23 16, S24 17 and 18, AA5 19)
+      [](GSHSCENE_Sink_Caps & c) { c.flags |= 1u << 21; }, // past every flag defined (S19 took 9 to 11, S20 12 and 13, S21 14, S22 15, S23 16, S24 17 and 18, AA5 19 and 20)
       [](GSHSCENE_Sink_Caps & c) { c.flags = (c.flags | GSHSCENE_CAP_CLIP_UNION_GENERAL) & ~GSHSCENE_CAP_CLIP_UNION; }, // GENERAL without CLIP_UNION (CU12)
       [](GSHSCENE_Sink_Caps & c) { c.image_filters |= 1u << 4; }, // past the four image filters (S21)
       [](GSHSCENE_Sink_Caps & c) { c.image_extends |= 1u << 4; }, // past the four edge modes
@@ -737,7 +737,7 @@ TEST(Sink, PixelKinds) {
   EXPECT_EQ(GSHSCENE_CAP_PATTERN, 0x8000u);
   EXPECT_EQ(GSHSCENE_CAP_HATCH, 0x10000u);
   EXPECT_EQ(GSHSCENE_CAP_ANTIALIAS_NONE, 0x80000u);
-  EXPECT_EQ(GSHSCENE_CAP_FLAGS_ALL, 0xfffffu);
+  EXPECT_EQ(GSHSCENE_CAP_FLAGS_ALL, 0x1fffffu);
   EXPECT_EQ(GSHSCENE_STROKE_NATIVE_ALL, 0xffffu);
   EXPECT_EQ(sizeof(GSHSCENE_Sink_Caps) % sizeof(void *), 0u);
   EXPECT_EQ((int)GSHSCENE_CANCEL_BETWEEN_UNITS, 1);
