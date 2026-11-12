@@ -64,6 +64,12 @@
  * limits; then `ERR_OOM`.  A failing call leaves the store as it was and takes no reference.  A zero-filled `map` (dimension 0) is
  * the identity.
  *
+ * **Text in a union is outlines.**  A member that is a glyph run from a font is `ERR_UNSUPPORTED`: a sink reports what became of each glyph of
+ * a run by `(chain, glyph index)`, and a union has no spelling for "the glyph of member k" there.  A caller whose clip is text, in several faces
+ * or under a rotation or decoration, makes each run's outlines with ::gshscene_glyph_run_centerline, interns that path, and uses the path as the
+ * member.  Nothing is refused by that, and the union's hash is then of the outlines, not of the face and glyph ids.  A font-run member that
+ * keeps the font reference needs the report's entry to name a member as well as a glyph; that is not built, and nothing here refuses it for good.
+ *
  * **Canonical form: an unordered set, one spelling (CU8).**  Two calls that name the same members in any order, with any
  * repetition, return the same handle.  The members are stored sorted ascending by `(u64 content hash of the resource, u64
  * gshgeom_map_hash of the canonical map, u8 rule)` and, only for members equal in all three but not identical (a 64-bit
