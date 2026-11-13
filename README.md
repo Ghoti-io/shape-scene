@@ -92,8 +92,9 @@ The retained scene (`version.h`, `edit.h`, `scene.h`, `diff.h`):
 - **Edits** are what a front-end or driver fills and returns unpublished; an upsert by key keeps IDs
   when a document is lowered again. Only the application's **scene** publishes, alone or by merging
   sibling edits that touch disjoint IDs (overlaps are refused, naming the IDs).
-  An **import** copies a subtree of any version over the same store into an edit with new IDs, atomically,
-  pointing the instances inside it at their copies.
+  An **import** copies a subtree of any version (of this scene or another, over any store) into an edit with new IDs,
+  copying the resources it names into the edit's store with `gshscene_store_copy_resource`, atomically, and pointing the
+  instances inside it at their copies.
 - **Diff** names the added, removed and changed IDs and the conservative damage, in whole device
   pixels, for a sink's map.
 - Structural limits (nodes, depth, occurrences, list items, push and picture nesting) are enforced
@@ -141,7 +142,6 @@ the reasons a sink without a feature is refused with.
   unclipped at every copy, later over earlier, by a sink with `CAP_PATTERN_OVERFLOW`; another sink clips it and the planning pass
   says so (`APPROXIMATED`, `PATTERN_OVERFLOW`), as it does for a tile whose extent is not known. No renderer measured draws the
   attribute (resvg, Inkscape, Chrome and Firefox clip), so the reference is SVG 2's text.
-- An import shares resources and so needs the source and the destination to share a store; copying resources between stores is not built.
 - No filter effects (blur, shadows), no mesh gradients, and no file format of its own: the dump is a debugging spelling, and a
   document is the business of a front end.
 

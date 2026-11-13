@@ -158,11 +158,12 @@ GSHSCENE_API GSHSCENE_Result gshscene_edit_upsert(GSHSCENE_Edit * edit, const GS
  *   gives the same IDs.
  * - **IM3 Keys are not carried.**  A front-end key is that front-end's data (AD-9) and names an element of its own document; the
  *   copies are bound to no key, and the front-end that owns the destination binds its own.
- * - **IM4 Resources are shared, not copied.**  A node names resources of a store, and the edit takes the copies' references to
- *   the same resources, so @p source must be a version of a scene that shares the edit's scene's store (::gshscene_scene_create
- *   takes the store to share); a node whose resource is of another store is ::GSHSCENE_ERR_INVALID, as ::gshscene_edit_add
- *   says, and a cross-store copy of resources is not built.  The foreground and the palette are the scene's, not the node's: a
- *   palette paint of a copy names an entry of the destination's palette.
+ * - **IM4 Resources are copied into the edit's store.**  A node names resources of a store, and the copies must name resources of the
+ *   edit's: each resource a node names (its shape's or stroke's, a group's clip, soft mask, a stroke's style, a paint's) is
+ *   copied with ::gshscene_store_copy_resource, which is the resource itself when it is already of the edit's store (two scenes that
+ *   share a store, or a version of the edit's own scene) and an equal resource interned there otherwise, with everything it names.
+ *   The foreground and the palette are the scene's, not the node's: a palette paint of a copy names an entry of the destination's
+ *   palette.  A face keeps its binding (::gshscene_store_copy_resource, CP4), and the destination store's limits apply.
  * - **IM5 Instances.**  An instance's target is an ID of the source.  An instance whose target is inside the imported subtree
  *   points at the copy of that target; an instance whose target is outside it has nothing to point at in the destination and
  *   is ::GSHSCENE_ERR_INVALID (import the subtree that holds the target as well, under a group that holds both).
@@ -172,12 +173,12 @@ GSHSCENE_API GSHSCENE_Result gshscene_edit_upsert(GSHSCENE_Edit * edit, const GS
  *
  * @param parent The ID of a group in the edit's view.
  * @param position An index from 0 to the group's child count, or ::GSHSCENE_APPEND.
- * @param source A version, borrowed; it may be a version of the edit's own scene (a copy of content within one scene) or of another
- *   scene that shares its store.
+ * @param source A version, borrowed; it may be a version of the edit's own scene (a copy of content within one scene) or of any other
+ *   scene, whatever its store.
  * @param source_node The ID in @p source of the node to copy.
  * @param out_id The ID of the copy of @p source_node; written only on success; may be NULL.
  * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, a spent edit, no such node in @p source, no such group in the edit, a position out of range,
- *   a resource of another store, an instance whose target is not in the subtree); ::GSHSCENE_ERR_LIMIT (`max_nodes`, or what
+ *   an instance whose target is not in the subtree); ::GSHSCENE_ERR_LIMIT (`max_nodes`, the destination store's limits, or what
  *   ::gshscene_edit_add says of a paint); ::GSHSCENE_ERR_OOM.
  */
 GSHSCENE_API GSHSCENE_Result gshscene_edit_import(GSHSCENE_Edit * edit, uint64_t parent, size_t position,

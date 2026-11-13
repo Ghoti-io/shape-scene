@@ -209,25 +209,82 @@ TEST(EditImport, ScenesThatShareAStoreExchangeContent) {
   EXPECT_EQ(info_of(v.get(), copy + 4).node.resource, src.sq.get());
 }
 
-TEST(EditImport, AResourceOfAnotherStoreIsInvalidAndTheViewIsAsItWas) {
-  Source src;
+/** A scene of its own store: root > G (clip, hidden-free) > [shape, stroke (style), group > shape]. */
+struct Rich {
+  SceneHolder s;
+  VersionRef v;
+  Ref sq, tri, style;
+  uint64_t g = 0;
+  explicit Rich(const GSHSCENE_Allocator * alloc = nullptr) : s(nullptr, alloc), sq(intern_square(s.store())), tri(intern_square(s.store(), 5.0)) {
+    GSHSCENE_Stroke_Style st;
+    gshscene_stroke_style_init(&st);
+    st.width = 2.5;
+    const GSHSCENE_Resource * r = nullptr;
+    EXPECT_EQ(gshscene_store_intern_stroke_style(s.store(), &st, &r), GSHSCENE_OK);
+    style = Ref(r);
+    EditHolder e(s);
+    GSHSCENE_Node gn = group_node(0.75, 2);
+    gn.clip = tri.get();
+    gn.clip_rule = GSHGEOM_FILL_EVEN_ODD;
+    g = add(e.edit, GSHSCENE_ROOT_ID, gn);
+    add(e.edit, g, shape_node(sq.get()));
+    add(e.edit, g, stroke_node(tri.get(), style.get()));
+    const uint64_t inner = add(e.edit, g, group_node());
+    add(e.edit, inner, shape_node(tri.get(), 4));
+    publish(s, e, &v);
+  }
+};
+
+TEST(EditImport, ScenesWithStoresOfTheirOwnExchangeContentByCopyingTheResources) {
+  Rich src;
   SceneHolder other;  // its own store
   ASSERT_NE(other.scene, nullptr);
   EditHolder e(other);
   const std::string before = view_state(e.edit, 20);
-  uint64_t out = 77;
-  EXPECT_EQ(gshscene_edit_import(e.edit, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, src.v.get(), src.a, &out), GSHSCENE_ERR_INVALID);
-  EXPECT_EQ(out, 77u) << "written only on success";
+  uint64_t copy = 0;
+  ASSERT_EQ(gshscene_edit_import(e.edit, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, src.v.get(), src.g, &copy), GSHSCENE_OK);
+  EXPECT_NE(view_state(e.edit, 20), before);
+  VersionRef v;
+  publish(other, e, &v);
+  EXPECT_EQ(gshscene_version_node_count(v.get()), gshscene_version_node_count(src.v.get()));
+  /* every resource of the copy is of the destination's store, with the original's content */
+  Ids top = children_of(v.get(), copy);
+  ASSERT_EQ(top.size(), 3u);
+  GSHSCENE_Node_Info gi = info_of(v.get(), copy);
+  ASSERT_NE(gi.node.clip, nullptr);
+  EXPECT_NE(gi.node.clip, src.tri.get());
+  EXPECT_EQ(gshscene_resource_hash(gi.node.clip), gshscene_resource_hash(src.tri.get()));
+  EXPECT_EQ(gi.node.clip_rule, GSHGEOM_FILL_EVEN_ODD);
+  GSHSCENE_Node_Info si = info_of(v.get(), top[0]);
+  EXPECT_NE(si.node.resource, src.sq.get());
+  EXPECT_EQ(gshscene_resource_hash(si.node.resource), gshscene_resource_hash(src.sq.get()));
+  GSHSCENE_Node_Info ti = info_of(v.get(), top[1]);
+  EXPECT_EQ(gshscene_resource_hash(ti.node.style), gshscene_resource_hash(src.style.get()));
+  EXPECT_EQ(gshscene_resource_hash(ti.node.resource), gshscene_resource_hash(src.tri.get()));
+  /* the emitted list is the same as the source scene's, spelled by content */
+  const GSHSCENE_List *la = nullptr, *lb = nullptr;
+  ASSERT_EQ(gshscene_version_list(src.v.get(), &la), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_version_list(v.get(), &lb), GSHSCENE_OK);
+  EXPECT_EQ(gshscene_list_hash(lb), gshscene_list_hash(la)) << "the same scene, spelled by content";
+  EXPECT_EQ(dump_list(lb), dump_list(la));
+}
+
+TEST(EditImport, TheDestinationStoresLimitsRefuseTheImportAndTheViewIsAsItWas) {
+  Rich src;
+  GSHSCENE_Limits l;
+  gshscene_limits_default(&l);
+  l.max_resources = 1;  // the copies need a path, a second path and a style
+  SceneHolder other(&l);
+  ASSERT_NE(other.scene, nullptr);
+  EditHolder e(other);
+  const std::string before = view_state(e.edit, 20);
+  uint64_t out = 9;
+  EXPECT_EQ(gshscene_edit_import(e.edit, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, src.v.get(), src.g, &out), GSHSCENE_ERR_LIMIT);
+  EXPECT_EQ(out, 9u);
   EXPECT_EQ(view_state(e.edit, 20), before);
-  /* a subtree with no resource (the root of a source that holds only groups) is fine whatever the store */
-  SceneHolder groups;
-  EditHolder ge(groups);
-  const uint64_t g = add(ge.edit, GSHSCENE_ROOT_ID, group_node());
-  add(ge.edit, g, group_node());
-  VersionRef gv;
-  publish(groups, ge, &gv);
-  EditHolder e2(other);
-  EXPECT_EQ(gshscene_edit_import(e2.edit, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, gv.get(), g, &out), GSHSCENE_OK);
+  GSHSCENE_Store_Stats stats;
+  gshscene_store_stats(other.store(), &stats);
+  EXPECT_EQ(stats.live, 0u) << "what the failed copies made is released";
 }
 
 TEST(EditImport, AnInstanceInsideTheSubtreePointsAtTheCopyOfItsTarget) {
@@ -357,6 +414,43 @@ TEST(EditImport, EveryFailingAllocationLeavesTheViewAsItWasAndNothingLeaks) {
     EXPECT_TRUE(succeeded) << "the sweep reached an import that no failure touched";
     VersionRef v;
     publish(src.s, e, &v);
+  }
+  EXPECT_TRUE(t.live.empty()) << t.live.size() << " blocks leaked";
+}
+
+TEST(EditImport, EveryFailingAllocationOfAnImportAcrossStoresLeavesTheViewAsItWasAndNothingLeaks) {
+  tracker::Tracker t;
+  GSHSCENE_Allocator a = tracker::allocator_for(&t);
+  {
+    Rich src(&a);
+    SceneHolder other(nullptr, &a);
+    ASSERT_NE(other.scene, nullptr);
+    EditHolder e(other);
+    ASSERT_NE(e.edit, nullptr);
+    bool succeeded = false;
+    for (long k = 0; k < 2000 && !succeeded; k++) {
+      const std::string before = view_state(e.edit, 80);
+      GSHSCENE_Store_Stats stats_before;
+      gshscene_store_stats(other.store(), &stats_before);
+      t.persistent = false;
+      t.failed = false;
+      t.fail_from = t.calls + k;
+      uint64_t out = 0;
+      GSHSCENE_Result r = gshscene_edit_import(e.edit, GSHSCENE_ROOT_ID, GSHSCENE_APPEND, src.v.get(), src.g, &out);
+      t.fail_from = -1;
+      if (r == GSHSCENE_OK) {
+        succeeded = true;
+      } else {
+        EXPECT_EQ(r, GSHSCENE_ERR_OOM) << "at allocation " << k;
+        EXPECT_EQ(view_state(e.edit, 80), before) << "at allocation " << k;
+        GSHSCENE_Store_Stats stats_after;
+        gshscene_store_stats(other.store(), &stats_after);
+        EXPECT_EQ(stats_after.live, stats_before.live) << "at allocation " << k << ": no resource is held by a failed import";
+      }
+    }
+    EXPECT_TRUE(succeeded);
+    VersionRef v;
+    publish(other, e, &v);
   }
   EXPECT_TRUE(t.live.empty()) << t.live.size() << " blocks leaked";
 }

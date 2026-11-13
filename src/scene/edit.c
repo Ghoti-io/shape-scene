@@ -707,6 +707,37 @@ static const Import_Pair * import_find(const Import_Pair * pairs, size_t n, uint
   return lo < n && pairs[lo].from == from ? &pairs[lo] : NULL;
 }
 
+/** The resources a node of the source names, copied into the edit's store: held here until the edit has retained them. */
+typedef struct Import_Held {
+  const GSHSCENE_Resource * items[5];
+  size_t count;
+} Import_Held;
+
+static void import_release(Import_Held * h) {
+  while (h->count > 0) {
+    gshscene_resource_release(h->items[--h->count]);
+  }
+}
+
+/** Replace every resource @p props names with its copy in @p store (a resource of the store is its own copy); all or none. */
+static GSHSCENE_Result import_resources(GSHSCENE_Store * store, GSHSCENE_Node * props, Import_Held * h) {
+  const GSHSCENE_Resource ** slots[5] = {&props->resource, &props->clip, &props->soft_mask, &props->style, &props->paint.resource};
+  for (size_t i = 0; i < 5; i++) {
+    if (!*slots[i]) {
+      continue;
+    }
+    const GSHSCENE_Resource * copy = NULL;
+    GSHSCENE_Result r = gshscene_store_copy_resource(store, *slots[i], &copy);
+    if (r != GSHSCENE_OK) {
+      import_release(h);
+      return r;
+    }
+    h->items[h->count++] = copy;
+    *slots[i] = copy;
+  }
+  return GSHSCENE_OK;
+}
+
 GSHSCENE_Result gshscene_edit_import(GSHSCENE_Edit * edit, uint64_t parent, size_t position, const GSHSCENE_Version * source,
     uint64_t source_node, uint64_t * out_id) {
   if (!edit || !source || edit->spent) {
@@ -728,9 +759,16 @@ GSHSCENE_Result gshscene_edit_import(GSHSCENE_Edit * edit, uint64_t parent, size
   int added = 0;
 
   /* The node and then its descendants, in draw order, each added under the copy of its parent. */
+  GSHSCENE_Store * store = gshscene_edit_store(edit);
   GSHSCENE_Node props = info.node;
+  Import_Held held = {{NULL, NULL, NULL, NULL, NULL}, 0};
   uint64_t id = 0;
+  result = import_resources(store, &props, &held);
+  if (result != GSHSCENE_OK) {
+    return result;
+  }
   result = gshscene_edit_add(edit, parent, position, &props, NULL, &id);
+  import_release(&held);
   if (result != GSHSCENE_OK) {
     return result;
   }
@@ -782,7 +820,12 @@ GSHSCENE_Result gshscene_edit_import(GSHSCENE_Edit * edit, uint64_t parent, size
       break;
     }
     props = info.node;
+    result = import_resources(store, &props, &held);
+    if (result != GSHSCENE_OK) {
+      break;
+    }
     result = gshscene_edit_add(edit, under, GSHSCENE_APPEND, &props, NULL, &id);
+    import_release(&held);
     if (result != GSHSCENE_OK) {
       break;
     }
