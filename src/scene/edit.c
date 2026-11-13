@@ -618,3 +618,212 @@ GSHSCENE_Result gshscene_edit_remove_key(GSHSCENE_Edit * edit, const GSHSCENE_Ke
   }
   return gshscene_edit_remove(edit, bound);
 }
+
+/* --- import (IM1 to IM6) ------------------------------------------------------------------------------ */
+
+/** One node of an import: the ID it had in the source, the one it has in the edit, and, for an instance, the target it had. */
+typedef struct Import_Pair {
+  uint64_t from;
+  uint64_t to;
+  uint64_t target;  /* an instance's target in the source; 0 for any other kind */
+} Import_Pair;
+
+/** One group being walked: its ID in the source, the next child to visit, how many it has, and its ID in the edit. */
+typedef struct Import_Frame {
+  uint64_t from;
+  size_t next;
+  size_t count;
+  uint64_t to;
+} Import_Frame;
+
+/** @p array of @p *cap elements of @p size grown to hold @p need; the new array (the old one freed), or NULL with @p array untouched on failure. */
+static void * import_grow(const GSHSCENE_Allocator * alloc, void * array, size_t * cap, size_t size, size_t need) {
+  if (need <= *cap) {
+    return array;
+  }
+  size_t grown = *cap ? *cap : 16;
+  while (grown < need) {
+    if (grown > SIZE_MAX / 2) {
+      return NULL;
+    }
+    grown *= 2;
+  }
+  if (grown > SIZE_MAX / size) {
+    return NULL;
+  }
+  void * block = gshscene_alloc(alloc, grown * size);
+  if (!block) {
+    return NULL;
+  }
+  if (*cap) {
+    memcpy(block, array, *cap * size);
+  }
+  gshscene_free(alloc, array);
+  *cap = grown;
+  return block;
+}
+
+/** Sort @p pairs by `from` (distinct) with @p tmp of the same length: a bottom-up merge sort, so that nothing leaves the allocator. */
+static void import_sort(Import_Pair * pairs, Import_Pair * tmp, size_t n) {
+  Import_Pair * src = pairs;
+  Import_Pair * dst = tmp;
+  for (size_t width = 1; width < n; width *= 2) {
+    for (size_t lo = 0; lo < n; lo += 2 * width) {
+      const size_t mid = lo + width < n ? lo + width : n;
+      const size_t hi = lo + 2 * width < n ? lo + 2 * width : n;
+      size_t a = lo;
+      size_t b = mid;
+      size_t k = lo;
+      while (a < mid && b < hi) {
+        dst[k++] = src[a].from <= src[b].from ? src[a++] : src[b++];
+      }
+      while (a < mid) {
+        dst[k++] = src[a++];
+      }
+      while (b < hi) {
+        dst[k++] = src[b++];
+      }
+    }
+    Import_Pair * swap = src;
+    src = dst;
+    dst = swap;
+  }
+  if (src != pairs) {
+    memcpy(pairs, src, n * sizeof *pairs);
+  }
+}
+
+static const Import_Pair * import_find(const Import_Pair * pairs, size_t n, uint64_t from) {
+  size_t lo = 0;
+  size_t hi = n;
+  while (lo < hi) {
+    const size_t mid = lo + (hi - lo) / 2;
+    if (pairs[mid].from < from) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+  return lo < n && pairs[lo].from == from ? &pairs[lo] : NULL;
+}
+
+GSHSCENE_Result gshscene_edit_import(GSHSCENE_Edit * edit, uint64_t parent, size_t position, const GSHSCENE_Version * source,
+    uint64_t source_node, uint64_t * out_id) {
+  if (!edit || !source || edit->spent) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  const GSHSCENE_Allocator * alloc = &edit->core->alloc;
+  GSHSCENE_Node_Info info;
+  if (gshscene_version_node(source, source_node, &info) != GSHSCENE_OK) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  Import_Pair * pairs = NULL;
+  size_t pairs_cap = 0;
+  size_t pairs_n = 0;
+  Import_Frame * stack = NULL;
+  size_t stack_cap = 0;
+  size_t stack_n = 0;
+  GSHSCENE_Result result = GSHSCENE_OK;
+  uint64_t root = 0;
+  int added = 0;
+
+  /* The node and then its descendants, in draw order, each added under the copy of its parent. */
+  GSHSCENE_Node props = info.node;
+  uint64_t id = 0;
+  result = gshscene_edit_add(edit, parent, position, &props, NULL, &id);
+  if (result != GSHSCENE_OK) {
+    return result;
+  }
+  root = id;
+  added = 1;
+  for (;;) {
+    Import_Pair * more = import_grow(alloc, pairs, &pairs_cap, sizeof *pairs, pairs_n + 1);
+    if (!more) {
+      result = GSHSCENE_ERR_OOM;
+      break;
+    }
+    pairs = more;
+    pairs[pairs_n].from = info.id;
+    pairs[pairs_n].to = id;
+    pairs[pairs_n].target = info.node.kind == GSHSCENE_NODE_INSTANCE ? info.node.target : 0;
+    pairs_n++;
+    if (info.child_count > 0) {
+      Import_Frame * deeper = import_grow(alloc, stack, &stack_cap, sizeof *stack, stack_n + 1);
+      if (!deeper) {
+        result = GSHSCENE_ERR_OOM;
+        break;
+      }
+      stack = deeper;
+      stack[stack_n].from = info.id;
+      stack[stack_n].next = 0;
+      stack[stack_n].count = info.child_count;
+      stack[stack_n].to = id;
+      stack_n++;
+    }
+    /* The next node to copy: the next child of the deepest group that has one left. */
+    uint64_t child = 0;
+    uint64_t under = 0;
+    while (stack_n > 0) {
+      Import_Frame * top = &stack[stack_n - 1];
+      if (top->next < top->count) {
+        if (gshscene_version_child(source, top->from, top->next++, &child) != GSHSCENE_OK) {
+          result = GSHSCENE_ERR_INTERNAL;
+        }
+        under = top->to;
+        break;
+      }
+      stack_n--;
+    }
+    if (result != GSHSCENE_OK || stack_n == 0) {
+      break;
+    }
+    if (gshscene_version_node(source, child, &info) != GSHSCENE_OK) {
+      result = GSHSCENE_ERR_INTERNAL;
+      break;
+    }
+    props = info.node;
+    result = gshscene_edit_add(edit, under, GSHSCENE_APPEND, &props, NULL, &id);
+    if (result != GSHSCENE_OK) {
+      break;
+    }
+  }
+
+  /* Instances now point at the copies of their targets; a target the subtree does not hold has no meaning in the edit. */
+  if (result == GSHSCENE_OK && pairs_n > 0) {
+    Import_Pair * tmp = gshscene_alloc(alloc, pairs_n * sizeof *tmp);
+    if (!tmp) {
+      result = GSHSCENE_ERR_OOM;
+    } else {
+      import_sort(pairs, tmp, pairs_n);
+      gshscene_free(alloc, tmp);
+      for (size_t i = 0; i < pairs_n && result == GSHSCENE_OK; i++) {
+        if (pairs[i].target == 0) {
+          continue;
+        }
+        const Import_Pair * t = import_find(pairs, pairs_n, pairs[i].target);
+        if (!t) {
+          result = GSHSCENE_ERR_INVALID;
+          break;
+        }
+        GSHSCENE_Node_Info mine;
+        result = gshscene_edit_node(edit, pairs[i].to, &mine);
+        if (result == GSHSCENE_OK) {
+          mine.node.target = t->to;
+          result = gshscene_edit_set(edit, pairs[i].to, &mine.node);
+        }
+      }
+    }
+  }
+  gshscene_free(alloc, pairs);
+  gshscene_free(alloc, stack);
+  if (result != GSHSCENE_OK) {
+    if (added) {
+      (void)gshscene_edit_remove(edit, root); /* whatever was copied goes, with its subtree; the IDs it was given are spent */
+    }
+    return result;
+  }
+  if (out_id) {
+    *out_id = root;
+  }
+  return GSHSCENE_OK;
+}

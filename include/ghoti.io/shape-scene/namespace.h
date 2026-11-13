@@ -182,6 +182,7 @@
 #define gshscene_edit_palette GHOTIIO_SHAPE_SCENE(gshscene_edit_palette)
 #define gshscene_edit_remove GHOTIIO_SHAPE_SCENE(gshscene_edit_remove)
 #define gshscene_edit_remove_key GHOTIIO_SHAPE_SCENE(gshscene_edit_remove_key)
+#define gshscene_edit_import GHOTIIO_SHAPE_SCENE(gshscene_edit_import)
 #define gshscene_edit_set GHOTIIO_SHAPE_SCENE(gshscene_edit_set)
 #define gshscene_edit_set_foreground GHOTIIO_SHAPE_SCENE(gshscene_edit_set_foreground)
 #define gshscene_edit_set_palette GHOTIIO_SHAPE_SCENE(gshscene_edit_set_palette)

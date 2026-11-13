@@ -1573,6 +1573,17 @@ re-lowering touches nothing and publishes nothing. **An edit cannot publish**: p
 application's scene, which no function returns from an edit or a version; `make check-publish-types`
 compiles probes that must and must not compile, and a self-test that collapses the types.
 
+**An import** (`gshscene_edit_import`, IM1 to IM6) is how content moves between scenes, since an ID belongs to the scene that
+issued it and means nothing in another. It copies a subtree of a version, any version of any scene that shares the edit's store,
+into the edit under a group, as new nodes with new IDs from the counter in draw order, so that the same import into the same state
+gives the same IDs. It does not carry keys (a key is its front-end's data), it shares the resources and does not copy them (so the
+stores must be one, which `gshscene_scene_create` lets two scenes be), and it points an instance at the copy of its target when the
+subtree holds the target and refuses it when it does not. It is atomic except for the IDs it spent: a failure removes what was
+copied, and the counter is not wound back, because another edit may have drawn from it since (a gap in the numbering, never a
+reused ID). Copying resources between stores, which would let the content of an unrelated scene in, is not built: it would be a
+copy of each of the fourteen resource kinds, pictures and masks and patterns recursively, with the limits and the hash of each
+checked again, and a front-end that wants it can share a store.
+
 **The scene** owns the ID counter (which is why IDs reproduce), the current version and the store. A
 publish runs under its lock: it takes what each edit really changed (entries equal to the base's are
 dropped), checks that the touched sets of sibling edits are disjoint and that what other publishes changed
@@ -1600,7 +1611,7 @@ inside the damage.
 **The store's total bytes** are bounded by `max_bytes`, accounted by a formula (`resource.h`) so the limit
 means the same on every target.
 
-Gaps that this design knows about (a font as an
+Gaps that this design knows about (a copy of resources between stores, a font as an
 opaque key, fixed picture paints, intersection-only clips, per-glyph maps, affine and 2D maps, the linear
 cost of publish and diff, the granularity of a merge, single-rectangle damage, what is met at emission).
 

@@ -53,6 +53,7 @@
  *   the key: how a front-end lowers its document again and keeps the IDs.  An
  *   identical re-lowering touches nothing and publishes nothing.
  * - ::gshscene_edit_remove_key removes the node a key names.
+ * - ::gshscene_edit_import copies a subtree of another version in, with new IDs (IM1 to IM6).
  *
  * What an edit **touches**, which decides what merges (scene.h): the IDs it
  * changed, added or removed.  Adding or removing a child touches the parent; a
@@ -141,6 +142,46 @@ GSHSCENE_API GSHSCENE_Result gshscene_edit_move(
  */
 GSHSCENE_API GSHSCENE_Result gshscene_edit_upsert(GSHSCENE_Edit * edit, const GSHSCENE_Key * key,
     uint64_t parent, size_t position, const GSHSCENE_Node * props, uint64_t * out_id);
+
+/**
+ * @brief Copy a subtree of another version into the edit, as new nodes with new IDs (IM1 to IM6).
+ *
+ * This is how content moves between scenes: an ID belongs to the scene that issued it, so nothing keeps its ID across the move.
+ *
+ * - **IM1 What is copied.**  The node @p source_node of @p source and every node below it, in draw order, each with the properties
+ *   it has there (kind, flags, maps, layer, depth, opacity, composite, ordering, isolation, knockout, clips, masks, paint, rule,
+ *   antialias, style, placeholder).  The copy of the node is added under @p parent at @p position as ::gshscene_edit_add adds a
+ *   node, and the copies of its descendants keep their order under the copies of their parents.  Any node may be the source,
+ *   the root included (its copy is then a group like any other).
+ * - **IM2 New IDs.**  Every copy takes the next ID of the scene's counter, in the order above (the copy of the source node first),
+ *   so the IDs an import gives are a function of the scene's counter and the subtree, and the same import into the same state
+ *   gives the same IDs.
+ * - **IM3 Keys are not carried.**  A front-end key is that front-end's data (AD-9) and names an element of its own document; the
+ *   copies are bound to no key, and the front-end that owns the destination binds its own.
+ * - **IM4 Resources are shared, not copied.**  A node names resources of a store, and the edit takes the copies' references to
+ *   the same resources, so @p source must be a version of a scene that shares the edit's scene's store (::gshscene_scene_create
+ *   takes the store to share); a node whose resource is of another store is ::GSHSCENE_ERR_INVALID, as ::gshscene_edit_add
+ *   says, and a cross-store copy of resources is not built.  The foreground and the palette are the scene's, not the node's: a
+ *   palette paint of a copy names an entry of the destination's palette.
+ * - **IM5 Instances.**  An instance's target is an ID of the source.  An instance whose target is inside the imported subtree
+ *   points at the copy of that target; an instance whose target is outside it has nothing to point at in the destination and
+ *   is ::GSHSCENE_ERR_INVALID (import the subtree that holds the target as well, under a group that holds both).
+ * - **IM6 Atomic.**  A failing call leaves the edit's view as it was.  The IDs it issued before failing are spent, never reused
+ *   (a gap in the numbering, which another edit of the scene may be drawing from at the same time), and are the one thing a
+ *   failing call changes.
+ *
+ * @param parent The ID of a group in the edit's view.
+ * @param position An index from 0 to the group's child count, or ::GSHSCENE_APPEND.
+ * @param source A version, borrowed; it may be a version of the edit's own scene (a copy of content within one scene) or of another
+ *   scene that shares its store.
+ * @param source_node The ID in @p source of the node to copy.
+ * @param out_id The ID of the copy of @p source_node; written only on success; may be NULL.
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, a spent edit, no such node in @p source, no such group in the edit, a position out of range,
+ *   a resource of another store, an instance whose target is not in the subtree); ::GSHSCENE_ERR_LIMIT (`max_nodes`, or what
+ *   ::gshscene_edit_add says of a paint); ::GSHSCENE_ERR_OOM.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_edit_import(GSHSCENE_Edit * edit, uint64_t parent, size_t position,
+    const GSHSCENE_Version * source, uint64_t source_node, uint64_t * out_id);
 
 /** @brief Remove the node a key names; ::GSHSCENE_ERR_INVALID if none. */
 GSHSCENE_API GSHSCENE_Result gshscene_edit_remove_key(GSHSCENE_Edit * edit, const GSHSCENE_Key * key);
