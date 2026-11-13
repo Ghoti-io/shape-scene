@@ -455,8 +455,13 @@ def files():
 
 def union_files():
     """Seeds of tests/fuzz/fuzz_union.c: a member count, four bytes a member (palette path, map, rule, translation), then the instance and order bytes."""
-    def case(*members, inst=0, order=0):
-        return bytes([len(members)]) + b"".join(bytes(m) for m in members) + bytes([inst, order])
+    def case(*members, inst=0, order=0, inners=()):
+        # After the older fields: for each member a count of inner clips (0 to 3) and four bytes each (palette path, map, rule, translation).
+        tail = b""
+        for i in range(len(members)):
+            mine = inners[i] if i < len(inners) else ()
+            tail += bytes([len(mine)]) + b"".join(bytes(k) for k in mine)
+        return bytes([len(members)]) + b"".join(bytes(m) for m in members) + bytes([inst, order]) + (tail if inners else b"")
     out = {}
     out["u-none.bin"] = case()  # the empty list: invalid
     out["u-touching.bin"] = case((0, 0, 0, 0), (1, 0, 1, 0))  # two rectangles sharing an edge: disjoint
@@ -473,6 +478,18 @@ def union_files():
     out["u-scaled-instance.bin"] = case((0, 2, 0, 0), (1, 2, 0, 0), inst=1)  # scale 2, an instance map
     out["u-singular.bin"] = case((0, 3, 0, 0), (1, 0, 0, 0))
     out["u-nine.bin"] = case(*[((i % 3), 1, i % 2, 0x10 * (i % 5) + (i % 7)) for i in range(9)], inst=1, order=4)
+    # Inner clips (CI1 to CI6), after the older fields.
+    out["u-inner-meet.bin"] = case((0, 0, 0, 0), inners=[[(3, 0, 0, 0)]])  # a rectangle met with an overlapping one: a lone clipped member and its box
+    out["u-inner-apart.bin"] = case((0, 0, 0, 0), inners=[[(2, 0, 0, 0)]])  # the rectangles do not meet: an empty box
+    out["u-inner-moved.bin"] = case((0, 1, 0, 0x11), inners=[[(3, 0, 0, 0), (0, 1, 1, 0x02)]])  # a translated member, two inner clips
+    out["u-inner-with-plain.bin"] = case((0, 0, 0, 0), (2, 0, 0, 0), inners=[[(3, 0, 0, 0)], []], order=1)  # a clipped member beside a plain one: never disjoint
+    out["u-inner-dup.bin"] = case((0, 0, 0, 0), inners=[[(3, 0, 0, 0), (3, 0, 0, 0), (3, 0, 0, 0)]], order=3)  # an inner clip three times is one
+    out["u-inner-two-clipped.bin"] = case((0, 0, 0, 0), (1, 0, 0, 0), inners=[[(3, 0, 0, 0)], [(3, 0, 0, 0)]], inst=1)
+    out["u-inner-3d.bin"] = case((0, 0, 0, 0), inners=[[(1, 4, 0, 0)]])  # an inner clip with a 3D map: unsupported
+    out["u-inner-bad-rule.bin"] = case((0, 0, 0, 0), inners=[[(1, 0, 4, 0)]])  # an inner rule past the enumeration: invalid
+    out["u-inner-nan.bin"] = case((0, 0, 0, 0), inners=[[(1, 5, 0, 0)]])
+    out["u-inner-singular.bin"] = case((0, 0, 0, 0), inners=[[(1, 3, 0, 0)]])  # an inner clip with an empty region
+    out["u-inner-run.bin"] = case((6, 0, 0, 0), inners=[[(6, 0, 0, 0), (7, 0, 0, 0)]])
     return out
 
 

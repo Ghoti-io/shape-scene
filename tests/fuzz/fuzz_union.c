@@ -31,7 +31,14 @@
  * handle; the canonical count is at most the count given; a union of one member is recorded as its single clip (the list equals the list
  * of that clip); the comparisons of the predicate are at most n (n - 1) / 2; and, when every member is a palette rectangle under a
  * translation or a scale of 2, the verdict equals the one an independent integer test of the boxes gives, and the planning pass refuses
- * under `CLIP_UNION` alone exactly when the verdict is overlap.  Built into libFuzzer by `make fuzz` and replayed over the committed
+ * under `CLIP_UNION` alone exactly when the verdict is overlap.
+ *
+ * After those bytes come the inner clips (CI1 to CI6): for each member a count (0 to 3) and four bytes for each (palette path, map, rule,
+ * translation), so a corpus file of the older form has none.  Invariants added: an input with no member or inner clip that is bad by
+ * construction is accepted; the same members with each member's inner clips reversed and one repeated are the same handle; a union
+ * with a clipped member is never provably disjoint (CI4), a plan without the inner capability refuses it as `UNION_INNER` naming
+ * the first clipped member and one with it does not refuse it; and a lone clipped palette rectangle has the box that an integer
+ * meet of the rectangles gives (CI3).  Built into libFuzzer by `make fuzz` and replayed over the committed
  * corpus by `make fuzz-replay`.
  */
 
@@ -43,7 +50,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-enum { OUT_INVALID, OUT_UNSUPPORTED, OUT_DISJOINT, OUT_OVERLAP, OUT_ONE, OUT_UNPROVABLE, OUT_COUNT };
+enum { OUT_INVALID, OUT_UNSUPPORTED, OUT_DISJOINT, OUT_OVERLAP, OUT_ONE, OUT_UNPROVABLE, OUT_CLIPPED, OUT_INNER_REJECTED, OUT_INNER_REFUSED, OUT_INNER_BOX, OUT_COUNT };
 static unsigned long g_outcome[OUT_COUNT];
 
 int gshscene_fuzz_unreached(void) {
@@ -171,9 +178,70 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
   }
   const unsigned inst_flag = take(&in) % 3u;
   const unsigned order = take(&in);
+  GSHSCENE_Clip_Inner inner[10][3];
+  unsigned inner_n[10];
+  IBox inner_box[10][3];
+  int inner_simple[10] = {0};
+  int inner_bad = 0;
+  int member_bad = n == 0;
+  memset(inner, 0, sizeof inner);
+  for (unsigned i = 0; i < n; i++) {
+    if (members[i].rule == (GSHGEOM_Fill_Rule)7 || map_of[i] == 4 || map_of[i] == 5) {
+      member_bad = 1;
+    }
+    inner_n[i] = take(&in) % 4u;
+    inner_simple[i] = 1;
+    for (unsigned k = 0; k < inner_n[i]; k++) {
+      const unsigned kind = take(&in) % 8u;
+      const unsigned mapsel = take(&in) % 6u;
+      const unsigned rule = take(&in) % 5u;
+      const unsigned trans = take(&in);
+      const double tx = (double)(trans & 15u) / 4.0, ty = (double)(trans >> 4) / 4.0;
+      inner[i][k].resource = palette[kind];
+      inner[i][k].rule = (GSHGEOM_Fill_Rule)(rule == 4 ? 7 : (rule & 1u));
+      switch (mapsel) {
+        case 1: gshgeom_map_translate(2, tx, ty, 0, &inner[i][k].map); break;
+        case 2: gshgeom_map_scale(2, 2.0, 2.0, 1.0, &inner[i][k].map); break;
+        case 3: gshgeom_map_scale(2, 0.0, 0.0, 1.0, &inner[i][k].map); break;
+        case 4: gshgeom_map_identity(3, &inner[i][k].map); break;
+        case 5: gshgeom_map_identity(2, &inner[i][k].map); inner[i][k].map.t[0] = (double)NAN; break;
+        default: break;
+      }
+      if (rule == 4 || mapsel == 4 || mapsel == 5) {
+        inner_bad = 1;
+      }
+      if (kind <= 3 && mapsel <= 1 && inner[i][k].rule <= 1) {
+        inner_box[i][k].x0 = (int64_t)(rects[kind][0] * 64.0) + (mapsel == 1 ? (int64_t)(trans & 15u) * 16 : 0);
+        inner_box[i][k].y0 = (int64_t)(rects[kind][1] * 64.0) + (mapsel == 1 ? (int64_t)(trans >> 4) * 16 : 0);
+        inner_box[i][k].x1 = (int64_t)(rects[kind][2] * 64.0) + (mapsel == 1 ? (int64_t)(trans & 15u) * 16 : 0);
+        inner_box[i][k].y1 = (int64_t)(rects[kind][3] * 64.0) + (mapsel == 1 ? (int64_t)(trans >> 4) * 16 : 0);
+        inner_box[i][k].empty = 0;
+      } else {
+        inner_simple[i] = 0;
+      }
+    }
+    members[i].inner_count = inner_n[i];
+    members[i].inner = inner_n[i] ? inner[i] : NULL;
+  }
+  if (inner_bad) {
+    independent = 0;
+  }
+  for (unsigned i = 0; i < n; i++) {
+    if (inner_n[i]) {
+      independent = 0;
+    }
+  }
 
   const GSHSCENE_Resource * u = NULL;
   GSHSCENE_Result r = gshscene_store_intern_clip_union(store, members, n, &u);
+  if (!member_bad && !inner_bad && r != GSHSCENE_OK) {
+    bad("a union with no member or inner clip that is bad by construction is not accepted");
+  }
+  if (r == GSHSCENE_ERR_INVALID || r == GSHSCENE_ERR_UNSUPPORTED) {
+    if (!member_bad && inner_bad) {
+      g_outcome[OUT_INNER_REJECTED]++;
+    }
+  }
   if (r == GSHSCENE_ERR_INVALID) {
     g_outcome[OUT_INVALID]++;
   } else if (r == GSHSCENE_ERR_UNSUPPORTED) {
@@ -187,8 +255,31 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
     }
     /* the same members, rotated by `order` and doubled, are one handle */
     GSHSCENE_Clip_Member again[10];
+    GSHSCENE_Clip_Inner shuffled[10][4];
     for (unsigned i = 0; i < n; i++) {
       again[i] = members[(i + order) % n];
+      const unsigned src = (i + order) % n;
+      /* the inner clips reversed, the first one repeated: an unordered set with a duplicate is the same set (CI6) */
+      for (unsigned k = 0; k < inner_n[src]; k++) {
+        shuffled[i][k] = inner[src][inner_n[src] - 1 - k];
+      }
+      if (inner_n[src]) {
+        shuffled[i][inner_n[src]] = inner[src][0];
+        again[i].inner_count = inner_n[src] + 1;
+        again[i].inner = shuffled[i];
+      }
+    }
+    int clipped = 0;
+    size_t first_clipped = 0;
+    for (size_t i = 0; i < distinct; i++) {
+      GSHSCENE_Clip_Member cm;
+      if (gshscene_resource_clip_union_member(u, i, &cm) != GSHSCENE_OK) {
+        bad("a canonical member cannot be read");
+      }
+      if (cm.inner_count > 0 && !clipped) {
+        clipped = 1;
+        first_clipped = i;
+      }
     }
     const GSHSCENE_Resource * u2 = NULL;
     if (gshscene_store_intern_clip_union(store, again, n, &u2) != GSHSCENE_OK || u2 != u) {
@@ -206,7 +297,7 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
     gshscene_list_close(list);
     const GSHSCENE_Item * item = NULL;
     if (pr == GSHSCENE_OK && gshscene_list_item(list, 0, &item) == GSHSCENE_OK) {
-      if (distinct == 1) {
+      if (distinct == 1 && !clipped) {
         g_outcome[OUT_ONE]++;
         if (gshscene_resource_kind(item->resource) == GSHSCENE_RESOURCE_CLIP_UNION) {
           bad("a one-member union is in the list");
@@ -239,11 +330,62 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
         caps.flags = GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_CLIP_UNION;
         GSHSCENE_Disposition d = gshscene_caps_disposition(&caps, item, inst_flag == 1 ? &inst : NULL, inst_flag == 1 ? 1 : 0, NULL, NULL, NULL);
         const int refused = d.entry_class == GSHSCENE_ENTRY_REFUSED;
-        if (refused != !v.disjoint || (refused && d.reason != GSHSCENE_REASON_UNION_OVERLAP) ||
+        if (clipped) {
+          g_outcome[OUT_CLIPPED]++;
+          if (v.disjoint) {
+            bad("a union with a clipped member is provably disjoint (CI4)");
+          }
+          if (!refused || (d.reason != GSHSCENE_REASON_UNION_OVERLAP && d.reason != GSHSCENE_REASON_UNION_INNER)) {
+            bad("a clipped member is not refused by the union caps without the inner capability");
+          }
+          caps.flags |= GSHSCENE_CAP_CLIP_UNION_GENERAL;
+          GSHSCENE_Disposition g = gshscene_caps_disposition(&caps, item, inst_flag == 1 ? &inst : NULL, inst_flag == 1 ? 1 : 0, NULL, NULL, NULL);
+          if (g.entry_class != GSHSCENE_ENTRY_REFUSED || g.reason != GSHSCENE_REASON_UNION_INNER ||
+              g.detail != (((uint64_t)first_clipped << 16) | first_clipped)) {
+            bad("the general tier without the inner capability does not name the first clipped member");
+          }
+          g_outcome[OUT_INNER_REFUSED]++;
+          caps.flags |= GSHSCENE_CAP_CLIP_UNION_INNER;
+          g = gshscene_caps_disposition(&caps, item, inst_flag == 1 ? &inst : NULL, inst_flag == 1 ? 1 : 0, NULL, NULL, NULL);
+          if (g.entry_class == GSHSCENE_ENTRY_REFUSED && (g.reason == GSHSCENE_REASON_UNION_INNER || g.reason == GSHSCENE_REASON_UNION_OVERLAP ||
+                                                          g.reason == GSHSCENE_REASON_CLIP_UNION)) {
+            bad("a sink with the general tier and the inner capability refuses a union for its members");
+          }
+          /* the box of a lone clipped palette rectangle is the integer meet of the rectangles (CI3) */
+          if (n == 1 && distinct == 1 && kind_of[0] <= 3 && map_of[0] <= 1 && members[0].rule <= 1 && inner_simple[0]) {
+            IBox m;
+            const int64_t ox = map_of[0] == 1 ? (int64_t)tx_of[0] * 16 : 0, oy = map_of[0] == 1 ? (int64_t)ty_of[0] * 16 : 0;
+            m.x0 = (int64_t)(rects[kind_of[0]][0] * 64.0) + ox;
+            m.y0 = (int64_t)(rects[kind_of[0]][1] * 64.0) + oy;
+            m.x1 = (int64_t)(rects[kind_of[0]][2] * 64.0) + ox;
+            m.y1 = (int64_t)(rects[kind_of[0]][3] * 64.0) + oy;
+            for (unsigned k = 0; k < inner_n[0]; k++) {
+              m.x0 = m.x0 > inner_box[0][k].x0 ? m.x0 : inner_box[0][k].x0;
+              m.y0 = m.y0 > inner_box[0][k].y0 ? m.y0 : inner_box[0][k].y0;
+              m.x1 = m.x1 < inner_box[0][k].x1 ? m.x1 : inner_box[0][k].x1;
+              m.y1 = m.y1 < inner_box[0][k].y1 ? m.y1 : inner_box[0][k].y1;
+            }
+            GSHGEOM_Device_Box box;
+            if (gshscene_clip_union_member_box(item, 0, NULL, 0, NULL, &box) == GSHSCENE_OK) {
+              if (m.x0 < m.x1 && m.y0 < m.y1) {
+                if (box.empty || box.x0 != m.x0 || box.y0 != m.y0 || box.x1 != m.x1 || box.y1 != m.y1) {
+                  bad("the box of a clipped member is not the meet of the boxes");
+                }
+                g_outcome[OUT_INNER_BOX]++;
+              } else if (m.x0 > m.x1 || m.y0 > m.y1) {
+                if (!box.empty) {
+                  bad("the box of a clipped member whose rectangles do not meet is not empty");
+                }
+              }
+            }
+          }
+        } else if (refused != !v.disjoint || (refused && d.reason != GSHSCENE_REASON_UNION_OVERLAP) ||
             (refused && d.detail != (((uint64_t)v.first << 16) | v.second))) {
           bad("the disposition and the verdict disagree");
         }
-        if (!v.disjoint && v.first == v.second) {
+        if (clipped) {
+          /* counted above */
+        } else if (!v.disjoint && v.first == v.second) {
           g_outcome[OUT_UNPROVABLE]++;
         } else {
           g_outcome[v.disjoint ? OUT_DISJOINT : OUT_OVERLAP]++;
