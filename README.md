@@ -76,6 +76,10 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
 - **Clip unions** (`clip_union.h`). A clip of several shapes, each with its own map and fill rule (SVG's `<clipPath>` of
   several children, the glyphs of a PDF text clip), is the exact union of their regions, named by a clip push like any region.
   `examples/clip_union.c`.
+- **Picking** (`pick.h`; PK1 to PK12 in `documentation/design.md`). Which items of a list, and so which nodes of a version, a point
+  of the device lattice lies on: topmost first, each with its chain and its instance path, decided in integers against the
+  polylines a sink fills, under every clip in force (unions with inner clips included) and through instances. Boundary
+  and undecided answers are reported as such, never guessed.
 - **Glyph path provider** (`glyph_provider.h`, `glyph.h`). A face resource binds a font's glyphs to the waist through a provider
   whose header names no floating type, so that a sink draws a run from a font without including a font header.
 - **Hash and dump** of every resource and list, in `shape-geometry`'s spelling (FNV-1a 64 over

@@ -45,6 +45,7 @@
 #include <ghoti.io/shape-scene/mask.h>
 #include <ghoti.io/shape-scene/paint.h>
 #include <ghoti.io/shape-scene/pattern.h>
+#include <ghoti.io/shape-scene/pick.h>
 #include <ghoti.io/shape-scene/primitive.h>
 #include <ghoti.io/shape-scene/report.h>
 #include <ghoti.io/shape-scene/resource.h>

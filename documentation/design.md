@@ -1636,6 +1636,57 @@ Gaps that this design knows about (a font as an
 opaque key, fixed picture paints, intersection-only clips, per-glyph maps, affine and 2D maps, the linear
 cost of publish and diff, the granularity of a merge, single-rectangle damage, what is met at emission).
 
+## Picking (normative; PK1 to PK12)
+
+A pick answers "what is under this point" for the pixels a render draws, without a sink (`pick.h`). It places every shape of a
+closed list under the maps the sinks place it under, flattens it as they do (the integer flattener at its default tolerance, so
+that the polylines are the ones a sink fills) and decides the point against it with `shape-geometry`'s exact hit test
+(`hit.h`, HT1 to HT6). It reads the list and the resources the list names and changes nothing, so any number of picks may run at
+once on a closed list or a version.
+
+**PK1 The point.** A 26.6 device point and a target map from the list's space to the device (a zero-filled map is the identity,
+as a sink's target is). The center of pixel `(x, y)` is `(64 x + 32, 64 y + 32)`. The units are pixels, so a stroke's width in
+the style's unit is the one a sink uses at a unit of 1.
+
+**PK2 What is tested.** Each fill and stroke, in paint order. A fill's shape is a path, the glyphs of a run (from outlines, or
+from a font by the route a raster sink takes, `glyph.h`: the windings of a run's glyphs add, AA2) or the plane (every point); a
+stroke's region is its expansion, SK5: the body together with the aligned part where the clip part selects it. Under every clip
+in force: every clip push not yet popped, in the list and in the lists of the instances that enclose the item, placed under the
+maps in force where it was pushed (N9: a group's own clip, pushed before the group, applies to its content). A clip is a path or
+a run under its rule or a union (CU1: the union over members of each member met with its inner clips, CI1). An instance is its
+picture's items under the instance's map. Paint, opacity, blend mode, soft mask, isolation and the antialias mode do not take
+part (PK8): the region is the area of the shape.
+
+**PK3 Three answers and an unknown.** Against a region a point is *inside*, *outside* or *on the boundary* (it lies exactly on an
+edge, HT3; a caller that wants the closed region takes it as inside). An item whose region cannot be formed here (PK9) is
+*undecided*. Regions combine soundly in this four-valued logic: an intersection is outside when any part is, else undecided when
+any part is, else inside when all are inside, else on the boundary; a union is inside when any part is, else undecided when any
+part is, else outside when all are, else on the boundary; a complement exchanges inside and outside. So an *inside* answer is a
+point in the region and an *outside* one a point out of it, whatever the edges do; only the edges are conservative.
+
+**PK4 The hits.** Every item whose answer is inside, on the boundary or undecided, **topmost first** (the reverse of paint
+order). Each entry has its chain, the key of a report entry (`report.h`); `gshscene_pick_resolve` turns a chain into the node
+and the instance path of a version, as `gshscene_report_resolve` does. **PK5** The list is in paint order (it is closed), so the
+order is the sinks': a depth tie has been ordered by the close (N11) and the pick agrees. **PK6** An instance is entered through
+its picture, under its map, with the clips and groups as they stand. **PK7** A placeholder draws nothing and is never hit.
+
+**PK8 Visibility.** By default every fill and stroke is tested whatever its paint, so that a transparent shape is pickable (a hit
+area). With `GSHSCENE_PICK_VISIBLE` a fill or stroke whose paint has alpha 0, and everything inside a group of opacity 0, is not.
+
+**PK9 What is undecided.** A stroke whose style is a hatch (the pieces are made from the fill's region and are not made here); a
+run from a font whose route a raster sink refuses or a glyph its provider could not make; a shape past the geometry's limits (a
+coordinate that does not round into 26.6, more points than `max_points`). Each is listed as `UNDECIDED` with a reason and is never
+skipped; a pick fails only for memory or an invalid argument, and then returns nothing.
+
+**PK10 Exactness.** Everything is decided in integers, so a result is the same on every target and run, and for a pixel center off
+every edge it is the answer of a sink's whole-or-nothing coverage (AA2): `shape-cpu`'s `test_render_pick` draws random lists with
+no antialiasing and compares the topmost hit at every pixel center with the color there. **PK11** The allocator given serves the
+result and the scratch; the memory is `O(clips + hits * depth)` plus the geometry of one item at a time. **PK12** `max_hits`
+keeps the topmost entries and the total says how many there were.
+
+What is left out: a pick does not know a sink's own choices (a clip's antialiased edge, a refused feature), and it asks a
+region only about a point; a region against a rectangle is a different question.
+
 ## The sink contract (normative)
 
 How a closed list and its resources are rendered by a backend the caller does not need to know
