@@ -1654,7 +1654,8 @@ stroke's region is its expansion, SK5: the body together with the aligned part w
 in force: every clip push not yet popped, in the list and in the lists of the instances that enclose the item, placed under the
 maps in force where it was pushed (N9: a group's own clip, pushed before the group, applies to its content). A clip is a path or
 a run under its rule or a union (CU1: the union over members of each member met with its inner clips, CI1). An instance is its
-picture's items under the instance's map. Paint, opacity, blend mode, soft mask, isolation and the antialias mode do not take
+picture's items under the instance's map. A fill painted with a hatch draws the stroke of its lines (HX13), so its region is the
+lines, trimmed to the fill's shape, and not the shape; it is listed as the fill it is. Paint, opacity, blend mode, soft mask, isolation and the antialias mode do not take
 part (PK8): the region is the area of the shape.
 
 **PK3 Three answers and an unknown.** Against a region a point is *inside*, *outside* or *on the boundary* (it lies exactly on an
@@ -1673,8 +1674,7 @@ its picture, under its map, with the clips and groups as they stand. **PK7** A p
 **PK8 Visibility.** By default every fill and stroke is tested whatever its paint, so that a transparent shape is pickable (a hit
 area). With `GSHSCENE_PICK_VISIBLE` a fill or stroke whose paint has alpha 0, and everything inside a group of opacity 0, is not.
 
-**PK9 What is undecided.** A stroke whose style is a hatch (the pieces are made from the fill's region and are not made here); a
-run from a font whose route a raster sink refuses or a glyph its provider could not make; a shape past the geometry's limits (a
+**PK9 What is undecided.** A run from a font whose route a raster sink refuses or a glyph its provider could not make; a shape past the geometry's limits (a
 coordinate that does not round into 26.6, more points than `max_points`). Each is listed as `UNDECIDED` with a reason and is never
 skipped; a pick fails only for memory or an invalid argument, and then returns nothing.
 

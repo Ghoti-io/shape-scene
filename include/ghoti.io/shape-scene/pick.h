@@ -33,7 +33,8 @@
  *   The units of the target are pixels: a stroke's width in the style's own unit is the one the sinks use at a unit of 1.
  * - **PK2 What is tested.**  The geometry of each item, in paint order: a fill's shape (a path; the glyphs of a run, from outlines
  *   or from a font by the route a raster sink takes, `glyph.h`; or the plane, which is every point), a stroke's region (its
- *   expansion, SK5: the body, together with the aligned part where the clip part selects it), under every clip in force.  The
+ *   expansion, SK5: the body, together with the aligned part where the clip part selects it; a fill painted with a hatch is the stroke
+ *   of its lines, HX13, and not its shape), under every clip in force.  The
  *   clips in force at an item are every clip push not yet popped, in the list and in the lists of the instances that
  *   enclose it (N9 makes a group's own clip, pushed before the group, apply to its result).  A clip is a region (a path or a run
  *   under its rule; a union, CU1, with each member intersected with its inner clips, CI1) and an instance is its picture's items
@@ -61,8 +62,7 @@
  * - **PK8 Visibility.**  By default every fill and stroke is tested whatever its paint, so that a transparent shape is
  *   pickable (an invisible hit area).  With ::GSHSCENE_PICK_VISIBLE a fill or stroke of a solid paint with alpha 0, and every
  *   item inside a group of opacity 0, is not.
- * - **PK9 What is undecided.**  A stroke whose style is a hatch (`hatch.h`: the pieces are made from the fill's region and are
- *   not made here); a run from a font whose route a raster sink refuses, or a glyph of one that the provider could not
+ * - **PK9 What is undecided.**  A run from a font whose route a raster sink refuses, or a glyph of one that the provider could not
  *   make (`glyph.h`'s refusals); a shape that does not fit the geometry's limits (a coordinate that does not round into
  *   26.6, or more points than `max_points`).  Each is listed as ::GSHSCENE_PICK_UNDECIDED with a ::GSHSCENE_Pick_Why, never
  *   skipped, and never the reason a pick fails.  A pick fails (::GSHSCENE_ERR_OOM, or an invalid argument) before
@@ -112,9 +112,8 @@ typedef enum GSHSCENE_Pick_State {
 /** @brief Why an entry is undecided (PK9).  The values are pinned.  Zero for a decided entry. */
 typedef enum GSHSCENE_Pick_Why {
   GSHSCENE_PICK_WHY_NONE = 0,  ///< Decided.
-  GSHSCENE_PICK_WHY_HATCH = 1, ///< A stroke whose style is a hatch.
-  GSHSCENE_PICK_WHY_GLYPH = 2, ///< A run from a font whose route is refused, or a glyph its provider could not make.
-  GSHSCENE_PICK_WHY_LIMIT = 3, ///< The region does not fit the geometry's limits.
+  GSHSCENE_PICK_WHY_GLYPH = 1, ///< A run from a font whose route is refused, or a glyph its provider could not make.
+  GSHSCENE_PICK_WHY_LIMIT = 2, ///< The region does not fit the geometry's limits.
   GSHSCENE_PICK_WHY_COUNT      ///< Closes the enum.
 } GSHSCENE_Pick_Why;
 
@@ -193,7 +192,7 @@ GSHSCENE_API GSHSCENE_Result gshscene_pick_resolve(const GSHSCENE_Pick * pick, c
 /** @brief Name a state ("boundary", "inside", "undecided"), or "unknown pick state"; never NULL. */
 GSHSCENE_API const char * gshscene_pick_state_string(GSHSCENE_Pick_State state);
 
-/** @brief Name a reason ("none", "hatch", "glyph", "limit"), or "unknown pick reason"; never NULL. */
+/** @brief Name a reason ("none", "glyph", "limit"), or "unknown pick reason"; never NULL. */
 GSHSCENE_API const char * gshscene_pick_why_string(GSHSCENE_Pick_Why why);
 
 #ifdef __cplusplus

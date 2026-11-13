@@ -409,7 +409,7 @@ TEST(Pick, AStrokeIsItsBodyAndNothingBeyondItsCaps) {
   EXPECT_EQ(pick_list(lb.list(), q), "");
 }
 
-TEST(Pick, AStrokeAlignedInsideIsABandInsideTheShapeAndAHatchIsUndecided) {
+TEST(Pick, AStrokeAlignedInsideIsABandInsideTheShape) {
   StoreHolder sh;
   Ref sq = rect_res(sh.store, 10, 10, 50, 50);
   GSHSCENE_Stroke_Style st;
@@ -425,6 +425,47 @@ TEST(Pick, AStrokeAlignedInsideIsABandInsideTheShapeAndAHatchIsUndecided) {
   EXPECT_EQ(pick_list(l.list(), ask(11, 30)), "inside:0") << "in the band";
   EXPECT_EQ(pick_list(l.list(), ask(30, 30)), "") << "the middle of the shape";
   EXPECT_EQ(pick_list(l.list(), ask(8, 30)), "") << "outside the shape";
+}
+
+TEST(Pick, AFillPaintedWithAHatchIsItsLinesTrimmedToTheShape) {
+  StoreHolder sh;
+  Ref region = rect_res(sh.store, 0, 0, 20, 20);
+  GSHSCENE_Stroke_Style st;
+  gshscene_stroke_style_init(&st);
+  st.width = 1.0;
+  const GSHSCENE_Resource * s = nullptr;
+  ASSERT_EQ(gshscene_store_intern_stroke_style(sh.store, &st, &s), GSHSCENE_OK);
+  Ref pen(s);
+  GSHSCENE_Hatch_Family fam;
+  std::memset(&fam, 0, sizeof fam);
+  fam.offset_across = 5.0;  // horizontal lines at y = 0, 5, 10, 15, 20
+  GSHSCENE_Hatch h;
+  gshscene_hatch_init(&h);
+  h.style = pen.get();
+  h.family_count = 1;
+  h.families = &fam;
+  const GSHSCENE_Resource * hr = nullptr;
+  ASSERT_EQ(gshscene_store_intern_hatch(sh.store, &h, &hr), GSHSCENE_OK);
+  Ref hatch(hr);
+  Recorded l(sh.store);
+  GSHSCENE_Paint paint;
+  std::memset(&paint, 0, sizeof paint);
+  paint.kind = GSHSCENE_PAINT_HATCH;
+  paint.resource = hatch.get();
+  paint.rgba[3] = 1.0;
+  const GSHGEOM_Map m = identity();
+  ASSERT_EQ(gshscene_list_fill(l.list(), region.get(), &m, GSHGEOM_FILL_NONZERO, &paint, 0, 0.0), GSHSCENE_OK);
+  l.close();
+  EXPECT_EQ(pick_list(l.list(), ask(10, 10)), "inside:0") << "on a line";
+  EXPECT_EQ(pick_list(l.list(), ask(10, 12.5)), "") << "between lines, inside the shape: not drawn, so not hit";
+  EXPECT_EQ(pick_list(l.list(), ask(30, 10)), "") << "on a line's extension, outside the shape";
+  EXPECT_EQ(pick_list(l.list(), ask(10, 10.5)), "boundary:0") << "the line's edge";
+  PickHolder p;
+  GSHSCENE_Pick_Params q = ask(10, 10);
+  ASSERT_EQ(gshscene_pick_list(nullptr, l.list(), &q, &p.pick), GSHSCENE_OK);
+  GSHSCENE_Pick_Entry e;
+  ASSERT_EQ(gshscene_pick_entry(p.pick, 0, &e), GSHSCENE_OK);
+  EXPECT_EQ(e.kind, GSHSCENE_ITEM_FILL) << "listed as the fill it is";
 }
 
 TEST(Pick, APlaneIsEverywhereTheClipsAllow) {
@@ -479,7 +520,7 @@ TEST(Pick, TheArgumentsAreChecked) {
   gshscene_pick_destroy(nullptr);
   EXPECT_STREQ(gshscene_pick_state_string(GSHSCENE_PICK_INSIDE), "inside");
   EXPECT_STREQ(gshscene_pick_state_string((GSHSCENE_Pick_State)99), "unknown pick state");
-  EXPECT_STREQ(gshscene_pick_why_string(GSHSCENE_PICK_WHY_HATCH), "hatch");
+  EXPECT_STREQ(gshscene_pick_why_string(GSHSCENE_PICK_WHY_GLYPH), "glyph");
   EXPECT_STREQ(gshscene_pick_why_string((GSHSCENE_Pick_Why)99), "unknown pick reason");
 }
 

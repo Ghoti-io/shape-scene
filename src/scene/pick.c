@@ -36,6 +36,7 @@
 
 #include <ghoti.io/shape-scene/clip_union.h>
 #include <ghoti.io/shape-scene/glyph.h>
+#include <ghoti.io/shape-scene/hatch.h>
 #include <ghoti.io/shape-scene/pick.h>
 #include <ghoti.io/shape-scene/report.h>
 #include <ghoti.io/shape-scene/resource.h>
@@ -44,12 +45,16 @@
 #include <ghoti.io/shape-scene/version.h>
 
 #include <ghoti.io/shape-geometry/flatten.h>
+#include <ghoti.io/shape-geometry/hatch.h>
 #include <ghoti.io/shape-geometry/hit.h>
 #include <ghoti.io/shape-geometry/stroke.h>
 
 #include <string.h>
 
 /* --- the four-valued answer --------------------------------------------------------------------- */
+
+/** The most lines one hatch may make (HX12): a sink's default, so that a pick and a render refuse the same hatches. */
+#define PICK_MAX_HATCH_LINES ((uint64_t)1 << 16)
 
 enum { S_OUT = 0, S_BOUND = 1, S_IN = 2, S_UNK = 3 };
 
@@ -463,16 +468,18 @@ static GSHSCENE_Result part_state(Ctx * c, const GSHGEOM_Flat_Path * flat, GSHGE
 
 /** SK5: the body, together with the aligned part where the clip part selects it (or its complement). */
 static GSHSCENE_Result stroke_region(Ctx * c, const GSHSCENE_Item * item, size_t level, St * out) {
-  if (gshscene_resource_kind(item->style) == GSHSCENE_RESOURCE_HATCH) {
-    *out = st_unknown(GSHSCENE_PICK_WHY_HATCH);
-    return GSHSCENE_OK;
+  /* HX13: a hatch fill is the stroke of its trimmed lines, the hatch in the style slot and its style the pen. */
+  GSHSCENE_Hatch hatch;
+  const int is_hatch = gshscene_resource_kind(item->style) == GSHSCENE_RESOURCE_HATCH;
+  if (is_hatch && gshscene_resource_hatch(item->style, &hatch) != GSHSCENE_OK) {
+    return GSHSCENE_ERR_INTERNAL;
   }
   GSHGEOM_Stroke params;
   const GSHGEOM_Path * path = gshscene_resource_path(item->resource);
   GSHSCENE_Glyph_Run run;
   memset(&run, 0, sizeof run);
   const int is_run = !path && gshscene_resource_glyph_run(item->resource, &run) == GSHSCENE_OK;
-  if ((!path && !is_run) || gshscene_resource_stroke_geometry(item->style, &params) != GSHSCENE_OK) {
+  if ((!path && !is_run) || gshscene_resource_stroke_geometry(is_hatch ? hatch.style : item->style, &params) != GSHSCENE_OK) {
     return GSHSCENE_ERR_INTERNAL; /* a style and a centerline the store holds pass the checks */
   }
   size_t n = place(c, level, &item->map);
@@ -511,7 +518,40 @@ static GSHSCENE_Result stroke_region(Ctx * c, const GSHSCENE_Item * item, size_t
     path = centerline;
   }
   GSHGEOM_Stroke_Outline * outline = NULL;
-  GSHGEOM_Result g = gshgeom_stroke_expand(path, &params, &canon, c->galloc, &c->limits, &outline);
+  GSHGEOM_Result g;
+  if (is_hatch) {
+    /* HX8, HX12: the pieces of the families trimmed to the region, then their stroke; the lines of one use are bounded as a sink bounds them. */
+    GSHGEOM_Hatch geom;
+    memset(&geom, 0, sizeof geom);
+    geom.angle_unit = hatch.angle_unit;
+    geom.nesting = hatch.nesting;
+    geom.map = hatch.map;
+    geom.family_count = hatch.family_count;
+    GSHGEOM_Hatch_Family * families = gshscene_alloc(c->alloc, hatch.family_count * sizeof *families);
+    if (!families) {
+      gshgeom_path_destroy(centerline);
+      return GSHSCENE_ERR_OOM;
+    }
+    for (size_t i = 0; i < hatch.family_count; i++) {
+      families[i].angle = hatch.families[i].angle;
+      families[i].origin_x = hatch.families[i].origin_x;
+      families[i].origin_y = hatch.families[i].origin_y;
+      families[i].offset_along = hatch.families[i].offset_along;
+      families[i].offset_across = hatch.families[i].offset_across;
+      families[i].dash_count = hatch.families[i].dash_count;
+      families[i].dashes = hatch.families[i].dashes;
+    }
+    geom.families = families;
+    GSHGEOM_Hatch_Pieces * pieces = NULL;
+    g = gshgeom_hatch_pieces(path, item->fill_rule, &geom, &canon, PICK_MAX_HATCH_LINES, c->galloc, &c->limits, &pieces);
+    if (g == GSHGEOM_OK) {
+      g = gshgeom_hatch_expand_pieces(pieces, &params, &canon, GSHGEOM_FLATTEN_TOLERANCE, c->galloc, &c->limits, &outline);
+    }
+    gshgeom_hatch_pieces_destroy(pieces);
+    gshscene_free(c->alloc, families);
+  } else {
+    g = gshgeom_stroke_expand(path, &params, &canon, c->galloc, &c->limits, &outline);
+  }
   gshgeom_path_destroy(centerline);
   if (g == GSHGEOM_ERR_OOM) {
     return GSHSCENE_ERR_OOM;
@@ -584,6 +624,19 @@ static GSHSCENE_Result record(Ctx * c, St st, GSHSCENE_Item_Kind kind, size_t ch
 
 /** Test one fill or stroke at @p level, whose chain is `chain[0 .. level]`. */
 static GSHSCENE_Result test_item(Ctx * c, const GSHSCENE_Item * item, size_t level) {
+  /* HX13: a fill painted with a hatch draws the stroke of its lines, with the hatch's ink at its alpha times the paint's. */
+  const GSHSCENE_Item_Kind kind = item->kind;
+  GSHSCENE_Item hatched;
+  GSHSCENE_Hatch h;
+  if (item->kind == GSHSCENE_ITEM_FILL && item->paint.kind == GSHSCENE_PAINT_HATCH && item->paint.resource &&
+      gshscene_resource_hatch(item->paint.resource, &h) == GSHSCENE_OK) {
+    hatched = *item;
+    hatched.kind = GSHSCENE_ITEM_STROKE;
+    hatched.style = item->paint.resource;
+    hatched.paint = h.ink;
+    hatched.paint.rgba[3] = h.ink.rgba[3] * item->paint.rgba[3];
+    item = &hatched;
+  }
   if ((c->flags & GSHSCENE_PICK_VISIBLE) && item->paint.rgba[3] == 0.0) {
     return GSHSCENE_OK;
   }
@@ -606,7 +659,7 @@ static GSHSCENE_Result test_item(Ctx * c, const GSHSCENE_Item * item, size_t lev
       return GSHSCENE_OK;
     }
   }
-  return record(c, st, item->kind, level + 1);
+  return record(c, st, kind, level + 1);
 }
 
 /* --- the walk ---------------------------------------------------------------------------------------------- */
@@ -914,8 +967,6 @@ const char * gshscene_pick_why_string(GSHSCENE_Pick_Why why) {
   switch (why) {
     case GSHSCENE_PICK_WHY_NONE:
       return "none";
-    case GSHSCENE_PICK_WHY_HATCH:
-      return "hatch";
     case GSHSCENE_PICK_WHY_GLYPH:
       return "glyph";
     case GSHSCENE_PICK_WHY_LIMIT:
