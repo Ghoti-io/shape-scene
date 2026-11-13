@@ -525,6 +525,20 @@ at least 2^-12 below the next one, which is the margin the sink's integer arithm
 before duplicates are removed. A glyph run from a font is not a member (`ERR_UNSUPPORTED`; its per-glyph report entries are keyed by
 `(chain, glyph index)`), a 3D map is `ERR_UNSUPPORTED` too, and a run from outlines has the hull of its glyphs' device boxes.
 
+**A clipped member (CI1 to CI6).** A member may carry inner clips: `{resource, map, rule}` regions its own is intersected with, which is what an SVG `clipPath`
+child with a `clip-path` of its own is (the child is drawn where its geometry and its clip both hold, and the clipPath is the union of its children so drawn). The union
+of intersections cannot be said with the pieces the waist had: a union clip cannot nest (nested clipping is an intersection of whole regions, not of one member), and the
+fast tier's sum of the members' own areas is not the area of a region that is an intersection. So the member is the unit that grows: it carries its inner clips (their maps place
+them in the union's space, as the member's own does, and are not composed with it), the union is still an unordered set of members, and each member's inner clips are an unordered
+set of their own, sorted by the same key and made distinct (the intersection of a region with itself is the region). A member without inner clips is spelled, hashed and counted as it was, and
+a clipped member's hash sets the high bit of its rule byte and appends the inner count and the inner clips, so no old spelling changes. The members and the inner clips are counted together
+against `max_clip_members`, because the sink's cost grows with both. Nothing that draws a union can ignore an inner clip and be right, so the capability is its own (`CLIP_UNION_INNER`,
+which needs `CLIP_UNION_GENERAL`) and a sink without it is refused the union, `UNION_INNER`, by the planning pass with the first clipped member named. A clipped member is never provably disjoint
+(its own area is not its region's): the predicate says so, naming it as an unprovable member. Its box is the meet of its parts' boxes, a bound a sink groups and sizes by. A union of one member
+with inner clips stays a union item: the single-clip collapse is for a member that has none. The oracle (`tools/clip-union-oracle.py`, CI1 to CI5) computes the exact area of the intersection by the
+same slab sweep, with closed forms for rectangles and exact algebra (inclusion and exclusion over `A n B`, `A n C`, `A n B n C`) as checks, and commits 93 cases for the sink; the
+spelling of the hash is restated by a test from the text of the header.
+
 ## Hatches (normative; masks-images-patterns story H1)
 
 A **hatch** is geometry, not a raster: families of parallel lines trimmed to a fill's region, dashed by one pattern that runs without

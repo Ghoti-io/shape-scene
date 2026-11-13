@@ -208,6 +208,19 @@ GSHSCENE_Disposition gshscene_caps_disposition_unit(const GSHSCENE_Sink_Caps * c
       d.reason = GSHSCENE_REASON_CLIP_UNION;
       return d;
     }
+    if (!(caps->flags & GSHSCENE_CAP_CLIP_UNION_INNER)) {
+      /* CI5: a member that carries inner clips needs a sink that draws them; one that does not refuses the push, `UNION_INNER`, naming the first. */
+      const size_t n = gshscene_resource_clip_union_count(item->resource);
+      for (size_t i = 0; i < n; i++) {
+        GSHSCENE_Clip_Member member;
+        if (gshscene_resource_clip_union_member(item->resource, i, &member) == GSHSCENE_OK && member.inner_count > 0) {
+          d.entry_class = GSHSCENE_ENTRY_REFUSED;
+          d.reason = GSHSCENE_REASON_UNION_INNER;
+          d.detail = ((uint64_t)i << 16) | (uint64_t)i;
+          return d;
+        }
+      }
+    }
     if (!(caps->flags & GSHSCENE_CAP_CLIP_UNION_GENERAL)) {
       GSHSCENE_Union_Verdict verdict;
       if (gshscene_clip_union_disjoint(item, instance_maps, instance_count, target_map, &verdict) != GSHSCENE_OK ||
@@ -611,7 +624,8 @@ static GSHSCENE_Result caps_for(const GSHSCENE_Sink * sink, const GSHSCENE_Targe
     return result;
   }
   if ((c.flags & ~GSHSCENE_CAP_FLAGS_ALL) ||
-      ((c.flags & GSHSCENE_CAP_CLIP_UNION_GENERAL) && !(c.flags & GSHSCENE_CAP_CLIP_UNION)) /* CU12 */ || (c.stroke_native & ~GSHSCENE_STROKE_NATIVE_ALL) ||
+      ((c.flags & GSHSCENE_CAP_CLIP_UNION_GENERAL) && !(c.flags & GSHSCENE_CAP_CLIP_UNION)) /* CU12 */ ||
+      ((c.flags & GSHSCENE_CAP_CLIP_UNION_INNER) && !(c.flags & GSHSCENE_CAP_CLIP_UNION_GENERAL)) /* CI5 */ || (c.stroke_native & ~GSHSCENE_STROKE_NATIVE_ALL) ||
       (c.image_filters & ~((UINT32_C(1) << GSHSCENE_IMAGE_FILTER_COUNT) - 1u)) ||
       (c.image_extends & ~((UINT32_C(1) << GSHSCENE_IMAGE_EXTEND_COUNT) - 1u)) || (c.image_formats & ~GSHSCENE_IMAGE_FORMAT_ALL) ||
       c.cancel_unit == 0 ||

@@ -457,7 +457,13 @@ typedef struct GSHSCENE_Target {
  * draws such a pattern clipped, with the same report, when the extent of the tile is not known (::gshscene_pattern_extent).
  */
 #define GSHSCENE_CAP_PATTERN_OVERFLOW (UINT32_C(1) << 21)
-#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 22) - 1) ///< Every flag defined.
+/**
+ * A sink draws a clip union whose members carry inner clips (clip_union.h, CI1 to CI6): each such member's region is the intersection of its
+ * own and its inner clips', the union's area exact.  Needs ::GSHSCENE_CAP_CLIP_UNION_GENERAL; without it the planning pass refuses a union clip push
+ * with a clipped member, `UNION_INNER`, and the clip's block is skipped (S24).
+ */
+#define GSHSCENE_CAP_CLIP_UNION_INNER (UINT32_C(1) << 22)
+#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 23) - 1) ///< Every flag defined.
 /** @} */
 
 /**

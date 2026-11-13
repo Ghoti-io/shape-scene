@@ -198,8 +198,9 @@ TEST(Sink, CapsThatBreakTheContractAreInternal) {
   EXPECT_EQ(gshscene_sink_caps(nullptr, &surface->target, &out), GSHSCENE_ERR_INVALID);
   GSHSCENE_Sink_Caps good = ms.mock.caps;
   std::vector<std::function<void(GSHSCENE_Sink_Caps &)>> bad = {
-      [](GSHSCENE_Sink_Caps & c) { c.flags |= 1u << 22; }, // past every flag defined (S19 took 9 to 11, S20 12 and 13, S21 14, S22 15, S23 16, S24 17 and 18, AA5 19 and 20, PT15 21)
+      [](GSHSCENE_Sink_Caps & c) { c.flags |= 1u << 23; }, // past every flag defined (S19 took 9 to 11, S20 12 and 13, S21 14, S22 15, S23 16, S24 17 and 18, AA5 19 and 20, PT15 21, CI5 22)
       [](GSHSCENE_Sink_Caps & c) { c.flags = (c.flags | GSHSCENE_CAP_CLIP_UNION_GENERAL) & ~GSHSCENE_CAP_CLIP_UNION; }, // GENERAL without CLIP_UNION (CU12)
+      [](GSHSCENE_Sink_Caps & c) { c.flags = (c.flags | GSHSCENE_CAP_CLIP_UNION_INNER) & ~GSHSCENE_CAP_CLIP_UNION_GENERAL; }, // INNER without GENERAL (CI5)
       [](GSHSCENE_Sink_Caps & c) { c.image_filters |= 1u << 4; }, // past the four image filters (S21)
       [](GSHSCENE_Sink_Caps & c) { c.image_extends |= 1u << 4; }, // past the four edge modes
       [](GSHSCENE_Sink_Caps & c) { c.image_formats |= 1u << 8; }, // past every sample type, layout and the alpha-only mark

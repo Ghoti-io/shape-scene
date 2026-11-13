@@ -265,25 +265,43 @@ static GSHSCENE_Result copy_palette(GSHSCENE_Store * dst, const GSHSCENE_Resourc
 
 static GSHSCENE_Result copy_clip_union(GSHSCENE_Store * dst, const GSHSCENE_Resource * from, const GSHSCENE_Resource ** out) {
   const size_t count = gshscene_resource_clip_union_count(from);
-  GSHSCENE_Clip_Member * members = NULL;
-  if (count == 0 || count > SIZE_MAX / sizeof *members) {
+  if (count == 0 || count > SIZE_MAX / sizeof(GSHSCENE_Clip_Member)) {
     return GSHSCENE_ERR_INTERNAL;
   }
-  members = gshscene_alloc(&dst->alloc, count * sizeof *members);
+  GSHSCENE_Clip_Member * members = gshscene_alloc(&dst->alloc, count * sizeof *members);
   if (!members) {
     return GSHSCENE_ERR_OOM;
   }
-  Held held = {NULL, 0, 0, &dst->alloc};
+  size_t inner_total = 0;
   GSHSCENE_Result r = GSHSCENE_OK;
   for (size_t i = 0; i < count && r == GSHSCENE_OK; i++) {
     r = gshscene_resource_clip_union_member(from, i, &members[i]);
-    if (r == GSHSCENE_OK) {
-      members[i].resource = copy_held(dst, members[i].resource, &held, &r);
+    inner_total += members[i].inner_count;
+  }
+  GSHSCENE_Clip_Inner * inners = NULL;
+  if (r == GSHSCENE_OK && inner_total) {
+    inners = inner_total > SIZE_MAX / sizeof *inners ? NULL : gshscene_alloc(&dst->alloc, inner_total * sizeof *inners);
+    if (!inners) {
+      r = GSHSCENE_ERR_OOM;
     }
+  }
+  Held held = {NULL, 0, 0, &dst->alloc};
+  size_t at = 0;
+  for (size_t i = 0; i < count && r == GSHSCENE_OK; i++) {
+    const GSHSCENE_Clip_Inner * source_inner = members[i].inner;
+    const size_t n = members[i].inner_count;
+    members[i].resource = copy_held(dst, members[i].resource, &held, &r);
+    for (size_t k = 0; k < n && r == GSHSCENE_OK; k++) {
+      inners[at + k] = source_inner[k];
+      inners[at + k].resource = copy_held(dst, source_inner[k].resource, &held, &r);
+    }
+    members[i].inner = n ? &inners[at] : NULL;
+    at += n;
   }
   if (r == GSHSCENE_OK) {
     r = gshscene_store_intern_clip_union(dst, members, count, out);
   }
+  gshscene_free(&dst->alloc, inners);
   gshscene_free(&dst->alloc, members);
   held_release(&held);
   return r;

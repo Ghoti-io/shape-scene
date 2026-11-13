@@ -189,7 +189,7 @@ GSHSCENE_Dump_Sink_Config config_toolpath_like() {
     // A pen has no pixels to tile a picture on (S22): every unit painted with a pattern is refused, `PATTERN`.
     caps->flags &= ~GSHSCENE_CAP_PATTERN;
     // A pen cannot follow a clip region (CU24): a union is refused, `CLIP_UNION`.
-    caps->flags &= ~(GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL);
+    caps->flags &= ~(GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL | GSHSCENE_CAP_CLIP_UNION_INNER);
   }
   return c;
 }
@@ -1666,7 +1666,7 @@ TEST(DumpSink, JobsInFlightAreBounded) {
 TEST(DumpSink, TheConfigurationIsValidated) {
   GSHSCENE_Sink * sink = nullptr;
   std::vector<std::function<void(GSHSCENE_Dump_Sink_Config &)>> bad = {
-      [](GSHSCENE_Dump_Sink_Config & c) { c.raster_caps.flags |= 1u << 22; },
+      [](GSHSCENE_Dump_Sink_Config & c) { c.raster_caps.flags |= 1u << 23; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.stream_caps.cancel_unit = 0; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.stream_caps.cancel_unit = GSHSCENE_CANCEL_UNIT_COUNT; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.raster_caps.work_measure = nullptr; },
@@ -1732,7 +1732,7 @@ TEST(DumpSink, TheConfigurationIsValidated) {
   uint32_t common = GSHSCENE_CAP_CAN_BLOCK | GSHSCENE_CAP_CALLER_MEMORY | GSHSCENE_CAP_GLYPHS_FROM_FONT |
       GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_BLEND_SPACES | GSHSCENE_CAP_GRADIENT_SPACES | GSHSCENE_CAP_PREPARE |
       GSHSCENE_CAP_STROKE_RUNS | GSHSCENE_CAP_IMAGE_FILTER_SPACES | GSHSCENE_CAP_GROUP_SOFT_MASK | GSHSCENE_CAP_PATTERN |
-      GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL | GSHSCENE_CAP_HATCH | GSHSCENE_CAP_ANTIALIAS_NONE | GSHSCENE_CAP_ANTIALIAS_NONE_TOP_LEFT | GSHSCENE_CAP_PATTERN_OVERFLOW;
+      GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL | GSHSCENE_CAP_CLIP_UNION_INNER | GSHSCENE_CAP_HATCH | GSHSCENE_CAP_ANTIALIAS_NONE | GSHSCENE_CAP_ANTIALIAS_NONE_TOP_LEFT | GSHSCENE_CAP_PATTERN_OVERFLOW;
   EXPECT_EQ(d.raster_caps.flags, common | GSHSCENE_CAP_READBACK);
   EXPECT_EQ(d.stream_caps.flags, common);
   // Not a test sink, not a test sink's job.
@@ -3236,10 +3236,10 @@ TEST(DumpSink, AUnionClipIsRecordedWithItsMembersAndRefusedByCapsAsCU13Orders) {
   GSHSCENE_Dump_Sink_Config fast = config_writer_like();
   GSHSCENE_Dump_Sink_Config none = config_writer_like();
   for (GSHSCENE_Sink_Caps * c : {&fast.raster_caps, &fast.stream_caps}) {
-    c->flags &= ~GSHSCENE_CAP_CLIP_UNION_GENERAL;
+    c->flags &= ~(GSHSCENE_CAP_CLIP_UNION_GENERAL | GSHSCENE_CAP_CLIP_UNION_INNER);
   }
   for (GSHSCENE_Sink_Caps * c : {&none.raster_caps, &none.stream_caps}) {
-    c->flags &= ~(GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL);
+    c->flags &= ~(GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL | GSHSCENE_CAP_CLIP_UNION_INNER);
   }
   auto reason_of = [&](const GSHSCENE_Dump_Sink_Config & config, const GSHSCENE_List * l) {
     const std::string d = records_dump(config, s, l);

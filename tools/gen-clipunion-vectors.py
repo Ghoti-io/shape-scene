@@ -10,7 +10,7 @@
 # as published by the Free Software Foundation.
 """Write tests/clipunion_vectors.h: the known answers of the clip union's coverage (CU1, CU2, CU16; the general tier, CG1 to CG4), from tools/clip-union-oracle.py.
 
-One table, `kUnionCases`: a union of polygon members (integer 26.6 vertices, each member with its own fill rule), a pixel grid, the
+One table, `kUnionCases` (and `kClippedCases` for the unions whose members carry inner clips, story A4): a union of polygon members (integer 26.6 vertices, each member with its own fill rule), a pixel grid, the
 expected clip byte of every pixel (the exact area of the union, quantized once), and whether the members' boxes are disjoint (CU16).
 Touching and abutting halves, partial pixels, both rules, both orientations, an empty member, 48 and 48 units in a pixel, a
 member that overlaps itself beside another, and overlapping unions (for which only the general tier applies).
@@ -92,6 +92,69 @@ def random_overlapping_unions():
     return out
 
 
+def random_clipped_unions():
+    """Seeded unions of 1 to 3 members, each a convex polygon or a self-intersecting one under either rule with up to two inner clips of the
+    same kinds, in a 4 by 4 pixel grid (CI1 to CI5): the exact step meets edges of the parts of a member and of different members crossing at places
+    that are not pixel edges, with some parts holding a pixel whole and others not.  A case is kept only where every pixel's exact area is
+    at least 2^-12 below a whole unit (`margin_ok`), the distance the sink's arithmetic guarantees."""
+    import random
+    rng = random.Random(20261113)
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    def hull(pts):
+        pts = sorted(set(pts))
+        if len(pts) < 3:
+            return None
+        lo = []
+        for q in pts:
+            while len(lo) >= 2 and cross(lo[-2], lo[-1], q) <= 0:
+                lo.pop()
+            lo.append(q)
+        up = []
+        for q in reversed(pts):
+            while len(up) >= 2 and cross(up[-2], up[-1], q) <= 0:
+                up.pop()
+            up.append(q)
+        h = lo[:-1] + up[:-1]
+        return h if len(h) >= 3 else None
+
+    def region():
+        while True:
+            n = 3 + rng.randrange(3)
+            pts = [(rng.randrange(0, 4 * 64), rng.randrange(0, 4 * 64)) for _ in range(n)]
+            if rng.randrange(3) == 0:
+                poly = pts  # as given: it may cross itself, and the rule then matters
+            else:
+                poly = hull(pts)
+            if poly and abs(sum(cross(poly[0], poly[i], poly[i + 1]) for i in range(1, len(poly) - 1))) >= 64 * 64 // 4:
+                return ([poly], rng.choice(["nonzero", "nonzero", "evenodd"]))
+
+    out = []
+    attempts = 0
+    while len(out) < 80 and attempts < 4000:
+        attempts += 1
+        members = []
+        for _ in range(1 + rng.randrange(3)):
+            own = region()
+            inner = [region() for _ in range(rng.choice([0, 1, 1, 2]))]
+            members.append((own[0], own[1], inner))
+        if not any(oracle.clipped(m) for m in members):
+            continue
+        w, h = grid(members)
+        if not all(oracle.margin_ok(members, x, y) for y in range(h) for x in range(w)):
+            continue
+        out.append(("random-clipped-%03d" % len(out), members))
+    return out
+
+
+def clipped_cases():
+    out = [(n, m) for n, m, c in oracle.clipped_cases()]
+    out.extend(random_clipped_unions())
+    return out
+
+
 def grid(members):
     boxes = [oracle.box_of(m) for m in members if oracle.box_of(m)]
     w = max(1, (max(b[2] for b in boxes) + 63) // 64) if boxes else 1
@@ -118,6 +181,29 @@ def emit():
                 # saturating-sum area and not the exact area; a group of several is the floor of the exact area of its union).
                 expect.append(oracle.byte(members, x, y))
         cases_t.append((name, w, h, first_member, len(members), first_expect, 1 if oracle.union_disjoint(members) else 0))
+    inners_t, cmembers_t, ccases_t, cexpect = [], [], [], []
+    for name, members in clipped_cases():
+        w, h = grid(members)
+        first_member = len(cmembers_t)
+        for m in members:
+            contour_list, rule = m[0], m[1]
+            first_contour = len(contours)
+            for c in contour_list:
+                contours.append((len(verts), len(c)))
+                verts.extend(c)
+            first_inner = len(inners_t)
+            for icl, irule in (m[2] if len(m) > 2 else []):
+                ifirst = len(contours)
+                for c in icl:
+                    contours.append((len(verts), len(c)))
+                    verts.extend(c)
+                inners_t.append((ifirst, len(icl), 1 if irule == "evenodd" else 0))
+            cmembers_t.append((first_contour, len(contour_list), 1 if rule == "evenodd" else 0, first_inner, len(inners_t) - first_inner))
+        first_expect = len(cexpect)
+        for y in range(h):
+            for x in range(w):
+                cexpect.append(oracle.byte(members, x, y))
+        ccases_t.append((name, w, h, first_member, len(members), first_expect))
     L = []
     L.append("// Generated by tools/gen-clipunion-vectors.py from tools/clip-union-oracle.py; do not edit.\n")
     L.append("// The known answers of the clip union's coverage (clip_union.h, CU1, CU2, CU16).\n")
@@ -131,6 +217,14 @@ def emit():
     L.append("static const Member kMembers[] = {%s};\n" % ", ".join("{%d, %d, %d}" % m for m in members_t))
     L.append("static const Case kCases[] = {\n%s};\n" % "".join('    {"%s", %d, %d, %d, %d, %d, %d},\n' % c for c in cases_t))
     L.append("static const uint8_t kExpect[] = {%s};\n\n" % ", ".join(str(e) for e in expect))
+    # Unions with clipped members (clip_union.h, CI1 to CI5): the contours of kContours, each member's inner clips by kInners, never disjoint
+    L.append("struct Inner { size_t contour_first; size_t contour_count; int even_odd; };\n")
+    L.append("struct ClippedMember { size_t contour_first; size_t contour_count; int even_odd; size_t inner_first; size_t inner_count; };\n")
+    L.append("struct ClippedCase { const char * name; int width; int height; size_t member_first; size_t member_count; size_t expect_first; };\n\n")
+    L.append("static const Inner kInners[] = {%s};\n" % ", ".join("{%d, %d, %d}" % i for i in inners_t))
+    L.append("static const ClippedMember kClippedMembers[] = {%s};\n" % ", ".join("{%d, %d, %d, %d, %d}" % m for m in cmembers_t))
+    L.append("static const ClippedCase kClippedCases[] = {\n%s};\n" % "".join('    {"%s", %d, %d, %d, %d, %d},\n' % c for c in ccases_t))
+    L.append("static const uint8_t kClippedExpect[] = {%s};\n\n" % ", ".join(str(e) for e in cexpect))
     L.append("}  // namespace clipunion_vectors\n\n#endif\n")
     return "".join(L)
 

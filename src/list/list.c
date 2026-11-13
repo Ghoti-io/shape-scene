@@ -846,7 +846,9 @@ GSHSCENE_Result gshscene_list_clip_push(GSHSCENE_List * list, const GSHSCENE_Res
     /* CU10: the members carry their rules, so the item's is stored as nonzero (one spelling), and a union of exactly one member
      * is recorded as the single clip of that member under the composed map: the list never holds a one-member union. */
     item.fill_rule = GSHGEOM_FILL_NONZERO;
-    if (gshscene_resource_clip_union_count(resource) == 1) {
+    GSHSCENE_Clip_Member only;
+    if (gshscene_resource_clip_union_count(resource) == 1 && gshscene_resource_clip_union_member(resource, 0, &only) == GSHSCENE_OK &&
+        only.inner_count == 0) {
       GSHSCENE_Item single;
       result = gshscene_clip_union_member_item(&item, 0, &single);
       if (result != GSHSCENE_OK) {

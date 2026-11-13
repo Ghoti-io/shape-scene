@@ -207,7 +207,7 @@ static void caps_full(GSHSCENE_Sink_Caps * caps, int readback) {
   caps->flags |= GSHSCENE_CAP_PATTERN;
   /* Every clip union, overlapping members included, recorded by handle with its members (S24, CU23). */
   /* Every hatch, recorded by handle with its lines and pieces (S23). */
-  caps->flags |= GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL | GSHSCENE_CAP_HATCH;
+  caps->flags |= GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL | GSHSCENE_CAP_CLIP_UNION_INNER | GSHSCENE_CAP_HATCH;
   caps->cancel_unit = GSHSCENE_CANCEL_BETWEEN_UNITS;
   caps->cancel_work_bound = 1;
   caps->work_measure = "units";
@@ -820,6 +820,22 @@ static GSHSCENE_Result union_records(Run * run, const GSHSCENE_Item * item, size
         gshgeom_map_hash(&member_map), (int)member.fill_rule);
     emit_text(run, run->line, failed);
     path_records(run, member.resource, &member_map, failed);
+    GSHSCENE_Clip_Member info;
+    if (gshscene_resource_clip_union_member(item->resource, i, &info) != GSHSCENE_OK) {
+      return GSHSCENE_ERR_INTERNAL;
+    }
+    for (size_t k = 0; k < info.inner_count; k++) { /* CI1: each inner clip of the member, as its own region under the composed map */
+      GSHSCENE_Item inner;
+      GSHGEOM_Map inner_map;
+      if (gshscene_clip_union_inner_item(item, i, k, &inner) != GSHSCENE_OK || unit_map(run, &inner, count, &inner_map)) {
+        return GSHSCENE_ERR_INTERNAL;
+      }
+      snprintf(run->line, LINE_BYTES, "i %llu %llu res=%s:%016" PRIx64 " map=%016" PRIx64 " rule=%d\n", (unsigned long long)i,
+          (unsigned long long)k, gshscene_resource_kind_string(gshscene_resource_kind(inner.resource)),
+          gshscene_resource_hash(inner.resource), gshgeom_map_hash(&inner_map), (int)inner.fill_rule);
+      emit_text(run, run->line, failed);
+      path_records(run, inner.resource, &inner_map, failed);
+    }
   }
   return GSHSCENE_OK;
 }

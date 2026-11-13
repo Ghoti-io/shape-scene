@@ -85,6 +85,41 @@
  * ::GSHSCENE_LIMITS_DEFAULT_MAX_CLIP_MEMBERS, ceiling ::GSHSCENE_CLIP_MEMBERS_CEILING; a value over the ceiling is `ERR_INVALID` at
  * the creation of the store); the count counted is the one given, before duplicates are removed.
  *
+ * ### A member that is clipped (CI1 to CI6)
+ *
+ * A member may carry **inner clips**: regions its own is intersected with, `{resource, map, rule}` each, a path or a glyph run from outlines
+ * (SVG's `clip-path` on a child of a `<clipPath>`: the child is drawn where its own geometry and its clip both hold, and the clipPath is
+ * the union of its children so drawn).
+ *
+ * - **CI1 The region.**  The region of a clipped member is the intersection of the region of its own contours and the region of every
+ *   inner clip, each under its own rule and its own map, the maps placing each in the union's space as a member's own does (the inner
+ *   clip's map is not composed with the member's).  The region of the union is the union of its members' regions.  A member whose
+ *   region is empty contributes 0.
+ * - **CI2 The coverage is the same area.**  The coverage of a pixel is the exact area of the union's region, quantized once (CU2, CU3),
+ *   where a clipped member's region is the intersection above, as the region the scan converter deposits (UC2).
+ * - **CI3 The box.**  A clipped member's box is the meet of the box of its own contours and of its inner clips', in the member
+ *   box's terms (CU16): the region lies in each box, so in the meet.  An inner clip whose box cannot be formed is left out of the
+ *   meet (the member's box is then larger, which is sound); a member whose own box cannot be formed is unprovable.
+ * - **CI4 Never the fast tier.**  The fast tier sums the members' own areas, which for a clipped member is the area of its own
+ *   contours and not of its region, so a union with a clipped member is not provably disjoint: ::gshscene_clip_union_disjoint says
+ *   `0` and names the first clipped member as an unprovable one, `(i, i)`.  A group of one clipped member has the floor of the exact
+ *   area of its region (CI2), not the fold of its own winding area; a group of several has the floor of the exact area of the union.
+ * - **CI5 The capability.**  A sink that draws clipped members claims ::GSHSCENE_CAP_CLIP_UNION_INNER (which needs
+ *   ::GSHSCENE_CAP_CLIP_UNION_GENERAL); without it the planning pass refuses a union clip push with a clipped member,
+ *   `UNION_INNER`, naming the first as `i << 16 | i`, and the clip's block is skipped (S24).
+ * - **CI6 Interning.**  The inner clips are checked as members are (`ERR_INVALID`, then `ERR_UNSUPPORTED` for a 3D map or a glyph
+ *   run from a font), counted with the members against ::GSHSCENE_Limits.max_clip_members (the count of members and of inner clips
+ *   as given, `ERR_LIMIT`), and canonical: a member's inner clips are an unordered set, sorted by the member key
+ *   `(content hash of the resource, hash of the canonical map, rule)` and, on a tie, by the resource id and the map's bits, with
+ *   duplicates removed (the intersection of a region with itself is the region).  Members are then ordered by their own key
+ *   and, equal in that, by their inner clips' keys in order (the count first), and two members with the same own key and the same
+ *   inner clips are one.  A member with no inner clips hashes, dumps and is accounted exactly as before; a clipped member
+ *   hashes `u64` the resource's hash, `u64` the map's hash, `u8` the rule with its high bit set, `u64` the inner count and, for
+ *   each inner clip, `u64` the resource's hash, `u64` the map's hash, `u8` the rule; the dump gives its `m` line `inner=K` and
+ *   one line `i <member> <index> res=<kind>:<hash> map=<hash> rule=<N>` for each inner clip; accounted bytes add
+ *   ::GSHSCENE_BYTES_PER_CLIP_INNER for each.  A union of one member with inner clips stays a union item (CU10's unwrapping is for
+ *   a member that has none).
+ *
  * ### The clip push of a union (CU10, CU11)
  *
  * ::gshscene_list_clip_push takes a union resource of the list's store.  The item's `map` places the union as a whole (the
@@ -127,11 +162,21 @@
 extern "C" {
 #endif
 
+/** One inner clip of a member (CI1): a region the member's own is intersected with. */
+typedef struct GSHSCENE_Clip_Inner {
+  const GSHSCENE_Resource * resource; ///< A path, or a glyph run from outlines, of the store.
+  GSHGEOM_Map map;                    ///< Its own map in the union's space, 2D; a zero-filled map (dimension 0) is the identity.
+  GSHGEOM_Fill_Rule rule;             ///< Its own fill rule.
+} GSHSCENE_Clip_Inner;
+
 /** One member of a clip union (CU1). */
 typedef struct GSHSCENE_Clip_Member {
   const GSHSCENE_Resource * resource; ///< A path, or a glyph run from outlines, of the store.
   GSHGEOM_Map map;                    ///< The member's own map, 2D; a zero-filled map (dimension 0) is the identity.
   GSHGEOM_Fill_Rule rule;             ///< The member's own fill rule.
+  size_t inner_count;                 ///< How many inner clips (CI1); 0 for a plain member.  Zero-filled members are plain.
+  /** The inner clips, canonical order (CI6) on a read back and in any order to intern; NULL only with @p inner_count 0.  On a read back they are the resource's, valid while a handle is held. */
+  const GSHSCENE_Clip_Inner * inner;
 } GSHSCENE_Clip_Member;
 
 /** The verdict of ::gshscene_clip_union_disjoint (CU17). */
@@ -175,6 +220,15 @@ GSHSCENE_API GSHSCENE_Result gshscene_resource_clip_union_member(const GSHSCENE_
 GSHSCENE_API GSHSCENE_Result gshscene_clip_union_member_item(const GSHSCENE_Item * item, size_t index, GSHSCENE_Item * out);
 
 /**
+ * @brief The single clip item of inner clip @p inner of member @p member of a union item (CI1): as ::gshscene_clip_union_member_item makes a
+ *        member's, with the inner clip's resource, map and rule.
+ *
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID for NULL, an item that is not a union clip push, or an index past a count;
+ *         ::GSHSCENE_ERR_LIMIT when the composition leaves the map bound.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_clip_union_inner_item(const GSHSCENE_Item * item, size_t member, size_t inner, GSHSCENE_Item * out);
+
+/**
  * @brief Whether the members of the union clip push @p item are provably disjoint under the chain (CU16, CU17).
  *
  * @param instance_maps The instance maps root to leaf (may be NULL when @p instance_count is 0).
@@ -185,7 +239,7 @@ GSHSCENE_API GSHSCENE_Result gshscene_clip_union_disjoint(const GSHSCENE_Item * 
     size_t instance_count, const GSHGEOM_Map * target_map, GSHSCENE_Union_Verdict * verdict);
 
 /**
- * @brief The device box of member @p index (CU15, CU16) under the chain of the instance maps, the member item's map and the target's:
+ * @brief The device box of member @p index (CU15, CU16, CI3: the meet with its inner clips' boxes) under the chain of the instance maps, the member item's map and the target's:
  *        the same box the predicate compares, for a sink that sizes its work from it (a glyph run's box is the hull of its glyphs').
  *
  * @return ::GSHSCENE_OK (with `empty` set for a member that draws nothing); ::GSHSCENE_ERR_INVALID for NULL, an item that is

@@ -176,6 +176,7 @@ typedef enum GSHSCENE_Reason {
   GSHSCENE_REASON_UNION_OVERLAP = 42, ///< Refused, per clip push: the sink draws only disjoint unions and the members could not be shown disjoint; `second` is `i << 16 | j` of the first pair (`i << 16 | i` for an unprovable member), canonical indices (CU13).
   GSHSCENE_REASON_ANTIALIAS = 43,     ///< Approximated, per fill or stroke: the item asks for no antialiasing and the sink draws it antialiased (list.h, AA5).
   GSHSCENE_REASON_PATTERN_OVERFLOW = 44, ///< Approximated, per unit: the pattern's tile may draw past its cell and the sink clips it to the cell, or its extent is not known (pattern.h, PT15).
+  GSHSCENE_REASON_UNION_INNER = 45,   ///< Refused, per clip push: the sink does not draw a clip union whose members carry inner clips; `second` is `i << 16 | i` of the first clipped member, canonical index (clip_union.h, CI5).
   GSHSCENE_REASON_COUNT               ///< Closes the enum.
 } GSHSCENE_Reason;
 

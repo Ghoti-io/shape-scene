@@ -255,7 +255,8 @@ typedef struct GSHSCENE_Glyph_Run {
 #define GSHSCENE_BYTES_PER_DASH ((size_t)16)     ///< Added for each dash of a stroke style's canonical array (SK12).
 #define GSHSCENE_BYTES_PER_TRANSFER_PIECE ((size_t)112) ///< Added for each piece of a mask's stitching transfer (MK4).
 #define GSHSCENE_BYTES_PER_TRANSFER_SAMPLE ((size_t)8)  ///< Added for each sample of a mask's tables (MK4).
-#define GSHSCENE_BYTES_PER_CLIP_MEMBER ((size_t)128)    ///< Added for each canonical member of a clip union (CU9); at least the member record the store keeps.
+#define GSHSCENE_BYTES_PER_CLIP_MEMBER ((size_t)160)    ///< Added for each canonical member of a clip union (CU9); at least the member record the store keeps.
+#define GSHSCENE_BYTES_PER_CLIP_INNER ((size_t)128)     ///< Added for each canonical inner clip of a clip union's members (CI6); at least the inner record the store keeps.
 /** @} */
 
 /** @brief Counters of a store, for tests and diagnostics. */

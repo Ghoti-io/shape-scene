@@ -144,6 +144,8 @@ struct GSHSCENE_Resource {
     struct {
       GSHSCENE_Clip_Member * members; /* count of them, canonical order (CU8); each member's resource is retained */
       size_t count;
+      GSHSCENE_Clip_Inner * inners;   /* every member's inner clips, one after another in member order; each resource is retained (CI6) */
+      size_t inner_total;
     } clipunion;
     struct {
       GSHSCENE_Hatch h;                   /* canonical (HX1); the style, the families and their elements point at the copies below */
