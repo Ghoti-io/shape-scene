@@ -289,6 +289,9 @@ void gshscene_resource_free_content(GSHSCENE_Resource * resource);
 GSHSCENE_Result gshscene_store_intern_path_tagged(GSHSCENE_Store * store, const GSHGEOM_Path * path,
     const GSHSCENE_Primitive * prim, const GSHSCENE_Resource ** out);
 
+/** Intern the image resource @p from into @p store: the same samples and descriptor, read from the resource (image.c). */
+GSHSCENE_Result gshscene_store_copy_image(GSHSCENE_Store * store, const GSHSCENE_Resource * from, const GSHSCENE_Resource ** out);
+
 /* --- glyph.c --------------------------------------------------------------- */
 
 /**

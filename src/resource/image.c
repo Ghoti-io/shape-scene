@@ -380,38 +380,11 @@ void gshscene_image_free(GSHSCENE_Resource * resource) {
   }
 }
 
-/** IM2 to IM10 and the intern of one image: @p raster is read, and @p owned (the same raster, or NULL) is taken. */
-static GSHSCENE_Result intern_image(GSHSCENE_Store * store, const GIMG_Raster * raster, GIMG_Raster * owned,
-    const GSHSCENE_Image_Params * params, const GSHSCENE_Resource ** out) {
-  if (!store || !raster || !out) {
-    return GSHSCENE_ERR_INVALID;
-  }
-  int take = owned != NULL;
-  GSHSCENE_Image_Params none;
-  if (!params) {
-    memset(&none, 0, sizeof none);
-    params = &none;
-  }
-  if (take && gimg_raster_ownership(raster) != GIMG_RASTER_OWNED) {
-    return GSHSCENE_ERR_INVALID; /* a borrowed buffer is never kept */
-  }
-  Image_Source src;
-  memset(&src, 0, sizeof src);
-  GSHSCENE_Result result = describe(raster, params, &src);
-  if (result != GSHSCENE_OK) {
-    return result;
-  }
-  result = within_limits(store, &src.info);
-  if (result != GSHSCENE_OK) {
-    return result;
-  }
-  src.sample_bytes = bytes_of(src.info.bits);
-  src.row_bytes = (size_t)src.info.width * src.info.layout * src.sample_bytes;
-  src.stride = gimg_raster_stride_bytes(raster);
-  src.rows = (const unsigned char *)gimg_raster_pixels_const(raster);
-  if (!src.rows || src.stride < src.row_bytes) {
-    return GSHSCENE_ERR_INVALID;
-  }
+/** The rest of an intern, from a descriptor over rows of samples that is already valid: the sample check, the tile hashes, the content hash and the table. */
+static GSHSCENE_Result intern_source(GSHSCENE_Store * store, Image_Source * srcp, GIMG_Raster * owned, int take,
+    const GSHSCENE_Resource ** out) {
+  Image_Source src = *srcp;
+  GSHSCENE_Result result;
   result = check_samples(&src);
   if (result != GSHSCENE_OK) {
     return result;
@@ -452,6 +425,41 @@ static GSHSCENE_Result intern_image(GSHSCENE_Store * store, const GIMG_Raster * 
   return GSHSCENE_OK;
 }
 
+/** IM2 to IM10 and the intern of one image: @p raster is read, and @p owned (the same raster, or NULL) is taken. */
+static GSHSCENE_Result intern_image(GSHSCENE_Store * store, const GIMG_Raster * raster, GIMG_Raster * owned,
+    const GSHSCENE_Image_Params * params, const GSHSCENE_Resource ** out) {
+  if (!store || !raster || !out) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  int take = owned != NULL;
+  GSHSCENE_Image_Params none;
+  if (!params) {
+    memset(&none, 0, sizeof none);
+    params = &none;
+  }
+  if (take && gimg_raster_ownership(raster) != GIMG_RASTER_OWNED) {
+    return GSHSCENE_ERR_INVALID; /* a borrowed buffer is never kept */
+  }
+  Image_Source src;
+  memset(&src, 0, sizeof src);
+  GSHSCENE_Result result = describe(raster, params, &src);
+  if (result != GSHSCENE_OK) {
+    return result;
+  }
+  result = within_limits(store, &src.info);
+  if (result != GSHSCENE_OK) {
+    return result;
+  }
+  src.sample_bytes = bytes_of(src.info.bits);
+  src.row_bytes = (size_t)src.info.width * src.info.layout * src.sample_bytes;
+  src.stride = gimg_raster_stride_bytes(raster);
+  src.rows = (const unsigned char *)gimg_raster_pixels_const(raster);
+  if (!src.rows || src.stride < src.row_bytes) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  return intern_source(store, &src, owned, take, out);
+}
+
 GSHSCENE_Result gshscene_store_intern_image(GSHSCENE_Store * store, const GIMG_Raster * raster,
     const GSHSCENE_Image_Params * params, const GSHSCENE_Resource ** out) {
   return intern_image(store, raster, NULL, params, out);
@@ -460,6 +468,27 @@ GSHSCENE_Result gshscene_store_intern_image(GSHSCENE_Store * store, const GIMG_R
 GSHSCENE_Result gshscene_store_intern_image_take(GSHSCENE_Store * store, GIMG_Raster * raster,
     const GSHSCENE_Image_Params * params, const GSHSCENE_Resource ** out) {
   return intern_image(store, raster, raster, params, out);
+}
+
+GSHSCENE_Result gshscene_store_copy_image(GSHSCENE_Store * store, const GSHSCENE_Resource * from, const GSHSCENE_Resource ** out) {
+  if (!store || !from || !out || from->kind != GSHSCENE_RESOURCE_IMAGE) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  Image_Source src;
+  memset(&src, 0, sizeof src);
+  src.info = from->u.image.info;
+  GSHSCENE_Result result = within_limits(store, &src.info);
+  if (result != GSHSCENE_OK) {
+    return result;
+  }
+  src.sample_bytes = bytes_of(src.info.bits);
+  src.row_bytes = from->u.image.row_bytes;
+  src.stride = from->u.image.stride;
+  src.rows = from->u.image.rows;
+  if (!src.rows || src.stride < src.row_bytes) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  return intern_source(store, &src, NULL, 0, out);
 }
 
 GSHSCENE_Result gshscene_image_space_from_raster(const GIMG_Raster * raster, GSHSCENE_Color_Space * out) {

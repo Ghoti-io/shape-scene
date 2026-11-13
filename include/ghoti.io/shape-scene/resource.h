@@ -394,6 +394,31 @@ GSHSCENE_API GSHSCENE_Result gshscene_store_intern_glyph_run(GSHSCENE_Store * st
 GSHSCENE_API GSHSCENE_Result gshscene_store_intern_picture(GSHSCENE_Store * store,
     const GSHSCENE_List * list, const GSHSCENE_Resource ** out);
 
+/**
+ * @brief Copy a resource into another store (CP1 to CP5).
+ *
+ * - **CP1 The copy is the resource.**  The result is a resource of @p dst of the same kind whose content hash
+ *   (::gshscene_resource_hash) and dump (::gshscene_resource_dump) are the original's: nothing a resource holds is lost,
+ *   changed or reinterpreted, and it is interned, so a copy of content the destination already has is the handle it already has.
+ * - **CP2 What it names is copied first.**  A glyph run's face and outlines, a picture's items (every resource a fill, a stroke, a
+ *   clip, a group's soft mask or an instance names, and the one a paint names), a mask's picture, a pattern's tile, an image paint's
+ *   image, a hatch's stroke style and a clip union's members are copied into @p dst before the resource that names them, so the result holds nothing of
+ *   the source store.  A picture is recorded again, item by item, in the order it was closed in, and closed again.
+ * - **CP3 A resource of @p dst is its own copy.**  The handle is retained and returned.
+ * - **CP4 A bound face shares its binding.**  The copy of a face runs the same provider ops on the same context, which the caller
+ *   keeps alive as long as either face exists; an unbound face copies as unbound.
+ * - **CP5 The destination's limits apply.**  A copy that would pass the destination's `max_bytes`, `max_resources`, picture depth
+ *   or expansion is ::GSHSCENE_ERR_LIMIT and keeps nothing; a picture's list is recorded with the default list limits.
+ *
+ * @param dst The store to copy into.
+ * @param src A resource of any store, borrowed (it may be one of @p dst).
+ * @param out The handle, with a reference for the caller; written only on success.
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL); ::GSHSCENE_ERR_LIMIT; ::GSHSCENE_ERR_OOM; what interning the kind says
+ *   of a resource that is in the source and not valid in the destination.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_store_copy_resource(GSHSCENE_Store * dst, const GSHSCENE_Resource * src,
+    const GSHSCENE_Resource ** out);
+
 /** The most entries a palette holds: an entry is in `[0, 0xFFFE]` (paint.h), so 65,535 of them. */
 #define GSHSCENE_PALETTE_MAX_ENTRIES 65535u
 
