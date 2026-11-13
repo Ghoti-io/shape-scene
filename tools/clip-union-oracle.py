@@ -45,6 +45,15 @@ overlaps itself.  A pixel's exact area (a) is a rational; the sink computes it w
 at slabs' ends (under 2^-12 up to 2^17 meetings), so a vector is committed only where its distance below the next whole unit is 0 or at
 least 2^-12 (`margin_ok`), and the selftest asserts it.
 
+**A member with inner clips (story A4, rules CI1 to CI5).**  A member may carry a list of **inner clips**, each a list of contours and a fill rule like
+a member's own, as the third element of the member tuple: `(contours, rule, inner)`.  Its region is the intersection of its own region and every
+inner clip's, each under its own rule (CI1); the union of members is then the union of those regions, and the exact area (a) is that region's, by the same slab
+sweep: at the middle line of a slab each member's covered set is the intersection of the intervals its parts hold, and the measure is the union of the
+members' sets (CI2).  A member's box is the meet of its parts' boxes (CI3), so a clipped member is disjoint from every box its parts' meet misses.  The
+fast tier's form (b) is the sum of the members' own areas, which is not defined for a clipped member (its own area is the area of an intersection, not an
+accumulated winding area), so a union with a clipped member is never read as disjoint (CI4): a group of one clipped member has the floor of the exact area
+of its region, and a group of several the floor of the exact area of the union (CI5).
+
 `--selftest [--plant NAME]` runs the oracle's invariants over a family of cases (a must lie in c's bracket, and equal b where the
 boxes are disjoint) and `--plant` breaks the oracle on purpose; each plant must make the selftest fail:
 
@@ -60,6 +69,11 @@ boxes are disjoint) and `--plant` breaks the oracle on purpose; each plant must 
   group-by-closed-boxes  groups by the closed boxes (boxes that touch are joined)
   dense-in-group   a group of several members takes the sum of its members' own areas, saturated, where it overlaps itself
   uncut            the edges are not cut at the pixel boundaries (the polygons are the devices paths' own, not the pieces the scan converter makes)
+  inner-ignored    a member's inner clips are dropped (CI1)
+  inner-unioned    a member's region is the union of its parts, not the intersection (CI1)
+  inner-member-rule  every inner clip is read under the member's own rule (CI1)
+  box-ignores-inner  a member's box is its own contours' box, not the meet of its parts' (CI3)
+  single-fold      a group of one clipped member takes the fold of its own winding area, as a plain member does (CI5)
 """
 import sys
 from fractions import Fraction as F
@@ -110,12 +124,13 @@ _EDGES = {}
 
 
 def edges_of(member):
-    """The member's edges as the scan converter deposits them (cut_polyline); kept, because every area asks for them again."""
-    hit = _EDGES.get(id(member))
-    if hit is not None and hit[0] is member and hit[1] == PLANT:
+    """The member's edges as the scan converter deposits them (cut_polyline); kept by the contours' identity, because every area asks for them again."""
+    key = id(member[0])
+    hit = _EDGES.get(key)
+    if hit is not None and hit[0] is member[0] and hit[1] == PLANT:
         return hit[2]
     es = _edges_of(member)
-    _EDGES[id(member)] = (member, PLANT, es)
+    _EDGES[key] = (member[0], PLANT, es)
     return es
 
 
@@ -172,6 +187,19 @@ def winding_intervals(edges, x, y0, y1):
     if y1 > prev:
         out.append((prev, y1, w))
     return out
+
+
+def parts_of(member):
+    """The member's region is the intersection of its parts: its own contours under its rule, then each inner clip (CI1)."""
+    if PLANT == "inner-ignored" or len(member) < 3:
+        return [(member[0], member[1])]
+    if PLANT == "inner-member-rule":
+        return [(member[0], member[1])] + [(c, member[1]) for (c, r) in member[2]]
+    return [(member[0], member[1])] + [(c, r) for (c, r) in member[2]]
+
+
+def clipped(member):
+    return len(member) > 2 and len(member[2]) > 0
 
 
 def holds(rule, w):
@@ -235,17 +263,67 @@ def exact_area(members, px, py):
     return area
 
 
+def intersect_sets(a, b):
+    """The intersection of two lists of disjoint intervals."""
+    out = []
+    i = j = 0
+    a = sorted(a)
+    b = sorted(b)
+    while i < len(a) and j < len(b):
+        lo = max(a[i][0], b[j][0])
+        hi = min(a[i][1], b[j][1])
+        if lo < hi:
+            out.append((lo, hi))
+        if a[i][1] < b[j][1]:
+            i += 1
+        else:
+            j += 1
+    return out
+
+
+def union_measure(sets):
+    """The measure of the union of the interval lists."""
+    allv = sorted(i for p in sets for i in p)
+    total = F(0)
+    cur_a = cur_b = None
+    for a, b in allv:
+        if cur_b is None or a > cur_b:
+            if cur_b is not None:
+                total += cur_b - cur_a
+            cur_a, cur_b = a, b
+        else:
+            cur_b = max(cur_b, b)
+    if cur_b is not None:
+        total += cur_b - cur_a
+    return total
+
+
 def _exact_area(members, px, py):
-    """(a), computed."""
+    """(a), computed: at each slab's middle line a member's covered set is the intersection of its parts' sets (CI2), the measure the union of the members'."""
     px0, px1, py0, py1 = F(64 * px), F(64 * px + 64), F(64 * py), F(64 * py + 64)
-    xs = breakpoints(members, px0, px1, py0, py1)
-    rules = [m[1] if PLANT != "one-rule" else members[0][1] for m in members]
-    edge_lists = [edges_of(m) for m in members]
+    parts = [parts_of(m) for m in members]
+    flat = [pt for ps in parts for pt in ps]
+    xs = breakpoints(flat, px0, px1, py0, py1)
+    rules = [[(r if PLANT != "one-rule" else members[0][1]) for (c, r) in ps] for ps in parts]
+    edge_lists = [[edges_of(pt) for pt in ps] for ps in parts]
     area = F(0)
     for xa, xb in zip(xs, xs[1:]):
         mid = (xa + xb) / 2
-        ivs = [winding_intervals(el, mid, py0, py1) for el in edge_lists]
-        area += (xb - xa) * measure(ivs, rules)
+        sets = []
+        for els, rs in zip(edge_lists, rules):
+            cover = None
+            sub = []
+            for el, rule in zip(els, rs):
+                ivs = [(a, b) for (a, b, w) in winding_intervals(el, mid, py0, py1) if holds(rule, w)]
+                sub.append(ivs)
+            if PLANT == "inner-unioned":
+                cover = [i for ivs in sub for i in ivs]
+            else:
+                cover = sub[0]
+                for ivs in sub[1:]:
+                    cover = intersect_sets(cover, ivs)
+            sets.append(cover)
+        area += (xb - xa) * union_measure(sets)
     return area * 2
 
 
@@ -329,7 +407,7 @@ def seg_meets_box(e, bx0, by0, bx1, by1):
 
 def bracket(members, px, py, k=8):
     """(c): [inner, outer] in 1/8192 pixel."""
-    es = [e for m in members for e in edges_of(m)]
+    es = [e for m in members for pt in parts_of(m) for e in edges_of(pt)]
     inner = outer = F(0)
     cell = F(64, k)
     unit = cell * cell * 2
@@ -343,13 +421,29 @@ def bracket(members, px, py, k=8):
                     outer += unit
             else:
                 cx, cy = bx0 + cell / 2 + F(1, 4096), by0 + cell / 2 + F(1, 8192)  # off the lattice, where a vertex's x would make the winding ambiguous
-                if any(holds(m[1], point_in(m, cx, cy)) for m in members):
+                if any(all(holds(r, point_in((c, r), cx, cy)) for (c, r) in parts_of(m)) for m in members):
                     inner += unit
                     outer += unit
     return inner, outer
 
 
 def box_of(member):
+    """The box of the member's contours; for a clipped member the meet of its parts' boxes (CI3), None when a part has no points."""
+    own = _contour_box(member)
+    if own is None or not clipped(member) or PLANT in ("box-ignores-inner", "inner-ignored"):
+        return own
+    box = own
+    for (c, r) in member[2]:
+        b = _contour_box((c, r))
+        if b is None:
+            return None
+        box = (max(box[0], b[0]), max(box[1], b[1]), min(box[2], b[2]), min(box[3], b[3]))
+        if box[0] > box[2] or box[1] > box[3]:
+            return None
+    return box
+
+
+def _contour_box(member):
     pts = [p for c in member[0] for p in c]
     if not pts:
         return None
@@ -403,6 +497,8 @@ def group_units(members, g, px, py):
     """CG3: the area of one group in the pixel, in whole units."""
     if len(g) == 1:
         m = members[g[0]]
+        if clipped(m) and PLANT != "single-fold":
+            return min(F(8192), exact_area([m], px, py) // 1)  # CI5
         return fold(member_area(m, px, py), m[1])
     sub = [members[i] for i in g]
     a = exact_area(sub, px, py)
@@ -518,6 +614,143 @@ def general_cases():
     return cases
 
 
+def rect_units(rects, px, py):
+    """Closed form: the area in the pixel, in units of 1/8192, of the intersection of axis-aligned lattice rectangles `(x0, y0, x1, y1)`."""
+    x0 = max([64 * px] + [r[0] for r in rects])
+    y0 = max([64 * py] + [r[1] for r in rects])
+    x1 = min([64 * px + 64] + [r[2] for r in rects])
+    y1 = min([64 * py + 64] + [r[3] for r in rects])
+    return F(2 * max(0, x1 - x0) * max(0, y1 - y0))
+
+
+def clipped_cases():
+    """Members with inner clips (CI1 to CI5), named; the rectangle cases carry the closed form their areas are worked from."""
+    def RC(*r):
+        return [rect(*r)]  # the contours of one rectangle
+
+    cases = []
+    A, B, C = (0, 0, 100, 100), (50, 50, 150, 150), (30, 70, 200, 130)
+    cases.append(("i-overlap", [(RC(*A), "nonzero", [(RC(*B), "nonzero")])], lambda x, y: rect_units([A, B], x, y)))
+    cases.append(("i-contained", [(RC(*A), "nonzero", [(RC(-64, -64, 400, 400), "nonzero")])], lambda x, y: rect_units([A], x, y)))
+    cases.append(("i-disjoint", [(RC(*A), "nonzero", [(RC(200, 200, 300, 300), "nonzero")])], lambda x, y: F(0)))
+    cases.append(("i-touching", [(RC(*A), "nonzero", [(RC(100, 0, 200, 100), "nonzero")])], lambda x, y: F(0)))
+    cases.append(("i-two-inner", [(RC(*A), "nonzero", [(RC(*B), "nonzero"), (RC(*C), "nonzero")])], lambda x, y: rect_units([A, B, C], x, y)))
+    D, E = (150, 20, 250, 120), (180, 0, 300, 90)
+    cases.append(("i-two-members", [(RC(*A), "nonzero", [(RC(*B), "nonzero")]), (RC(*D), "nonzero", [(RC(*E), "nonzero")])],
+                  lambda x, y: rect_units([A, B], x, y) + rect_units([D, E], x, y)))
+    # an inner ring under even-odd (a hole of the same orientation) and the member nonzero: the member's rule is not the inner's
+    outer, hole = (20, 20, 180, 180), (60, 60, 140, 140)
+    ring = [rect(*outer), rect(*hole)]
+    cases.append(("i-inner-ring-evenodd", [(RC(0, 0, 192, 192), "nonzero", [(ring, "evenodd")])],
+                  lambda x, y: rect_units([outer], x, y) - rect_units([outer, hole], x, y)))
+    # the same ring with the nonzero rule has no hole: the two readings differ
+    cases.append(("i-inner-ring-nonzero", [(RC(0, 0, 192, 192), "nonzero", [(ring, "nonzero")])], lambda x, y: rect_units([outer], x, y)))
+    # a member under even-odd with a hole, clipped by a nonzero rectangle
+    L = (0, 0, 100, 192)
+    cases.append(("i-member-ring", [(ring, "evenodd", [(RC(*L), "nonzero")])],
+                  lambda x, y: rect_units([outer, L], x, y) - rect_units([hole, L], x, y)))
+    # a member alone in its group whose own winding area (the whole rectangle) is not the area of its region
+    M, N, P = (0, 0, 192, 64), (0, 0, 192, 30), (300, 0, 360, 64)
+    cases.append(("i-alone-and-plain-beside", [(RC(*M), "nonzero", [(RC(*N), "nonzero")]), (RC(*P), "nonzero")],
+                  lambda x, y: rect_units([M, N], x, y) + rect_units([P], x, y)))
+    # slanted edges: two triangles; a clipped star beside a plain rectangle; two clipped slivers that cross
+    cases.append(("i-triangles", [([[(0, 0), (192, 0), (0, 192)]], "nonzero", [([[(0, 192), (192, 192), (192, 0)]], "nonzero")])], None))
+    cases.append(("i-triangle-star", [([[(96, 0), (156, 186), (0, 70), (192, 70), (36, 186)]], "nonzero", [(RC(0, 60, 192, 120), "evenodd")]),
+                                      (RC(0, 100, 60, 192), "nonzero")], None))
+    cases.append(("i-crossing-slivers-clipped", [([[(0, 0), (192, 61), (192, 101), (0, 40)]], "nonzero", [(RC(40, 0, 150, 192), "nonzero")]),
+                                                ([[(0, 120), (192, 20), (192, 60), (0, 161)]], "nonzero", [(RC(100, 0, 192, 192), "nonzero")])], None))
+    return cases
+
+
+def selftest_clipped():
+    """CI1 to CI5: the closed forms, the brackets, the margins, the algebra of union and intersection, and the boxes."""
+    bad = []
+    import random
+    for name, members, closed in clipped_cases():
+        boxes = [box_of(m) for m in members if box_of(m)]
+        w = max(1, (max(b[2] for b in boxes) + 63) // 64) if boxes else 1
+        h = max(1, (max(b[3] for b in boxes) + 63) // 64) if boxes else 1
+        for y in range(h):
+            for x in range(w):
+                a = exact_area(members, x, y)
+                u = union_units(members, x, y)
+                if closed is not None:
+                    want = closed(x, y)
+                    if a != want:
+                        bad.append("%s pixel (%d,%d): exact area %s, closed form %s" % (name, x, y, a, want))
+                    if u != min(F(8192), want // 1):
+                        bad.append("%s pixel (%d,%d): units %s, closed form %s" % (name, x, y, u, min(F(8192), want // 1)))
+                lo, hi = bracket(members, x, y, 4)
+                if not (lo <= a <= hi):
+                    bad.append("%s pixel (%d,%d): exact area %s outside bracket [%s, %s]" % (name, x, y, a, lo, hi))
+                if not margin_ok(members, x, y):
+                    bad.append("%s pixel (%d,%d): within 2^-12 below a whole unit" % (name, x, y))
+                if u != int(u):
+                    bad.append("%s pixel (%d,%d): units %s are not whole" % (name, x, y, u))
+    names = dict((n, m) for n, m, c in clipped_cases())
+    # CI3: the boxes.  A clipped member's box is the meet of its parts'; a member whose parts' boxes do not meet has none.
+    if box_of(names["i-overlap"][0]) != (50, 50, 100, 100):
+        bad.append("i-overlap: the box is %s, not the meet (50, 50, 100, 100)" % (box_of(names["i-overlap"][0]),))
+    if box_of(names["i-disjoint"][0]) is not None:
+        bad.append("i-disjoint: a member whose parts' boxes do not meet has a box")
+    # a plain rectangle whose box meets the member's own box but not its meet: two groups, not one (CI3)
+    apart = [names["i-overlap"][0], ([rect(0, 0, 40, 40)], "nonzero")]
+    if group_of(apart) != [[0], [1]]:
+        bad.append("the member's box is not the meet: %s" % (group_of(apart),))
+    if not union_disjoint(apart):
+        bad.append("CI4's premise: the boxes of the meet and of the rectangle are disjoint")
+    # CI4: a union with a clipped member is not the fast tier's form where that differs: the clipped member alone is exact
+    one = names["i-alone-and-plain-beside"]
+    if union_units(one, 0, 0) != rect_units([(0, 0, 192, 64), (0, 0, 192, 30)], 0, 0) // 1:
+        bad.append("i-alone-and-plain-beside: a clipped member alone is not the area of its region")
+    # algebra: |A n B u A n C| + |A n B n C| = |A n B| + |A n C|, exactly, in rationals
+    A, B, C = rect(0, 0, 100, 100), rect(50, 50, 150, 150), rect(30, 70, 200, 130)
+    tri = [(10, 0), (190, 40), (60, 190)]
+    for pa, pb, pc in ((A, B, C), (tri, B, C), (A, tri, [(0, 190), (180, 150), (90, 0)]), (tri, [(0, 0), (192, 192), (192, 0)], C)):
+        for x in range(3):
+            for y in range(3):
+                ab = exact_area([([pa], "nonzero", [([pb], "nonzero")])], x, y)
+                ac = exact_area([([pa], "nonzero", [([pc], "nonzero")])], x, y)
+                abc = exact_area([([pa], "nonzero", [([pb], "nonzero"), ([pc], "nonzero")])], x, y)
+                both = exact_area([([pa], "nonzero", [([pb], "nonzero")]), ([pa], "nonzero", [([pc], "nonzero")])], x, y)
+                if both + abc != ab + ac:
+                    bad.append("inclusion-exclusion fails at pixel (%d,%d): %s + %s != %s + %s" % (x, y, both, abc, ab, ac))
+                ba = exact_area([([pb], "nonzero", [([pa], "nonzero")])], x, y)
+                if ba != ab:
+                    bad.append("intersection is not symmetric at pixel (%d,%d): %s != %s" % (x, y, ab, ba))
+                alone = exact_area([([pa], "nonzero")], x, y)
+                if ab > alone or ab > exact_area([([pb], "nonzero")], x, y):
+                    bad.append("an intersection is larger than a part at pixel (%d,%d)" % (x, y))
+    # random polygons: members with zero to two inner clips: the brackets, the margins, whole units
+    rng = random.Random(20261113)
+    made = 0
+    attempts = 0
+    while made < 16 and attempts < 300:
+        attempts += 1
+        members = []
+        for _ in range(rng.choice([1, 2, 2, 3])):
+            def poly():
+                return [(rng.randrange(0, 192), rng.randrange(0, 192)) for _ in range(rng.choice([3, 4, 5]))]
+            inner = [([poly()], rng.choice(["nonzero", "evenodd"])) for _ in range(rng.choice([0, 1, 1, 2]))]
+            members.append(([poly()], rng.choice(["nonzero", "evenodd"]), inner))
+        if not any(clipped(m) for m in members):
+            continue
+        if not all(margin_ok(members, x, y) for y in range(3) for x in range(3)):
+            continue
+        made += 1
+        for y in range(3):
+            for x in range(3):
+                a = exact_area(members, x, y)
+                lo, hi = bracket(members, x, y, 4)
+                if not (lo <= a <= hi):
+                    bad.append("random %d pixel (%d,%d): exact area %s outside bracket [%s, %s]" % (made, x, y, a, lo, hi))
+                if union_units(members, x, y) != int(union_units(members, x, y)):
+                    bad.append("random %d pixel (%d,%d): units are not whole" % (made, x, y))
+    if made < 16:
+        bad.append("only %d random clipped cases made" % made)
+    return bad
+
+
 def selftest():
     bad = []
     for ci, members in enumerate(selftest_cases()):
@@ -549,6 +782,7 @@ def selftest():
         if ci == 6 and disjoint:
             bad.append("case 6 (overlap): read as disjoint")
     bad.extend(selftest_general())
+    bad.extend(selftest_clipped())
     # the quantization example: 48 + 48 units are 96 units, three levels
     two = selftest_cases()[2]
     if byte(two, 0, 0) != 255:
