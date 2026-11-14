@@ -491,6 +491,11 @@ def union_files():
     out["u-inner-nan.bin"] = case((0, 0, 0, 0), inners=[[(1, 5, 0, 0)]])
     out["u-inner-singular.bin"] = case((0, 0, 0, 0), inners=[[(1, 3, 0, 0)]])  # an inner clip with an empty region
     out["u-inner-run.bin"] = case((6, 0, 0, 0), inners=[[(6, 0, 0, 0), (7, 0, 0, 0)]])
+    # A glyph run from a font (palette 8, CU24): a member beside a rectangle, one alone, one as an inner clip, one under a 3D map.
+    out["u-font.bin"] = case((8, 0, 0, 0), (0, 0, 0, 0))
+    out["u-font-alone.bin"] = case((8, 1, 0, 0x11))
+    out["u-font-inner.bin"] = case((0, 0, 0, 0), (2, 0, 0, 0), inners=[[(8, 0, 0, 0)], []], order=1)
+    out["u-font-3d.bin"] = case((8, 4, 0, 0), (0, 0, 0, 0))
     return out
 
 

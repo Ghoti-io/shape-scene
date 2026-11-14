@@ -522,8 +522,24 @@ commits its answers (`tests/clipunion_vectors.h`); a vector is committed only wh
 at least 2^-12 below the next one, which is the margin the sink's integer arithmetic keeps (its error is `(8 K + 2 E + 1) 2^-30` of a unit for `K` meetings, under 2^-12 up to 2^17).
 
 **Limits.** `max_clip_members` (default 256, ceiling 1024, checked at the creation of the store); the count counted is the one given,
-before duplicates are removed. A glyph run from a font is not a member (`ERR_UNSUPPORTED`; its per-glyph report entries are keyed by
-`(chain, glyph index)`), a 3D map is `ERR_UNSUPPORTED` too, and a run from outlines has the hull of its glyphs' device boxes.
+before duplicates are removed. A 3D map is `ERR_UNSUPPORTED`, and a run from outlines has the hull of its glyphs' device boxes.
+
+**A glyph run from a font in a union (CU24).** A glyph run from a font is a member, and an inner clip of a member, like a path: its region
+is the glyphs' outlines as a plain clip push of the run draws them, under the part's own rule and map. The run is spelled by its
+resource's content hash, which has the face and the glyph ids in it, so a font member and the outlines of the same glyphs are two members
+and two unions (an outlines run hashes its outlines). The entries the sink makes for a part are a run's own (the planning pass's
+run-level ones, the render's per-glyph ones) with the chain of the clip push, and the part is named by the report entry's `member`:
+0 for every entry that is not about a part of a union, else `(i + 1) << 16 | j`, `i` the member's canonical index and `j` 0 for the
+member's own region or `k + 1` for its inner clip `k` (at most 1024 members and inner clips, so the value fits 32 bits). The report
+sorts by chain, class, reason, `second` and then `member`, and hashes and dumps `member` only when it is nonzero (the class byte's high
+bit and a trailing `u64`, ` member=N` in a line), so no report without a part is spelled differently from before. A sink without
+`GLYPHS_FROM_FONT` refuses the push, `GLYPH_SOURCE`, naming the first font part; a part whose face is unbound refuses it,
+`FACE_UNBOUND`, naming that part, and the block is skipped; the run's hint status entries name their part. The store cannot box a
+font member (the glyph boxes are the provider's), so the member is unprovable, the predicate says `(i, i)`,
+`gshscene_clip_union_member_box` is `ERR_LIMIT` for it, and a sink that draws only disjoint unions refuses the push (`UNION_OVERLAP`);
+the general tier forms the box itself, as the hull of the lattice points of the flattened outlines it sweeps. A font run that is an
+inner clip leaves the member's box as it is (CI3). Nothing in the area's definition (CG2, CG3) changes: a font part is a region, and
+the group of a font member is made from its box as any member's is.
 
 **A clipped member (CI1 to CI6).** A member may carry inner clips: `{resource, map, rule}` regions its own is intersected with, which is what an SVG `clipPath`
 child with a `clip-path` of its own is (the child is drawn where its geometry and its clip both hold, and the clipPath is the union of its children so drawn). The union

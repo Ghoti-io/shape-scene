@@ -157,6 +157,26 @@ static uint32_t mask_missing(const GSHSCENE_Sink_Caps * caps, const GSHSCENE_Ite
   return need & ~caps->mask_native;
 }
 
+/** The part code (report.h, `member`) of the first part of the union @p resource that is a glyph run from a font, in the order members, each with its inner clips; 0 for none. */
+static size_t gshscene_union_first_font(const GSHSCENE_Resource * resource) {
+  const size_t n = gshscene_resource_clip_union_count(resource);
+  for (size_t i = 0; i < n; i++) {
+    GSHSCENE_Clip_Member m;
+    if (gshscene_resource_clip_union_member(resource, i, &m) != GSHSCENE_OK) {
+      return 0;
+    }
+    if (glyphs_from_font(m.resource)) {
+      return GSHSCENE_REPORT_MEMBER(i);
+    }
+    for (size_t k = 0; k < m.inner_count; k++) {
+      if (glyphs_from_font(m.inner[k].resource)) {
+        return GSHSCENE_REPORT_INNER(i, k);
+      }
+    }
+  }
+  return 0;
+}
+
 GSHSCENE_Disposition gshscene_caps_disposition_unit(const GSHSCENE_Sink_Caps * caps, const GSHSCENE_Item * item,
     const GSHGEOM_Map * instance_maps, size_t instance_count, const GSHGEOM_Map * target_map,
     const GSHSCENE_Color_Space * target_space, const GSHSCENE_Resource * palette) {
@@ -197,6 +217,18 @@ GSHSCENE_Disposition gshscene_caps_disposition_unit(const GSHSCENE_Sink_Caps * c
     d.entry_class = GSHSCENE_ENTRY_REFUSED;
     d.reason = GSHSCENE_REASON_GLYPH_SOURCE;
     return d;
+  }
+  /* CU24: a union clip push with a part that is a glyph run from a font needs the capability as a plain one does; the first such
+   * part is named by the entry's `member` (the detail is its code, report.h). */
+  if (item->kind == GSHSCENE_ITEM_CLIP_PUSH && !(caps->flags & GSHSCENE_CAP_GLYPHS_FROM_FONT) && item->resource &&
+      item->resource->kind == GSHSCENE_RESOURCE_CLIP_UNION) {
+    const size_t first = gshscene_union_first_font(item->resource);
+    if (first) {
+      d.entry_class = GSHSCENE_ENTRY_REFUSED;
+      d.reason = GSHSCENE_REASON_GLYPH_SOURCE;
+      d.detail = first;
+      return d;
+    }
   }
   /* S24, CU13: a union clip push.  A sink that does not draw unions refuses it, `CLIP_UNION`; one that draws only disjoint unions
    * refuses it when the one predicate (CU16) cannot show the members disjoint, `UNION_OVERLAP`, naming the first pair it could
@@ -836,6 +868,16 @@ GSHSCENE_Result gshscene_job_report_glyph(GSHSCENE_Job * job, GSHSCENE_Entry_Cla
   return gshscene_report_add(job->request.report, entry_class, reason, chain, chain_count, glyph, 0.0);
 }
 
+GSHSCENE_Result gshscene_job_report_part(GSHSCENE_Job * job, GSHSCENE_Entry_Class entry_class, GSHSCENE_Reason reason,
+    const size_t * chain, size_t chain_count, size_t glyph, size_t member) {
+  if (!job || !job->request.report || entry_class < GSHSCENE_ENTRY_REFUSED ||
+      entry_class >= GSHSCENE_ENTRY_CLASS_COUNT || reason < GSHSCENE_REASON_ITEM_KIND ||
+      reason >= GSHSCENE_REASON_COUNT || (!chain && chain_count) || member == 0) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  return gshscene_report_add_part(job->request.report, entry_class, reason, chain, chain_count, glyph, member, 0.0);
+}
+
 void gshscene_job_complete(GSHSCENE_Job * job, GSHSCENE_Result result, const size_t * chain, size_t chain_count,
     const char * reason) {
   if (!job || gcu_atomic_int_load(&job->state) != GSHSCENE_JOB_RUNNING) {
@@ -919,6 +961,45 @@ static int plan_route(const GSHSCENE_Job * job, const GSHSCENE_Item * item, GSHG
 }
 
 /**
+ * CU24: the entries of the parts of a union clip push that are runs from a font, the run-level ones (a face with no provider, the hint
+ * status) with the chain of the push and the part's code as `member`.  @p maps holds the enclosing levels' maps below @p count - 1.
+ * @p stop is set when a part is refused: the block is skipped.
+ */
+static GSHSCENE_Result plan_union_parts(const GSHSCENE_Job * job, const GSHSCENE_Item * item, GSHGEOM_Map * maps, size_t count,
+    const size_t * chain, size_t chain_count, int * stop) {
+  GSHSCENE_Report * report = job->request.report;
+  const size_t n = gshscene_resource_clip_union_count(item->resource);
+  *stop = 0;
+  for (size_t i = 0; i < n; i++) {
+    GSHSCENE_Clip_Member info;
+    if (gshscene_resource_clip_union_member(item->resource, i, &info) != GSHSCENE_OK) {
+      return GSHSCENE_ERR_INTERNAL;
+    }
+    for (size_t k = 0; k <= info.inner_count; k++) {
+      GSHSCENE_Item part;
+      GSHSCENE_Result r = k == 0 ? gshscene_clip_union_member_item(item, i, &part) : gshscene_clip_union_inner_item(item, i, k - 1u, &part);
+      if (r != GSHSCENE_OK) {
+        continue; /* a map past the bounds: the sink meets it as its own limit */
+      }
+      GSHSCENE_Glyph_Route route;
+      if (!plan_route(job, &part, maps, count, &route) || !route.entry_class) {
+        continue;
+      }
+      const size_t code = k == 0 ? GSHSCENE_REPORT_MEMBER(i) : GSHSCENE_REPORT_INNER(i, k - 1u);
+      r = gshscene_report_add_part(report, (GSHSCENE_Entry_Class)route.entry_class, (GSHSCENE_Reason)route.reason, chain,
+          chain_count, 0, code, 0.0);
+      if (r != GSHSCENE_OK) {
+        return r;
+      }
+      if (route.entry_class == GSHSCENE_ENTRY_REFUSED) {
+        *stop = 1;
+      }
+    }
+  }
+  return GSHSCENE_OK;
+}
+
+/**
  * Walk the list against the caps: every refusal and approximation the caps decide, the notice of each gradient fill
  * and each stroke that draws nothing (S17, S20), the entry of each run from a font's route (never a stroke's, SK7),
  * every tie.  @p refused is set to the refusals found.
@@ -969,7 +1050,9 @@ static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
     if (d.entry_class) {
       /* A stroke refused for its style names the missing features (SK11), a placeholder its source and code (PH4); every
       * other entry's second is 0. */
-      result = gshscene_report_add(report, d.entry_class, d.reason, chain, count, (size_t)d.detail, 0.0);
+      const int part = d.reason == GSHSCENE_REASON_GLYPH_SOURCE; /* its detail is a union part's code (CU24), else 0 */
+      result = gshscene_report_add_part(report, d.entry_class, d.reason, chain, count, part ? 0 : (size_t)d.detail,
+          part ? (size_t)d.detail : 0, 0.0);
       if (result != GSHSCENE_OK) {
         return result;
       }
@@ -1008,6 +1091,19 @@ static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
         return result;
       }
       if (route.entry_class == GSHSCENE_ENTRY_REFUSED) {
+        (*refused)++;
+        gshscene_skip_begin(&skip, item, count);
+        continue;
+      }
+    }
+    if (!tile_refused && item->kind == GSHSCENE_ITEM_CLIP_PUSH && item->resource &&
+        item->resource->kind == GSHSCENE_RESOURCE_CLIP_UNION) {
+      int stop = 0;
+      result = plan_union_parts(job, item, maps, outer + 1, chain, count, &stop);
+      if (result != GSHSCENE_OK) {
+        return result;
+      }
+      if (stop) {
         (*refused)++;
         gshscene_skip_begin(&skip, item, count);
         continue;

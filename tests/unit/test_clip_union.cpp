@@ -174,12 +174,15 @@ TEST(ClipUnion, ValidityIsDecidedInTheOrderTheHeaderStates) {
   // the order: a validity failure after an unsupported member still wins
   union_of(s.store, {member(a.get(), GSHGEOM_FILL_NONZERO, &three), member(nullptr)}, &r);
   EXPECT_EQ(r, GSHSCENE_ERR_INVALID);
-  // a glyph run from a font is unsupported; from outlines it is a member
+  // a glyph run from a font is a member (CU24), a member that is not the same as the outlines of its glyphs
   Ref face(intern_face(s.store));
   Ref font_run(intern_font_run(s.store, face.get(), 12.0, {{1, 0, 0, nullptr}}));
   ASSERT_NE(font_run.get(), nullptr);
-  union_of(s.store, {member(font_run.get())}, &r);
-  EXPECT_EQ(r, GSHSCENE_ERR_UNSUPPORTED);
+  Ref font_union(union_of(s.store, {member(font_run.get())}, &r));
+  EXPECT_EQ(r, GSHSCENE_OK);
+  ASSERT_NE(font_union.get(), nullptr);
+  union_of(s.store, {member(font_run.get(), GSHGEOM_FILL_NONZERO, &three)}, &r);
+  EXPECT_EQ(r, GSHSCENE_ERR_UNSUPPORTED) << "a 3D map is still unsupported for a font member";
   GSHSCENE_Glyph g{7, 1.0, 2.0, a.get()};
   GSHSCENE_Glyph_Run run;
   std::memset(&run, 0, sizeof run);

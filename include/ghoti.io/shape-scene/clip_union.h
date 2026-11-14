@@ -26,7 +26,7 @@
  *
  * ### What a union is (CU1)
  *
- * A **member** is `{resource, map, rule}`: a path or a glyph run from outlines, a 2D map and a fill rule.  The region of a member is
+ * A **member** is `{resource, map, rule}`: a path or a glyph run (from outlines or from a font), a 2D map and a fill rule.  The region of a member is
  * the set of points its rule selects from the member's closed device contours under the composed chain (the instance maps, the
  * item's map, the member's map, the target's), exactly as a single clip push's region is.  The region of a **clip union** is the
  * set-theoretic union of its members' regions (SVG 2 and CSS Masking: the clipping path of a `<clipPath>` is the union of its
@@ -59,16 +59,22 @@
  * ::gshscene_store_intern_clip_union decides in this order (`ERR_INVALID` unless stated): a NULL `members` or `out`; `count` 0 (an
  * empty region has a spelling already, a clip push of an empty path); for each member in the order given, a NULL resource or one
  * of another store, a kind other than path or glyph run, an invalid map, a rule outside the enumeration; then `ERR_UNSUPPORTED`
- * for a member map that is 3D and for a glyph run from a font (the per-glyph report entries of a run name `(chain, glyph index)`
- * and have no encoding for a member); then `ERR_LIMIT` for `count` over ::GSHSCENE_Limits.max_clip_members or the store's
+ * for a member map that is 3D; then `ERR_LIMIT` for `count` over ::GSHSCENE_Limits.max_clip_members or the store's
  * limits; then `ERR_OOM`.  A failing call leaves the store as it was and takes no reference.  A zero-filled `map` (dimension 0) is
  * the identity.
  *
- * **Text in a union is outlines.**  A member that is a glyph run from a font is `ERR_UNSUPPORTED`: a sink reports what became of each glyph of
- * a run by `(chain, glyph index)`, and a union has no spelling for "the glyph of member k" there.  A caller whose clip is text, in several faces
- * or under a rotation or decoration, makes each run's outlines with ::gshscene_glyph_run_centerline, interns that path, and uses the path as the
- * member.  Nothing is refused by that, and the union's hash is then of the outlines, not of the face and glyph ids.  A font-run member that
- * keeps the font reference needs the report's entry to name a member as well as a glyph; that is not built, and nothing here refuses it for good.
+ * **Text in a union (CU24).**  A member that is a glyph run from a font is a member like another: its region is the glyphs' outlines as a plain
+ * clip push of the same run draws them (the route and the provider are the sink's: glyph.h), under the member's rule and map.  Three things
+ * are fixed by it.  The run is spelled by its resource's content hash, which has the face and the glyph ids in it (a run from outlines hashes
+ * its outlines), so a font member and the outlines of the same glyphs are two different members and two different unions.  The entries
+ * the sink makes for the run (the run-level ones the planning pass writes, the per-glyph ones the render writes) name the part by the
+ * report entry's `member` (report.h), their chain being the clip push's.  And the member's box (CU16) cannot be formed from the store (the
+ * glyph boxes are the provider's): a font member is **unprovable**, ::gshscene_clip_union_disjoint says `0` and names it `(i, i)`, and
+ * ::gshscene_clip_union_member_box is `ERR_LIMIT` for it, so a sink that draws only disjoint unions refuses a union with a font member,
+ * `UNION_OVERLAP`, and one that draws any union forms the box itself from the device outlines it sweeps (the hull of the flattened points).
+ * A font run that is an inner clip leaves the member's box as it is (CI3).  A sink without ::GSHSCENE_CAP_GLYPHS_FROM_FONT refuses a push
+ * with a font part, `GLYPH_SOURCE`, naming the first as `member`; a part whose face is not bound is refused `FACE_UNBOUND` and named
+ * the same way.
  *
  * **Canonical form: an unordered set, one spelling (CU8).**  Two calls that name the same members in any order, with any
  * repetition, return the same handle.  The members are stored sorted ascending by `(u64 content hash of the resource, u64
@@ -87,7 +93,7 @@
  *
  * ### A member that is clipped (CI1 to CI6)
  *
- * A member may carry **inner clips**: regions its own is intersected with, `{resource, map, rule}` each, a path or a glyph run from outlines
+ * A member may carry **inner clips**: regions its own is intersected with, `{resource, map, rule}` each, a path or a glyph run
  * (SVG's `clip-path` on a child of a `<clipPath>`: the child is drawn where its own geometry and its clip both hold, and the clipPath is
  * the union of its children so drawn).
  *
@@ -107,8 +113,7 @@
  * - **CI5 The capability.**  A sink that draws clipped members claims ::GSHSCENE_CAP_CLIP_UNION_INNER (which needs
  *   ::GSHSCENE_CAP_CLIP_UNION_GENERAL); without it the planning pass refuses a union clip push with a clipped member,
  *   `UNION_INNER`, naming the first as `i << 16 | i`, and the clip's block is skipped (S24).
- * - **CI6 Interning.**  The inner clips are checked as members are (`ERR_INVALID`, then `ERR_UNSUPPORTED` for a 3D map or a glyph
- *   run from a font), counted with the members against ::GSHSCENE_Limits.max_clip_members (the count of members and of inner clips
+ * - **CI6 Interning.**  The inner clips are checked as members are (`ERR_INVALID`, then `ERR_UNSUPPORTED` for a 3D map), counted with the members against ::GSHSCENE_Limits.max_clip_members (the count of members and of inner clips
  *   as given, `ERR_LIMIT`), and canonical: a member's inner clips are an unordered set, sorted by the member key
  *   `(content hash of the resource, hash of the canonical map, rule)` and, on a tie, by the resource id and the map's bits, with
  *   duplicates removed (the intersection of a region with itself is the region).  Members are then ordered by their own key
@@ -164,14 +169,14 @@ extern "C" {
 
 /** One inner clip of a member (CI1): a region the member's own is intersected with. */
 typedef struct GSHSCENE_Clip_Inner {
-  const GSHSCENE_Resource * resource; ///< A path, or a glyph run from outlines, of the store.
+  const GSHSCENE_Resource * resource; ///< A path or a glyph run (CU24) of the store.
   GSHGEOM_Map map;                    ///< Its own map in the union's space, 2D; a zero-filled map (dimension 0) is the identity.
   GSHGEOM_Fill_Rule rule;             ///< Its own fill rule.
 } GSHSCENE_Clip_Inner;
 
 /** One member of a clip union (CU1). */
 typedef struct GSHSCENE_Clip_Member {
-  const GSHSCENE_Resource * resource; ///< A path, or a glyph run from outlines, of the store.
+  const GSHSCENE_Resource * resource; ///< A path or a glyph run (CU24) of the store.
   GSHGEOM_Map map;                    ///< The member's own map, 2D; a zero-filled map (dimension 0) is the identity.
   GSHGEOM_Fill_Rule rule;             ///< The member's own fill rule.
   size_t inner_count;                 ///< How many inner clips (CI1); 0 for a plain member.  Zero-filled members are plain.

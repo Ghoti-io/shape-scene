@@ -191,15 +191,17 @@ struct World {
       hatch = Ref(r);
     }
     gshscene_resource_release(hstyle);
-    GSHSCENE_Clip_Member members[2];
+    GSHSCENE_Clip_Member members[3];
     std::memset(members, 0, sizeof members);
+    members[2].resource = run_font.get(); /* a glyph run from a font is a member (CU24): its face is copied with it */
+    members[2].rule = GSHGEOM_FILL_NONZERO;
     members[0].resource = sq.get();
     members[0].rule = GSHGEOM_FILL_NONZERO;
     gshgeom_map_identity(2, &members[0].map);
     members[1].resource = run_outlines.get();
     members[1].rule = GSHGEOM_FILL_EVEN_ODD;
     members[1].map = translate(2, 2);
-    if (gshscene_store_intern_clip_union(s, members, 2, &r) == GSHSCENE_OK) {
+    if (gshscene_store_intern_clip_union(s, members, 3, &r) == GSHSCENE_OK) {
       clip_union = Ref(r);
     }
   }

@@ -48,6 +48,7 @@ typedef struct GSHSCENE_Report_Item {
   size_t chain;       /* offset in the pool */
   size_t chain_count;
   size_t second;
+  size_t member;      /* the union part the entry is about (report.h, `member`), 0 for none */
   double depth;
   size_t seq;         /* the order it was added in: the last key */
   const size_t * key; /* the chain, set for the sort only */
@@ -138,6 +139,10 @@ void gshscene_report_clear(GSHSCENE_Report * report);
 /** Add an entry (validated by the caller); counts past the cap. */
 GSHSCENE_Result gshscene_report_add(GSHSCENE_Report * report, GSHSCENE_Entry_Class entry_class,
     GSHSCENE_Reason reason, const size_t * chain, size_t chain_count, size_t second, double depth);
+
+/** Add an entry about one part of a clip union (report.h, `member`); @p member is 0 for none, and then this is ::gshscene_report_add. */
+GSHSCENE_Result gshscene_report_add_part(GSHSCENE_Report * report, GSHSCENE_Entry_Class entry_class,
+    GSHSCENE_Reason reason, const size_t * chain, size_t chain_count, size_t second, size_t member, double depth);
 
 /** Make room for @p bytes of scratch; NULL on failure. */
 void * gshscene_report_scratch(GSHSCENE_Report * report, size_t bytes);

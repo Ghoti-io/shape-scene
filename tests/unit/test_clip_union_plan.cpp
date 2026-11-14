@@ -353,3 +353,28 @@ int main(int argc, char ** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
+
+TEST(ClipUnionPlan, AFontMemberIsUnprovableAndHasNoBoxInTheStore) {
+  // CU24: the glyph boxes are the provider's, so the store cannot box a font run: the predicate names it (i, i) and the box is ERR_LIMIT
+  Fixture f;
+  const GSHSCENE_Resource * a = f.add(0, 0, 3.5, 4);
+  Ref face(intern_face(f.store.store));
+  Ref run(intern_font_run(f.store.store, face.get(), 12.0, {{1, 0.0, 0.0, nullptr}}));
+  ASSERT_NE(run.get(), nullptr);
+  ASSERT_TRUE(f.make({mem(a), mem(run.get())}));
+  const size_t i = canon_index(f, run.get());
+  const GSHSCENE_Union_Verdict v = verdict_of(f);
+  EXPECT_EQ(v.disjoint, 0);
+  EXPECT_EQ(v.first, i);
+  EXPECT_EQ(v.second, i);
+  GSHGEOM_Device_Box box;
+  GSHGEOM_Map identity;
+  gshgeom_map_identity(2, &identity);
+  EXPECT_EQ(gshscene_clip_union_member_box(f.item, i, nullptr, 0, &identity, &box), GSHSCENE_ERR_LIMIT);
+  EXPECT_EQ(gshscene_clip_union_member_box(f.item, canon_index(f, a), nullptr, 0, &identity, &box), GSHSCENE_OK);
+  // a sink that draws only disjoint unions refuses it, UNION_OVERLAP, naming the font member
+  GSHSCENE_Sink_Caps caps = caps_with(GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_GLYPHS_FROM_FONT);
+  GSHSCENE_Disposition d = gshscene_caps_disposition(&caps, f.item, nullptr, 0, nullptr, nullptr, nullptr);
+  EXPECT_EQ(d.reason, GSHSCENE_REASON_UNION_OVERLAP);
+  EXPECT_EQ(d.detail, ((uint64_t)i << 16) | i);
+}

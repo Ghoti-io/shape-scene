@@ -299,8 +299,10 @@ OK, ERR_REFUSED = 0, 9
 
 def report(result, units, entries, static=0, work=1, failure_chain=(), reason="", frame="%FRAME%",
            workspace="%WORKSPACE%"):
-    """entries: (class, reason, chain, second, depth), in the order report.h says."""
-    keyed = sorted(entries, key=lambda e: (list(e[2]), e[0], e[1], e[3]))
+    """entries: (class, reason, chain, second, depth[, member]), in the order report.h says; a member (a union part, nonzero) sets
+    the class byte's bit 7 and is appended after the depth."""
+    entries = [e if len(e) == 6 else tuple(e) + (0,) for e in entries]
+    keyed = sorted(entries, key=lambda e: (list(e[2]), e[0], e[1], e[3], e[5]))
     assert keyed == list(entries), "the expectation itself is out of order"
     by = [0, 0, 0, 0, 0, 0]
     for e in entries:
@@ -313,17 +315,19 @@ def report(result, units, entries, static=0, work=1, failure_chain=(), reason=""
     fc = failure_chain if result != OK else ()
     out += u32(result) + u64(len(fc)) + b"".join(u64(i) for i in fc)
     out += u64(len(entries))
-    for cls, rsn, ch, second, depth in entries:
-        out += u8(cls) + u32(rsn) + u64(len(ch)) + b"".join(u64(i) for i in ch) + u64(second) + f64(depth)
+    for cls, rsn, ch, second, depth, member in entries:
+        out += u8(cls | (0x80 if member else 0)) + u32(rsn) + u64(len(ch)) + b"".join(u64(i) for i in ch) + u64(second) + f64(depth)
+        if member:
+            out += u64(member)
     h = fnv(out)
     lines = ["gshscene.report 1 result=%d units=%d/%d/%d entries=%d counted=%d overflowed=0 static=%d frame=%s "
              "workspace=%s work=%d hash=%016x" % (result, units[0], units[1], units[2], len(entries), len(entries), static,
                                                   frame, workspace, work, h)]
     if result != OK:
         lines.append("failure result=%d chain=%s reason=%s" % (result, chain_text(fc) if fc else "-", reason))
-    for cls, rsn, ch, second, depth in entries:
-        lines.append("E class=%d reason=%d chain=%s second=%d depth=%016x" % (
-            cls, rsn, chain_text(ch) if ch else "-", second, bits(depth)))
+    for cls, rsn, ch, second, depth, member in entries:
+        lines.append("E class=%d reason=%d chain=%s second=%d depth=%016x%s" % (
+            cls, rsn, chain_text(ch) if ch else "-", second, bits(depth), " member=%d" % member if member else ""))
     return h, "\n".join(lines) + "\n"
 
 

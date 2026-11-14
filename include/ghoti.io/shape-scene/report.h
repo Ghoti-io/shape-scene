@@ -59,9 +59,19 @@
  * stroke for its style (`STROKE_STYLE`, stroke.h, SK11) has in `second` the
  * `GSHSCENE_STROKE_NATIVE_*` bits of the features the sink lacks.
  *
+ * **A union part** (`member`).  A clip union (clip_union.h) has parts, each member's own region and each of its inner clips, and a part
+ * that is a glyph run from a font has the entries a run of a plain clip push has: a run-level one (a face with no glyph path provider,
+ * `FACE_UNBOUND`; the run's `HINT_STATUS`) and one for each glyph the provider cannot give or hints in part (`GLYPH_UNAVAILABLE`,
+ * `RESOURCE_LIMIT`, `HINT_*`).  Their chain is the clip push's, so the entry names the part by `member`: 0 for every entry that is not
+ * about a part of a union (every entry before this field existed), else `(i + 1) << 16 | j` (::GSHSCENE_REPORT_MEMBER and
+ * ::GSHSCENE_REPORT_INNER), `i` the member's canonical index in the union and `j` 0 for the member's own region or `k + 1` for its inner
+ * clip `k`.  The value fits 32 bits (a union has at most 1024 members and inner clips together).  `second` is the glyph's index in the
+ * part's run, or 0 for a run-level entry, exactly as for a run that is not in a union.  Refusals decided for the union by what a
+ * part is (a sink without `GLYPHS_FROM_FONT`: `GLYPH_SOURCE`) name the first such part the same way.
+ *
  * **Order** (normative): entries are sorted by chain (element by element, a
  * prefix before its extensions, so render-level entries come first), then
- * class, then reason, then `second`; entries equal in all four keep the order
+ * class, then reason, then `second`, then `member`; entries equal in all five keep the order
  * they were added in.  The order does not depend on the sink.
  *
  * **The cap.** At most `max_report_entries` (::GSHSCENE_Limits) entries are
@@ -90,8 +100,8 @@
  * `by_class[1]` to `by_class[5]`,
  * `u64` static bytes and work max, `u32` the failure's result, `u64` its chain
  * length and `u64` each index; `u64` the entries stored, then for each entry in
- * order `u8` class, `u32` reason, `u64` chain length, `u64` each index, `u64`
- * second, `f64` depth.  Not hashed: the failure's reason text, and the frame
+ * order `u8` class (with bit 7 set when the entry has a `member`), `u32` reason, `u64` chain length, `u64` each index, `u64`
+ * second, `f64` depth, and, when the class byte's bit 7 is set, `u64` member.  Not hashed: the failure's reason text, and the frame
  * bytes and the workspace needed, which measure the host (the size of a pointer
  * is in them), not the render; the dump shows them.
  *
@@ -99,7 +109,7 @@
  *
  * `gshscene.report 1 result=N units=T/P/D entries=E counted=C overflowed=O static=N frame=N workspace=N work=N hash=<16 hex digits>`,
  * then, if the result is not 0, `failure result=N chain=<chain> reason=<text>`,
- * then one line per entry `E class=N reason=N chain=<chain> second=N depth=<16 hex digits>`;
+ * then one line per entry `E class=N reason=N chain=<chain> second=N depth=<16 hex digits>`, followed by ` member=N` when the entry has one;
  * a chain is its indices in decimal joined by `.`, or `-` when empty; numbers
  * are decimal and the depth is the 16 hexadecimal digits of its bit pattern.
  */
@@ -208,12 +218,18 @@ GSHSCENE_API const char * gshscene_entry_class_string(GSHSCENE_Entry_Class entry
 /** @brief Name a reason ("item-kind", "composite", ...), or "unknown reason". */
 GSHSCENE_API const char * gshscene_reason_string(GSHSCENE_Reason reason);
 
+/** @brief `member` of a union's member @p i (its canonical index): its own region. */
+#define GSHSCENE_REPORT_MEMBER(i) ((((size_t)(i)) + 1u) << 16)
+/** @brief `member` of inner clip @p k (its index in the member's sorted inner clips) of the union's member @p i. */
+#define GSHSCENE_REPORT_INNER(i, k) (GSHSCENE_REPORT_MEMBER(i) | (((size_t)(k)) + 1u))
+
 /** @brief One entry, as read back. */
 typedef struct GSHSCENE_Report_Entry {
   GSHSCENE_Entry_Class entry_class; ///< The class.
   GSHSCENE_Reason reason;           ///< The reason.
   const size_t * chain;             ///< The key (see the file comment); valid until the report is reset or destroyed.  NULL when empty.
   size_t chain_count;               ///< Its length; 0 for a render-level entry.
+  size_t member;                    ///< The part of a clip union the entry is about (the file comment): 0 for none, else ::GSHSCENE_REPORT_MEMBER or ::GSHSCENE_REPORT_INNER.
   size_t second;                    ///< Ambiguity: the first item of the unit painted after, in the list of the chain's last index.  A glyph's entry: its index in the run.  A stroke refused for its style: the missing features' bits (SK11).  Else 0.
   double depth;                     ///< Ambiguity: the depth the two units share.  Else 0.
 } GSHSCENE_Report_Entry;

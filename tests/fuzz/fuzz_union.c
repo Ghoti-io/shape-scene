@@ -31,7 +31,9 @@
  * handle; the canonical count is at most the count given; a union of one member is recorded as its single clip (the list equals the list
  * of that clip); the comparisons of the predicate are at most n (n - 1) / 2; and, when every member is a palette rectangle under a
  * translation or a scale of 2, the verdict equals the one an independent integer test of the boxes gives, and the planning pass refuses
- * under `CLIP_UNION` alone exactly when the verdict is overlap.
+ * under `CLIP_UNION` alone exactly when the verdict is overlap.  The palette's ninth path is a glyph run from a font (CU24): a union with
+ * one, as a member or an inner clip, is refused as `GLYPH_SOURCE` naming the first such part by its report code when the caps lack the
+ * font capability, and an ordinary unprovable member when they have it.
  *
  * After those bytes come the inner clips (CI1 to CI6): for each member a count (0 to 3) and four bytes for each (palette path, map, rule,
  * translation), so a corpus file of the older form has none.  Invariants added: an input with no member or inner clip that is bad by
@@ -50,7 +52,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-enum { OUT_INVALID, OUT_UNSUPPORTED, OUT_DISJOINT, OUT_OVERLAP, OUT_ONE, OUT_UNPROVABLE, OUT_CLIPPED, OUT_INNER_REJECTED, OUT_INNER_REFUSED, OUT_INNER_BOX, OUT_COUNT };
+enum { OUT_INVALID, OUT_UNSUPPORTED, OUT_DISJOINT, OUT_OVERLAP, OUT_ONE, OUT_UNPROVABLE, OUT_CLIPPED, OUT_INNER_REJECTED, OUT_INNER_REFUSED, OUT_INNER_BOX, OUT_FONT, OUT_COUNT };
 static unsigned long g_outcome[OUT_COUNT];
 
 int gshscene_fuzz_unreached(void) {
@@ -112,7 +114,7 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
   if (gshscene_store_create(NULL, NULL, &store) != GSHSCENE_OK) {
     return 0;
   }
-  const GSHSCENE_Resource * palette[8] = {0};
+  const GSHSCENE_Resource * palette[9] = {0};
   static const double rects[4][4] = {{0, 0, 4, 4}, {4, 0, 8, 4}, {12, 0, 16, 4}, {2, 2, 6, 6}};
   for (int k = 0; k < 4; k++) {
     const double c[8] = {rects[k][0], rects[k][1], rects[k][2], rects[k][1], rects[k][2], rects[k][3], rects[k][0], rects[k][3]};
@@ -133,6 +135,23 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
   run.glyph_count = 1;
   run.glyphs = &g;
   gshscene_store_intern_glyph_run(store, &run, &palette[6]);
+  /* a glyph run from a font whose face is bound to nothing (CU24): a valid member that has no box in the store */
+  GSHSCENE_Face_Desc face_desc;
+  memset(&face_desc, 0, sizeof face_desc);
+  face_desc.font_key = 0x99;
+  const GSHSCENE_Resource * face = NULL;
+  GSHSCENE_Glyph font_glyph = {1, 0.0, 0.0, NULL};
+  GSHSCENE_Glyph_Run font_run;
+  memset(&font_run, 0, sizeof font_run);
+  if (gshscene_store_intern_face(store, &face_desc, &face) == GSHSCENE_OK) {
+    font_run.source = GSHSCENE_GLYPHS_FROM_FONT;
+    font_run.face = face;
+    font_run.size = 12.0;
+    font_run.glyph_count = 1;
+    font_run.glyphs = &font_glyph;
+    gshscene_store_intern_glyph_run(store, &font_run, &palette[8]);
+    gshscene_resource_release(face);
+  }
 
   const unsigned n = take(&in) % 10u;
   GSHSCENE_Clip_Member members[10];
@@ -143,7 +162,7 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
   (void)kinds_and_maps_at;
   unsigned kind_of[10], map_of[10], tx_of[10], ty_of[10];
   for (unsigned i = 0; i < n; i++) {
-    const unsigned kind = take(&in) % 8u;
+    const unsigned kind = take(&in) % 9u;
     const unsigned mapsel = take(&in) % 6u;
     const unsigned rule = take(&in) % 5u;
     const unsigned trans = take(&in);
@@ -151,7 +170,7 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
     map_of[i] = mapsel;
     tx_of[i] = trans & 15u;
     ty_of[i] = trans >> 4;
-    members[i].resource = palette[kind];
+    members[i].resource = palette[kind] ? palette[kind] : palette[0];
     members[i].rule = (GSHGEOM_Fill_Rule)(rule == 4 ? 7 : (rule & 1u));
     const double tx = (double)(trans & 15u) / 4.0, ty = (double)(trans >> 4) / 4.0;
     switch (mapsel) {
@@ -192,12 +211,12 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
     inner_n[i] = take(&in) % 4u;
     inner_simple[i] = 1;
     for (unsigned k = 0; k < inner_n[i]; k++) {
-      const unsigned kind = take(&in) % 8u;
+      const unsigned kind = take(&in) % 9u;
       const unsigned mapsel = take(&in) % 6u;
       const unsigned rule = take(&in) % 5u;
       const unsigned trans = take(&in);
       const double tx = (double)(trans & 15u) / 4.0, ty = (double)(trans >> 4) / 4.0;
-      inner[i][k].resource = palette[kind];
+      inner[i][k].resource = palette[kind] ? palette[kind] : palette[0];
       inner[i][k].rule = (GSHGEOM_Fill_Rule)(rule == 4 ? 7 : (rule & 1u));
       switch (mapsel) {
         case 1: gshgeom_map_translate(2, tx, ty, 0, &inner[i][k].map); break;
@@ -271,10 +290,20 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
     }
     int clipped = 0;
     size_t first_clipped = 0;
+    size_t font_code = 0; /* the code (report.h) of the first part that is a glyph run from a font, in canonical order */
     for (size_t i = 0; i < distinct; i++) {
       GSHSCENE_Clip_Member cm;
       if (gshscene_resource_clip_union_member(u, i, &cm) != GSHSCENE_OK) {
         bad("a canonical member cannot be read");
+      }
+      GSHSCENE_Glyph_Run gr;
+      if (!font_code && gshscene_resource_glyph_run(cm.resource, &gr) == GSHSCENE_OK && gr.source == GSHSCENE_GLYPHS_FROM_FONT) {
+        font_code = GSHSCENE_REPORT_MEMBER(i);
+      }
+      for (size_t k = 0; !font_code && k < cm.inner_count; k++) {
+        if (gshscene_resource_glyph_run(cm.inner[k].resource, &gr) == GSHSCENE_OK && gr.source == GSHSCENE_GLYPHS_FROM_FONT) {
+          font_code = GSHSCENE_REPORT_INNER(i, k);
+        }
       }
       if (cm.inner_count > 0 && !clipped) {
         clipped = 1;
@@ -328,6 +357,16 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
         memset(&caps, 0, sizeof caps);
         caps.item_kinds = UINT32_C(0xffffffff);
         caps.flags = GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_CLIP_UNION;
+        if (font_code) {
+          /* CU24: without the capability a union with a font part is refused naming the first, before every union refusal; with it the
+           * font part is an ordinary unprovable one */
+          GSHSCENE_Disposition fd = gshscene_caps_disposition(&caps, item, inst_flag == 1 ? &inst : NULL, inst_flag == 1 ? 1 : 0, NULL, NULL, NULL);
+          if (fd.entry_class != GSHSCENE_ENTRY_REFUSED || fd.reason != GSHSCENE_REASON_GLYPH_SOURCE || fd.detail != font_code) {
+            bad("a union with a font part is not refused as GLYPH_SOURCE naming the first");
+          }
+          g_outcome[OUT_FONT]++;
+          caps.flags |= GSHSCENE_CAP_GLYPHS_FROM_FONT;
+        }
         GSHSCENE_Disposition d = gshscene_caps_disposition(&caps, item, inst_flag == 1 ? &inst : NULL, inst_flag == 1 ? 1 : 0, NULL, NULL, NULL);
         const int refused = d.entry_class == GSHSCENE_ENTRY_REFUSED;
         if (clipped) {
@@ -415,7 +454,7 @@ int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
     gshscene_list_destroy(list);
     gshscene_resource_release(u);
   }
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < 9; i++) {
     gshscene_resource_release(palette[i]);
   }
   gshscene_store_destroy(store);

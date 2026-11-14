@@ -316,7 +316,7 @@ static GSHSCENE_Result region_check(const GSHSCENE_Store * store, const GSHSCENE
   if (member_map(in_map, &map) != GSHSCENE_OK || (unsigned)rule >= (unsigned)GSHGEOM_FILL_RULE_COUNT) {
     return GSHSCENE_ERR_INVALID;
   }
-  if (map.dim != 2 || (resource->kind == GSHSCENE_RESOURCE_GLYPH_RUN && resource->u.glyphs.run.source == GSHSCENE_GLYPHS_FROM_FONT)) {
+  if (map.dim != 2) {
     *unsupported = 1;
   }
   return GSHSCENE_OK;

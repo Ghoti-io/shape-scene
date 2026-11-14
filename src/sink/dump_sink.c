@@ -803,11 +803,65 @@ static int union_device_box(Run * run, const GSHSCENE_Item * item, size_t count,
 
 static void path_records(Run * run, const GSHSCENE_Resource * resource, const GSHGEOM_Map * map, GSHSCENE_Result * failed);
 
-/** CU23: one `m` line for each member of a union clip, in canonical order, and the member's own `T` and `a` lines as asked. */
-static GSHSCENE_Result union_records(Run * run, const GSHSCENE_Item * item, size_t count, GSHSCENE_Result * failed) {
-  if (!(run->sink->config.records & GSHSCENE_DUMP_RECORD_CLIP_UNION)) {
+static GSHSCENE_Result glyph_records(Run * run, const GSHSCENE_Item * item, const GSHGEOM_Map * map,
+    const GSHSCENE_Glyph_Route * route, const size_t * chain, size_t count, size_t member, GSHSCENE_Result * failed);
+
+/**
+ * CU24: the glyph records and entries of a part of a union that is a glyph run from a font, as a plain clip push of the run has them,
+ * the entries naming the part by @p member.  Always made, whatever records the configuration asks for: the entries are the render's.
+ * @return 0 to go on; ::GSHSCENE_ERR_REFUSED to stop (a glyph refused under strict); an error from the report or the stream.
+ */
+static GSHSCENE_Result union_font_part(Run * run, const GSHSCENE_Item * part, const GSHGEOM_Map * part_map, const size_t * chain,
+    size_t count, size_t member, GSHSCENE_Result * failed) {
+  GSHSCENE_Glyph_Run glyphs;
+  if (gshscene_resource_glyph_run(part->resource, &glyphs) != GSHSCENE_OK || glyphs.source != GSHSCENE_GLYPHS_FROM_FONT) {
     return GSHSCENE_OK;
   }
+  GSHSCENE_Glyph_Route route;
+  memset(&route, 0, sizeof route);
+  if (gshscene_glyph_route(part->resource, part_map, run->job->target.kind, &route) != GSHSCENE_OK ||
+      route.entry_class == GSHSCENE_ENTRY_REFUSED) {
+    return GSHSCENE_OK; /* the planning pass refused the push for it and the block is skipped: the render does not get here */
+  }
+  return glyph_records(run, part, part_map, &route, chain, count, member, failed);
+}
+
+/**
+ * CU24: the reason the planning pass refused the push of the union @p item for one of its parts that is a glyph run from a font (an unbound
+ * face), or 0 when none is refused.  Decided as the plan decided it, by the part's route under its composed map.
+ */
+static GSHSCENE_Reason union_refused_part(Run * run, const GSHSCENE_Item * item, size_t count) {
+  const size_t n = gshscene_resource_clip_union_count(item->resource);
+  for (size_t i = 0; i < n; i++) {
+    GSHSCENE_Clip_Member info;
+    if (gshscene_resource_clip_union_member(item->resource, i, &info) != GSHSCENE_OK) {
+      return (GSHSCENE_Reason)0;
+    }
+    for (size_t k = 0; k <= info.inner_count; k++) {
+      GSHSCENE_Item part;
+      GSHGEOM_Map part_map;
+      GSHSCENE_Glyph_Run glyphs;
+      if ((k == 0 ? gshscene_clip_union_member_item(item, i, &part) : gshscene_clip_union_inner_item(item, i, k - 1u, &part)) !=
+              GSHSCENE_OK ||
+          gshscene_resource_glyph_run(part.resource, &glyphs) != GSHSCENE_OK || glyphs.source != GSHSCENE_GLYPHS_FROM_FONT ||
+          unit_map(run, &part, count, &part_map)) {
+        continue;
+      }
+      GSHSCENE_Glyph_Route route;
+      memset(&route, 0, sizeof route);
+      if (gshscene_glyph_route(part.resource, &part_map, run->job->target.kind, &route) == GSHSCENE_OK &&
+          route.entry_class == GSHSCENE_ENTRY_REFUSED) {
+        return (GSHSCENE_Reason)route.reason;
+      }
+    }
+  }
+  return (GSHSCENE_Reason)0;
+}
+
+/** CU23: one `m` line for each member of a union clip, in canonical order, and the member's own `T` and `a` lines as asked; CU24 the glyph records of its font parts. */
+static GSHSCENE_Result union_records(Run * run, const GSHSCENE_Item * item, const size_t * chain, size_t count,
+    GSHSCENE_Result * failed) {
+  const int text = (run->sink->config.records & GSHSCENE_DUMP_RECORD_CLIP_UNION) != 0;
   size_t n = gshscene_resource_clip_union_count(item->resource);
   for (size_t i = 0; i < n; i++) {
     GSHSCENE_Item member;
@@ -815,11 +869,17 @@ static GSHSCENE_Result union_records(Run * run, const GSHSCENE_Item * item, size
     if (gshscene_clip_union_member_item(item, i, &member) != GSHSCENE_OK || unit_map(run, &member, count, &member_map)) {
       return GSHSCENE_ERR_INTERNAL; /* the box of the same member was formed a moment ago */
     }
-    snprintf(run->line, LINE_BYTES, "m %llu res=%s:%016" PRIx64 " map=%016" PRIx64 " rule=%d\n", (unsigned long long)i,
-        gshscene_resource_kind_string(gshscene_resource_kind(member.resource)), gshscene_resource_hash(member.resource),
-        gshgeom_map_hash(&member_map), (int)member.fill_rule);
-    emit_text(run, run->line, failed);
-    path_records(run, member.resource, &member_map, failed);
+    if (text) {
+      snprintf(run->line, LINE_BYTES, "m %llu res=%s:%016" PRIx64 " map=%016" PRIx64 " rule=%d\n", (unsigned long long)i,
+          gshscene_resource_kind_string(gshscene_resource_kind(member.resource)), gshscene_resource_hash(member.resource),
+          gshgeom_map_hash(&member_map), (int)member.fill_rule);
+      emit_text(run, run->line, failed);
+      path_records(run, member.resource, &member_map, failed);
+    }
+    GSHSCENE_Result fr = union_font_part(run, &member, &member_map, chain, count, GSHSCENE_REPORT_MEMBER(i), failed);
+    if (fr != GSHSCENE_OK) {
+      return fr;
+    }
     GSHSCENE_Clip_Member info;
     if (gshscene_resource_clip_union_member(item->resource, i, &info) != GSHSCENE_OK) {
       return GSHSCENE_ERR_INTERNAL;
@@ -830,11 +890,17 @@ static GSHSCENE_Result union_records(Run * run, const GSHSCENE_Item * item, size
       if (gshscene_clip_union_inner_item(item, i, k, &inner) != GSHSCENE_OK || unit_map(run, &inner, count, &inner_map)) {
         return GSHSCENE_ERR_INTERNAL;
       }
-      snprintf(run->line, LINE_BYTES, "i %llu %llu res=%s:%016" PRIx64 " map=%016" PRIx64 " rule=%d\n", (unsigned long long)i,
-          (unsigned long long)k, gshscene_resource_kind_string(gshscene_resource_kind(inner.resource)),
-          gshscene_resource_hash(inner.resource), gshgeom_map_hash(&inner_map), (int)inner.fill_rule);
-      emit_text(run, run->line, failed);
-      path_records(run, inner.resource, &inner_map, failed);
+      if (text) {
+        snprintf(run->line, LINE_BYTES, "i %llu %llu res=%s:%016" PRIx64 " map=%016" PRIx64 " rule=%d\n", (unsigned long long)i,
+            (unsigned long long)k, gshscene_resource_kind_string(gshscene_resource_kind(inner.resource)),
+            gshscene_resource_hash(inner.resource), gshgeom_map_hash(&inner_map), (int)inner.fill_rule);
+        emit_text(run, run->line, failed);
+        path_records(run, inner.resource, &inner_map, failed);
+      }
+      fr = union_font_part(run, &inner, &inner_map, chain, count, GSHSCENE_REPORT_INNER(i, k), failed);
+      if (fr != GSHSCENE_OK) {
+        return fr;
+      }
     }
   }
   return GSHSCENE_OK;
@@ -925,7 +991,7 @@ static GSHSCENE_Result stop_here(Run * run, const size_t * chain, size_t count, 
  * strict); an error from the report or the stream.
  */
 static GSHSCENE_Result glyph_records(Run * run, const GSHSCENE_Item * item, const GSHGEOM_Map * map,
-    const GSHSCENE_Glyph_Route * route, const size_t * chain, size_t count, GSHSCENE_Result * failed) {
+    const GSHSCENE_Glyph_Route * route, const size_t * chain, size_t count, size_t member, GSHSCENE_Result * failed) {
   GSHSCENE_Glyph_Run glyphs;
   if (gshscene_resource_glyph_run(item->resource, &glyphs) != GSHSCENE_OK) {
     return GSHSCENE_ERR_INTERNAL;
@@ -979,8 +1045,10 @@ static GSHSCENE_Result glyph_records(Run * run, const GSHSCENE_Item * item, cons
     }
     emit_text(run, run->line, failed);
     if (note.entry_class) {
-      r = gshscene_job_report_glyph(run->job, (GSHSCENE_Entry_Class)note.entry_class, (GSHSCENE_Reason)note.reason,
-          chain, count, i);
+      r = member ? gshscene_job_report_part(run->job, (GSHSCENE_Entry_Class)note.entry_class, (GSHSCENE_Reason)note.reason,
+                       chain, count, i, member)
+                 : gshscene_job_report_glyph(run->job, (GSHSCENE_Entry_Class)note.entry_class, (GSHSCENE_Reason)note.reason,
+                       chain, count, i);
       if (r != GSHSCENE_OK) {
         return r;
       }
@@ -1669,6 +1737,16 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
         run->skip_reason = (GSHSCENE_Reason)route.reason;
         return failed;
       }
+      if (item->kind == GSHSCENE_ITEM_CLIP_PUSH && gshscene_resource_kind(item->resource) == GSHSCENE_RESOURCE_CLIP_UNION) {
+        const GSHSCENE_Reason refused = union_refused_part(run, item, count); /* CU24: a font part the plan refused */
+        if (refused) {
+          snprintf(run->line, LINE_BYTES, " X class=%d reason=%d\n", (int)GSHSCENE_ENTRY_REFUSED, (int)refused);
+          emit_text(run, run->line, &failed);
+          gshscene_skip_begin(&run->skip, item, count);
+          run->skip_reason = refused;
+          return failed;
+        }
+      }
       /* PL4, PL6: the plane has no box, so no extent limit applies to it and nothing is sized from it. */
       int plane = item->kind == GSHSCENE_ITEM_FILL && gshscene_resource_kind(item->resource) == GSHSCENE_RESOURCE_PLANE;
       /* HX15: a hatch fill's box is its region's, outset as a stroke's is (the caps of the trimmed lines reach outside it). */
@@ -1785,14 +1863,14 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
         }
       }
       if (item->kind == GSHSCENE_ITEM_CLIP_PUSH && gshscene_resource_kind(item->resource) == GSHSCENE_RESOURCE_CLIP_UNION) {
-        GSHSCENE_Result r = union_records(run, item, count, &failed);
+        GSHSCENE_Result r = union_records(run, item, chain, count, &failed);
         if (r != GSHSCENE_OK) {
           return r;
         }
       }
       path_records(run, item->resource, &map, &failed);
       if (routed) {
-        GSHSCENE_Result r = glyph_records(run, item, &map, &route, chain, count, &failed);
+        GSHSCENE_Result r = glyph_records(run, item, &map, &route, chain, count, 0, &failed);
         if (r != GSHSCENE_OK) {
           return r;
         }

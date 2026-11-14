@@ -244,6 +244,11 @@ static GSHSCENE_Result pool_reserve(GSHSCENE_Report * report, size_t more) {
 
 GSHSCENE_Result gshscene_report_add(GSHSCENE_Report * report, GSHSCENE_Entry_Class entry_class,
     GSHSCENE_Reason reason, const size_t * chain, size_t chain_count, size_t second, double depth) {
+  return gshscene_report_add_part(report, entry_class, reason, chain, chain_count, second, 0, depth);
+}
+
+GSHSCENE_Result gshscene_report_add_part(GSHSCENE_Report * report, GSHSCENE_Entry_Class entry_class,
+    GSHSCENE_Reason reason, const size_t * chain, size_t chain_count, size_t second, size_t member, double depth) {
   GSHSCENE_Report_Summary * s = &report->summary;
   if (report->count >= report->max_entries) {
     s->counted++;
@@ -274,6 +279,7 @@ GSHSCENE_Result gshscene_report_add(GSHSCENE_Report * report, GSHSCENE_Entry_Cla
   item->chain = report->pool_used;
   item->chain_count = chain_count;
   item->second = second;
+  item->member = member;
   item->depth = depth;
   item->seq = report->count;
   if (chain_count) {
@@ -329,6 +335,9 @@ static int item_compare(const void * pa, const void * pb) {
   if (a->second != b->second) {
     return a->second < b->second ? -1 : 1;
   }
+  if (a->member != b->member) {
+    return a->member < b->member ? -1 : 1;
+  }
   return a->seq < b->seq ? -1 : (a->seq > b->seq ? 1 : 0);
 }
 
@@ -371,6 +380,7 @@ GSHSCENE_Result gshscene_report_entry(const GSHSCENE_Report * report, size_t ind
   out->chain = item->chain_count ? report->pool + item->chain : NULL;
   out->chain_count = item->chain_count;
   out->second = item->second;
+  out->member = item->member;
   out->depth = item->depth;
   return GSHSCENE_OK;
 }
@@ -443,7 +453,9 @@ uint64_t gshscene_report_hash(const GSHSCENE_Report * report) {
   gshgeom_hash_u64(&h, (uint64_t)report->count);
   for (size_t i = 0; i < report->count; i++) {
     const GSHSCENE_Report_Item * item = &report->items[i];
-    gshgeom_hash_u8(&h, (uint8_t)item->entry_class);
+    /* an entry about a union part sets the class byte's high bit and appends its `member` after the depth, so that no entry
+     * without one is spelled differently from before */
+    gshgeom_hash_u8(&h, (uint8_t)(item->entry_class | (item->member ? 0x80u : 0u)));
     gshgeom_hash_u32(&h, item->reason);
     gshgeom_hash_u64(&h, (uint64_t)item->chain_count);
     for (size_t k = 0; k < item->chain_count; k++) {
@@ -451,6 +463,9 @@ uint64_t gshscene_report_hash(const GSHSCENE_Report * report) {
     }
     gshgeom_hash_u64(&h, (uint64_t)item->second);
     gshgeom_hash_f64(&h, item->depth);
+    if (item->member) {
+      gshgeom_hash_u64(&h, (uint64_t)item->member);
+    }
   }
   return gshgeom_hash_value(&h);
 }
@@ -487,7 +502,11 @@ GSHSCENE_Result gshscene_report_dump(const GSHSCENE_Report * report, FILE * out)
     const GSHSCENE_Report_Item * item = &report->items[i];
     fprintf(out, "E class=%u reason=%u chain=", (unsigned)item->entry_class, (unsigned)item->reason);
     chain_dump(out, report->pool + item->chain, item->chain_count);
-    fprintf(out, " second=%" PRIu64 " depth=%016" PRIx64 "\n", (uint64_t)item->second, gshgeom_f64_bits(item->depth));
+    fprintf(out, " second=%" PRIu64 " depth=%016" PRIx64, (uint64_t)item->second, gshgeom_f64_bits(item->depth));
+    if (item->member) {
+      fprintf(out, " member=%" PRIu64, (uint64_t)item->member);
+    }
+    fputc('\n', out);
   }
   return (fflush(out) == 0 && !ferror(out)) ? GSHSCENE_OK : GSHSCENE_ERR_IO;
 }

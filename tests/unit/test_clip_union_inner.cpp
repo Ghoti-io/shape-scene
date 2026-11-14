@@ -216,10 +216,11 @@ TEST(ClipUnionInner, TheChecksAreInTheOrderTheHeaderStatesForInnerClipsToo) {
   EXPECT_EQ(intern_union(s.store, {clipped(a.get(), {inner_of(a.get(), GSHGEOM_FILL_NONZERO, &m3)})}), GSHSCENE_ERR_UNSUPPORTED);
   EXPECT_EQ(intern_union(s.store, {clipped(a.get(), {inner_of(a.get(), GSHGEOM_FILL_NONZERO, &m3), inner_of(nullptr)})}), GSHSCENE_ERR_INVALID)
       << "invalid before unsupported, over every inner clip";
-  /* an inner clip that is a glyph run from a font is unsupported */
+  /* an inner clip that is a glyph run from a font is one like another (CU24) */
   Ref face(intern_face(s.store));
   Ref run(intern_font_run(s.store, face.get(), 12.0, {{1, 0.0, 0.0, nullptr}}));
-  EXPECT_EQ(intern_union(s.store, {clipped(a.get(), {inner_of(run.get())})}), GSHSCENE_ERR_UNSUPPORTED);
+  EXPECT_EQ(intern_union(s.store, {clipped(a.get(), {inner_of(run.get())})}), GSHSCENE_OK);
+  EXPECT_EQ(intern_union(s.store, {clipped(a.get(), {inner_of(run.get(), GSHGEOM_FILL_NONZERO, &m3)})}), GSHSCENE_ERR_UNSUPPORTED);
 }
 
 TEST(ClipUnionInner, MembersAndInnerClipsAreCountedTogetherAgainstTheLimit) {

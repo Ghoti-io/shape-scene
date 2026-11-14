@@ -815,6 +815,14 @@ GSHSCENE_API GSHSCENE_Result gshscene_job_report_glyph(GSHSCENE_Job * job, GSHSC
     GSHSCENE_Reason reason, const size_t * chain, size_t chain_count, size_t glyph);
 
 /**
+ * @brief Add an entry about one part of a clip union (report.h, `member`): as ::gshscene_job_report_glyph, with @p member
+ *   (::GSHSCENE_REPORT_MEMBER, ::GSHSCENE_REPORT_INNER) as the entry's `member` and @p glyph, 0 for a run-level entry, as its `second`.
+ *   A @p member of 0 is ::GSHSCENE_ERR_INVALID.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_job_report_part(GSHSCENE_Job * job, GSHSCENE_Entry_Class entry_class,
+    GSHSCENE_Reason reason, const size_t * chain, size_t chain_count, size_t glyph, size_t member);
+
+/**
  * @brief Complete the job (S3): seal the report (sort it, write the summary and @p result, the failure's @p chain and
  *   static @p reason), release the surface, call `on_complete`, mark the job done.  Called once per begun job.
  *

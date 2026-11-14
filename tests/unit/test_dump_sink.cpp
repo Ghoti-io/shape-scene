@@ -10,6 +10,8 @@
  */
 
 #include "sink_conformance.h"
+#include "../alloc_tracker.h"
+#include <ghoti.io/shape-geometry/hash.h>
 
 #include <ghoti.io/shape-scene/shape-scene.h>
 
@@ -4132,6 +4134,263 @@ TEST(DumpSink, ANullListHoldsNothingAndAPaintWhoseResourceIsOfAnotherKindIsRefus
     EXPECT_NE(gshscene_list_fill(l, path, nullptr, GSHGEOM_FILL_NONZERO, &p, 0, 0.0), GSHSCENE_OK) << (int)k;
   }
   EXPECT_EQ(gshscene_list_count(l), 0u) << "none of them was recorded";
+}
+
+// --- a glyph run from a font as a member of a clip union and as an inner clip (clip_union.h, CU24; report.h, `member`) ---------------
+
+namespace {
+
+/** A union of the given members and a list that clips a fill by it; the union is held by @p s. */
+struct FontUnion {
+  const GSHSCENE_Resource * u = nullptr;
+  const GSHSCENE_List * list = nullptr;
+};
+
+GSHSCENE_Clip_Member part(const GSHSCENE_Resource * r, const GSHSCENE_Clip_Inner * inner = nullptr, size_t inner_count = 0) {
+  GSHSCENE_Clip_Member m{};
+  m.resource = r;
+  m.rule = GSHGEOM_FILL_NONZERO;
+  m.inner = inner;
+  m.inner_count = inner_count;
+  return m;
+}
+
+GSHSCENE_Clip_Inner inner_part(const GSHSCENE_Resource * r) {
+  GSHSCENE_Clip_Inner in{};
+  in.resource = r;
+  in.rule = GSHGEOM_FILL_NONZERO;
+  return in;
+}
+
+FontUnion make_font_union(Scene & s, std::vector<GSHSCENE_Clip_Member> members) {
+  FontUnion f;
+  EXPECT_EQ(gshscene_store_intern_clip_union(s.store, members.data(), members.size(), &f.u), GSHSCENE_OK);
+  s.held.push_back(f.u);
+  GSHSCENE_Paint red = solid(1, 0, 0);
+  GSHSCENE_List * l = s.open();
+  gshscene_list_clip_push(l, f.u, nullptr, GSHGEOM_FILL_NONZERO, 0, 0.0);
+  gshscene_list_fill(l, s.sq(0, 0, 60), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0);
+  gshscene_list_clip_pop(l);
+  EXPECT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  f.list = l;
+  return f;
+}
+
+/** The canonical index of the member of @p u whose own resource is @p r. */
+size_t member_index(const GSHSCENE_Resource * u, const GSHSCENE_Resource * r) {
+  for (size_t i = 0; i < gshscene_resource_clip_union_count(u); i++) {
+    GSHSCENE_Clip_Member m{};
+    gshscene_resource_clip_union_member(u, i, &m);
+    if (m.resource == r) {
+      return i;
+    }
+  }
+  ADD_FAILURE() << "no such member";
+  return 0;
+}
+
+/** The hash of a report of a render that succeeded, restated from the spelling in report.h: the class byte's bit 7 and a trailing `u64` mark an entry's member. */
+uint64_t restated_report_hash(const GSHSCENE_Report * report) {
+  const GSHSCENE_Report_Summary sum = summary(report);
+  GSHGEOM_Hash h;
+  gshgeom_hash_init(&h);
+  gshgeom_hash_u32(&h, 1);
+  gshgeom_hash_u32(&h, 0x54525052u);
+  gshgeom_hash_u32(&h, (uint32_t)sum.result);
+  gshgeom_hash_u64(&h, sum.units_total);
+  gshgeom_hash_u64(&h, sum.units_processed);
+  gshgeom_hash_u64(&h, sum.units_done);
+  gshgeom_hash_u64(&h, sum.counted);
+  gshgeom_hash_u8(&h, (uint8_t)(sum.overflowed != 0));
+  for (int c = GSHSCENE_ENTRY_REFUSED; c < GSHSCENE_ENTRY_CLASS_COUNT; c++) {
+    gshgeom_hash_u64(&h, sum.by_class[c]);
+  }
+  gshgeom_hash_u64(&h, sum.static_bytes);
+  gshgeom_hash_u64(&h, sum.work_max);
+  gshgeom_hash_u32(&h, (uint32_t)sum.failure.result);
+  gshgeom_hash_u64(&h, sum.failure.chain_count);
+  const auto e = entries(report);
+  gshgeom_hash_u64(&h, e.size());
+  for (const auto & x : e) {
+    gshgeom_hash_u8(&h, (uint8_t)(x.entry_class | (x.member ? 0x80u : 0u)));
+    gshgeom_hash_u32(&h, (uint32_t)x.reason);
+    gshgeom_hash_u64(&h, x.chain_count);
+    for (size_t k = 0; k < x.chain_count; k++) {
+      gshgeom_hash_u64(&h, x.chain[k]);
+    }
+    gshgeom_hash_u64(&h, x.second);
+    gshgeom_hash_f64(&h, x.depth);
+    if (x.member) {
+      gshgeom_hash_u64(&h, x.member);
+    }
+  }
+  return gshgeom_hash_value(&h);
+}
+
+}  // namespace
+
+TEST(DumpSink, AFontRunIsAUnionMemberAndAnUnavailableGlyphNamesItsPart) {
+  Scene s;
+  const GSHSCENE_Resource * face = s.face();
+  const GSHSCENE_Resource * text = s.glyphs(face, {1, 9, 2}, 6.0, GSHSCENE_HINT_NONE); // glyph 9 is unavailable: index 1 of the run
+  FontUnion f = make_font_union(s, {part(text), part(s.sq(30, 30, 10))});
+  SinkRef sink(make_full(nullptr, nullptr));
+  auto stream = make_stream();
+  ReportRef report;
+  ASSERT_EQ(render_job(sink.sink, request_for(f.list, *stream, report.report)).result, GSHSCENE_OK);
+  auto e = entries(report.report);
+  const size_t i = member_index(f.u, text);
+  ASSERT_EQ(e.size(), 1u);
+  EXPECT_EQ(e[0].entry_class, GSHSCENE_ENTRY_REFUSED);
+  EXPECT_EQ(e[0].reason, GSHSCENE_REASON_GLYPH_UNAVAILABLE);
+  ASSERT_EQ(e[0].chain_count, 1u);
+  EXPECT_EQ(e[0].chain[0], 0u);
+  EXPECT_EQ(e[0].second, 1u) << "the glyph's index in the run";
+  EXPECT_EQ(e[0].member, GSHSCENE_REPORT_MEMBER(i));
+  EXPECT_NE(e[0].member, 0u);
+  // the glyph records of the part are in the dump, whatever records the configuration asks for
+  EXPECT_NE(stream->bytes.find("Y 0 "), std::string::npos) << stream->bytes;
+  EXPECT_NE(stream->bytes.find("Y 1 x reason="), std::string::npos) << stream->bytes;
+}
+
+TEST(DumpSink, AFontRunAsAnInnerClipNamesItsInnerIndex) {
+  Scene s;
+  const GSHSCENE_Resource * face = s.face();
+  const GSHSCENE_Resource * text = s.glyphs(face, {1, 9}, 6.0, GSHSCENE_HINT_NONE);
+  const GSHSCENE_Resource * base = s.sq(0, 0, 50);
+  GSHSCENE_Clip_Inner inner[1] = {inner_part(text)};
+  FontUnion f = make_font_union(s, {part(base, inner, 1), part(s.sq(30, 30, 10))});
+  SinkRef sink(make_full(nullptr, nullptr));
+  auto stream = make_stream();
+  ReportRef report;
+  ASSERT_EQ(render_job(sink.sink, request_for(f.list, *stream, report.report)).result, GSHSCENE_OK);
+  auto e = entries(report.report);
+  const size_t i = member_index(f.u, base);
+  ASSERT_EQ(e.size(), 1u);
+  EXPECT_EQ(e[0].reason, GSHSCENE_REASON_GLYPH_UNAVAILABLE);
+  EXPECT_EQ(e[0].second, 1u);
+  EXPECT_EQ(e[0].member, GSHSCENE_REPORT_INNER(i, 0));
+  EXPECT_EQ(e[0].member & 0xffffu, 1u);
+  EXPECT_EQ(e[0].member >> 16, i + 1);
+}
+
+TEST(DumpSink, ASinkWithoutGlyphsFromAFontRefusesAUnionWithAFontPartNamingIt) {
+  Scene s;
+  const GSHSCENE_Resource * text = s.glyphs(s.face(), {1, 2}, 6.0, GSHSCENE_HINT_NONE);
+  FontUnion f = make_font_union(s, {part(s.sq(30, 30, 10)), part(text)});
+  SinkRef sink(make_narrow(nullptr, nullptr));
+  auto stream = make_stream();
+  ReportRef report;
+  ASSERT_EQ(render_job(sink.sink, request_for(f.list, *stream, report.report)).result, GSHSCENE_OK);
+  auto e = entries(report.report);
+  ASSERT_EQ(e.size(), 1u);
+  EXPECT_EQ(e[0].entry_class, GSHSCENE_ENTRY_REFUSED);
+  EXPECT_EQ(e[0].reason, GSHSCENE_REASON_GLYPH_SOURCE);
+  EXPECT_EQ(e[0].second, 0u);
+  EXPECT_EQ(e[0].member, GSHSCENE_REPORT_MEMBER(member_index(f.u, text)));
+}
+
+TEST(DumpSink, AFontPartWhoseFaceIsUnboundRefusesTheUnionNamingItAndSkipsItsBlock) {
+  Scene s;
+  const GSHSCENE_Resource * text = s.glyphs(s.face(1, 0), {1}, 6.0, GSHSCENE_HINT_NONE);
+  FontUnion f = make_font_union(s, {part(text), part(s.sq(30, 30, 10))});
+  SinkRef sink(make_full(nullptr, nullptr));
+  auto stream = make_stream();
+  ReportRef report;
+  ASSERT_EQ(render_job(sink.sink, request_for(f.list, *stream, report.report)).result, GSHSCENE_OK);
+  auto e = entries(report.report);
+  ASSERT_EQ(e.size(), 1u);
+  EXPECT_EQ(e[0].entry_class, GSHSCENE_ENTRY_REFUSED);
+  EXPECT_EQ(e[0].reason, GSHSCENE_REASON_FACE_UNBOUND);
+  EXPECT_EQ(e[0].member, GSHSCENE_REPORT_MEMBER(member_index(f.u, text)));
+  EXPECT_EQ(summary(report.report).by_class[GSHSCENE_ENTRY_REFUSED], 1u);
+  EXPECT_EQ(stream->bytes.find("F res=path:"), std::string::npos) << "the fill inside the refused block is not drawn";
+}
+
+TEST(DumpSink, AStrictRenderStopsAtAFontPartsRefusedGlyph) {
+  Scene s;
+  s.provider.flags = GSHSCENE_FACE_HINTING;
+  // glyph 5: its program fails, and under FONT_STRICT that refuses the glyph
+  const GSHSCENE_Resource * text = s.glyphs(s.face(), {1, 5}, 6.0, GSHSCENE_HINT_FONT_STRICT);
+  FontUnion f = make_font_union(s, {part(text), part(s.sq(30, 30, 10))});
+  SinkRef sink(make_full(nullptr, nullptr));
+  auto raster = make_raster(); // the fast tier, whose hinting is the provider's, is the raster's
+  ReportRef report;
+  GSHSCENE_Render_Request req = request_for(f.list, *raster, report.report);
+  req.flags |= GSHSCENE_RENDER_STRICT;
+  EXPECT_EQ(render_job(sink.sink, req).result, GSHSCENE_ERR_REFUSED);
+  bool found = false;
+  for (const auto & x : entries(report.report)) {
+    if (x.member != 0 && x.entry_class == GSHSCENE_ENTRY_REFUSED && x.second == 1u) {
+      found = true;
+      EXPECT_EQ(x.member, GSHSCENE_REPORT_MEMBER(member_index(f.u, text)));
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(DumpSink, TheMemberOfAnEntryIsInTheHashTheDumpAndTheOrder) {
+  Scene s;
+  const GSHSCENE_Resource * text = s.glyphs(s.face(), {1, 9}, 6.0, GSHSCENE_HINT_NONE);
+  FontUnion f = make_font_union(s, {part(text), part(s.sq(30, 30, 10))});
+  SinkRef sink(make_full(nullptr, nullptr));
+  auto stream = make_stream();
+  ReportRef report;
+  ASSERT_EQ(render_job(sink.sink, request_for(f.list, *stream, report.report)).result, GSHSCENE_OK);
+  char * buffer = nullptr;
+  size_t size = 0;
+  FILE * out = open_memstream(&buffer, &size);
+  ASSERT_EQ(gshscene_report_dump(report.report, out), GSHSCENE_OK);
+  fclose(out);
+  std::string dump(buffer, size);
+  free(buffer);
+  const std::string want = " member=" + std::to_string(GSHSCENE_REPORT_MEMBER(member_index(f.u, text)));
+  EXPECT_NE(dump.find(want), std::string::npos) << dump;
+  EXPECT_EQ(gshscene_report_hash(report.report), restated_report_hash(report.report)) << "the spelling of report.h";
+  // an entry without a part has no member in its line, and a different member is a different hash
+  ReportRef plain;
+  Scene s2;
+  GSHSCENE_Paint red = solid(1, 0, 0);
+  GSHSCENE_List * l = s2.open();
+  gshscene_list_fill(l, s2.glyphs(s2.face(), {1, 9}, 6.0, GSHSCENE_HINT_NONE), nullptr, GSHGEOM_FILL_NONZERO, &red, 0, 0.0);
+  gshscene_list_close(l);
+  auto stream2 = make_stream();
+  ASSERT_EQ(render_job(sink.sink, request_for(l, *stream2, plain.report)).result, GSHSCENE_OK);
+  auto pe = entries(plain.report);
+  ASSERT_EQ(pe.size(), 1u);
+  EXPECT_EQ(pe[0].member, 0u);
+  EXPECT_NE(gshscene_report_hash(plain.report), gshscene_report_hash(report.report));
+  EXPECT_EQ(gshscene_report_hash(plain.report), restated_report_hash(plain.report)) << "an entry without a part is spelled as before";
+}
+
+TEST(DumpSink, AFailingAllocationInAFontUnionRenderLeavesTheSinkUsable) {
+  Scene s;
+  const GSHSCENE_Resource * text = s.glyphs(s.face(), {1, 9, 2}, 6.0, GSHSCENE_HINT_NONE);
+  FontUnion f = make_font_union(s, {part(text), part(s.sq(30, 30, 10))});
+  bool finished = false;
+  long ooms = 0;
+  for (long k = 0; k < 4000 && !finished; k++) {
+    tracker::Tracker t;
+    GSHSCENE_Allocator alloc = tracker::allocator_for(&t);
+    {
+      SinkRef sink(make_full(&alloc, nullptr));
+      ASSERT_NE(sink.sink, nullptr);
+      auto stream = make_stream();
+      ReportRef report(&alloc);
+      t.fail_from = t.calls + k;
+      const GSHSCENE_Result r = render_job(sink.sink, request_for(f.list, *stream, report.report)).result;
+      t.fail_from = -1;
+      if (r == GSHSCENE_ERR_OOM) {
+        ooms++;
+      } else {
+        ASSERT_EQ(r, GSHSCENE_OK) << "call " << k;
+        finished = true;
+      }
+    }
+    EXPECT_TRUE(t.live.empty()) << "call " << k << " leaked";
+  }
+  EXPECT_TRUE(finished);
+  EXPECT_GT(ooms, 0);
 }
 
 int main(int argc, char ** argv) {

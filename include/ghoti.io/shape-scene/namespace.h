@@ -246,6 +246,7 @@
 #define gshscene_job_poll GHOTIIO_SHAPE_SCENE(gshscene_job_poll)
 #define gshscene_job_report GHOTIIO_SHAPE_SCENE(gshscene_job_report)
 #define gshscene_job_report_glyph GHOTIIO_SHAPE_SCENE(gshscene_job_report_glyph)
+#define gshscene_job_report_part GHOTIIO_SHAPE_SCENE(gshscene_job_report_part)
 #define gshscene_job_request GHOTIIO_SHAPE_SCENE(gshscene_job_request)
 #define gshscene_job_set_frame_bytes GHOTIIO_SHAPE_SCENE(gshscene_job_set_frame_bytes)
 #define gshscene_job_set_impl_state GHOTIIO_SHAPE_SCENE(gshscene_job_set_impl_state)
