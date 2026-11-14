@@ -231,6 +231,8 @@ typedef struct GSHSCENE_Node {
   const GSHSCENE_Resource * soft_mask;
   /** Group with a soft mask: the mask's placement in the group's own space (MK6), composed by emission with the group's accumulated map as `clip_map` is.  Else the identity; a map that is not the identity without a mask is ::GSHSCENE_ERR_INVALID. */
   GSHGEOM_Map soft_mask_map;
+  /** Group: the filter's slot (D-FL1): NULL, or a filter resource of the scene's store, which the node holds.  Else NULL. */
+  const GSHSCENE_Resource * filter;
   const GSHSCENE_Resource * clip;    ///< Group: a path or glyph run clipping the group, or NULL.  Else NULL.
   GSHGEOM_Map clip_map;              ///< Group with a clip: the clip's placement in the group's own space.  Else the identity.
   GSHGEOM_Fill_Rule clip_rule;       ///< Group with a clip: its rule.  Else nonzero.

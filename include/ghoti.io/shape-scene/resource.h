@@ -176,6 +176,7 @@ typedef enum GSHSCENE_Resource_Kind {
   GSHSCENE_RESOURCE_HATCH = 13,    ///< A hatch: line families trimmed to a fill's region and stroked; reserved, not yet interned.
   GSHSCENE_RESOURCE_CLIP_UNION = 14, ///< A clip union: the union of several shapes, which a clip push and a group's clip name (clip_union.h, CU6).
   GSHSCENE_RESOURCE_WIDTH_PROFILE = 15, ///< A width profile: a stroke style's width as a function of the position along each subpath (stroke.h, SW1 to SW9).
+  GSHSCENE_RESOURCE_FILTER = 16,   ///< A filter: a region and a graph of primitives that processes a group's result (filter.h, FL1).
   GSHSCENE_RESOURCE_KIND_COUNT     ///< Closes the enum.
 } GSHSCENE_Resource_Kind;
 

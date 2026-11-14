@@ -1668,7 +1668,7 @@ TEST(DumpSink, JobsInFlightAreBounded) {
 TEST(DumpSink, TheConfigurationIsValidated) {
   GSHSCENE_Sink * sink = nullptr;
   std::vector<std::function<void(GSHSCENE_Dump_Sink_Config &)>> bad = {
-      [](GSHSCENE_Dump_Sink_Config & c) { c.raster_caps.flags |= 1u << 23; },
+      [](GSHSCENE_Dump_Sink_Config & c) { c.raster_caps.flags |= 1u << 24; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.stream_caps.cancel_unit = 0; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.stream_caps.cancel_unit = GSHSCENE_CANCEL_UNIT_COUNT; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.raster_caps.work_measure = nullptr; },
@@ -1727,6 +1727,7 @@ TEST(DumpSink, TheConfigurationIsValidated) {
     EXPECT_EQ(caps->image_extends, 0xfu) << "every edge mode";
     EXPECT_EQ(caps->image_formats, 0xffu) << "every sample type, layout and the alpha-only mark";
     EXPECT_EQ(caps->mask_native, (uint32_t)GSHSCENE_MASK_NATIVE_ALL) << "every mask feature, kept by handle (MK14)";
+    EXPECT_EQ(caps->filter_native, (uint32_t)GSHSCENE_FILTER_NATIVE_ALL) << "every filter primitive and feature, kept by handle (D-FL11)";
     for (unsigned char b : caps->_reserved) {
       EXPECT_EQ(b, 0);
     }
@@ -1734,7 +1735,8 @@ TEST(DumpSink, TheConfigurationIsValidated) {
   uint32_t common = GSHSCENE_CAP_CAN_BLOCK | GSHSCENE_CAP_CALLER_MEMORY | GSHSCENE_CAP_GLYPHS_FROM_FONT |
       GSHSCENE_CAP_CLIP_AA | GSHSCENE_CAP_BLEND_SPACES | GSHSCENE_CAP_GRADIENT_SPACES | GSHSCENE_CAP_PREPARE |
       GSHSCENE_CAP_STROKE_RUNS | GSHSCENE_CAP_IMAGE_FILTER_SPACES | GSHSCENE_CAP_GROUP_SOFT_MASK | GSHSCENE_CAP_PATTERN |
-      GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL | GSHSCENE_CAP_CLIP_UNION_INNER | GSHSCENE_CAP_HATCH | GSHSCENE_CAP_ANTIALIAS_NONE | GSHSCENE_CAP_ANTIALIAS_NONE_TOP_LEFT | GSHSCENE_CAP_PATTERN_OVERFLOW;
+      GSHSCENE_CAP_CLIP_UNION | GSHSCENE_CAP_CLIP_UNION_GENERAL | GSHSCENE_CAP_CLIP_UNION_INNER | GSHSCENE_CAP_HATCH | GSHSCENE_CAP_ANTIALIAS_NONE | GSHSCENE_CAP_ANTIALIAS_NONE_TOP_LEFT | GSHSCENE_CAP_PATTERN_OVERFLOW |
+      GSHSCENE_CAP_GROUP_FILTER;
   EXPECT_EQ(d.raster_caps.flags, common | GSHSCENE_CAP_READBACK);
   EXPECT_EQ(d.stream_caps.flags, common);
   // Not a test sink, not a test sink's job.
@@ -4391,6 +4393,110 @@ TEST(DumpSink, AFailingAllocationInAFontUnionRenderLeavesTheSinkUsable) {
   }
   EXPECT_TRUE(finished);
   EXPECT_GT(ooms, 0);
+}
+
+// FL1, D-FL11: a sink that applies filters records a filtered group with its filter's hash; one without the flag refuses the group,
+// `FILTER`; one with the flag and not every primitive refuses it naming the missing bits, `FILTER_PRIMITIVE`; one without canonical space
+// refuses a group under a rotated map, `FILTER_MAP`, and a refused group's block is skipped.
+TEST(DumpSink, AFilteredGroupIsRecordedOrRefusedByWhatTheSinkApplies) {
+  Scene s;
+  GSHSCENE_Filter_Input prev = {GSHSCENE_FILTER_INPUT_PREVIOUS, 0};
+  GSHSCENE_Filter_Primitive blur{};
+  blur.kind = GSHSCENE_FILTER_GAUSSIAN_BLUR;
+  blur.input_count = 1;
+  blur.inputs = &prev;
+  blur.sx = 2;
+  blur.sy = 2;
+  GSHSCENE_Filter_Primitive shift{};
+  shift.kind = GSHSCENE_FILTER_OFFSET;
+  shift.input_count = 1;
+  shift.inputs = &prev;
+  shift.dx = 1;
+  GSHSCENE_Filter_Primitive prims[2] = {blur, shift};
+  GSHSCENE_Filter f{};
+  f.region_mode = GSHSCENE_FILTER_REGION_AUTO;
+  f.color_space = GSHSCENE_FILTER_SPACE_LINEAR_RGB;
+  f.primitive_count = 2;
+  f.primitives = prims;
+  const GSHSCENE_Resource * filter = nullptr;
+  ASSERT_EQ(gshscene_store_intern_filter(s.store, &f, &filter), GSHSCENE_OK);
+  s.held.push_back(filter);
+  GSHSCENE_List * l = s.open();
+  GSHSCENE_Group g{};
+  g.opacity = 1.0;
+  g.filter = filter;
+  ASSERT_EQ(gshscene_list_group_push(l, &g, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_fill(l, s.sq(2, 2, 8), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0.0), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);
+  ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK);
+  const uint32_t both = (1u << GSHSCENE_FILTER_GAUSSIAN_BLUR) | (1u << GSHSCENE_FILTER_OFFSET) | GSHSCENE_FILTER_NATIVE_REGION_AUTO;
+  struct Want {
+    const char * name;
+    bool rotated;
+    GSHSCENE_Reason reason;  // 0: drawn
+    size_t second;
+  };
+  const Want wants[] = {
+      {"every primitive and feature", true, (GSHSCENE_Reason)0, 0},
+      {"no flag", false, GSHSCENE_REASON_FILTER, 0},
+      {"no primitive", false, GSHSCENE_REASON_FILTER_PRIMITIVE, both},
+      {"no offset and no auto region", false, GSHSCENE_REASON_FILTER_PRIMITIVE,
+          (size_t)((1u << GSHSCENE_FILTER_OFFSET) | GSHSCENE_FILTER_NATIVE_REGION_AUTO)},
+      {"no canonical space, axis aligned", false, (GSHSCENE_Reason)0, 0},
+      {"no canonical space, rotated", true, GSHSCENE_REASON_FILTER_MAP, 0},
+  };
+  for (size_t k = 0; k < sizeof wants / sizeof wants[0]; k++) {
+    const Want & w = wants[k];
+    GSHSCENE_Dump_Sink_Config c = config_default();
+    for (GSHSCENE_Sink_Caps * caps : {&c.raster_caps, &c.stream_caps}) {
+      switch (k) {
+        case 1:
+          caps->flags &= ~GSHSCENE_CAP_GROUP_FILTER;
+          break;
+        case 2:
+          caps->filter_native = 0;
+          break;
+        case 3:
+          caps->filter_native = (1u << GSHSCENE_FILTER_GAUSSIAN_BLUR);
+          break;
+        case 4:
+        case 5:
+          caps->filter_native &= ~GSHSCENE_FILTER_NATIVE_CANONICAL_SPACE;
+          break;
+        default:
+          break;
+      }
+    }
+    SinkRef sink(make_with(c, nullptr, nullptr));
+    auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+    if (k >= 4) {
+      GSHGEOM_Map turn;
+      ASSERT_EQ(gshgeom_map_rotate(GSHGEOM_ANGLE_DEGREES, 30.0, &turn), GSHGEOM_OK);
+      if (w.rotated) {
+        stream->target.map = turn;
+      }
+    }
+    ReportRef report;
+    Rendered r = render_job(sink.sink, request_for(l, *stream, report.report));
+    ASSERT_EQ(r.result, GSHSCENE_OK) << w.name;
+    auto got = sinkconf::entries(report.report);
+    char want_hash[40];
+    std::snprintf(want_hash, sizeof want_hash, " filter=%016llx", (unsigned long long)gshscene_resource_hash(filter));
+    const bool recorded = stream->bytes.find(want_hash) != std::string::npos;
+    if (w.reason == 0) {
+      EXPECT_TRUE(got.empty()) << w.name;
+      EXPECT_TRUE(recorded) << w.name << ": the group's record names the filter\n" << stream->bytes;
+    } else {
+      ASSERT_EQ(got.size(), 1u) << w.name;
+      EXPECT_EQ(got[0].reason, w.reason) << w.name;
+      EXPECT_EQ(got[0].second, w.second) << w.name;
+      EXPECT_EQ(got[0].chain_count, 1u) << w.name;
+      EXPECT_FALSE(recorded) << w.name << ": a refused group's block is skipped";
+    }
+  }
+  EXPECT_STREQ(gshscene_reason_string(GSHSCENE_REASON_FILTER), "filter");
+  EXPECT_STREQ(gshscene_reason_string(GSHSCENE_REASON_FILTER_PRIMITIVE), "filter-primitive");
+  EXPECT_STREQ(gshscene_reason_string(GSHSCENE_REASON_FILTER_MAP), "filter-map");
 }
 
 int main(int argc, char ** argv) {

@@ -1487,6 +1487,69 @@ names it, as a writer emits an `SMask` once; its raster-like configuration claim
 toolpath-like one claims neither, so a mask is refused `SOFT_MASK`. `tests/sink_conformance.h` runs the cases for these
 against every sink.
 
+## Filters (normative; FL1 to FL24)
+
+A **filter** processes a group's result at its pop: a region and a directed acyclic graph of primitives (Filter Effects Module Level 1: offset,
+flood, merge, blend, composite, color matrix, component transfer, Gaussian blur, drop shadow, morphology, convolve matrix, tile, image,
+displacement map, turbulence, diffuse and specular lighting). SVG's `filter`, CSS's `filter` and `backdrop-filter`, `box-shadow` and
+`text-shadow` are all lowered onto it by a front end. This section is the contract between the waist and a sink; `filter.h` is the resource.
+
+**D-FL1 The resource and the slot.** A filter is a resource (kind 16) interned by content, and a group names it in its `filter` slot, as it
+names a soft mask. The retained scene's group node carries the slot, emission passes it to the list's group push, and a copy into another
+store copies it (and the images its `IMAGE` primitives name). A filtered group is isolated and not knockout (FL9: the standard defines neither
+together), `ERR_INVALID` otherwise; a filter of another store, or a resource of another kind, is `ERR_INVALID`. A group without a filter is
+hashed and dumped exactly as before: a group with one sets the high bit of its composite byte and bit 2 of its flags byte, and writes the
+filter's content hash after the mask's and its placement, `u64`; the dump line gains ` filter=<hash>`.
+
+**D-FL2 User space.** Every length of the resource (region, subregions, deviations, offsets, radii, light positions) is in the space of the
+group's items; a front end resolves `objectBoundingBox` units into it before it interns the filter. No map is carried: the group's composed
+map (the enclosing instances' maps, then the target's) is the filter's map to the device.
+
+**D-FL3 Region.** `EXPLICIT` (four finite numbers, `width, height >= 0`; a zero side is an empty region and the group draws nothing) or
+`AUTO`, which is what CSS filter functions mean: the sink derives the region from the group's content and each primitive's reach (FL5).
+
+**D-FL4 The graph.** Primitives are in one array. Primitive `i` takes inputs `PREVIOUS` (the default: primitive `i - 1`, or the source graphic for
+the first), `SOURCE_GRAPHIC`, `SOURCE_ALPHA` or `RESULT(j)` for `j < i`, so the graph is acyclic by construction and the last primitive is the
+result. `BackgroundImage`, `BackgroundAlpha`, `FillPaint` and `StrokePaint` are not inputs (Filter Effects 1 removed them): a front end lowers
+each to an empty `FLOOD`, transparent black.
+
+**D-FL6 Arithmetic and color.** A primitive is defined in real arithmetic on premultiplied RGBA of the layer, rounded to `double`, as every
+layer of a sink is (S11); the browsers' 8-bit intermediates are not the definition. A primitive works in its own color space
+(`color-interpolation-filters`, `linearRGB` by default, `sRGB`), its inputs converted by N3 and its result converted back at the end.
+
+**D-FL8 Resolution.** The filter works on the **device grid**: a user length `l` along an axis becomes `l s` pixels, `s` the column norm of the
+composed map's linear part, for a map that is axis aligned (a scale, a mirror, a turn by a multiple of 90 degrees, composed). A map with
+another rotation or a shear needs the sink's `CANONICAL_SPACE` feature: the group is drawn in the space with the rotation taken out, filtered
+there, and drawn back through the rotation with bilinear sampling. `gshscene_filter_axis_aligned` is the test the planning pass uses.
+
+**D-FL9 Blur.** Standard deviation `s` per axis. For `s >= 2` three box blurs of width `d = floor(s 3 sqrt(2 pi) / 4 + 1/2)` (odd `d` centered;
+even `d` as two boxes of width `d` offset by half a pixel and one of width `d + 1` centered); for `s < 2` a truncated Gaussian of radius
+`ceil(3 s)` with weights `exp(-x^2 / (2 s^2))` normalized to sum 1. `s = 0` on one axis blurs the other only. The edge is transparent black
+(`NONE`); `DUPLICATE` and `WRAP` are the feature `EDGE_DUPLICATE_WRAP`.
+
+**D-FL10 Limits** are asserted by their bound and are `ERR_LIMIT` after every `ERR_INVALID`: 256 primitives, 1024 convolution kernel entries,
+4096 table, matrix and kernel values over the filter, 256 merge inputs, 16 octaves, magnitudes to 65536.
+
+**D-FL11 Capabilities and refusals.** `GSHSCENE_CAP_GROUP_FILTER` (bit 23) is the flag; `filter_native` in the caps names what the sink draws: bit
+`kind` for each primitive (1 to 17), `REGION_AUTO`, `CANONICAL_SPACE`, `EDGE_DUPLICATE_WRAP`. The planning pass refuses a filtered group, after the
+soft mask's refusals, with `FILTER` (46) when the flag is missing, `FILTER_PRIMITIVE` (47, the missing bits in `second`) when a primitive or a
+feature is, and `FILTER_MAP` (48) when the group's composed map is not axis aligned and `CANONICAL_SPACE` is missing. A refused group's block is
+skipped (S24) and is never drawn as an unfiltered group. The test sink claims all of it and records the group's filter by handle.
+
+**D-FL12 Hash and dump.** The content is one canonical byte string (`filter.h`, "Hash, dump") of the fields each kind uses, `-0` spelled `+0`; the hash is FNV-1a
+over `u32` 1, `u32` 16, `u64` its length and its bytes, and equality compares the strings and an image's handle. A test restates the hash from
+the text of the header.
+
+**What each primitive computes** (FL10 to FL19, with the standard's definitions): `OFFSET` shifts by the deviation rounded to whole device pixels
+(`floor(v + 1/2)`); `FLOOD` is the premultiplied color times its opacity over the subregion; `MERGE` is source-over in order; `BLEND` and
+`COMPOSITE` use the group blend functions and Porter-Duff operators of the waist, and `ARITHMETIC` is `k1 i1 i2 + k2 i1 + k3 i2 + k4` on
+premultiplied components clamped to `[0, 1]`, the color clamped to alpha; `COLOR_MATRIX` and `COMPONENT_TRANSFER` act on un-premultiplied color
+and clamp; `DROP_SHADOW` is the offset blur of the alpha, colored, under the source; `TURBULENCE` is the standard's reference implementation in user
+space at the pixel center mapped back; `DIFFUSE_LIGHTING` and `SPECULAR_LIGHTING` are the standard's Sobel normals and light vectors. A primitive's
+result is clipped to its subregion (default: the union of its inputs' subregions, else the filter region). A filter's result is clipped to its region
+and composited as the group's result: the opacity, the soft mask and the clips apply to the filtered result, through the group's composite (FL20).
+A filtered group is picked by its content, never by its filtered result (FL24).
+
 ## Gradients (normative; color-paint story P1)
 
 In real arithmetic, as N1 to N14. Each rule is in `paint.h` too; tests, plants, the oracle and the vectors cite them.

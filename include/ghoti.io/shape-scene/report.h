@@ -187,6 +187,9 @@ typedef enum GSHSCENE_Reason {
   GSHSCENE_REASON_ANTIALIAS = 43,     ///< Approximated, per fill or stroke: the item asks for no antialiasing and the sink draws it antialiased (list.h, AA5).
   GSHSCENE_REASON_PATTERN_OVERFLOW = 44, ///< Approximated, per unit: the pattern's tile may draw past its cell and the sink clips it to the cell, or its extent is not known (pattern.h, PT15).
   GSHSCENE_REASON_UNION_INNER = 45,   ///< Refused, per clip push: the sink does not draw a clip union whose members carry inner clips; `second` is `i << 16 | i` of the first clipped member, canonical index (clip_union.h, CI5).
+  GSHSCENE_REASON_FILTER = 46,        ///< Refused, per group: the sink does not apply a group's filter (filter.h, FL1, D-FL11).
+  GSHSCENE_REASON_FILTER_PRIMITIVE = 47, ///< Refused, per group: the filter needs a primitive or a feature the sink's `filter_native` lacks; `second` names the missing `GSHSCENE_FILTER_NATIVE_*` bits (D-FL11).
+  GSHSCENE_REASON_FILTER_MAP = 48,    ///< Refused, per group: the group's composed map has a rotation or a shear and the sink does not filter in canonical space (D-FL8).
   GSHSCENE_REASON_COUNT               ///< Closes the enum.
 } GSHSCENE_Reason;
 

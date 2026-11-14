@@ -149,6 +149,12 @@ const char * gshscene_reason_string(GSHSCENE_Reason reason) {
       return "union-overlap";
     case GSHSCENE_REASON_UNION_INNER:
       return "union-inner";
+    case GSHSCENE_REASON_FILTER:
+      return "filter";
+    case GSHSCENE_REASON_FILTER_PRIMITIVE:
+      return "filter-primitive";
+    case GSHSCENE_REASON_FILTER_MAP:
+      return "filter-map";
     case GSHSCENE_REASON_ANTIALIAS:
       return "antialias";
     case GSHSCENE_REASON_PATTERN_OVERFLOW:

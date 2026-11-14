@@ -266,6 +266,7 @@ static void item_release(const GSHSCENE_Item * item) {
   gshscene_resource_release(item->resource);
   gshscene_resource_release(item->paint.resource);
   gshscene_resource_release(item->group.soft_mask);
+  gshscene_resource_release(item->group.filter);
   gshscene_resource_release(item->style);
 }
 
@@ -352,6 +353,7 @@ static GSHSCENE_Result list_append(GSHSCENE_List * list, const GSHSCENE_Item * i
   gshscene_resource_retain(item->resource);
   gshscene_resource_retain(item->paint.resource);
   gshscene_resource_retain(item->group.soft_mask);
+  gshscene_resource_retain(item->group.filter);
   gshscene_resource_retain(item->style);
   note_item(list, item);
   list->count++;
@@ -527,6 +529,12 @@ static GSHSCENE_Result canonical_group(const GSHSCENE_Store * store, const GSHSC
       (group->soft_mask->kind != GSHSCENE_RESOURCE_MASK || group->soft_mask->store != store)) {
     return GSHSCENE_ERR_INVALID;
   }
+  /* D-FL1, FL9: the filter's slot: a filter resource of this store, on a group that is isolated and not knockout. */
+  if (group->filter &&
+      (group->filter->kind != GSHSCENE_RESOURCE_FILTER || group->filter->store != store ||
+          group->isolation != (uint32_t)GSHSCENE_ISOLATION_ISOLATED || group->knockout)) {
+    return GSHSCENE_ERR_INVALID;
+  }
   /* MK6: the mask's placement; a zero-filled map is the identity, and only a group with a mask may place one. */
   GSHGEOM_Map placement;
   gshgeom_map_identity(2, &placement);
@@ -558,6 +566,7 @@ static GSHSCENE_Result canonical_group(const GSHSCENE_Store * store, const GSHSC
   out->isolation = group->isolation;
   out->knockout = group->knockout;
   out->soft_mask = group->soft_mask;
+  out->filter = group->filter;
   if (group->soft_mask) {
     out->soft_mask_map = placement; /* one spelling: the identity is spelled as a 2D identity */
   }
@@ -566,33 +575,40 @@ static GSHSCENE_Result canonical_group(const GSHSCENE_Store * store, const GSHSC
 
 /* --- T1: the spelling of PDF's group fields, shared with the retained scene's group nodes ---------------------- */
 
-int gshscene_group_pdf_default(uint32_t isolation, uint32_t knockout, const GSHSCENE_Resource * soft_mask) {
-  return isolation == (uint32_t)GSHSCENE_ISOLATION_ISOLATED && knockout == 0 && soft_mask == NULL;
+int gshscene_group_pdf_default(uint32_t isolation, uint32_t knockout, const GSHSCENE_Resource * soft_mask,
+    const GSHSCENE_Resource * filter) {
+  return isolation == (uint32_t)GSHSCENE_ISOLATION_ISOLATED && knockout == 0 && soft_mask == NULL && filter == NULL;
 }
 
 void gshscene_group_hash_composite(GSHGEOM_Hash * h, uint32_t composite, uint32_t isolation, uint32_t knockout,
-    const GSHSCENE_Resource * soft_mask, const GSHGEOM_Map * soft_mask_map) {
-  if (gshscene_group_pdf_default(isolation, knockout, soft_mask)) {
+    const GSHSCENE_Resource * soft_mask, const GSHGEOM_Map * soft_mask_map, const GSHSCENE_Resource * filter) {
+  if (gshscene_group_pdf_default(isolation, knockout, soft_mask, filter)) {
     gshgeom_hash_u8(h, (uint8_t)composite); /* the spelling every group had before the fields existed */
     return;
   }
   gshgeom_hash_u8(h, (uint8_t)(composite | 0x80u));
-  gshgeom_hash_u8(h, (uint8_t)((isolation == (uint32_t)GSHSCENE_ISOLATION_NON_ISOLATED ? 1u : 0u) | (knockout ? 2u : 0u)));
+  gshgeom_hash_u8(h, (uint8_t)((isolation == (uint32_t)GSHSCENE_ISOLATION_NON_ISOLATED ? 1u : 0u) | (knockout ? 2u : 0u) | (filter ? 4u : 0u)));
   gshgeom_hash_u64(h, soft_mask ? gshscene_resource_hash(soft_mask) : 0);
   if (soft_mask) {
     gshgeom_hash_u64(h, placement_hash(soft_mask_map)); /* MK13: the placement follows the mask */
   }
+  if (filter) {
+    gshgeom_hash_u64(h, gshscene_resource_hash(filter)); /* FL12: the filter follows the mask and its placement */
+  }
 }
 
 int gshscene_group_dump_pdf(FILE * out, uint32_t isolation, uint32_t knockout, const GSHSCENE_Resource * soft_mask,
-    const GSHGEOM_Map * soft_mask_map) {
-  if (gshscene_group_pdf_default(isolation, knockout, soft_mask)) {
+    const GSHGEOM_Map * soft_mask_map, const GSHSCENE_Resource * filter) {
+  if (gshscene_group_pdf_default(isolation, knockout, soft_mask, filter)) {
     return 0;
   }
   int written = fprintf(out, " isolation=%u knockout=%u mask=%016llx", (unsigned)isolation, (unsigned)knockout,
       (unsigned long long)(soft_mask ? gshscene_resource_hash(soft_mask) : 0));
   if (written >= 0 && soft_mask) {
     written = fprintf(out, " maskmap=%016llx", (unsigned long long)placement_hash(soft_mask_map));
+  }
+  if (written >= 0 && filter) {
+    written = fprintf(out, " filter=%016llx", (unsigned long long)gshscene_resource_hash(filter));
   }
   return written;
 }
@@ -1524,7 +1540,8 @@ static int item_equal(const GSHSCENE_Item * a, const GSHSCENE_Item * b) {
          gshscene_space_equal(&a->group.blend_space, &b->group.blend_space) &&
          a->group.composite == b->group.composite && a->group.ordering == b->group.ordering &&
          a->group.isolation == b->group.isolation && a->group.knockout == b->group.knockout &&
-         a->group.soft_mask == b->group.soft_mask && map_equal(&a->group.soft_mask_map, &b->group.soft_mask_map);
+         a->group.soft_mask == b->group.soft_mask && map_equal(&a->group.soft_mask_map, &b->group.soft_mask_map) &&
+         a->group.filter == b->group.filter;
 }
 
 int gshscene_list_equal(const GSHSCENE_List * a, const GSHSCENE_List * b) {
@@ -1620,7 +1637,7 @@ uint64_t gshscene_list_hash(const GSHSCENE_List * list) {
         gshgeom_hash_f64(&h, item->group.opacity);
         gshscene_space_hash(&h, &item->group.blend_space);
         gshscene_group_hash_composite(&h, item->group.composite, item->group.isolation, item->group.knockout,
-            item->group.soft_mask, &item->group.soft_mask_map);
+            item->group.soft_mask, &item->group.soft_mask_map, item->group.filter);
         gshgeom_hash_u32(&h, item->group.ordering);
         gshgeom_hash_i32(&h, item->layer);
         gshgeom_hash_f64(&h, item->depth);
@@ -1783,7 +1800,7 @@ GSHSCENE_Result gshscene_list_dump(const GSHSCENE_List * list, FILE * out) {
         }
         if (written >= 0) {
           written = gshscene_group_dump_pdf(out, item->group.isolation, item->group.knockout, item->group.soft_mask,
-              &item->group.soft_mask_map);
+              &item->group.soft_mask_map, item->group.filter);
         }
         if (written >= 0) {
           written = dump_layer_depth(out, item);

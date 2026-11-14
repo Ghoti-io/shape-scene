@@ -42,6 +42,7 @@
 #include <ghoti.io/shape-scene/image_paint.h>
 #include <ghoti.io/shape-scene/list.h>
 #include <ghoti.io/shape-scene/macros.h>
+#include <ghoti.io/shape-scene/filter.h>
 #include <ghoti.io/shape-scene/mask.h>
 #include <ghoti.io/shape-scene/paint.h>
 #include <ghoti.io/shape-scene/pattern.h>

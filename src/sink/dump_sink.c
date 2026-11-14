@@ -203,6 +203,9 @@ static void caps_full(GSHSCENE_Sink_Caps * caps, int readback) {
   /* Every mask feature, recorded by handle (MK14); a configuration clears them for a writer that lacks some. */
   caps->flags |= GSHSCENE_CAP_GROUP_SOFT_MASK;
   caps->mask_native = GSHSCENE_MASK_NATIVE_ALL;
+  /* Every filter primitive and feature, recorded by handle (D-FL11); a configuration clears them for a writer that lacks some. */
+  caps->flags |= GSHSCENE_CAP_GROUP_FILTER;
+  caps->filter_native = GSHSCENE_FILTER_NATIVE_ALL;
   /* Every pattern, recorded by handle (S22). */
   caps->flags |= GSHSCENE_CAP_PATTERN;
   /* Every clip union, overlapping members included, recorded by handle with its members (S24, CU23). */
@@ -236,6 +239,7 @@ static int caps_valid(const GSHSCENE_Sink_Caps * caps) {
       !(caps->image_extends & ~((UINT32_C(1) << GSHSCENE_IMAGE_EXTEND_COUNT) - 1u)) &&
       !(caps->image_formats & ~GSHSCENE_IMAGE_FORMAT_ALL) &&
       !(caps->stroke_native & ~GSHSCENE_STROKE_NATIVE_ALL) && !(caps->mask_native & ~GSHSCENE_MASK_NATIVE_ALL) &&
+      !(caps->filter_native & ~GSHSCENE_FILTER_NATIVE_ALL) &&
       caps->cancel_unit >= GSHSCENE_CANCEL_BETWEEN_UNITS &&
       caps->cancel_unit < GSHSCENE_CANCEL_UNIT_COUNT && caps->work_measure != NULL;
 }
@@ -1891,7 +1895,7 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
       break;
     }
     case GSHSCENE_ITEM_GROUP_PUSH: {
-      if (gshscene_group_pdf_default(item->group.isolation, item->group.knockout, item->group.soft_mask)) {
+      if (gshscene_group_pdf_default(item->group.isolation, item->group.knockout, item->group.soft_mask, item->group.filter)) {
         snprintf(run->line, LINE_BYTES, " G opacity=%016" PRIx64 " composite=%u\n", gshgeom_f64_bits(item->group.opacity),
             (unsigned)item->group.composite);
       } else {
@@ -1903,6 +1907,11 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
           /* MK13, MK14: the placement follows the mask's hash, before the line's end. */
           size_t at = strlen(run->line) - 1;
           snprintf(run->line + at, LINE_BYTES - at, " maskmap=%016" PRIx64 "\n", gshgeom_map_hash(&item->group.soft_mask_map));
+        }
+        if (item->group.filter) {
+          /* FL12: the filter's content hash follows the mask and its placement, before the line's end. */
+          size_t at = strlen(run->line) - 1;
+          snprintf(run->line + at, LINE_BYTES - at, " filter=%016" PRIx64 "\n", gshscene_resource_hash(item->group.filter));
         }
       }
       emit_text(run, run->line, &failed);

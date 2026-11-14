@@ -364,6 +364,8 @@ GSHSCENE_Disposition gshscene_caps_disposition_unit(const GSHSCENE_Sink_Caps * c
       refused = GSHSCENE_REASON_GROUP_KNOCKOUT;
     } else if (item->group.soft_mask && !(caps->flags & GSHSCENE_CAP_GROUP_SOFT_MASK)) {
       refused = GSHSCENE_REASON_SOFT_MASK;
+    } else if (item->group.filter && !(caps->flags & GSHSCENE_CAP_GROUP_FILTER)) {
+      refused = GSHSCENE_REASON_FILTER;
     } else if (item->group.soft_mask) {
       /* MK9: the features the mask needs and the sink lacks, named.  SPACES is needed only where a space differs from the
        * one the group composites in, when that one is known. */
@@ -379,6 +381,22 @@ GSHSCENE_Disposition gshscene_caps_disposition_unit(const GSHSCENE_Sink_Caps * c
       d.entry_class = GSHSCENE_ENTRY_REFUSED;
       d.reason = refused;
       return d;
+    }
+    if (item->group.filter) {
+      /* D-FL11: the primitives and features the filter needs and the sink lacks, named; then the map (D-FL8). */
+      const uint32_t lacks = gshscene_filter_required(item->group.filter) & ~caps->filter_native;
+      if (lacks) {
+        d.entry_class = GSHSCENE_ENTRY_REFUSED;
+        d.reason = GSHSCENE_REASON_FILTER_PRIMITIVE;
+        d.detail = lacks;
+        return d;
+      }
+      if (gshscene_filter_needs_canonical(instance_maps, instance_count, target_map) &&
+          !(caps->filter_native & GSHSCENE_FILTER_NATIVE_CANONICAL_SPACE)) {
+        d.entry_class = GSHSCENE_ENTRY_REFUSED;
+        d.reason = GSHSCENE_REASON_FILTER_MAP;
+        return d;
+      }
     }
   }
   /* S20, SK7, ST5 (3): a stroke of a run is one region of all its glyphs (SG13), which only a sink that says so unites. */
@@ -658,6 +676,7 @@ static GSHSCENE_Result caps_for(const GSHSCENE_Sink * sink, const GSHSCENE_Targe
   if ((c.flags & ~GSHSCENE_CAP_FLAGS_ALL) ||
       ((c.flags & GSHSCENE_CAP_CLIP_UNION_GENERAL) && !(c.flags & GSHSCENE_CAP_CLIP_UNION)) /* CU12 */ ||
       ((c.flags & GSHSCENE_CAP_CLIP_UNION_INNER) && !(c.flags & GSHSCENE_CAP_CLIP_UNION_GENERAL)) /* CI5 */ || (c.stroke_native & ~GSHSCENE_STROKE_NATIVE_ALL) ||
+      (c.filter_native & ~GSHSCENE_FILTER_NATIVE_ALL) ||
       (c.image_filters & ~((UINT32_C(1) << GSHSCENE_IMAGE_FILTER_COUNT) - 1u)) ||
       (c.image_extends & ~((UINT32_C(1) << GSHSCENE_IMAGE_EXTEND_COUNT) - 1u)) || (c.image_formats & ~GSHSCENE_IMAGE_FORMAT_ALL) ||
       c.cancel_unit == 0 ||

@@ -121,6 +121,12 @@ struct GSHSCENE_Resource {
       double max_factor;           /* the largest factor, for a stroke's bounds */
     } profile;
     struct {
+      GSHSCENE_Filter f;          /* canonical (FL1); the arrays point into the arena below, the images are retained */
+      uint8_t * arena;            /* the primitives, their inputs and their tables, one block */
+      uint8_t * canon;            /* the canonical string (FL12): the content's one definition */
+      size_t canon_len;
+    } filter;
+    struct {
       GSHSCENE_Image_Paint p;     /* canonical (IP1); image and tint point at the copies below */
       GSHSCENE_Paint tint;        /* the tint, when the image is alpha-only */
       const GSHSCENE_Resource * image; /* retained */
@@ -445,6 +451,12 @@ int gshscene_image_dump(const GSHSCENE_Resource * resource, FILE * out);
 /* --- mask.c ----------------------------------------------------------------- */
 
 /** Whether a mask resource has the canonical content @p source (a GSHSCENE_Mask, `-0` allowed). */
+/** The filter resource (filter.c, FL1): equality with a probe's source, freeing its arena and handles, and the payload of its dump (negative on failure). */
+int gshscene_filter_matches(const GSHSCENE_Resource * resource, const void * source);
+void gshscene_filter_free(GSHSCENE_Resource * resource);
+int gshscene_filter_dump(const GSHSCENE_Resource * resource, FILE * out);
+/** D-FL8: whether the map a group's filter is drawn under (the instances' maps composed, then the target's) is not axis aligned, or cannot be formed. */
+int gshscene_filter_needs_canonical(const GSHGEOM_Map * instance_maps, size_t instance_count, const GSHGEOM_Map * target_map);
 int gshscene_mask_matches(const GSHSCENE_Resource * resource, const void * source);
 
 /** Release the picture a mask holds and free its transfer's arrays. */
@@ -550,15 +562,16 @@ GSHSCENE_Result gshscene_list_canonical_group(
     const GSHSCENE_Store * store, const GSHSCENE_Group * group, GSHSCENE_Group * out);
 
 /** T1: whether a group's isolation, knockout and soft mask are the defaults (isolated, 0, none). */
-int gshscene_group_pdf_default(uint32_t isolation, uint32_t knockout, const GSHSCENE_Resource * soft_mask);
+int gshscene_group_pdf_default(uint32_t isolation, uint32_t knockout, const GSHSCENE_Resource * soft_mask,
+    const GSHSCENE_Resource * filter);
 
 /** T1, MK13: a group's `u8` composite in a hash, and after it PDF's fields when one is not the default, the mask's placement after its hash (list.h). */
 void gshscene_group_hash_composite(GSHGEOM_Hash * h, uint32_t composite, uint32_t isolation, uint32_t knockout,
-    const GSHSCENE_Resource * soft_mask, const GSHGEOM_Map * soft_mask_map);
+    const GSHSCENE_Resource * soft_mask, const GSHGEOM_Map * soft_mask_map, const GSHSCENE_Resource * filter);
 
 /** T1, MK13: ` isolation=N knockout=N mask=<hash>` (and ` maskmap=<hash>` with a mask) in a dump when one of them is not the default; else nothing.  < 0 on error. */
 int gshscene_group_dump_pdf(FILE * out, uint32_t isolation, uint32_t knockout, const GSHSCENE_Resource * soft_mask,
-    const GSHGEOM_Map * soft_mask_map);
+    const GSHGEOM_Map * soft_mask_map, const GSHSCENE_Resource * filter);
 GSHSCENE_Result gshscene_list_canonical_depth(double depth, double * out);
 
 /** PH1, PH2: a placeholder's fields by the rules of the record call (a retained scene's node shares them); -0 becomes +0. */

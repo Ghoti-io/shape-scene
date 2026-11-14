@@ -721,8 +721,8 @@ static void import_release(Import_Held * h) {
 
 /** Replace every resource @p props names with its copy in @p store (a resource of the store is its own copy); all or none. */
 static GSHSCENE_Result import_resources(GSHSCENE_Store * store, GSHSCENE_Node * props, Import_Held * h) {
-  const GSHSCENE_Resource ** slots[5] = {&props->resource, &props->clip, &props->soft_mask, &props->style, &props->paint.resource};
-  for (size_t i = 0; i < 5; i++) {
+  const GSHSCENE_Resource ** slots[6] = {&props->resource, &props->clip, &props->soft_mask, &props->style, &props->paint.resource, &props->filter};
+  for (size_t i = 0; i < 6; i++) {
     if (!*slots[i]) {
       continue;
     }

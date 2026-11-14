@@ -372,6 +372,14 @@ typedef struct GSHSCENE_Group {
    * A group item reads it back as the identity (dimension 2) when it names a mask, and zero-filled when it does not.
    */
   GSHGEOM_Map soft_mask_map;
+  /**
+   * The filter's slot (D-FL1, FL1): NULL (the default, none), or a filter resource of the list's store (filter.h), which the list
+   * retains.  The group's result is processed by it at the pop, before the soft mask, the opacity and the composite apply (FL20).
+   * A filtered group is isolated and not knockout (::GSHSCENE_ERR_INVALID otherwise, FL9).  A sink that does not claim
+   * ::GSHSCENE_CAP_GROUP_FILTER refuses a group that names one.  Its space is the group's user space (the items' space): no map is
+   * carried.
+   */
+  const GSHSCENE_Resource * filter;
 } GSHSCENE_Group;
 
 /**

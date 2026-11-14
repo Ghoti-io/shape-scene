@@ -152,6 +152,7 @@ static GSHSCENE_Result copy_picture(GSHSCENE_Store * dst, const GSHSCENE_Resourc
     case GSHSCENE_ITEM_GROUP_PUSH: {
       GSHSCENE_Group group = it->group;
       group.soft_mask = copy_held(dst, it->group.soft_mask, &held, &r);
+      group.filter = r == GSHSCENE_OK ? copy_held(dst, it->group.filter, &held, &r) : NULL;
       if (r == GSHSCENE_OK) {
         r = gshscene_list_group_push(copy, &group, it->layer, it->depth);
       }
@@ -367,6 +368,26 @@ static GSHSCENE_Result copy_into(GSHSCENE_Store * dst, const GSHSCENE_Resource *
     if (r == GSHSCENE_OK) {
       r = gshscene_store_intern_width_profile(dst, stops, count, out);
     }
+    break;
+  }
+  case GSHSCENE_RESOURCE_FILTER: {
+    /* FL1: the primitives as stored, each image the filter names copied first (held until the intern has retained it). */
+    GSHSCENE_Filter f;
+    r = gshscene_resource_filter(from, &f);
+    GSHSCENE_Filter_Primitive * prims = NULL;
+    if (r == GSHSCENE_OK) {
+      prims = gshscene_alloc(&dst->alloc, f.primitive_count * sizeof *prims);
+      r = prims ? GSHSCENE_OK : GSHSCENE_ERR_OOM;
+    }
+    for (size_t i = 0; r == GSHSCENE_OK && i < f.primitive_count; i++) {
+      prims[i] = f.primitives[i];
+      prims[i].image = copy_held(dst, f.primitives[i].image, &held, &r);
+    }
+    if (r == GSHSCENE_OK) {
+      f.primitives = prims;
+      r = gshscene_store_intern_filter(dst, &f, out);
+    }
+    gshscene_free(&dst->alloc, prims);
     break;
   }
   case GSHSCENE_RESOURCE_IMAGE_PAINT: {

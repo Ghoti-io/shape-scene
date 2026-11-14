@@ -463,7 +463,13 @@ typedef struct GSHSCENE_Target {
  * with a clipped member, `UNION_INNER`, and the clip's block is skipped (S24).
  */
 #define GSHSCENE_CAP_CLIP_UNION_INNER (UINT32_C(1) << 22)
-#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 23) - 1) ///< Every flag defined.
+/**
+ * A sink applies a group's filter (filter.h, FL1 to FL24, D-FL11): the group's result is processed by the filter's primitives at its pop.  The
+ * primitives it draws are `filter_native`'s bits (a missing one refuses the group, `FILTER_PRIMITIVE`, the missing bits in `second`); without
+ * this flag the planning pass refuses every filtered group, `FILTER`, whatever `filter_native` says.
+ */
+#define GSHSCENE_CAP_GROUP_FILTER (UINT32_C(1) << 23)
+#define GSHSCENE_CAP_FLAGS_ALL ((UINT32_C(1) << 24) - 1) ///< Every flag defined.
 /** @} */
 
 /**
@@ -520,7 +526,13 @@ typedef struct GSHSCENE_Sink_Caps {
    * refuses every masked group, `SOFT_MASK`, whatever this says.
    */
   uint32_t mask_native;
-  uint8_t _reserved[8];       ///< Zero.
+  /**
+   * The `GSHSCENE_FILTER_NATIVE_*` bits (filter.h, D-FL11): the primitives (bit `kind`) and the features of a group's filter a sink
+   * draws; 0, none.  Without ::GSHSCENE_CAP_GROUP_FILTER every filtered group is refused, `FILTER`, whatever this says.  A filter needing a primitive or a feature it lacks is refused, `FILTER_PRIMITIVE`,
+   * the missing bits in `second`; one whose group's map is not axis aligned, without `CANONICAL_SPACE`, `FILTER_MAP`.
+   */
+  uint32_t filter_native;
+  uint8_t _reserved[4];       ///< Zero.
 } GSHSCENE_Sink_Caps;
 
 /* --- the request (S1) and the job (S3) -------------------------------------------- */
