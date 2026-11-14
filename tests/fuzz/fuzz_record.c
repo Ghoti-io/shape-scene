@@ -118,7 +118,7 @@ enum {
   OUT_PARAMETER_REFUSED, OUT_EMIT_TIES, OUT_PALETTE_FILL, OUT_TRUNCATED, OUT_GRADIENT_FILL, OUT_GRADIENT_DEGENERATE,
   OUT_GRADIENT_REFUSED, OUT_GRADIENT_LIMIT, OUT_GRADIENT_NODE, OUT_GRADIENT_EMITTED, OUT_COLOR_LIMIT, OUT_COLOR_AT_BOUND,
   OUT_BLEND_GROUP, OUT_PDF_GROUP, OUT_PDF_INVALID, OUT_PDF_EMITTED, OUT_STYLE_INTERNED, OUT_STYLE_INVALID,
-  OUT_STYLE_LIMIT, OUT_STYLE_DOUBLED, OUT_STYLE_SOLID, OUT_STYLE_UNSUPPORTED, OUT_STROKE_RECORDED,
+  OUT_STYLE_LIMIT, OUT_STYLE_DOUBLED, OUT_STYLE_SOLID, OUT_STYLE_PROFILE, OUT_STROKE_RECORDED,
   OUT_STROKE_UNSUPPORTED, OUT_STROKE_NODE, OUT_STROKE_EMITTED, OUT_PLACEHOLDER_RECORDED, OUT_PLACEHOLDER_INVALID,
   OUT_PLACEHOLDER_NODE, OUT_PLACEHOLDER_EMITTED, OUT_IMAGE_INTERNED, OUT_IMAGE_INVALID, OUT_IMAGE_UNSUPPORTED,
   OUT_IMAGE_LIMIT, OUT_IMAGE_BAD_SAMPLE, OUT_IMAGE_HIT, OUT_IMAGE_TAKEN, OUT_IMAGE_NOT_SHAPE, OUT_IMAGE_PAINT,
@@ -143,7 +143,7 @@ static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limi
     "a color past N1's bound refused", "a color at N1's bound recorded", "a blend-mode group recorded",
     "a group of PDF's fields recorded", "a group of PDF's fields refused as invalid", "a node of PDF's fields emitted",
     "a stroke style interned", "a stroke style refused as invalid", "a stroke style past SK2's bounds refused",
-    "an odd dash array doubled", "a dash array made solid", "a width profile refused (reserved)",
+    "an odd dash array doubled", "a dash array made solid", "a style naming a width profile interned",
     "a stroke recorded", "a 3D stroke refused as unsupported", "a stroke node", "an emitted list with a stroke",
     "a placeholder recorded", "a placeholder refused as invalid", "a placeholder node", "an emitted list with a placeholder",
     "an image interned", "an image refused as invalid", "an image refused as unsupported", "an image past IM10's bounds refused",
@@ -3580,10 +3580,6 @@ static void op(S * s, unsigned code) {
         invalid = invalid || !isfinite(dashes[i]);
       }
       size_t count = st.dashes ? style_dash_count(dashes, n) : 0;
-      /* SW5: a profile needs round joins and caps, no dashes and center alignment */
-      int unsupported = !invalid && st.width_profile != NULL &&
-          (st.join != GSHSCENE_STROKE_JOIN_ROUND || st.cap != GSHSCENE_STROKE_CAP_ROUND || count != 0 ||
-              st.alignment != GSHSCENE_STROKE_ALIGN_CENTER);
       size_t most = lim->max_resource_elements < 65535 ? lim->max_resource_elements : 65535;
       int beyond = !style_within(st.width) || !style_within(st.dash_offset) || !(st.miter_limit >= 1.0) ||
           !(st.miter_limit <= 0x1p16) || count > most;
@@ -3598,9 +3594,6 @@ static void op(S * s, unsigned code) {
       if (invalid) {
         CHECK(r == GSHSCENE_ERR_INVALID);
         outcomes[OUT_STYLE_INVALID]++;
-      } else if (unsupported) {
-        CHECK(r == GSHSCENE_ERR_UNSUPPORTED);
-        outcomes[OUT_STYLE_UNSUPPORTED]++;
       } else if (beyond) {
         CHECK(r == GSHSCENE_ERR_LIMIT);
         outcomes[OUT_STYLE_LIMIT]++;
@@ -3613,6 +3606,7 @@ static void op(S * s, unsigned code) {
         break;
       }
       outcomes[OUT_STYLE_INTERNED]++;
+      outcomes[OUT_STYLE_PROFILE] += st.width_profile != NULL;
       outcomes[OUT_STYLE_DOUBLED] += n % 2 && count == 2 * n;
       outcomes[OUT_STYLE_SOLID] += n && count == 0;
       GSHSCENE_Stroke_Style back;

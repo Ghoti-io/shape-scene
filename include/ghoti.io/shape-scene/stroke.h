@@ -355,7 +355,7 @@ typedef struct GSHSCENE_Stroke_Style {
   uint32_t dash_scope;            ///< A ::GSHSCENE_Dash_Scope; read only with dashes.
   uint32_t alignment;             ///< A ::GSHSCENE_Alignment.
   GSHGEOM_Fill_Rule alignment_rule; ///< The rule of the region inside and outside alignment clip to (D10); read only off center.
-  const GSHSCENE_Resource * width_profile; ///< NULL (constant width), or a width profile of the store (SW1 to SW9): the width is `width` times its factor, which needs round joins, round caps, no dashes and center alignment (::GSHSCENE_ERR_UNSUPPORTED otherwise).
+  const GSHSCENE_Resource * width_profile; ///< NULL (constant width), or a width profile of the store (SW1 to SW14): the width is `width` times its factor, with any join, cap, dash array and alignment.
 } GSHSCENE_Stroke_Style;
 
 /** @name SK2's bounds
@@ -385,7 +385,7 @@ typedef struct GSHSCENE_Stroke_Style {
 #define GSHSCENE_STROKE_NATIVE_ALIGN (UINT32_C(1) << 13)              ///< Inside and outside alignment, by nonzero.
 #define GSHSCENE_STROKE_NATIVE_ALIGN_EVEN_ODD (UINT32_C(1) << 14)     ///< Alignment by even-odd.
 #define GSHSCENE_STROKE_NATIVE_DEGENERATE_DRAW (UINT32_C(1) << 15)    ///< A subpath of zero length drawn as SVG 2's dot.
-#define GSHSCENE_STROKE_NATIVE_WIDTH_PROFILE (UINT32_C(1) << 16)      ///< A width that varies along the subpath (SW1 to SW9): a round-brush stroke.
+#define GSHSCENE_STROKE_NATIVE_WIDTH_PROFILE (UINT32_C(1) << 16)      ///< A width that varies along the subpath (SW1 to SW14): a stroke of varying width.
 #define GSHSCENE_STROKE_NATIVE_ALL ((UINT32_C(1) << 17) - 1)          ///< Every feature defined.
 /** @} */
 
@@ -399,8 +399,7 @@ GSHSCENE_API void gshscene_stroke_style_init(GSHSCENE_Stroke_Style * style);
  * @param style The style; its dashes are copied (the canonical array).
  * @param out The handle, with a reference for the caller; written only on success.
  * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, a non-finite double, an enumeration out of range, a negative
- *   width, dashes counted but not given, a width profile that is not one of this store); ::GSHSCENE_ERR_UNSUPPORTED (a width profile
- *   with a join or cap other than round, dashes or an alignment other than center, SW5); ::GSHSCENE_ERR_LIMIT
+ *   width, dashes counted but not given, a width profile that is not one of this store); ::GSHSCENE_ERR_LIMIT
  *   (SK2's bounds, or the store's own limits); ::GSHSCENE_ERR_OOM.
  */
 GSHSCENE_API GSHSCENE_Result gshscene_store_intern_stroke_style(GSHSCENE_Store * store,

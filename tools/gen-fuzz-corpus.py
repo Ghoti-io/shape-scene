@@ -237,7 +237,7 @@ def scripted():
               + bytes([st, 1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 2, 8, 1, 1, 3, 1])
               + bytes([st, 0, 1, 9, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1])
               + bytes([st, 0, 1, 5, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1])
-              + bytes([st, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1])  # a profile (roll 0), a real one (which 1), a miter join: unsupported (SW5)
+              + bytes([st, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1])  # a profile (roll 0), a real one (which 1), a miter join (drawn since SW10)
               + bytes([st, 0, 3, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 2])  # round joins and caps, no dashes, a real profile: interned
               + bytes([st, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1]))
     sk = OP["STROKE"]

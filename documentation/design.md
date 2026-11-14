@@ -853,7 +853,7 @@ width, `1 / sin(θ / 2)`; past it (strictly greater) a miter becomes a bevel, an
 (`GSHSCENE_STROKE_JOIN_MITER`, ...) keep the `STROKE_` infix so that a cap is never read as a capability flag.
 
 **SK2 Validity and bounds.** On the style as given: a non-finite double, an enumeration out of range, a negative
-width or dashes counted but not given are `ERR_INVALID`; a width profile that is not a width profile resource of this store is `ERR_INVALID`, and one with a join or cap other than round, dashes or an alignment other than center is `ERR_UNSUPPORTED` (SW5);
+width or dashes counted but not given are `ERR_INVALID`; a width profile that is not a width profile resource of this store is `ERR_INVALID`;
 then `ERR_LIMIT`, decided after every other check: the width 0 or of magnitude in `[2^-64, 2^64]` (G14's band); the
 miter limit in `[1, 2^16]`; each dash (by magnitude, so a negative one too) and the offset 0 or of magnitude in
 `[2^-64, 2^64]`; at most `min(max_resource_elements, 65535)` dashes after an odd array is doubled. The bounds are met
@@ -1060,8 +1060,8 @@ stops than `min(max_resource_elements, 65535)` or a position or factor outside `
 factor of each stop, the dump is `stops N` and a line `s <hex> <hex>` for each, and the accounted bytes are the base plus
 `GSHSCENE_BYTES_PER_WIDTH_STOP` (16) for each stop.
 
-**A style that names one** is checked as a stroke style is, with the profile a resource of this store (`ERR_INVALID` otherwise) and
-SW5's combination: round joins, round caps, no dashes and center alignment, else `ERR_UNSUPPORTED`. The style holds a reference to
+**A style that names one** is checked as a stroke style is, with the profile a resource of this store (`ERR_INVALID` otherwise); any join, cap, dash array and
+alignment goes with it (the geometry library's SW10 to SW13 define each). The style holds a reference to
 the profile, and its hash already carries the profile's content hash. A **copy** into another store copies the profile first. **SK10's
 bound** widens by the profile's largest factor, so that a box still covers what is drawn. **SK11** adds
 `GSHSCENE_STROKE_NATIVE_WIDTH_PROFILE` (bit 16, `GSHSCENE_STROKE_NATIVE_ALL` now `0x1ffff`) to the features such a stroke requires: a sink that

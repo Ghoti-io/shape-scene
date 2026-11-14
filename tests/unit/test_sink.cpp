@@ -204,7 +204,7 @@ TEST(Sink, CapsThatBreakTheContractAreInternal) {
       [](GSHSCENE_Sink_Caps & c) { c.image_filters |= 1u << 4; }, // past the four image filters (S21)
       [](GSHSCENE_Sink_Caps & c) { c.image_extends |= 1u << 4; }, // past the four edge modes
       [](GSHSCENE_Sink_Caps & c) { c.image_formats |= 1u << 8; }, // past every sample type, layout and the alpha-only mark
-      [](GSHSCENE_Sink_Caps & c) { c.stroke_native |= 1u << 16; }, // past every stroke feature defined (S20)
+      [](GSHSCENE_Sink_Caps & c) { c.stroke_native |= 1u << 17; }, // past every stroke feature defined (S20)
       [](GSHSCENE_Sink_Caps & c) { c.stroke_native = 0xffffffffu; },
       [](GSHSCENE_Sink_Caps & c) { c.cancel_unit = 0; },
       [](GSHSCENE_Sink_Caps & c) { c.cancel_unit = GSHSCENE_CANCEL_UNIT_COUNT; },
@@ -738,8 +738,8 @@ TEST(Sink, PixelKinds) {
   EXPECT_EQ(GSHSCENE_CAP_PATTERN, 0x8000u);
   EXPECT_EQ(GSHSCENE_CAP_HATCH, 0x10000u);
   EXPECT_EQ(GSHSCENE_CAP_ANTIALIAS_NONE, 0x80000u);
-  EXPECT_EQ(GSHSCENE_CAP_FLAGS_ALL, 0x3fffffu);
-  EXPECT_EQ(GSHSCENE_STROKE_NATIVE_ALL, 0xffffu);
+  EXPECT_EQ(GSHSCENE_CAP_FLAGS_ALL, 0x7fffffu);
+  EXPECT_EQ(GSHSCENE_STROKE_NATIVE_ALL, 0x1ffffu);
   EXPECT_EQ(sizeof(GSHSCENE_Sink_Caps) % sizeof(void *), 0u);
   EXPECT_EQ((int)GSHSCENE_CANCEL_BETWEEN_UNITS, 1);
   EXPECT_EQ((int)GSHSCENE_CANCEL_BEFORE_SUBMIT, 2);

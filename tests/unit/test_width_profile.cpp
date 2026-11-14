@@ -185,26 +185,30 @@ TEST(WidthProfile, AStyleThatNamesOneIsCheckedHeldAndConverted) {
   style = Ref();
 }
 
-TEST(WidthProfile, AStyleWithAProfileHasToBeRoundWithNoDashesAndCenteredAndOfThisStore) {
+TEST(WidthProfile, AStyleWithAProfileMayHaveAnyJoinCapDashesAndAlignmentAndHasToBeOfThisStore) {
   StoreHolder sh;
   Ref p = intern_profile(sh.store, {{0, 1}});
   const GSHSCENE_Resource * out = nullptr;
   GSHSCENE_Stroke_Style st = round_style(p.get());
   st.join = GSHSCENE_STROKE_JOIN_MITER;
-  EXPECT_EQ(gshscene_store_intern_stroke_style(sh.store, &st, &out), GSHSCENE_ERR_UNSUPPORTED);
-  st = round_style(p.get());
   st.cap = GSHSCENE_STROKE_CAP_BUTT;
-  EXPECT_EQ(gshscene_store_intern_stroke_style(sh.store, &st, &out), GSHSCENE_ERR_UNSUPPORTED);
+  ASSERT_EQ(gshscene_store_intern_stroke_style(sh.store, &st, &out), GSHSCENE_OK) << "SW10: a miter join and a butt cap";
+  gshscene_resource_release(out);
+  out = nullptr;
   st = round_style(p.get());
   static const double dashes[2] = {2, 1};
   st.dash_count = 2;
   st.dashes = dashes;
-  EXPECT_EQ(gshscene_store_intern_stroke_style(sh.store, &st, &out), GSHSCENE_ERR_UNSUPPORTED);
+  ASSERT_EQ(gshscene_store_intern_stroke_style(sh.store, &st, &out), GSHSCENE_OK) << "SW11: dashes";
+  gshscene_resource_release(out);
+  out = nullptr;
   st = round_style(p.get());
   st.alignment = GSHSCENE_STROKE_ALIGN_INSIDE;
-  EXPECT_EQ(gshscene_store_intern_stroke_style(sh.store, &st, &out), GSHSCENE_ERR_UNSUPPORTED);
+  ASSERT_EQ(gshscene_store_intern_stroke_style(sh.store, &st, &out), GSHSCENE_OK) << "SW13: an alignment";
+  gshscene_resource_release(out);
+  out = nullptr;
   st.width = -1;
-  EXPECT_EQ(gshscene_store_intern_stroke_style(sh.store, &st, &out), GSHSCENE_ERR_INVALID) << "invalid before unsupported";
+  EXPECT_EQ(gshscene_store_intern_stroke_style(sh.store, &st, &out), GSHSCENE_ERR_INVALID) << "a negative width is invalid";
   /* a profile of another store, and a resource that is not a profile */
   StoreHolder other;
   Ref foreign = intern_profile(other.store, {{0, 1}});

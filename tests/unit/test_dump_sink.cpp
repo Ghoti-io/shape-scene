@@ -1671,7 +1671,7 @@ TEST(DumpSink, TheConfigurationIsValidated) {
       [](GSHSCENE_Dump_Sink_Config & c) { c.stream_caps.cancel_unit = GSHSCENE_CANCEL_UNIT_COUNT; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.raster_caps.work_measure = nullptr; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.raster_caps._reserved[2] = 1; },
-      [](GSHSCENE_Dump_Sink_Config & c) { c.stream_caps.stroke_native |= 1u << 16; },
+      [](GSHSCENE_Dump_Sink_Config & c) { c.stream_caps.stroke_native |= 1u << 17; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.raster_caps.mask_native |= 1u << 12; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.stream_caps.mask_native |= 1u << 20; },
       [](GSHSCENE_Dump_Sink_Config & c) { c.raster_caps.flags |= GSHSCENE_CAP_THREAD_AFFINE; },

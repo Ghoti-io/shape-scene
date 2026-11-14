@@ -103,11 +103,6 @@ static GSHSCENE_Result valid(const GSHSCENE_Store * store, const GSHSCENE_Stroke
     if (in->width_profile->kind != GSHSCENE_RESOURCE_WIDTH_PROFILE || in->width_profile->store != store) {
       return GSHSCENE_ERR_INVALID;
     }
-    /* SW5: the region is a swept disc, so the style must say round joins and caps, no dashes and center alignment. */
-    if (in->join != (uint32_t)GSHSCENE_STROKE_JOIN_ROUND || in->cap != (uint32_t)GSHSCENE_STROKE_CAP_ROUND ||
-        canonical_dash_count(in) != 0 || in->alignment != (uint32_t)GSHSCENE_STROKE_ALIGN_CENTER) {
-      return GSHSCENE_ERR_UNSUPPORTED;
-    }
   }
   return GSHSCENE_OK;
 }

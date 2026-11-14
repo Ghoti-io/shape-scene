@@ -458,7 +458,7 @@ TEST(StrokeStyle, EveryInvalidFieldIsInvalid) {
   EXPECT_EQ(stats.live, 0u) << "a failing intern keeps nothing";
 }
 
-TEST(StrokeStyle, TheWidthProfileIsCheckedAfterValidityAndBeforeTheBounds) {
+TEST(StrokeStyle, TheWidthProfileIsCheckedForValidityAndTheBoundsAreAsForAnyStyle) {
   StoreHolder s;
   Ref path(intern_square(s.store));
   const GSHSCENE_Width_Stop one[1] = {{0, 1}};
@@ -470,15 +470,17 @@ TEST(StrokeStyle, TheWidthProfileIsCheckedAfterValidityAndBeforeTheBounds) {
   st.s.width_profile = path.get();
   EXPECT_EQ(gshscene_store_intern_stroke_style(s.store, st.get(), &r), GSHSCENE_ERR_INVALID) << "not a profile";
   st.s.width_profile = profile.get();
-  EXPECT_EQ(gshscene_store_intern_stroke_style(s.store, st.get(), &r), GSHSCENE_ERR_UNSUPPORTED) << "SW5: a miter join and a butt cap";
+  ASSERT_EQ(gshscene_store_intern_stroke_style(s.store, st.get(), &r), GSHSCENE_OK) << "SW10: a miter join and a butt cap are drawn";
+  gshscene_resource_release(r);
+  r = nullptr;
   st.s.width = kNaN;
   EXPECT_EQ(gshscene_store_intern_stroke_style(s.store, st.get(), &r), GSHSCENE_ERR_INVALID) << "validity first";
   st.s.width = -1.0;
   EXPECT_EQ(gshscene_store_intern_stroke_style(s.store, st.get(), &r), GSHSCENE_ERR_INVALID)
       << "a negative width is decided before the profile too";
   st.s.width = std::ldexp(1.0, 70);
-  EXPECT_EQ(gshscene_store_intern_stroke_style(s.store, st.get(), &r), GSHSCENE_ERR_UNSUPPORTED)
-      << "the profile before the bounds";
+  EXPECT_EQ(gshscene_store_intern_stroke_style(s.store, st.get(), &r), GSHSCENE_ERR_LIMIT)
+      << "a style that names a profile has the same bounds";
   EXPECT_EQ(r, nullptr);
 }
 
@@ -1821,6 +1823,46 @@ TEST(StrokeRequired, EachFieldOfTheStyleRequiresItsFeature) {
     GSHSCENE_Item item = stroke_item(k, r.get(), id, black);
     EXPECT_EQ(gshscene_stroke_required(&item, nullptr, 0, nullptr), c.want) << c.what;
   }
+}
+
+TEST(StrokeDisposition, AWidthProfileIsAFeatureASinkClaimsOrExpands) {
+  Kit k;
+  GSHSCENE_Paint black = solid(0, 0, 0, 1);
+  GSHGEOM_Map id = translate(0, 0);
+  GSHSCENE_Color_Space srgb = srgb_space();
+  const GSHSCENE_Width_Stop stops[2] = {{0, 1}, {4, 0.25}};
+  const GSHSCENE_Resource * pr = nullptr;
+  ASSERT_EQ(gshscene_store_intern_width_profile(k.s.store, stops, 2, &pr), GSHSCENE_OK);
+  Ref profile(pr);
+  Style st;
+  st.s.width_profile = profile.get();
+  Ref style;
+  ASSERT_EQ(intern(k.s.store, st, &style), GSHSCENE_OK);
+  GSHSCENE_Item item = stroke_item(k, style.get(), id, black);
+  const uint32_t need = gshscene_stroke_required(&item, nullptr, 0, nullptr);
+  EXPECT_EQ(need, GSHSCENE_STROKE_NATIVE_JOIN_MITER | GSHSCENE_STROKE_NATIVE_CAP_BUTT | GSHSCENE_STROKE_NATIVE_WIDTH_LOCAL |
+      GSHSCENE_STROKE_NATIVE_WIDTH_PROFILE);
+  // a sink that claims the feature is passed the stroke as a stroke, the style (and the profile it names) read back from the handle
+  GSHSCENE_Sink_Caps caps = all_caps();
+  EXPECT_EQ(gshscene_caps_disposition(&caps, &item, nullptr, 0, nullptr, &srgb, nullptr).entry_class, 0);
+  GSHSCENE_Stroke_Style back{};
+  ASSERT_EQ(gshscene_resource_stroke_style(item.style, &back), GSHSCENE_OK);
+  ASSERT_NE(back.width_profile, nullptr);
+  const GSHSCENE_Width_Stop * got = nullptr;
+  size_t n = 0;
+  ASSERT_EQ(gshscene_resource_width_profile(back.width_profile, &got, &n), GSHSCENE_OK);
+  ASSERT_EQ(n, 2u);
+  EXPECT_EQ(got[1].position, 4.0);
+  EXPECT_EQ(got[1].factor, 0.25);
+  // one that does not is refused, naming the feature, or draws it expanded when it can
+  GSHSCENE_Sink_Caps lacks = caps;
+  lacks.stroke_native &= ~GSHSCENE_STROKE_NATIVE_WIDTH_PROFILE;
+  GSHSCENE_Disposition x = gshscene_caps_disposition(&lacks, &item, nullptr, 0, nullptr, &srgb, nullptr);
+  EXPECT_EQ(x.entry_class, GSHSCENE_ENTRY_REFUSED);
+  EXPECT_EQ(x.reason, GSHSCENE_REASON_STROKE_STYLE);
+  EXPECT_EQ(x.detail, (uint64_t)GSHSCENE_STROKE_NATIVE_WIDTH_PROFILE);
+  lacks.flags |= GSHSCENE_CAP_STROKE_EXPAND;
+  EXPECT_EQ(gshscene_caps_disposition(&lacks, &item, nullptr, 0, nullptr, &srgb, nullptr).entry_class, 0);
 }
 
 TEST(StrokeDisposition, StrokeStyleIsDecidedAfterTheOtherRefusalsAndBeforeAnyApproximation) {
