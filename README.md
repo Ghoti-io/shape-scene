@@ -26,7 +26,7 @@ The waist: interned immutable resources, transient lists, and the immediate-mode
   content), and a pattern (`pattern.h`: a closed picture repeated on a lattice, with a cell, a step
   and a repeat per axis, a map and an optional tint that makes it uncolored, whose copies are placed
   by an exact product of the index and the step, so a million copies carry no accumulated error and
-  abutting cells share their edge). A stroke style's width profile is named and reserved.
+  abutting cells share their edge). A stroke style's width profile is a resource (`stroke.h`, SW1 to SW9): the width tapers or swells along each subpath.
 - **Recording without floats** (`fixed.h`). Integer-only calls, for a front end whose headers
   name no floating type: fills and clips of glyph runs under a design map of fixed-point ops,
   palette and foreground paints, groups by operator, a palette from 8-bit entries, a gradient from
@@ -139,7 +139,7 @@ the reasons a sink without a feature is refused with.
 
 ## Not implemented
 
-- A stroke style's width profile is named and reserved; no sink draws one.
+- A width profile needs round joins, round caps, no dashes and center alignment; a butt or mitered stroke of varying width is not defined, and a sink that emits strokes natively (rather than by expansion) does not yet claim `STROKE_NATIVE_WIDTH_PROFILE`.
 - GPU target kinds are reserved; there is no GPU sink.
 - The seam-free flag of a render is reserved and refused.
 - A pattern's tile is clipped to its cell unless the pattern's `overflow` is 1 (SVG 2's `overflow="visible"`): then it is drawn

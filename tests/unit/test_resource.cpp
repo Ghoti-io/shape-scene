@@ -145,7 +145,7 @@ TEST(ResourceKind, EveryKindHasItsPinnedValueAndName) {
   EXPECT_EQ((int)GSHSCENE_RESOURCE_MASK, 11);
   EXPECT_EQ((int)GSHSCENE_RESOURCE_PATTERN, 12);
   EXPECT_EQ((int)GSHSCENE_RESOURCE_HATCH, 13);
-  EXPECT_EQ((int)GSHSCENE_RESOURCE_KIND_COUNT, 15);
+  EXPECT_EQ((int)GSHSCENE_RESOURCE_KIND_COUNT, 16);
   EXPECT_STREQ(gshscene_resource_kind_string(GSHSCENE_RESOURCE_PATTERN), "pattern");
   EXPECT_STREQ(gshscene_resource_kind_string(GSHSCENE_RESOURCE_HATCH), "hatch");
   EXPECT_STREQ(gshscene_resource_kind_string(GSHSCENE_RESOURCE_MASK), "mask");

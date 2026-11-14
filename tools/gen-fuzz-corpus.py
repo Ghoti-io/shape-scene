@@ -226,7 +226,7 @@ def scripted():
     # Strokes story S1.  INTERN_STYLE reads: the store pick (1: the scene's), the slot, the width, the width space, the
     # join, the miter limit, the cap, the degenerate rule, the dash scope, the alignment and its rule, the dash count
     # and each dash, the null-array pick when there are dashes (0: dashes counted but not given), the offset and the
-    # profile pick (0: a path as a width profile, reserved).  Values index the fuzzer's table (0 zero, 1 one, 2 2.5,
+    # profile pick (0: a profile, then which: 0 a path, which is not one, 1 or 2 a width profile of the store).  Values index the fuzzer's table (0 zero, 1 one, 2 2.5,
     # 3 -0, 4 2^-64, 5 2^-65, 6 2^64, 7 one step past, 8 -1, 9 NaN, 10 infinity, 11 three).  An odd array doubled; a
     # negative dash (solid) in the scene's store; a NaN width (invalid); a width past SK2's band (limit); a profile
     # (unsupported); a width of 0.  STROKE reads: the centerline's recipe (5 is 3D), the style pick, the map, the 3D map
@@ -237,7 +237,8 @@ def scripted():
               + bytes([st, 1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 2, 8, 1, 1, 3, 1])
               + bytes([st, 0, 1, 9, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1])
               + bytes([st, 0, 1, 5, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1])
-              + bytes([st, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0])
+              + bytes([st, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1])  # a profile (roll 0), a real one (which 1), a miter join: unsupported (SW5)
+              + bytes([st, 0, 3, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 2])  # round joins and caps, no dashes, a real profile: interned
               + bytes([st, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1]))
     sk = OP["STROKE"]
     strokes = bytes([sk, 2, 0, 0, 1, 0]) + bytes([sk, 5, 0, 0, 1, 0]) + bytes([sk, 2, 2, 3, 0, 0]) + bytes([sk, 3, 2, 2, 1, 1])

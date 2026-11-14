@@ -57,7 +57,7 @@ is converted: the stops are kept as given and hashed as given, so a better `gmat
 
 A stroke style (strokes story S1, SK1 to SK3) is a resource too: a width and its space, a join and its miter limit, a
 cap, what a subpath of zero length draws, a dash array with its offset and scope, an alignment and its fill rule, and a
-reserved width profile, interned in a canonical form (an all-zero or negative dash array is solid, an odd one is
+a width profile (a resource of its own, below), interned in a canonical form (an all-zero or negative dash array is solid, an odd one is
 doubled, a field that does not apply takes its default, `-0` is `+0`), so one drawing is one handle and one hash.
 
 An image (rules IM1 to IM14, `image.h`) is a resource too: a raster's samples as they were imported, with the
@@ -644,9 +644,8 @@ the plane has no outline to test a center against: it covers every pixel the cli
 ## Reserved
 
 Refused with `ERR_UNSUPPORTED`: ProPhoto (D50: converting to it needs a chromatic adaptation), the parametric,
-BT.1886, PQ and HLG transfers and ICC profiles, gray-alpha images (a pinned layout value with no raster to carry it),
-and a stroke style's **width profile** (variable width, D8 of the strokes spec): the slot is a resource handle,
-hashed as `u64` 0 while it is empty, so that defining a profile fills a spelling that already exists. (The palette
+BT.1886, PQ and HLG transfers and ICC profiles, and gray-alpha images (a pinned layout value with no raster to carry it).
+(The palette
 paint is N14 below; the gradient paint and resource are G1 to G13; the image resource is IM1 to IM14 above; the mask
 resource is MK1 to MK14 below; the pattern resource is PT1 to PT14 above; the hatch resource is HX1 to HX3 above.) A mask's transfer is PDF's function types 0, 2 and 3 on one level, and its coefficients are
 MK3's four sets; any other function or weights are sampled or named by the front end and reported as approximated.
@@ -854,7 +853,7 @@ width, `1 / sin(θ / 2)`; past it (strictly greater) a miter becomes a bevel, an
 (`GSHSCENE_STROKE_JOIN_MITER`, ...) keep the `STROKE_` infix so that a cap is never read as a capability flag.
 
 **SK2 Validity and bounds.** On the style as given: a non-finite double, an enumeration out of range, a negative
-width or dashes counted but not given are `ERR_INVALID`; a non-NULL width profile is `ERR_UNSUPPORTED` (reserved, D8);
+width or dashes counted but not given are `ERR_INVALID`; a width profile that is not a width profile resource of this store is `ERR_INVALID`, and one with a join or cap other than round, dashes or an alignment other than center is `ERR_UNSUPPORTED` (SW5);
 then `ERR_LIMIT`, decided after every other check: the width 0 or of magnitude in `[2^-64, 2^64]` (G14's band); the
 miter limit in `[1, 2^16]`; each dash (by magnitude, so a negative one too) and the offset 0 or of magnitude in
 `[2^-64, 2^64]`; at most `min(max_resource_elements, 65535)` dashes after an odd array is doubled. The bounds are met
@@ -1022,7 +1021,7 @@ what it would have drawn, as it requires no feature. All of the test sink's conf
 
 `gshscene_resource_stroke_geometry` converts a style to `shape-geometry`'s parameters, field by field: every
 enumeration is asserted equal at compile time (the libraries state them separately), the doubles are copied, `dashes`
-points into the resource (valid while a handle is held), the width profile is NULL. A sink and the test sink call it, so
+points into the resource (valid while a handle is held), and the width profile is the profile resource's own stops (a style holds a reference to it). A sink and the test sink call it, so
 that no sink restates the table.
 
 **SK12 Hash and dump (the style).** Every format stays 1, and no existing hash or dump changes: no resource from before
@@ -1046,6 +1045,28 @@ walk hands a stroke to the same leaf callback as a shape, which reads the kind.
 **SK14 Fill and stroke of one element.** Two items, or two nodes: the fill, then the stroke, in the order the format's
 paint order gives (SVG's `paint-order`; markers are items of their own). A front end that needs them composited as one
 (an element's opacity) wraps them in a group, as now. Nothing new is defined: it is SVG's and PDF's semantics exactly.
+
+## Width profiles (normative; SW1 to SW9)
+
+A **width profile** is a resource of kind 15 (`"width-profile"`): `count` stops of `{position, factor}`, interned by `gshscene_store_intern_width_profile`
+and read back by `gshscene_resource_width_profile`. A stroke style names one in its `width_profile` slot, and the width at a point of a
+subpath is the style's `width` times the profile's factor at the point's position (`shape-geometry`'s design has SW1 to SW9, the
+definition: the region is the union of the discs along the centerline, the factor linear between stops, constant outside them, a jump where two stops
+share a position; the position is the arc length from the start of the subpath, in model units).
+
+**Interning** decides in order: `ERR_INVALID` for a NULL, no stops, a non-finite, negative or decreasing value; `ERR_LIMIT` for more
+stops than `min(max_resource_elements, 65535)` or a position or factor outside `0` or `[2^-64, 2^64]` (a factor at most `2^16`); `ERR_OOM`. A
+`-0` is a `+0`, equal content is one handle, the hash is, after the two leading fields, `u64` the count and the `f64` position and
+factor of each stop, the dump is `stops N` and a line `s <hex> <hex>` for each, and the accounted bytes are the base plus
+`GSHSCENE_BYTES_PER_WIDTH_STOP` (16) for each stop.
+
+**A style that names one** is checked as a stroke style is, with the profile a resource of this store (`ERR_INVALID` otherwise) and
+SW5's combination: round joins, round caps, no dashes and center alignment, else `ERR_UNSUPPORTED`. The style holds a reference to
+the profile, and its hash already carries the profile's content hash. A **copy** into another store copies the profile first. **SK10's
+bound** widens by the profile's largest factor, so that a box still covers what is drawn. **SK11** adds
+`GSHSCENE_STROKE_NATIVE_WIDTH_PROFILE` (bit 16, `GSHSCENE_STROKE_NATIVE_ALL` now `0x1ffff`) to the features such a stroke requires: a sink that
+cannot emit a variable-width stroke is not refused (it expands, `STROKE_EXPAND`) or is refused (`STROKE_STYLE`) as for any feature it
+lacks. `shape-cpu` draws one by the expansion, which is the geometry library's.
 
 ## Blend modes (normative; color-paint story P3)
 

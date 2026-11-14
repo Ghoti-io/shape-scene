@@ -222,6 +222,8 @@
 #define gshscene_pattern_init GHOTIIO_SHAPE_SCENE(gshscene_pattern_init)
 #define gshscene_pattern_notice GHOTIIO_SHAPE_SCENE(gshscene_pattern_notice)
 #define gshscene_pattern_overlaps GHOTIIO_SHAPE_SCENE(gshscene_pattern_overlaps)
+#define gshscene_store_intern_width_profile GHOTIIO_SHAPE_SCENE(gshscene_store_intern_width_profile)
+#define gshscene_resource_width_profile GHOTIIO_SHAPE_SCENE(gshscene_resource_width_profile)
 #define gshscene_pick_count GHOTIIO_SHAPE_SCENE(gshscene_pick_count)
 #define gshscene_pick_destroy GHOTIIO_SHAPE_SCENE(gshscene_pick_destroy)
 #define gshscene_pick_entry GHOTIIO_SHAPE_SCENE(gshscene_pick_entry)

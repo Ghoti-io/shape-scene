@@ -355,7 +355,7 @@ typedef struct GSHSCENE_Stroke_Style {
   uint32_t dash_scope;            ///< A ::GSHSCENE_Dash_Scope; read only with dashes.
   uint32_t alignment;             ///< A ::GSHSCENE_Alignment.
   GSHGEOM_Fill_Rule alignment_rule; ///< The rule of the region inside and outside alignment clip to (D10); read only off center.
-  const GSHSCENE_Resource * width_profile; ///< Reserved (D8): NULL; anything else is ::GSHSCENE_ERR_UNSUPPORTED.
+  const GSHSCENE_Resource * width_profile; ///< NULL (constant width), or a width profile of the store (SW1 to SW9): the width is `width` times its factor, which needs round joins, round caps, no dashes and center alignment (::GSHSCENE_ERR_UNSUPPORTED otherwise).
 } GSHSCENE_Stroke_Style;
 
 /** @name SK2's bounds
@@ -385,7 +385,8 @@ typedef struct GSHSCENE_Stroke_Style {
 #define GSHSCENE_STROKE_NATIVE_ALIGN (UINT32_C(1) << 13)              ///< Inside and outside alignment, by nonzero.
 #define GSHSCENE_STROKE_NATIVE_ALIGN_EVEN_ODD (UINT32_C(1) << 14)     ///< Alignment by even-odd.
 #define GSHSCENE_STROKE_NATIVE_DEGENERATE_DRAW (UINT32_C(1) << 15)    ///< A subpath of zero length drawn as SVG 2's dot.
-#define GSHSCENE_STROKE_NATIVE_ALL ((UINT32_C(1) << 16) - 1)          ///< Every feature defined.
+#define GSHSCENE_STROKE_NATIVE_WIDTH_PROFILE (UINT32_C(1) << 16)      ///< A width that varies along the subpath (SW1 to SW9): a round-brush stroke.
+#define GSHSCENE_STROKE_NATIVE_ALL ((UINT32_C(1) << 17) - 1)          ///< Every feature defined.
 /** @} */
 
 /** @brief Fill @p style with SK1's defaults.  NULL is ignored. */
@@ -398,11 +399,38 @@ GSHSCENE_API void gshscene_stroke_style_init(GSHSCENE_Stroke_Style * style);
  * @param style The style; its dashes are copied (the canonical array).
  * @param out The handle, with a reference for the caller; written only on success.
  * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, a non-finite double, an enumeration out of range, a negative
- *   width, dashes counted but not given); ::GSHSCENE_ERR_UNSUPPORTED (a width profile, D8); ::GSHSCENE_ERR_LIMIT
+ *   width, dashes counted but not given, a width profile that is not one of this store); ::GSHSCENE_ERR_UNSUPPORTED (a width profile
+ *   with a join or cap other than round, dashes or an alignment other than center, SW5); ::GSHSCENE_ERR_LIMIT
  *   (SK2's bounds, or the store's own limits); ::GSHSCENE_ERR_OOM.
  */
 GSHSCENE_API GSHSCENE_Result gshscene_store_intern_stroke_style(GSHSCENE_Store * store,
     const GSHSCENE_Stroke_Style * style, const GSHSCENE_Resource ** out);
+
+/** @brief One stop of a width profile (the geometry library's, SW1): a position along a subpath in model units and a factor. */
+typedef GSHGEOM_Width_Stop GSHSCENE_Width_Stop;
+
+/**
+ * @brief Intern a width profile (SW1 to SW9, `shape-geometry`'s stroke.h): the stops of a function from the position along a
+ *   subpath to the factor a stroke style's width is multiplied by, linear between them and constant outside them, two stops
+ *   at one position being a jump.  Equal content is one handle; a `-0` is a `+0`.
+ *
+ * @param stops The stops, copied: positions at least 0 and not decreasing, factors at least 0, all finite.
+ * @param count At least 1.
+ * @param out The handle, with a reference for the caller; written only on success.
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (NULL, no stops, a non-finite, negative or decreasing value);
+ *   ::GSHSCENE_ERR_LIMIT (more stops than `min(max_resource_elements, 65535)`, a position or factor outside SW1's bands, the
+ *   store's limits); ::GSHSCENE_ERR_OOM.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_store_intern_width_profile(GSHSCENE_Store * store, const GSHSCENE_Width_Stop * stops,
+    size_t count, const GSHSCENE_Resource ** out);
+
+/**
+ * @brief Read a width profile's stops back (valid while a handle is held).
+ *
+ * @return ::GSHSCENE_OK or ::GSHSCENE_ERR_INVALID (NULL, not a width profile).
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_resource_width_profile(
+    const GSHSCENE_Resource * resource, const GSHSCENE_Width_Stop ** stops, size_t * count);
 
 /**
  * @brief Read a stroke style back, in its canonical form (SK3).

@@ -3563,15 +3563,27 @@ static void op(S * s, unsigned code) {
       st.dash_count = n;
       st.dashes = (n && pick(s, 8) == 0) ? NULL : dashes;
       st.dash_offset = style_values[pick(s, 12)];
-      st.width_profile = pick(s, 12) == 0 ? s->res[0] : NULL;
-      int invalid = (n && !st.dashes) || !isfinite(st.width) || !isfinite(st.miter_limit) || !isfinite(st.dash_offset) ||
+      /* a width profile (SW1): a real one of the store, or a path, which is not one, or none */
+      const GSHSCENE_Width_Stop wstops[2] = {{0.0, 1.0}, {4.0, 2.0}};
+      const GSHSCENE_Resource * real_profile = NULL;
+      if (gshscene_store_intern_width_profile(store, wstops, 2, &real_profile) != GSHSCENE_OK) {
+        real_profile = NULL;
+      }
+      const unsigned profile_roll = (unsigned)pick(s, 12);
+      const unsigned profile_which = profile_roll == 0 ? (unsigned)pick(s, 3) : 0; /* only the inputs that named a profile read a byte more */
+      st.width_profile = profile_roll != 0 ? NULL : profile_which == 0 ? s->res[0] : real_profile;
+      const int profile_is_real = st.width_profile != NULL && st.width_profile == real_profile;
+      int invalid = (st.width_profile != NULL && !profile_is_real) || (n && !st.dashes) || !isfinite(st.width) || !isfinite(st.miter_limit) || !isfinite(st.dash_offset) ||
           st.width_space > 1 || st.join > 4 || st.cap > 2 || st.degenerate > 1 || st.dash_scope > 1 ||
           st.alignment > 2 || st.alignment_rule > 1 || st.width < 0.0;
       for (size_t i = 0; st.dashes && i < n; i++) {
         invalid = invalid || !isfinite(dashes[i]);
       }
-      int unsupported = !invalid && st.width_profile != NULL;
       size_t count = st.dashes ? style_dash_count(dashes, n) : 0;
+      /* SW5: a profile needs round joins and caps, no dashes and center alignment */
+      int unsupported = !invalid && st.width_profile != NULL &&
+          (st.join != GSHSCENE_STROKE_JOIN_ROUND || st.cap != GSHSCENE_STROKE_CAP_ROUND || count != 0 ||
+              st.alignment != GSHSCENE_STROKE_ALIGN_CENTER);
       size_t most = lim->max_resource_elements < 65535 ? lim->max_resource_elements : 65535;
       int beyond = !style_within(st.width) || !style_within(st.dash_offset) || !(st.miter_limit >= 1.0) ||
           !(st.miter_limit <= 0x1p16) || count > most;
@@ -3580,6 +3592,9 @@ static void op(S * s, unsigned code) {
       }
       const GSHSCENE_Resource * g = NULL;
       r = gshscene_store_intern_stroke_style(store, &st, &g);
+      if (r != GSHSCENE_OK) {
+        gshscene_resource_release(real_profile); /* the style holds its own reference when there is one */
+      }
       if (invalid) {
         CHECK(r == GSHSCENE_ERR_INVALID);
         outcomes[OUT_STYLE_INVALID]++;
@@ -3621,7 +3636,8 @@ static void op(S * s, unsigned code) {
       } else {
         CHECK(same_bits(back.dash_offset, 0.0) && back.dash_scope == GSHSCENE_STROKE_DASH_PER_SUBPATH);
       }
-      CHECK(back.width_profile == NULL);
+      CHECK(back.width_profile == st.width_profile);
+      gshscene_resource_release(real_profile);
       CHECK(gshscene_resource_dump(g, s->null) == GSHSCENE_OK);
       const GSHSCENE_Resource * again = NULL;
       if (gshscene_store_intern_stroke_style(store, &back, &again) == GSHSCENE_OK) {

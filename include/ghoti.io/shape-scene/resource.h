@@ -175,6 +175,7 @@ typedef enum GSHSCENE_Resource_Kind {
   GSHSCENE_RESOURCE_PATTERN = 12,  ///< A pattern: a picture repeated on a lattice, which a pattern paint names (pattern.h, PT1).
   GSHSCENE_RESOURCE_HATCH = 13,    ///< A hatch: line families trimmed to a fill's region and stroked; reserved, not yet interned.
   GSHSCENE_RESOURCE_CLIP_UNION = 14, ///< A clip union: the union of several shapes, which a clip push and a group's clip name (clip_union.h, CU6).
+  GSHSCENE_RESOURCE_WIDTH_PROFILE = 15, ///< A width profile: a stroke style's width as a function of the position along each subpath (stroke.h, SW1 to SW9).
   GSHSCENE_RESOURCE_KIND_COUNT     ///< Closes the enum.
 } GSHSCENE_Resource_Kind;
 
@@ -183,7 +184,7 @@ typedef enum GSHSCENE_Resource_Kind {
  *
  * @param kind The kind, including a value outside the enum.
  * @return A static string, never NULL: "path", "glyph-run", "picture",
- *   "gradient", "image", "face", "palette", "stroke-style", "plane", "image-paint", "mask", or "unknown resource kind".
+ *   "gradient", "image", "face", "palette", "stroke-style", "plane", "image-paint", "mask", "pattern", "hatch", "clip-union", "width-profile", or "unknown resource kind".
  */
 GSHSCENE_API const char * gshscene_resource_kind_string(GSHSCENE_Resource_Kind kind);
 
@@ -252,6 +253,7 @@ typedef struct GSHSCENE_Glyph_Run {
 #define GSHSCENE_BYTES_PER_AXIS ((size_t)8)      ///< Added for each variation coordinate of a face.
 #define GSHSCENE_BYTES_PER_COLOR ((size_t)48)    ///< Added for each entry of a palette.
 #define GSHSCENE_BYTES_PER_STOP ((size_t)96)     ///< Added for each stop of a gradient.
+#define GSHSCENE_BYTES_PER_WIDTH_STOP ((size_t)16) ///< Added for each stop of a width profile.
 #define GSHSCENE_BYTES_PER_DASH ((size_t)16)     ///< Added for each dash of a stroke style's canonical array (SK12).
 #define GSHSCENE_BYTES_PER_TRANSFER_PIECE ((size_t)112) ///< Added for each piece of a mask's stitching transfer (MK4).
 #define GSHSCENE_BYTES_PER_TRANSFER_SAMPLE ((size_t)8)  ///< Added for each sample of a mask's tables (MK4).

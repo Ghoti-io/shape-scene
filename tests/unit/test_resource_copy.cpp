@@ -47,7 +47,7 @@ struct World {
   StoreHolder src;
   std::vector<Ref> all;                        // every resource, in kind order, for the loop tests
   Ref path, tagged, run_outlines, face, run_font, picture, gradient, image, palette, style, plane, image_paint, mask, pattern, hatch,
-      clip_union;
+      clip_union, width_profile, profiled_style;
   RasterHolder raster;
 
   explicit World(const GSHSCENE_Limits * limits = nullptr, const GSHSCENE_Allocator * alloc = nullptr)
@@ -118,6 +118,20 @@ struct World {
     }
     if (gshscene_store_intern_plane(s, &r) == GSHSCENE_OK) {
       plane = Ref(r);
+    }
+    /* a width profile and a style that names it */
+    const GSHSCENE_Width_Stop wstops[3] = {{0, 0.5}, {9, 2.0}, {9, 1.0}};
+    if (gshscene_store_intern_width_profile(s, wstops, 3, &r) == GSHSCENE_OK) {
+      width_profile = Ref(r);
+    }
+    GSHSCENE_Stroke_Style ps;
+    gshscene_stroke_style_init(&ps);
+    ps.width = 5.0;
+    ps.join = GSHSCENE_STROKE_JOIN_ROUND;
+    ps.cap = GSHSCENE_STROKE_CAP_ROUND;
+    ps.width_profile = width_profile.get();
+    if (gshscene_store_intern_stroke_style(s, &ps, &r) == GSHSCENE_OK) {
+      profiled_style = Ref(r);
     }
     /* an image (and its paint) */
     if (gshscene_store_intern_image(s, raster.raster, nullptr, &r) == GSHSCENE_OK) {
@@ -193,7 +207,7 @@ struct World {
   /** Pointers to the resources, in a fixed order, null-free once the constructor has succeeded. */
   std::vector<const GSHSCENE_Resource *> list() const {
     return {path.get(), tagged.get(), run_outlines.get(), face.get(), run_font.get(), picture.get(), gradient.get(), image.get(),
-        palette.get(), style.get(), plane.get(), image_paint.get(), mask.get(), pattern.get(), hatch.get(), clip_union.get()};
+        palette.get(), style.get(), plane.get(), image_paint.get(), mask.get(), pattern.get(), hatch.get(), clip_union.get(), width_profile.get(), profiled_style.get()};
   }
 };
 
@@ -240,7 +254,7 @@ TEST(ResourceCopy, TheWorldHasAResourceOfEveryKind) {
     ASSERT_NE(r, nullptr);
     kinds.push_back(gshscene_resource_kind(r));
   }
-  for (int k = (int)GSHSCENE_RESOURCE_PATH; k <= (int)GSHSCENE_RESOURCE_CLIP_UNION; k++) {
+  for (int k = (int)GSHSCENE_RESOURCE_PATH; k <= (int)GSHSCENE_RESOURCE_WIDTH_PROFILE; k++) {
     EXPECT_NE(std::find(kinds.begin(), kinds.end(), (GSHSCENE_Resource_Kind)k), kinds.end()) << "kind " << k;
   }
 }

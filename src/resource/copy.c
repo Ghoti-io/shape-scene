@@ -350,6 +350,9 @@ static GSHSCENE_Result copy_into(GSHSCENE_Store * dst, const GSHSCENE_Resource *
     GSHSCENE_Stroke_Style s;
     r = gshscene_resource_stroke_style(from, &s);
     if (r == GSHSCENE_OK) {
+      s.width_profile = copy_held(dst, s.width_profile, &held, &r); /* the profile a style names is copied first */
+    }
+    if (r == GSHSCENE_OK) {
       r = gshscene_store_intern_stroke_style(dst, &s, out);
     }
     break;
@@ -357,6 +360,15 @@ static GSHSCENE_Result copy_into(GSHSCENE_Store * dst, const GSHSCENE_Resource *
   case GSHSCENE_RESOURCE_PLANE:
     r = gshscene_store_intern_plane(dst, out);
     break;
+  case GSHSCENE_RESOURCE_WIDTH_PROFILE: {
+    const GSHSCENE_Width_Stop * stops = NULL;
+    size_t count = 0;
+    r = gshscene_resource_width_profile(from, &stops, &count);
+    if (r == GSHSCENE_OK) {
+      r = gshscene_store_intern_width_profile(dst, stops, count, out);
+    }
+    break;
+  }
   case GSHSCENE_RESOURCE_IMAGE_PAINT: {
     GSHSCENE_Image_Paint p;
     r = gshscene_resource_image_paint(from, &p);

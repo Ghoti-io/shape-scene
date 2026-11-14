@@ -116,6 +116,11 @@ struct GSHSCENE_Resource {
       double * dashes;         /* dash_count of them, NULL for none */
     } stroke;
     struct {
+      GSHGEOM_Width_Stop * stops;  /* count of them, copied, `-0` as `+0` */
+      GSHGEOM_Width_Profile geom;  /* the geometry library's view of the stops, for a style's conversion */
+      double max_factor;           /* the largest factor, for a stroke's bounds */
+    } profile;
+    struct {
       GSHSCENE_Image_Paint p;     /* canonical (IP1); image and tint point at the copies below */
       GSHSCENE_Paint tint;        /* the tint, when the image is alpha-only */
       const GSHSCENE_Resource * image; /* retained */
@@ -372,6 +377,11 @@ int gshscene_image_paint_singular(const GSHSCENE_Resource * resource);
 
 /** Whether a clip union resource has the canonical content @p source (clip_union.c Source). */
 int gshscene_clip_union_matches(const GSHSCENE_Resource * resource, const void * source);
+
+/** The width profile resource (width_profile.c, SW1): equality with a probe's source, freeing its stops, and the payload of its dump (negative on failure). */
+int gshscene_width_profile_matches(const GSHSCENE_Resource * resource, const void * source);
+void gshscene_width_profile_free(GSHSCENE_Resource * resource);
+int gshscene_width_profile_dump(const GSHSCENE_Resource * resource, FILE * out);
 
 /** Release the members' resources and free the array. */
 void gshscene_clip_union_free(GSHSCENE_Resource * resource);

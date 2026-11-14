@@ -74,8 +74,10 @@ void gshscene_stroke_style_init(GSHSCENE_Stroke_Style * style) {
 
 /* --- SK2 and SK3 ------------------------------------------------------------------- */
 
+static size_t canonical_dash_count(const GSHSCENE_Stroke_Style * in);
+
 /** SK2's validity: every check that makes the style ::GSHSCENE_ERR_INVALID, then the reserved profile. */
-static GSHSCENE_Result valid(const GSHSCENE_Stroke_Style * in) {
+static GSHSCENE_Result valid(const GSHSCENE_Store * store, const GSHSCENE_Stroke_Style * in) {
   if (in->dash_count && !in->dashes) {
     return GSHSCENE_ERR_INVALID;
   }
@@ -98,7 +100,14 @@ static GSHSCENE_Result valid(const GSHSCENE_Stroke_Style * in) {
     return GSHSCENE_ERR_INVALID;
   }
   if (in->width_profile) {
-    return GSHSCENE_ERR_UNSUPPORTED; /* D8: reserved until a profile is defined */
+    if (in->width_profile->kind != GSHSCENE_RESOURCE_WIDTH_PROFILE || in->width_profile->store != store) {
+      return GSHSCENE_ERR_INVALID;
+    }
+    /* SW5: the region is a swept disc, so the style must say round joins and caps, no dashes and center alignment. */
+    if (in->join != (uint32_t)GSHSCENE_STROKE_JOIN_ROUND || in->cap != (uint32_t)GSHSCENE_STROKE_CAP_ROUND ||
+        canonical_dash_count(in) != 0 || in->alignment != (uint32_t)GSHSCENE_STROKE_ALIGN_CENTER) {
+      return GSHSCENE_ERR_UNSUPPORTED;
+    }
   }
   return GSHSCENE_OK;
 }
@@ -156,7 +165,7 @@ static void canonical(const GSHSCENE_Stroke_Style * in, size_t count, double * d
     out->dash_offset = 0.0;
     out->dash_scope = GSHSCENE_STROKE_DASH_PER_SUBPATH;
   }
-  out->width_profile = NULL;
+  out->width_profile = in->width_profile;
 }
 
 /* --- hash and equality ------------------------------------------------------------- */
@@ -224,11 +233,13 @@ static GSHSCENE_Result build_stroke(GSHSCENE_Store * store, const void * source,
   }
   resource->u.stroke.s = *s;
   resource->u.stroke.s.dashes = resource->u.stroke.dashes;
+  gshscene_resource_retain(s->width_profile); /* the style names it: held until the style goes */
   *out = resource;
   return GSHSCENE_OK;
 }
 
 void gshscene_stroke_free(GSHSCENE_Resource * resource) {
+  gshscene_resource_release(resource->u.stroke.s.width_profile);
   gshscene_free(&resource->store->alloc, resource->u.stroke.dashes);
 }
 
@@ -237,7 +248,7 @@ GSHSCENE_Result gshscene_store_intern_stroke_style(
   if (!store || !style || !out) {
     return GSHSCENE_ERR_INVALID;
   }
-  GSHSCENE_Result result = valid(style);
+  GSHSCENE_Result result = valid(store, style);
   if (result != GSHSCENE_OK) {
     return result;
   }
@@ -326,7 +337,7 @@ GSHSCENE_Result gshscene_resource_stroke_geometry(const GSHSCENE_Resource * reso
   g.dash_scope = s->dash_scope;
   g.alignment = s->alignment;
   g.alignment_rule = s->alignment_rule;
-  g.width_profile = NULL; /* reserved: a style with one is not interned (D8) */
+  g.width_profile = s->width_profile ? &s->width_profile->u.profile.geom : NULL; /* into the profile: valid while a handle is held */
   if (gshgeom_stroke_check(&g) != GSHGEOM_OK) {
     return GSHSCENE_ERR_INTERNAL; /* SK2 equals SG2: a style the store holds passes */
   }
@@ -419,7 +430,8 @@ static double reach(const GSHSCENE_Stroke_Style * s, double pixel, int hatch) {
     f = 1.5; /* a square cap's corner, sqrt 2 half widths from the end */
   }
   double a = s->alignment == (uint32_t)GSHSCENE_STROKE_ALIGN_CENTER ? 1.0 : 2.0; /* a hatch's style is always centered (HX2) */
-  return (s->width * 0.5) * f * a * pixel * STROKE_ROUND_UP;
+  const double factor = s->width_profile ? s->width_profile->u.profile.max_factor : 1.0; /* SW2: the widest the profile makes it */
+  return (s->width * factor * 0.5) * f * a * pixel * STROKE_ROUND_UP;
 }
 
 static GSHSCENE_Result bounds_core(const GSHSCENE_Resource * style, const GSHGEOM_Bounds * centerline,
@@ -695,6 +707,9 @@ uint32_t gshscene_stroke_required(const GSHSCENE_Item * item, const GSHGEOM_Map 
     if (s->alignment_rule == GSHGEOM_FILL_EVEN_ODD) {
       need |= GSHSCENE_STROKE_NATIVE_ALIGN_EVEN_ODD;
     }
+  }
+  if (s->width_profile) {
+    need |= GSHSCENE_STROKE_NATIVE_WIDTH_PROFILE;
   }
   if (s->degenerate == (uint32_t)GSHSCENE_STROKE_DEGENERATE_DRAW && s->cap != (uint32_t)GSHSCENE_STROKE_CAP_BUTT) {
     need |= GSHSCENE_STROKE_NATIVE_DEGENERATE_DRAW; /* with a butt cap a degenerate subpath draws nothing either way */

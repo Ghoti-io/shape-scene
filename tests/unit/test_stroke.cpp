@@ -458,13 +458,19 @@ TEST(StrokeStyle, EveryInvalidFieldIsInvalid) {
   EXPECT_EQ(stats.live, 0u) << "a failing intern keeps nothing";
 }
 
-TEST(StrokeStyle, TheWidthProfileIsReservedAndDecidedAfterValidity) {
+TEST(StrokeStyle, TheWidthProfileIsCheckedAfterValidityAndBeforeTheBounds) {
   StoreHolder s;
   Ref path(intern_square(s.store));
+  const GSHSCENE_Width_Stop one[1] = {{0, 1}};
+  const GSHSCENE_Resource * pr = nullptr;
+  ASSERT_EQ(gshscene_store_intern_width_profile(s.store, one, 1, &pr), GSHSCENE_OK);
+  Ref profile(pr);
   Style st;
-  st.s.width_profile = path.get();
   const GSHSCENE_Resource * r = nullptr;
-  EXPECT_EQ(gshscene_store_intern_stroke_style(s.store, st.get(), &r), GSHSCENE_ERR_UNSUPPORTED) << "D8";
+  st.s.width_profile = path.get();
+  EXPECT_EQ(gshscene_store_intern_stroke_style(s.store, st.get(), &r), GSHSCENE_ERR_INVALID) << "not a profile";
+  st.s.width_profile = profile.get();
+  EXPECT_EQ(gshscene_store_intern_stroke_style(s.store, st.get(), &r), GSHSCENE_ERR_UNSUPPORTED) << "SW5: a miter join and a butt cap";
   st.s.width = kNaN;
   EXPECT_EQ(gshscene_store_intern_stroke_style(s.store, st.get(), &r), GSHSCENE_ERR_INVALID) << "validity first";
   st.s.width = -1.0;
