@@ -524,7 +524,12 @@ static void put64(Out * o, uint64_t v) {
 
 /** A number, `-0` as `+0` (one spelling for one number). */
 static void putf(Out * o, double v) {
-  put64(o, gshgeom_f64_bits(v == 0.0 ? 0.0 : v));
+  /* a negative zero is a zero; selected on the bits, since a conditional on doubles compiles to x87 selects on a 32-bit x86 build */
+  uint64_t bits = gshgeom_f64_bits(v);
+  if (v == 0.0) {
+    bits = 0;
+  }
+  put64(o, bits);
 }
 
 static void put_color(Out * o, const GSHSCENE_Color * c) {
