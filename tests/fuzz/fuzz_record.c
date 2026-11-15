@@ -1591,7 +1591,8 @@ static void fuzz_filter(S * s) {
   static const double vals[6] = {0.0, 1.5, 2.0, -1.0, 0x1p65, (double)NAN};
   unsigned count = 1 + pick(s, 3), k0 = pick(s, 19), k1 = pick(s, 19), vsel = pick(s, 6), region = pick(s, 4), grp = pick(s, 3);
   static const GSHSCENE_Filter_Input two[2] = {{GSHSCENE_FILTER_INPUT_SOURCE_GRAPHIC, 0}, {GSHSCENE_FILTER_INPUT_RESULT, 0}};
-  static const GSHSCENE_Filter_Input one[1] = {{GSHSCENE_FILTER_INPUT_PREVIOUS, 0}};
+  /* two entries: a displacement map takes two inputs whatever `count` says, and must not read past the array */
+  static const GSHSCENE_Filter_Input one[2] = {{GSHSCENE_FILTER_INPUT_PREVIOUS, 0}, {GSHSCENE_FILTER_INPUT_PREVIOUS, 0}};
   GSHSCENE_Filter_Primitive prims[3];
   for (unsigned i = 0; i < count; i++) {
     const unsigned kind = i == 0 ? k0 : k1;
