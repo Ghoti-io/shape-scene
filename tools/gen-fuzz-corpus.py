@@ -36,7 +36,7 @@ OPS = ["LIST_CREATE", "FILL", "CLIP_PUSH", "CLIP_POP", "GROUP_PUSH", "GROUP_POP"
        "FILL_EX", "CLIP_PUSH_EX", "GROUP_PUSH_EX", "LIST_FOREGROUND", "NODE_PROPS", "EDIT_FOREGROUND", "LIST_PALETTE",
        "FILL_FIXED", "TRUNCATE", "EDIT_PALETTE", "INTERN_GRADIENT", "FILL_GRADIENT", "SCENE_GRADIENT", "GRADIENT_NODE",
        "COLOR_BOUND", "GROUP_PDF", "NODE_PDF", "INTERN_STYLE", "STROKE", "STROKE_NODE", "PLACEHOLDER", "PLACEHOLDER_NODE", "INTERN_IMAGE", "IMAGE_NOT_SHAPE", "IMAGE_PAINT",
-       "INTERN_MASK", "GROUP_MASK", "NODE_MASK", "INTERN_PRIMITIVE", "INTERN_PATTERN", "PATTERN_FILL", "PATTERN_NODE", "INTERN_HATCH"]
+       "INTERN_MASK", "GROUP_MASK", "NODE_MASK", "INTERN_PRIMITIVE", "INTERN_PATTERN", "PATTERN_FILL", "PATTERN_NODE", "INTERN_HATCH", "INTERN_FILTER"]
 OP = {name: i for i, name in enumerate(OPS)}
 
 BIASED = {
@@ -48,7 +48,7 @@ BIASED = {
     "LIST_PALETTE": 2, "FILL_FIXED": 4, "TRUNCATE": 2, "EDIT_PALETTE": 2, "INTERN_GRADIENT": 4, "FILL_GRADIENT": 4,
     "SCENE_GRADIENT": 4, "GRADIENT_NODE": 5, "INTERN_STYLE": 5, "STROKE": 4, "STROKE_NODE": 4,
     "INTERN_IMAGE": 6, "IMAGE_NOT_SHAPE": 2, "IMAGE_PAINT": 6, "INTERN_MASK": 8, "GROUP_MASK": 6, "NODE_MASK": 3,
-    "INTERN_PRIMITIVE": 5, "INTERN_PATTERN": 8, "PATTERN_FILL": 6, "PATTERN_NODE": 3, "INTERN_HATCH": 13,
+    "INTERN_PRIMITIVE": 5, "INTERN_PATTERN": 8, "PATTERN_FILL": 6, "PATTERN_NODE": 3, "INTERN_HATCH": 13, "INTERN_FILTER": 6,
 }
 
 BIASED_FILES = 160
@@ -399,6 +399,16 @@ def scripted():
     out["scripted-pattern-tinted.bin"] = bytes(bytearray([0xFF, 0xFF, OP["INTERN_PATTERN"]]) + bytes(9) + bytes([1, 0]))
     out["scripted-hatch-stroke.bin"] = bytes(bytearray([0xFF, 0xFF, OP["INTERN_STYLE"]]) + bytes(13) + bytes([1])
                                              + bytes([OP["INTERN_HATCH"], 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 2, 0, 2]))
+    # Filters (FL1): a blur and an offset interned as a pair and found again (every pick zero but the count and the second kind), an invalid
+    # first kind, a filter whose group is not isolated, a blur of a value past the bound, and an explicit region.
+    # picks: count, kind 0, kind 1, value, region, group.
+    def flt(count, k0, k1, v, region, group):
+        return bytes([OP["INTERN_FILTER"], count, k0, k1, v, region, group])
+    out["scripted-filters.bin"] = bytes(bytearray([0xFF, 0xFF]) + flt(1, 8, 0, 1, 1, 0) + flt(2, 8, 1, 2, 1, 0) + flt(1, 8, 0, 1, 0, 2)
+                                         + flt(1, 0, 0, 1, 1, 0) + flt(1, 8, 0, 4, 1, 0) + flt(2, 3, 5, 1, 2, 1) + flt(1, 2, 0, 0, 3, 0))
+    # A fill painted with a hatch (mode 0), and one whose pen has no width, which draws nothing and is noticed (the same picks but the width).
+    out["scripted-hatch-fill.bin"] = bytes(bytearray([0xFF, 0xFF, OP["LIST_CREATE"]]) + bytes([OP["INTERN_HATCH"], 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 2, 0, 0]))
+    out["scripted-hatch-fill-no-width.bin"] = bytes(bytearray([0xFF, 0xFF, OP["LIST_CREATE"]]) + bytes([OP["INTERN_HATCH"], 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]))
     out["scripted-images.bin"] = bytes(bytearray([0xFF, 0xFF]) + images)
     # The same under a store whose bytes are bounded (b1 = 0x40: max_bytes 1500): an image that does not fit is refused by
     # the store's limit, and one that does is interned.

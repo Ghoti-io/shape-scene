@@ -107,7 +107,7 @@ enum {
   OP_FILL_FIXED, OP_TRUNCATE, OP_EDIT_PALETTE, OP_INTERN_GRADIENT, OP_FILL_GRADIENT, OP_SCENE_GRADIENT,
   OP_GRADIENT_NODE, OP_COLOR_BOUND, OP_GROUP_PDF, OP_NODE_PDF, OP_INTERN_STYLE, OP_STROKE, OP_STROKE_NODE, OP_PLACEHOLDER,
   OP_PLACEHOLDER_NODE, OP_INTERN_IMAGE, OP_IMAGE_NOT_SHAPE, OP_IMAGE_PAINT, OP_INTERN_MASK,
-  OP_GROUP_MASK, OP_NODE_MASK, OP_INTERN_PRIMITIVE, OP_INTERN_PATTERN, OP_PATTERN_FILL, OP_PATTERN_NODE, OP_INTERN_HATCH, OP_COUNT
+  OP_GROUP_MASK, OP_NODE_MASK, OP_INTERN_PRIMITIVE, OP_INTERN_PATTERN, OP_PATTERN_FILL, OP_PATTERN_NODE, OP_INTERN_HATCH, OP_INTERN_FILTER, OP_COUNT
 };
 
 /* --- the outcomes the corpus must reach ------------------------------------------------------------ */
@@ -131,7 +131,8 @@ enum {
   OUT_PATTERN_INVALID, OUT_PATTERN_UNSUPPORTED, OUT_PATTERN_LIMIT, OUT_PATTERN_HIT, OUT_PATTERN_NEAR, OUT_PATTERN_FILL,
   OUT_PATTERN_FILL_INVALID, OUT_PATTERN_NOTICE, OUT_PATTERN_NODE, OUT_PATTERN_DAMAGE, OUT_PATTERN_NO_DAMAGE,
   OUT_PATTERN_EMITTED, OUT_HATCH_INTERNED, OUT_HATCH_INVALID, OUT_HATCH_UNSUPPORTED, OUT_HATCH_LIMIT, OUT_HATCH_HIT,
-  OUT_HATCH_NEAR, OUT_HATCH_FILL, OUT_HATCH_NOTICE, OUT_HATCH_FILL_REFUSED, OUT_COUNT
+  OUT_HATCH_NEAR, OUT_HATCH_FILL, OUT_HATCH_NOTICE, OUT_HATCH_FILL_REFUSED, OUT_FILTER_INTERNED, OUT_FILTER_INVALID, OUT_FILTER_LIMIT, OUT_FILTER_HIT,
+  OUT_FILTER_NEAR, OUT_FILTER_GROUP, OUT_FILTER_GROUP_INVALID, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limit", "edit limit", "publish limit",
@@ -165,7 +166,9 @@ static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limi
     "a shape node painted with a pattern", "a changed pattern damaging its node", "an unchanged pattern damaging nothing",
     "an emitted list with a pattern fill", "a hatch interned", "a hatch refused as invalid", "a hatch refused as unsupported",
     "a hatch past HX2's bounds refused", "a hatch found again", "a hatch told apart from its nearest neighbor",
-    "a fill painted with a hatch recorded", "a hatch fill that draws nothing noticed", "a hatch paint refused where it does not go"};
+    "a fill painted with a hatch recorded", "a hatch fill that draws nothing noticed", "a hatch paint refused where it does not go",
+    "a filter interned", "a filter refused as invalid", "a filter past FL's bounds refused", "a filter found again",
+    "a filter told apart from its nearest neighbor", "a group recorded with a filter", "a filtered group refused as invalid"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -1547,6 +1550,132 @@ static void fuzz_pattern_fill(S * s) {
 /* --- hatches (masks-images-patterns story H1: HX1 to HX3, HX9, HX15) ------------------------------------------------------------ */
 
 /** HX1 to HX3: a hatch from the input, its result class predicted in HX2's order, read back, found again, told from its neighbor, painted. */
+/* --- filters (FL1 to FL6, FL9, FL12) ------------------------------------------------------------------------------------ */
+
+/** A primitive of kind @p kind from the picks: the fields its kind uses, one of them from @p v (which may be invalid). */
+static void filter_primitive(GSHSCENE_Filter_Primitive * p, unsigned kind, double v, const GSHSCENE_Filter_Input * in, unsigned count) {
+  memset(p, 0, sizeof *p);
+  p->kind = kind;
+  switch (kind) {
+    case GSHSCENE_FILTER_FLOOD:
+      p->color.rgba[3] = 1.0;
+      p->opacity = v;
+      return;
+    case GSHSCENE_FILTER_TURBULENCE:
+      p->sx = v;
+      p->sy = v;
+      p->octaves = 1;
+      return;
+    default:
+      break;
+  }
+  p->input_count = (kind == GSHSCENE_FILTER_BLEND || kind == GSHSCENE_FILTER_COMPOSITE || kind == GSHSCENE_FILTER_DISPLACEMENT_MAP) ? 2u : count;
+  p->inputs = in;
+  switch (kind) {
+    case GSHSCENE_FILTER_OFFSET:
+      p->dx = v;
+      break;
+    case GSHSCENE_FILTER_GAUSSIAN_BLUR:
+    case GSHSCENE_FILTER_MORPHOLOGY:
+      p->sx = v;
+      p->sy = 1.0;
+      break;
+    case GSHSCENE_FILTER_COMPOSITE:
+      break;
+    default:
+      break;
+  }
+}
+
+static void fuzz_filter(S * s) {
+  static const double vals[6] = {0.0, 1.5, 2.0, -1.0, 0x1p65, (double)NAN};
+  unsigned count = 1 + pick(s, 3), k0 = pick(s, 19), k1 = pick(s, 19), vsel = pick(s, 6), region = pick(s, 4), grp = pick(s, 3);
+  static const GSHSCENE_Filter_Input two[2] = {{GSHSCENE_FILTER_INPUT_SOURCE_GRAPHIC, 0}, {GSHSCENE_FILTER_INPUT_RESULT, 0}};
+  static const GSHSCENE_Filter_Input one[1] = {{GSHSCENE_FILTER_INPUT_PREVIOUS, 0}};
+  GSHSCENE_Filter_Primitive prims[3];
+  for (unsigned i = 0; i < count; i++) {
+    const unsigned kind = i == 0 ? k0 : k1;
+    filter_primitive(&prims[i], kind, vals[(vsel + i) % 6], kind == GSHSCENE_FILTER_BLEND || kind == GSHSCENE_FILTER_COMPOSITE ? two : one, 1);
+    if (i == 0 && prims[i].input_count == 2) {
+      prims[i].inputs = one; /* the first primitive has nothing earlier to name */
+    }
+  }
+  GSHSCENE_Filter f;
+  memset(&f, 0, sizeof f);
+  f.region_mode = region == 0 ? GSHSCENE_FILTER_REGION_EXPLICIT : GSHSCENE_FILTER_REGION_AUTO;
+  if (region == 0) {
+    f.region[2] = 4.0;
+    f.region[3] = 4.0;
+  }
+  f.color_space = region == 3 ? GSHSCENE_FILTER_SPACE_SRGB : GSHSCENE_FILTER_SPACE_LINEAR_RGB;
+  f.primitive_count = count;
+  f.primitives = prims;
+  const GSHSCENE_Resource * made = NULL;
+  GSHSCENE_Result r = gshscene_store_intern_filter(s->store, &f, &made);
+  CHECK(r == GSHSCENE_OK || r == GSHSCENE_ERR_INVALID || r == GSHSCENE_ERR_LIMIT || r == GSHSCENE_ERR_OOM);
+  if (r == GSHSCENE_ERR_INVALID) {
+    outcomes[OUT_FILTER_INVALID]++;
+    CHECK(made == NULL);
+    return;
+  }
+  if (r == GSHSCENE_ERR_LIMIT) {
+    outcomes[OUT_FILTER_LIMIT]++;
+    return;
+  }
+  if (r != GSHSCENE_OK) {
+    return;
+  }
+  outcomes[OUT_FILTER_INTERNED]++;
+  GSHSCENE_Filter back;
+  CHECK(gshscene_resource_filter(made, &back) == GSHSCENE_OK && back.primitive_count == count);
+  const GSHSCENE_Resource * again = NULL;
+  CHECK(gshscene_store_intern_filter(s->store, &f, &again) == GSHSCENE_OK && again == made);
+  gshscene_resource_release(again);
+  outcomes[OUT_FILTER_HIT]++;
+  /* its nearest neighbor: the region's size changed */
+  GSHSCENE_Filter g = f;
+  g.region_mode = GSHSCENE_FILTER_REGION_EXPLICIT;
+  g.region[0] = 0.0;
+  g.region[1] = 0.0;
+  g.region[2] = f.region_mode == GSHSCENE_FILTER_REGION_EXPLICIT ? f.region[2] + 1.0 : 5.0;
+  g.region[3] = 4.0;
+  const GSHSCENE_Resource * near = NULL;
+  if (gshscene_store_intern_filter(s->store, &g, &near) == GSHSCENE_OK) {
+    CHECK(near != made && gshscene_resource_hash(near) != gshscene_resource_hash(made));
+    gshscene_resource_release(near);
+    outcomes[OUT_FILTER_NEAR]++;
+  }
+  /* a group that names it: recorded (its list hashed differently from a plain group's), or refused where it is not isolated */
+  GSHSCENE_List * list = NULL;
+  if (gshscene_list_create(NULL, &s->limits, s->store, &list) == GSHSCENE_OK) {
+    GSHSCENE_Group grpd;
+    memset(&grpd, 0, sizeof grpd);
+    grpd.opacity = 1.0;
+    grpd.filter = made;
+    if (grp == 2) {
+      grpd.isolation = GSHSCENE_ISOLATION_NON_ISOLATED;
+      CHECK(gshscene_list_group_push(list, &grpd, 0, 0.0) == GSHSCENE_ERR_INVALID);
+      outcomes[OUT_FILTER_GROUP_INVALID]++;
+    } else if (gshscene_list_group_push(list, &grpd, 0, 0.0) == GSHSCENE_OK) {
+      CHECK(gshscene_list_group_pop(list) == GSHSCENE_OK && gshscene_list_close(list) == GSHSCENE_OK);
+      GSHSCENE_List * plain = NULL;
+      if (gshscene_list_create(NULL, &s->limits, s->store, &plain) == GSHSCENE_OK) {
+        GSHSCENE_Group pg;
+        memset(&pg, 0, sizeof pg);
+        pg.opacity = 1.0;
+        if (gshscene_list_group_push(plain, &pg, 0, 0.0) == GSHSCENE_OK && gshscene_list_group_pop(plain) == GSHSCENE_OK &&
+            gshscene_list_close(plain) == GSHSCENE_OK) {
+          CHECK(gshscene_list_hash(plain) != gshscene_list_hash(list) && !gshscene_list_equal(plain, list));
+        }
+        gshscene_list_destroy(plain);
+      }
+      outcomes[OUT_FILTER_GROUP]++;
+    }
+    gshscene_list_destroy(list);
+  }
+  gshscene_resource_release(made);
+}
+
 static void fuzz_hatch(S * s) {
   static const double angles[8] = {0.0, 45.0, 90.0, 30.0, -17.5, 1e6, (double)NAN, 0x1p41};
   static const double values[8] = {0.0, 1.5, 2.0, 0.25, -1.0, 0x1p65, (double)INFINITY, 0x1p-65};
@@ -3988,6 +4117,9 @@ static void op(S * s, unsigned code) {
       break;
     case OP_INTERN_HATCH:
       fuzz_hatch(s);
+      break;
+    case OP_INTERN_FILTER:
+      fuzz_filter(s);
       break;
     default:
       break;
