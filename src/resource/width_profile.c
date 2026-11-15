@@ -39,13 +39,13 @@
 #define HEX(x) ((unsigned long long)(x))
 
 static double canonical_zero(double x) {
-  return x == 0.0 ? 0.0 : x;
+  return x + 0.0; /* -0 + +0 is +0 in round-to-nearest; no double select (x87 on i686) */
 }
 
 /** Zero, or a magnitude in [2^-64, 2^64] (SW1's band, SK2's). */
 static int within(double x) {
-  double m = x < 0.0 ? -x : x;
-  return m == 0.0 || (m >= GSHSCENE_STROKE_VALUE_MIN && m <= GSHSCENE_STROKE_VALUE_MAX);
+  return x == 0.0 || (x >= GSHSCENE_STROKE_VALUE_MIN && x <= GSHSCENE_STROKE_VALUE_MAX) ||
+      (x <= -GSHSCENE_STROKE_VALUE_MIN && x >= -GSHSCENE_STROKE_VALUE_MAX);
 }
 
 static uint64_t content_hash(size_t count, const GSHSCENE_Width_Stop * stops) {
@@ -91,15 +91,17 @@ static GSHSCENE_Result build(GSHSCENE_Store * store, const void * source, GSHSCE
     gshscene_store_discard_resource(resource);
     return GSHSCENE_ERR_OOM;
   }
-  double most = 0.0;
+  size_t widest = 0;
   for (size_t i = 0; i < src->count; i++) {
     resource->u.profile.stops[i].position = canonical_zero(src->stops[i].position);
     resource->u.profile.stops[i].factor = canonical_zero(src->stops[i].factor);
-    most = resource->u.profile.stops[i].factor > most ? resource->u.profile.stops[i].factor : most;
+    if (resource->u.profile.stops[i].factor > resource->u.profile.stops[widest].factor) {
+      widest = i; /* an index, not a double select: no x87 on i686 */
+    }
   }
   resource->u.profile.geom.count = src->count;
   resource->u.profile.geom.stops = resource->u.profile.stops;
-  resource->u.profile.max_factor = most;
+  resource->u.profile.max_factor = resource->u.profile.stops[widest].factor;
   *out = resource;
   return GSHSCENE_OK;
 }
