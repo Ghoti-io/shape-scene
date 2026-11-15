@@ -1520,7 +1520,7 @@ layer of a sink is (S11); the browsers' 8-bit intermediates are not the definiti
 **D-FL8 Resolution.** The filter works on the **device grid**: a user length `l` along an axis becomes `l s` pixels, `s` the column norm of the
 composed map's linear part, for a map that is axis aligned (a scale, a mirror, a turn by a multiple of 90 degrees, composed). A map with
 another rotation or a shear needs the sink's `CANONICAL_SPACE` feature: the group is drawn in the space with the rotation taken out, filtered
-there, and drawn back through the rotation with bilinear sampling. `gshscene_filter_axis_aligned` is the test the planning pass uses.
+there, and drawn back through the rotation with bilinear sampling. shape-cpu makes the canonical layer by resampling the group's device layer (bilinear at the pixel centers, about the region's center) and resamples the result back, so the filter's axes follow the element's, and claims `CANONICAL_SPACE`. `gshscene_filter_axis_aligned` is the test the planning pass uses.
 
 **D-FL9 Blur.** Standard deviation `s` per axis. For `s >= 2` three box blurs of width `d = floor(s 3 sqrt(2 pi) / 4 + 1/2)` (odd `d` centered;
 even `d` as two boxes of width `d` offset by half a pixel and one of width `d + 1` centered); for `s < 2` a truncated Gaussian of radius
