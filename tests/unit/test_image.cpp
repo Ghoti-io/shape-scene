@@ -208,6 +208,17 @@ GIMG_Raster * descriptor_raster(const GIMG_Pixel_Format & format, uint32_t w = 4
   return raster;
 }
 
+/** Whether image refuses @p format when a raster is made (its validation, which the scene's own checks sit behind). */
+bool refused_at_creation(const GIMG_Pixel_Format & format) {
+  GIMG_Raster * raster = nullptr;
+  GIMG_Result r = gimg_raster_create(4, 4, &format, GIMG_RASTER_OWNED, nullptr, 0, &raster);
+  if (r == GIMG_OK) {
+    gimg_raster_destroy(raster);
+    return false;
+  }
+  return raster == nullptr;
+}
+
 /** Whether @p raster is refused with @p want, with nothing allocated and the store as it was. */
 void expect_refused(const GIMG_Raster * raster, GSHSCENE_Result want, const GSHSCENE_Image_Params & p = params()) {
   tracker::Tracker t;
@@ -246,12 +257,21 @@ TEST(Image, AModelThisResourceDoesNotCarryIsUnsupported) {
       {"YCBCR", ycbcr}, {"LAB", lab}, {"INDEXED", indexed}, {"UNKNOWN 2", unknown2}, {"UNKNOWN 3", unknown3},
       {"UNKNOWN 5", unknown5}, {"SNORM", snorm}, {"UINT", uint}, {"SINT", sint}, {"planar", planar}, {"UNORM 10", ten},
       {"UNORM 4", four}};
+  size_t reached = 0, not_made = 0;
   for (const Case & c : cases) {
     SCOPED_TRACE(c.name);
     RasterHolder raster(descriptor_raster(c.format));
-    ASSERT_NE(raster.get(), nullptr);
+    if (!raster.get()) {
+      /* image refuses a self-contradicting format where a raster is made, so the scene never sees it. */
+      EXPECT_TRUE(refused_at_creation(c.format)) << "only a format image itself refuses may be missing here";
+      ++not_made;
+      continue;
+    }
     expect_refused(raster.get(), GSHSCENE_ERR_UNSUPPORTED);
+    ++reached;
   }
+  EXPECT_GE(reached, 10) << "the models the scene itself refuses must still be exercised (CMYK, YCbCr, Lab, indexed...)";
+  EXPECT_EQ(reached + not_made, sizeof cases / sizeof cases[0]);
 }
 
 TEST(Image, ADescriptorThatContradictsItselfIsInvalid) {
@@ -270,9 +290,9 @@ TEST(Image, ADescriptorThatContradictsItselfIsInvalid) {
       {"a channel count that is not the RGB model's", two_rgb}, {"channels of unequal width", uneven}};
   for (const auto & c : cases) {
     SCOPED_TRACE(c.name);
-    RasterHolder raster(descriptor_raster(c.format));
-    ASSERT_NE(raster.get(), nullptr);
-    expect_refused(raster.get(), GSHSCENE_ERR_INVALID);
+    /* image now refuses a self-contradicting format where a raster is made, so no raster reaches the scene with one;
+       the scene's own check stays as defence in depth for a raster built some other way. */
+    EXPECT_TRUE(refused_at_creation(c.format));
   }
   (void)float16; /* gimg_raster_create refuses a float of another width, so no raster can carry one */
 }
@@ -323,10 +343,10 @@ TEST(Image, InvalidBeforeUnsupportedBeforeLimit) {
   both.reserved = 5;
   expect_refused(rgb.get(), GSHSCENE_ERR_INVALID, both);
   /* An unsupported format over a size past the limit: unsupported, because the limit is decided after. */
-  GIMG_Pixel_Format ten = format_of({GIMG_CHANNEL_GRAY, GIMG_CHANNEL_UNORM, 1, 10, GIMG_ALPHA_NONE});
+  /* (CMYK, which image still builds: it refuses a ten-bit gray where a raster is made.) */
   std::vector<unsigned char> small(64);
   GIMG_Raster * huge = nullptr;
-  ASSERT_EQ(gimg_raster_create(70000, 1, &ten, GIMG_RASTER_BORROWED, small.data(), 0, &huge), GIMG_OK);
+  ASSERT_EQ(gimg_raster_create(70000, 1, &GIMG_PIXEL_CMYK8, GIMG_RASTER_BORROWED, small.data(), 0, &huge), GIMG_OK);
   RasterHolder holder(huge);
   expect_refused(huge, GSHSCENE_ERR_UNSUPPORTED);
 }
@@ -827,13 +847,23 @@ TEST(Image, HostileSizesOverASmallBufferAreRefusedBeforeAnythingIsReadOrAllocate
   };
   const Size sizes[] = {{0xFFFFFFFFu, 1}, {1, 0xFFFFFFFFu}, {0xFFFFFFFFu, 0xFFFFFFFFu}, {65537, 65537}, {16385, 16384},
       {16384, 16385}, {40000, 40000}, {65536, 65536}, {65536, 65535}, {65535, 65536}};
+  size_t refused_by_image = 0, reached_scene = 0;
   for (const Size & s : sizes) {
     SCOPED_TRACE(std::to_string(s.w) + "x" + std::to_string(s.h));
     GIMG_Raster * raster = nullptr;
-    ASSERT_EQ(gimg_raster_create(s.w, s.h, &format, GIMG_RASTER_BORROWED, buffer.data(), (size_t)s.w * 4, &raster), GIMG_OK);
+    GIMG_Result made = gimg_raster_create(s.w, s.h, &format, GIMG_RASTER_BORROWED, buffer.data(), (size_t)s.w * 4, &raster);
+    if (made != GIMG_OK) {
+      /* image's own limits now refuse a hostile size where a raster is made; none reaches the scene. */
+      EXPECT_EQ(raster, nullptr);
+      ++refused_by_image;
+      continue;
+    }
     RasterHolder holder(raster);
     expect_refused(raster, GSHSCENE_ERR_LIMIT);
+    ++reached_scene;
   }
+  EXPECT_EQ(refused_by_image + reached_scene, sizeof sizes / sizeof sizes[0]);
+  EXPECT_GT(reached_scene, 0u) << "the scene's own bound must still be exercised by a size image accepts";
 }
 
 TEST(Image, TheTexelBoundHoldsWhenTheStoreHasBytesToSpare) {
