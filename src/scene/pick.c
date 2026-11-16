@@ -150,6 +150,43 @@ typedef struct Clip {
   St st;
 } Clip;
 
+/* --- the stroke cache of a pick context --------------------------------------------------------------- */
+
+/** What the expansion of one stroke came to: it depends on the item, its chain's maps and the target alone, never on the point. */
+enum { PREP_OUTLINE = 0, PREP_OUT = 1, PREP_UNKNOWN = 2 };
+
+typedef struct Prep {
+  uint8_t kind;
+  uint8_t why;                      /* for PREP_UNKNOWN */
+  GSHGEOM_Stroke_Outline * outline; /* for PREP_OUTLINE */
+  int64_t sx, sy;                   /* the canonical map's whole-pixel shift */
+} Prep;
+
+typedef struct Cache_Entry {
+  size_t * chain; /* the item's key; NULL for an empty slot */
+  size_t count;
+  uint64_t hash;
+  Prep prep;
+  size_t points; /* what the outline holds, against the budget */
+} Cache_Entry;
+
+typedef struct Cache {
+  Cache_Entry * slots; /* open addressing, a power of two long */
+  size_t slot_count;
+  size_t used;
+  size_t points;     /* the points held now */
+  size_t max_points; /* the budget: an outline past it is used once and not kept */
+} Cache;
+
+static uint64_t chain_hash(const size_t * chain, size_t count) {
+  uint64_t h = 1469598103934665603ull;
+  for (size_t i = 0; i < count; i++) {
+    h ^= (uint64_t)chain[i];
+    h *= 1099511628211ull;
+  }
+  return h;
+}
+
 typedef struct Ctx {
   const GSHSCENE_Allocator * alloc;
   GSHGEOM_Allocator * galloc;
@@ -159,6 +196,7 @@ typedef struct Ctx {
   uint32_t flags;
   size_t max_hits;
   GSHSCENE_Pick * pick;
+  Cache * cache; /* a context's strokes already expanded, or NULL: every stroke is expanded afresh */
   Frame * frames;
   GSHGEOM_Map * maps;
   size_t * chain;
@@ -466,8 +504,9 @@ static GSHSCENE_Result part_state(Ctx * c, const GSHGEOM_Flat_Path * flat, GSHGE
   return GSHSCENE_OK;
 }
 
-/** SK5: the body, together with the aligned part where the clip part selects it (or its complement). */
-static GSHSCENE_Result stroke_region(Ctx * c, const GSHSCENE_Item * item, size_t level, St * out) {
+/** SK5: expand the stroke of @p item (the hatch's lines, a run's glyphs) once: what the point is then tested against. */
+static GSHSCENE_Result stroke_prepare(Ctx * c, const GSHSCENE_Item * item, size_t level, Prep * prep) {
+  memset(prep, 0, sizeof *prep);
   /* HX13: a hatch fill is the stroke of its trimmed lines, the hatch in the style slot and its style the pen. */
   GSHSCENE_Hatch hatch;
   const int is_hatch = gshscene_resource_kind(item->style) == GSHSCENE_RESOURCE_HATCH;
@@ -488,7 +527,8 @@ static GSHSCENE_Result stroke_region(Ctx * c, const GSHSCENE_Item * item, size_t
   int64_t sx = 0;
   int64_t sy = 0;
   if (compose(c, n, &composed) != GSHSCENE_OK || gshgeom_stroke_canonical_map(&composed, &canon, &sx, &sy) != GSHGEOM_OK) {
-    *out = st_unknown(GSHSCENE_PICK_WHY_LIMIT);
+    prep->kind = PREP_UNKNOWN;
+    prep->why = (uint8_t)(GSHSCENE_PICK_WHY_LIMIT);
     return GSHSCENE_OK;
   }
   GSHGEOM_Path * centerline = NULL;
@@ -512,7 +552,8 @@ static GSHSCENE_Result stroke_region(Ctx * c, const GSHSCENE_Item * item, size_t
     }
     if (cr != GSHSCENE_OK || refused) {
       gshgeom_path_destroy(centerline);
-      *out = st_unknown(cr != GSHSCENE_OK ? GSHSCENE_PICK_WHY_LIMIT : GSHSCENE_PICK_WHY_GLYPH);
+      prep->kind = PREP_UNKNOWN;
+      prep->why = (uint8_t)(cr != GSHSCENE_OK ? GSHSCENE_PICK_WHY_LIMIT : GSHSCENE_PICK_WHY_GLYPH);
       return GSHSCENE_OK;
     }
     path = centerline;
@@ -557,42 +598,172 @@ static GSHSCENE_Result stroke_region(Ctx * c, const GSHSCENE_Item * item, size_t
     return GSHSCENE_ERR_OOM;
   }
   if (g != GSHGEOM_OK) {
-    *out = st_unknown(GSHSCENE_PICK_WHY_LIMIT);
+    prep->kind = PREP_UNKNOWN;
+    prep->why = (uint8_t)(GSHSCENE_PICK_WHY_LIMIT);
     return GSHSCENE_OK;
   }
   if (gshgeom_stroke_outline_status(outline) != GSHGEOM_STROKE_DRAWN) {
     gshgeom_stroke_outline_destroy(outline);
-    *out = st_make(S_OUT); /* SG14, SG15: nothing is covered */
+    prep->kind = PREP_OUT; /* SG14, SG15: nothing is covered */
     return GSHSCENE_OK;
   }
-  /* The outline is of the canonical map, a whole-pixel shift from the map's: the point moves back by it instead. */
-  const int64_t px = (int64_t)c->point.x - 64 * sx;
-  const int64_t py = (int64_t)c->point.y - 64 * sy;
-  if (px < INT32_MIN || px > INT32_MAX || py < INT32_MIN || py > INT32_MAX) {
-    gshgeom_stroke_outline_destroy(outline); /* past every coordinate of an outline: the point is on none of it */
-    *out = st_make(S_OUT);
-    return GSHSCENE_OK;
+  prep->kind = PREP_OUTLINE;
+  prep->outline = outline;
+  prep->sx = sx;
+  prep->sy = sy;
+  return GSHSCENE_OK;
+}
+
+/* --- the cache ------------------------------------------------------------------------------------------ */
+
+static void prep_release(Prep * prep) {
+  if (prep->kind == PREP_OUTLINE) {
+    gshgeom_stroke_outline_destroy(prep->outline);
+    prep->outline = NULL;
   }
-  GSHGEOM_Device_Point p = {(int32_t)px, (int32_t)py};
-  St body;
-  GSHSCENE_Result r = part_state(c, gshgeom_stroke_outline_body(outline), p, GSHGEOM_FILL_NONZERO, &body);
-  const GSHGEOM_Flat_Path * aligned = gshgeom_stroke_outline_aligned(outline);
-  if (r == GSHSCENE_OK && aligned) {
-    St al;
-    St cl;
-    r = part_state(c, aligned, p, GSHGEOM_FILL_NONZERO, &al);
-    if (r == GSHSCENE_OK) {
-      r = part_state(c, gshgeom_stroke_outline_clip(outline), p, gshgeom_stroke_outline_clip_rule(outline), &cl);
+}
+
+static size_t outline_points(const GSHGEOM_Stroke_Outline * o) {
+  return gshgeom_flat_path_point_count(gshgeom_stroke_outline_body(o)) + gshgeom_flat_path_point_count(gshgeom_stroke_outline_aligned(o)) +
+         gshgeom_flat_path_point_count(gshgeom_stroke_outline_clip(o));
+}
+
+static const Cache_Entry * cache_find(const Cache * cache, const size_t * chain, size_t count, uint64_t hash) {
+  if (cache->slot_count == 0) {
+    return NULL;
+  }
+  const size_t mask = cache->slot_count - 1u;
+  for (size_t i = (size_t)hash & mask;; i = (i + 1u) & mask) {
+    const Cache_Entry * e = &cache->slots[i];
+    if (!e->chain) {
+      return NULL;
     }
-    if (r == GSHSCENE_OK) {
-      if (gshgeom_stroke_outline_clip_complement(outline)) {
-        cl = st_not(cl);
+    if (e->hash == hash && e->count == count && memcmp(e->chain, chain, count * sizeof *chain) == 0) {
+      return e;
+    }
+  }
+}
+
+/** Put @p *prep in the cache under the chain `c->chain[0 .. count)`.  On success the cache owns the outline; any failure to keep
+ *  it (OOM, the budget) leaves it with the caller, who tests the point and then releases it. */
+static int cache_keep(Ctx * c, size_t count, uint64_t hash, const Prep * prep) {
+  Cache * cache = c->cache;
+  const size_t points = prep->kind == PREP_OUTLINE ? outline_points(prep->outline) : 0;
+  if (points > cache->max_points || cache->points > cache->max_points - points) {
+    return 0;
+  }
+  if ((cache->used + 1u) * 2u > cache->slot_count) {
+    const size_t grown = cache->slot_count ? cache->slot_count * 2u : 64u;
+    Cache_Entry * slots = gshscene_calloc(c->alloc, grown, sizeof *slots);
+    if (!slots) {
+      return 0;
+    }
+    for (size_t i = 0; i < cache->slot_count; i++) {
+      if (cache->slots[i].chain) {
+        size_t j = (size_t)cache->slots[i].hash & (grown - 1u);
+        while (slots[j].chain) {
+          j = (j + 1u) & (grown - 1u);
+        }
+        slots[j] = cache->slots[i];
       }
-      body = st_or(body, st_and(al, cl));
+    }
+    gshscene_free(c->alloc, cache->slots);
+    cache->slots = slots;
+    cache->slot_count = grown;
+  }
+  size_t * key = gshscene_alloc(c->alloc, count * sizeof *key);
+  if (!key) {
+    return 0;
+  }
+  memcpy(key, c->chain, count * sizeof *key);
+  size_t j = (size_t)hash & (cache->slot_count - 1u);
+  while (cache->slots[j].chain) {
+    j = (j + 1u) & (cache->slot_count - 1u);
+  }
+  Cache_Entry * e = &cache->slots[j];
+  e->chain = key;
+  e->count = count;
+  e->hash = hash;
+  e->prep = *prep;
+  e->points = points;
+  cache->used++;
+  cache->points += points;
+  return 1;
+}
+
+static void cache_free(const GSHSCENE_Allocator * alloc, Cache * cache) {
+  for (size_t i = 0; i < cache->slot_count; i++) {
+    if (cache->slots[i].chain) {
+      prep_release(&cache->slots[i].prep);
+      gshscene_free(alloc, cache->slots[i].chain);
     }
   }
-  gshgeom_stroke_outline_destroy(outline);
-  *out = body;
+  gshscene_free(alloc, cache->slots);
+  memset(cache, 0, sizeof *cache);
+}
+
+/** SK5: the body, together with the aligned part where the clip part selects it (or its complement). */
+static GSHSCENE_Result stroke_region(Ctx * c, const GSHSCENE_Item * item, size_t level, St * out) {
+  Prep own;
+  const Prep * prep = NULL;
+  int owned = 0;
+  uint64_t hash = 0;
+  if (c->cache) {
+    hash = chain_hash(c->chain, level + 1u);
+    const Cache_Entry * hit = cache_find(c->cache, c->chain, level + 1u, hash);
+    if (hit) {
+      prep = &hit->prep;
+    }
+  }
+  if (!prep) {
+    GSHSCENE_Result pr = stroke_prepare(c, item, level, &own);
+    if (pr != GSHSCENE_OK) {
+      return pr;
+    }
+    if (c->cache && cache_keep(c, level + 1u, hash, &own)) {
+      prep = &cache_find(c->cache, c->chain, level + 1u, hash)->prep;
+    } else {
+      prep = &own;
+      owned = 1;
+    }
+  }
+  GSHSCENE_Result r = GSHSCENE_OK;
+  if (prep->kind == PREP_UNKNOWN) {
+    *out = st_unknown((GSHSCENE_Pick_Why)prep->why);
+  } else if (prep->kind == PREP_OUT) {
+    *out = st_make(S_OUT);
+  } else {
+    const GSHGEOM_Stroke_Outline * outline = prep->outline;
+    /* The outline is of the canonical map, a whole-pixel shift from the map's: the point moves back by it instead. */
+    const int64_t px = (int64_t)c->point.x - 64 * prep->sx;
+    const int64_t py = (int64_t)c->point.y - 64 * prep->sy;
+    if (px < INT32_MIN || px > INT32_MAX || py < INT32_MIN || py > INT32_MAX) {
+      *out = st_make(S_OUT); /* past every coordinate of an outline: the point is on none of it */
+    } else {
+      GSHGEOM_Device_Point p = {(int32_t)px, (int32_t)py};
+      St body;
+      r = part_state(c, gshgeom_stroke_outline_body(outline), p, GSHGEOM_FILL_NONZERO, &body);
+      const GSHGEOM_Flat_Path * aligned = gshgeom_stroke_outline_aligned(outline);
+      if (r == GSHSCENE_OK && aligned) {
+        St al;
+        St cl;
+        r = part_state(c, aligned, p, GSHGEOM_FILL_NONZERO, &al);
+        if (r == GSHSCENE_OK) {
+          r = part_state(c, gshgeom_stroke_outline_clip(outline), p, gshgeom_stroke_outline_clip_rule(outline), &cl);
+        }
+        if (r == GSHSCENE_OK) {
+          if (gshgeom_stroke_outline_clip_complement(outline)) {
+            cl = st_not(cl);
+          }
+          body = st_or(body, st_and(al, cl));
+        }
+      }
+      *out = body;
+    }
+  }
+  if (owned) {
+    prep_release(&own);
+  }
   return r;
 }
 
@@ -827,26 +998,18 @@ void gshscene_pick_destroy(GSHSCENE_Pick * pick) {
   pick_free(pick);
 }
 
-GSHSCENE_Result gshscene_pick_list(const GSHSCENE_Allocator * alloc, const GSHSCENE_List * list,
-    const GSHSCENE_Pick_Params * params, GSHSCENE_Pick ** out) {
-  if (!list || !params || !out || !gshscene_list_is_closed(list) || (params->flags & ~GSHSCENE_PICK_VISIBLE)) {
-    return GSHSCENE_ERR_INVALID;
-  }
+static int reserved_clear(const GSHSCENE_Pick_Params * params) {
   for (size_t i = 0; i < sizeof params->_reserved; i++) {
     if (params->_reserved[i]) {
-      return GSHSCENE_ERR_INVALID;
+      return 0;
     }
   }
-  if (!alloc) {
-    alloc = gshscene_allocator_default();
-  }
-  GSHGEOM_Map target = params->target;
-  if (target.dim == 0) {
-    gshgeom_map_identity(2, &target);
-  }
-  if (target.dim != 2 || gshgeom_map_check(&target) != GSHGEOM_OK) {
-    return GSHSCENE_ERR_INVALID;
-  }
+  return 1;
+}
+
+/** The walk of PK1 to PK12 over @p list into a new pick; @p cache is a context's, or NULL. */
+static GSHSCENE_Result pick_run(const GSHSCENE_Allocator * alloc, const GSHSCENE_List * list, const GSHGEOM_Map * target,
+    const GSHSCENE_Pick_Params * params, Cache * cache, GSHSCENE_Pick ** out) {
   GSHSCENE_Pick * pick = gshscene_calloc(alloc, 1, sizeof *pick);
   if (!pick) {
     return GSHSCENE_ERR_OOM;
@@ -858,11 +1021,12 @@ GSHSCENE_Result gshscene_pick_list(const GSHSCENE_Allocator * alloc, const GSHSC
   c.alloc = &own;
   c.galloc = &own;
   gshgeom_limits_default(&c.limits);
-  c.target = target;
+  c.target = *target;
   c.point = params->point;
   c.flags = params->flags;
   c.max_hits = params->max_hits;
   c.pick = pick;
+  c.cache = cache;
   GSHSCENE_Result r = walk(&c, list);
   gshscene_free(&own, c.frames);
   gshscene_free(&own, c.maps);
@@ -880,6 +1044,86 @@ GSHSCENE_Result gshscene_pick_list(const GSHSCENE_Allocator * alloc, const GSHSC
   }
   *out = pick;
   return GSHSCENE_OK;
+}
+
+static int target_of(const GSHGEOM_Map * given, GSHGEOM_Map * target) {
+  *target = *given;
+  if (target->dim == 0) {
+    gshgeom_map_identity(2, target);
+  }
+  return target->dim == 2 && gshgeom_map_check(target) == GSHGEOM_OK;
+}
+
+GSHSCENE_Result gshscene_pick_list(const GSHSCENE_Allocator * alloc, const GSHSCENE_List * list,
+    const GSHSCENE_Pick_Params * params, GSHSCENE_Pick ** out) {
+  if (!list || !params || !out || !gshscene_list_is_closed(list) || (params->flags & ~GSHSCENE_PICK_VISIBLE) || !reserved_clear(params)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  if (!alloc) {
+    alloc = gshscene_allocator_default();
+  }
+  GSHGEOM_Map target;
+  if (!target_of(&params->target, &target)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  return pick_run(alloc, list, &target, params, NULL, out);
+}
+
+/* --- a context: the same list and target picked at many points ------------------------------------------- */
+
+struct GSHSCENE_Pick_Context {
+  GSHSCENE_Allocator alloc;
+  const GSHSCENE_List * list;
+  GSHGEOM_Map target;
+  Cache cache;
+};
+
+GSHSCENE_Result gshscene_pick_context_create(const GSHSCENE_Allocator * alloc, const GSHSCENE_List * list, const GSHGEOM_Map * target,
+    size_t max_cache_points, GSHSCENE_Pick_Context ** out) {
+  if (!list || !out || !gshscene_list_is_closed(list)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  GSHGEOM_Map map;
+  const GSHGEOM_Map zero = {0};
+  if (!target_of(target ? target : &zero, &map)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  if (!alloc) {
+    alloc = gshscene_allocator_default();
+  }
+  GSHSCENE_Pick_Context * ctx = gshscene_calloc(alloc, 1, sizeof *ctx);
+  if (!ctx) {
+    return GSHSCENE_ERR_OOM;
+  }
+  ctx->alloc = *alloc;
+  ctx->list = list;
+  ctx->target = map;
+  ctx->cache.max_points = max_cache_points ? max_cache_points : GSHSCENE_PICK_CACHE_POINTS_DEFAULT;
+  *out = ctx;
+  return GSHSCENE_OK;
+}
+
+GSHSCENE_Result gshscene_pick_context_pick(GSHSCENE_Pick_Context * ctx, const GSHSCENE_Pick_Params * params, GSHSCENE_Pick ** out) {
+  if (!ctx || !params || !out || (params->flags & ~GSHSCENE_PICK_VISIBLE) || !reserved_clear(params) || params->target.dim != 0) {
+    return GSHSCENE_ERR_INVALID; /* the target is the context's: a map here would be ignored */
+  }
+  return pick_run(&ctx->alloc, ctx->list, &ctx->target, params, &ctx->cache, out);
+}
+
+size_t gshscene_pick_context_cached(const GSHSCENE_Pick_Context * ctx, size_t * points) {
+  if (points) {
+    *points = ctx ? ctx->cache.points : 0;
+  }
+  return ctx ? ctx->cache.used : 0;
+}
+
+void gshscene_pick_context_destroy(GSHSCENE_Pick_Context * ctx) {
+  if (!ctx) {
+    return;
+  }
+  const GSHSCENE_Allocator alloc = ctx->alloc;
+  cache_free(&alloc, &ctx->cache);
+  gshscene_free(&alloc, ctx);
 }
 
 GSHSCENE_Result gshscene_pick_version(const GSHSCENE_Allocator * alloc, const GSHSCENE_Version * version,

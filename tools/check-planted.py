@@ -5150,6 +5150,20 @@ if _argued_file.exists():
         ARGUED = _argued_json.load(_f)
 
 
+PK = ["testPick"]
+PICK = "src/scene/pick.c"
+PLANTS += [
+    # the context's cache of expanded strokes (PK13)
+    ('pkc-key-ignores-chain', 'src', PICK, 'e->hash == hash && e->count == count && memcmp(e->chain, chain, count * sizeof *chain) == 0', 'e->count == count && memcmp(e->chain, chain, 0) == 0 && ((void)hash, 1)', PK),
+    ('pkc-never-finds', 'src', PICK, '    if (e->hash == hash && e->count == count &&', '    if (0 && e->hash == hash && e->count == count &&', PK),
+    ('pkc-never-keeps', 'src', PICK, '  if (points > cache->max_points || cache->points > cache->max_points - points) {\n    return 0;\n  }', '  if (1) {\n    return 0;\n  }', PK),
+    ('pkc-budget-off-by-all', 'src', PICK, 'cache->points > cache->max_points - points) {', 'cache->points >= cache->max_points - points) {', PK),
+    ('pkc-points-not-counted', 'src', PICK, '  cache->used++;\n  cache->points += points;', '  cache->used++;', PK),
+    ('pkc-grow-drops-entries', 'src', PICK, '        slots[j] = cache->slots[i];', '        slots[j] = slots[j];', PK),
+    ('pkc-unknown-kept-as-out', 'src', PICK, '    *out = st_unknown((GSHSCENE_Pick_Why)prep->why);', '    *out = st_make(S_OUT);', PK),
+    ('pkc-context-takes-a-map', 'src', PICK, '|| params->target.dim != 0) {\n    return GSHSCENE_ERR_INVALID; /* the target is the context', '|| 0) {\n    return GSHSCENE_ERR_INVALID; /* the target is the context', PK),
+]
+
 def main():
     known = 0
     shutil.rmtree(WORK, ignore_errors=True)

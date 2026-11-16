@@ -1759,7 +1759,7 @@ Gaps that this design knows about (a font as an
 opaque key, fixed picture paints, intersection-only clips, per-glyph maps, affine and 2D maps, the linear
 cost of publish and diff, the granularity of a merge, single-rectangle damage, what is met at emission).
 
-## Picking (normative; PK1 to PK12)
+## Picking (normative; PK1 to PK13)
 
 A pick answers "what is under this point" for the pixels a render draws, without a sink (`pick.h`). It places every shape of a
 closed list under the maps the sinks place it under, flattens it as they do (the integer flattener at its default tolerance, so
@@ -1806,6 +1806,13 @@ every edge it is the answer of a sink's whole-or-nothing coverage (AA2): `shape-
 no antialiasing and compares the topmost hit at every pixel center with the color there. **PK11** The allocator given serves the
 result and the scratch; the memory is `O(clips + hits * depth)` plus the geometry of one item at a time. **PK12** `max_hits`
 keeps the topmost entries and the total says how many there were.
+
+**PK13 A context.** What a stroke's region is tested against (its outline, a hatch's lines, a run's centerline) is made from the item, the maps
+above it and the target, never from the point. `gshscene_pick_context_create` holds a closed list and a target, and `gshscene_pick_context_pick`
+keeps each such expansion under the item's chain, so the first pick at a stroke pays for it and every later pick only tests the point. The
+answer is `gshscene_pick_list`'s, entry for entry. The kept outlines are bounded by a count of points (a default of 2^22, or the caller's); one
+past what is left is expanded for the pick and dropped, as `gshscene_pick_list` does for every stroke. A refusal or an undecided stroke is kept
+too, since it does not depend on the point either. The list and its resources must outlive the context and stay as they were.
 
 What is left out: a pick does not know a sink's own choices (a clip's antialiased edge, a refused feature), and it asks a
 region only about a point; a region against a rectangle is a different question.

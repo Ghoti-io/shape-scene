@@ -157,6 +157,51 @@ GSHSCENE_API GSHSCENE_Result gshscene_pick_list(const GSHSCENE_Allocator * alloc
 GSHSCENE_API GSHSCENE_Result gshscene_pick_version(const GSHSCENE_Allocator * alloc, const GSHSCENE_Version * version,
     const GSHSCENE_Pick_Params * params, GSHSCENE_Pick ** out);
 
+/** @brief A list and a target held for many picks (PK13). */
+typedef struct GSHSCENE_Pick_Context GSHSCENE_Pick_Context;
+
+/** @brief The points of expanded stroke outline a context keeps by default: 2^22 (32 MiB of 26.6 points). */
+#define GSHSCENE_PICK_CACHE_POINTS_DEFAULT ((size_t)1 << 22)
+
+/**
+ * @brief Hold @p list and @p target for many picks (PK13).
+ *
+ * The expansion of a stroke (a stroke's outline, a hatch's lines, a text run's centerline) does not depend on the point, so a context
+ * keeps each one it makes: the first pick at a stroke pays for it, and every later pick only tests the point against it.  The answer is
+ * what ::gshscene_pick_list gives for the same list, target and params, entry for entry.
+ *
+ * @param alloc            The allocator for the context and what it keeps; NULL for the default.
+ * @param list             A closed list; it, and the resources it names, must outlive the context and stay unchanged.
+ * @param target           The map from the list's space to the device pixels, 2D; NULL is the identity.
+ * @param max_cache_points The most points of outline kept (all the strokes together); an outline past it is expanded again at each pick,
+ *                         as ::gshscene_pick_list does.  0 is ::GSHSCENE_PICK_CACHE_POINTS_DEFAULT.
+ * @param out              The context; written only on success.
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (a NULL, an open list, an invalid or 3D map); ::GSHSCENE_ERR_OOM.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_pick_context_create(const GSHSCENE_Allocator * alloc, const GSHSCENE_List * list,
+    const GSHGEOM_Map * target, size_t max_cache_points, GSHSCENE_Pick_Context ** out);
+
+/**
+ * @brief Pick the context's list at @p params->point (PK13).
+ *
+ * @param params What to ask; its `target` is the context's and must be zero-filled (a map here would be silently ignored, so it is
+ *               refused).
+ * @return ::GSHSCENE_OK; ::GSHSCENE_ERR_INVALID (a NULL, a non-zero target, an unknown flag or reserved byte); ::GSHSCENE_ERR_OOM.
+ *         A failed pick leaves the context valid.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_pick_context_pick(GSHSCENE_Pick_Context * ctx, const GSHSCENE_Pick_Params * params,
+    GSHSCENE_Pick ** out);
+
+/**
+ * @brief How many strokes the context keeps expanded (PK13), and, in @p points when it is not NULL, how many points of outline they hold.
+ *
+ * Zero for NULL.  A stroke that is not kept (past the budget) is expanded again at each pick.
+ */
+GSHSCENE_API size_t gshscene_pick_context_cached(const GSHSCENE_Pick_Context * ctx, size_t * points);
+
+/** @brief Free a context and what it keeps; NULL is ignored.  Picks made through it stay valid. */
+GSHSCENE_API void gshscene_pick_context_destroy(GSHSCENE_Pick_Context * ctx);
+
 /** @brief Free a pick; NULL is ignored. */
 GSHSCENE_API void gshscene_pick_destroy(GSHSCENE_Pick * pick);
 

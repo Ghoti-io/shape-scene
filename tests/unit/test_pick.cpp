@@ -21,7 +21,7 @@
 /**
  * @file
  *
- * Picking (pick.h, PK1 to PK12): the answers against fills, clips, groups, instances, unions with inner clips and strokes; the order and
+ * Picking (pick.h, PK1 to PK13): the answers against fills, clips, groups, instances, unions with inner clips and strokes; the order and
  * the truncation; the resolution to nodes of a version; the arguments; and a randomized comparison with a reference that knows only
  * rectangles on the 26.6 lattice (every region exact, so the reference is the definition).
  */
@@ -35,6 +35,7 @@
 #include <functional>
 #include <random>
 #include <tuple>
+#include <vector>
 
 using namespace scene;
 
@@ -407,6 +408,175 @@ TEST(Pick, AStrokeIsItsBodyAndNothingBeyondItsCaps) {
   EXPECT_EQ(pick_list(lb.list(), q), "inside:0");
   q.point = at(50, 47);  // list y 23.5: past the half width 3
   EXPECT_EQ(pick_list(lb.list(), q), "");
+}
+
+TEST(Pick, AContextAnswersAsPickListDoesAtEveryPointWhateverItsBudget) {
+  StoreHolder sh;
+  GSHGEOM_Path * line = new_path();
+  gshgeom_path_move_to(line, P(10, 20));
+  gshgeom_path_line_to(line, P(40, 20));
+  gshgeom_path_line_to(line, P(40, 45));
+  Ref center(intern(sh.store, line));
+  gshgeom_path_destroy(line);
+  Ref box = rect_res(sh.store, 5, 5, 30, 30);
+  GSHSCENE_Stroke_Style st;
+  gshscene_stroke_style_init(&st);
+  st.width = 6;
+  st.join = GSHSCENE_STROKE_JOIN_ROUND;
+  const GSHSCENE_Resource * sr = nullptr;
+  ASSERT_EQ(gshscene_store_intern_stroke_style(sh.store, &st, &sr), GSHSCENE_OK);
+  Ref pen(sr);
+  Recorded l(sh.store);
+  l.fill(box.get());
+  l.stroke(center.get(), pen.get(), scaled(1.5, 1.0));
+  l.stroke(box.get(), pen.get());
+  l.close();
+  const GSHGEOM_Map target = scaled(2, 2);
+  for (size_t budget : {(size_t)0, (size_t)1}) {  // the default keeps everything; one point keeps nothing, so each pick expands afresh
+    GSHSCENE_Pick_Context * ctx = nullptr;
+    ASSERT_EQ(gshscene_pick_context_create(nullptr, l.list(), &target, budget, &ctx), GSHSCENE_OK);
+    size_t compared = 0;
+    for (int round = 0; round < 2; round++) {  // the second round is answered from what the first kept
+      for (double y = 0; y <= 100; y += 2.5) {
+        for (double x = 0; x <= 130; x += 2.5) {
+          GSHSCENE_Pick_Params q = ask(x, y);
+          PickHolder viaContext;
+          ASSERT_EQ(gshscene_pick_context_pick(ctx, &q, &viaContext.pick), GSHSCENE_OK);
+          GSHSCENE_Pick_Params full = ask(x, y);
+          full.target = target;
+          EXPECT_EQ(summarize(viaContext.pick), pick_list(l.list(), full)) << x << "," << y << " budget " << budget;
+          compared++;
+        }
+      }
+    }
+    EXPECT_GT(compared, (size_t)1000);
+    size_t points = 99;
+    const size_t kept = gshscene_pick_context_cached(ctx, &points);
+    if (budget == 0) {
+      EXPECT_EQ(kept, (size_t)2) << "both strokes are kept";
+      EXPECT_GT(points, (size_t)0);
+    } else {
+      EXPECT_EQ(kept, (size_t)0) << "a budget of one point keeps no outline";
+      EXPECT_EQ(points, (size_t)0);
+    }
+    GSHSCENE_Pick_Params withMap = ask(1, 1);
+    withMap.target = target;
+    PickHolder refused;
+    EXPECT_EQ(gshscene_pick_context_pick(ctx, &withMap, &refused.pick), GSHSCENE_ERR_INVALID) << "a map here would be ignored";
+    gshscene_pick_context_destroy(ctx);
+  }
+  GSHSCENE_Pick_Context * none = nullptr;
+  EXPECT_EQ(gshscene_pick_context_create(nullptr, nullptr, &target, 0, &none), GSHSCENE_ERR_INVALID);
+  gshscene_pick_context_destroy(nullptr);
+  EXPECT_EQ(gshscene_pick_context_cached(nullptr, nullptr), (size_t)0);
+}
+
+TEST(Pick, AContextKeepsAnUndecidedStrokeUndecidedAndKeepsAsManyStrokesAsItIsGiven) {
+  StoreHolder sh;
+  GSHSCENE_Stroke_Style st;
+  gshscene_stroke_style_init(&st);
+  st.width = 2;
+  const GSHSCENE_Resource * sr = nullptr;
+  ASSERT_EQ(gshscene_store_intern_stroke_style(sh.store, &st, &sr), GSHSCENE_OK);
+  Ref pen(sr);
+  /* a stroke of a run from a font whose face is not bound cannot be decided; the cache keeps it as undecided, and says why again */
+  Ref face(intern_face(sh.store));
+  GSHSCENE_Glyph fg;
+  std::memset(&fg, 0, sizeof fg);
+  fg.id = 7;
+  Ref font(intern_font_run(sh.store, face.get(), 16.0, {fg}));
+  ASSERT_NE(font.get(), nullptr);
+  Recorded lf(sh.store);
+  lf.stroke(font.get(), pen.get());
+  lf.close();
+  GSHSCENE_Pick_Context * ctx = nullptr;
+  ASSERT_EQ(gshscene_pick_context_create(nullptr, lf.list(), nullptr, 0, &ctx), GSHSCENE_OK);
+  for (int round = 0; round < 3; round++) {
+    GSHSCENE_Pick_Params q = ask(5, 5);
+    PickHolder p;
+    ASSERT_EQ(gshscene_pick_context_pick(ctx, &q, &p.pick), GSHSCENE_OK);
+    EXPECT_EQ(summarize(p.pick), "undecided:0");
+    GSHSCENE_Pick_Entry e;
+    ASSERT_EQ(gshscene_pick_entry(p.pick, 0, &e), GSHSCENE_OK);
+    EXPECT_EQ(e.why, why_of(lf.list(), q)) << "the reason is the one pick_list gives";
+    EXPECT_NE(e.why, GSHSCENE_PICK_WHY_NONE);
+  }
+  EXPECT_EQ(gshscene_pick_context_cached(ctx, nullptr), (size_t)1);
+  gshscene_pick_context_destroy(ctx);
+
+  /* a hundred strokes grow the table past its first size, and a budget of exactly their points keeps every one */
+  std::vector<Ref> lines;
+  Recorded many(sh.store);
+  for (int i = 0; i < 100; i++) {
+    GSHGEOM_Path * line = new_path();
+    gshgeom_path_move_to(line, P(2.0 * i, 10));
+    gshgeom_path_line_to(line, P(2.0 * i, 30));
+    lines.emplace_back(intern(sh.store, line));
+    gshgeom_path_destroy(line);
+    many.stroke(lines.back().get(), pen.get());
+  }
+  many.close();
+  ASSERT_EQ(gshscene_pick_context_create(nullptr, many.list(), nullptr, 0, &ctx), GSHSCENE_OK);
+  for (int i = 0; i < 100; i += 7) {
+    GSHSCENE_Pick_Params q = ask(2.0 * i, 20);
+    PickHolder p;
+    ASSERT_EQ(gshscene_pick_context_pick(ctx, &q, &p.pick), GSHSCENE_OK);
+    EXPECT_EQ(summarize(p.pick), pick_list(many.list(), q));
+  }
+  GSHSCENE_Pick_Params everywhere = ask(1, 20);
+  PickHolder p;
+  ASSERT_EQ(gshscene_pick_context_pick(ctx, &everywhere, &p.pick), GSHSCENE_OK);
+  size_t points = 0;
+  EXPECT_EQ(gshscene_pick_context_cached(ctx, &points), (size_t)100);
+  EXPECT_GT(points, (size_t)0);
+  for (int i = 0; i < 100; i++) {
+    GSHSCENE_Pick_Params q = ask(2.0 * i, 20);
+    PickHolder h;
+    ASSERT_EQ(gshscene_pick_context_pick(ctx, &q, &h.pick), GSHSCENE_OK);
+    EXPECT_EQ(summarize(h.pick), pick_list(many.list(), q)) << i;
+  }
+  gshscene_pick_context_destroy(ctx);
+  GSHSCENE_Pick_Context * exact = nullptr;
+  ASSERT_EQ(gshscene_pick_context_create(nullptr, many.list(), nullptr, points, &exact), GSHSCENE_OK);
+  for (int i = 0; i < 100; i++) {
+    GSHSCENE_Pick_Params q = ask(2.0 * i, 20);
+    PickHolder h;
+    ASSERT_EQ(gshscene_pick_context_pick(exact, &q, &h.pick), GSHSCENE_OK);
+  }
+  size_t held = 0;
+  EXPECT_EQ(gshscene_pick_context_cached(exact, &held), (size_t)100) << "a budget that is exactly enough is enough";
+  EXPECT_EQ(held, points);
+  gshscene_pick_context_destroy(exact);
+
+  /* the same strokes met through instances of one picture: the chain is the instance and then the stroke, and two chains can share a slot */
+  Recorded inner(sh.store);
+  for (int k = 0; k < 10; k++) {
+    inner.stroke(lines[k].get(), pen.get());
+  }
+  inner.close();
+  const GSHSCENE_Resource * pic = nullptr;
+  ASSERT_EQ(gshscene_store_intern_picture(sh.store, inner.list(), &pic), GSHSCENE_OK);
+  Ref picture(pic);
+  Recorded outer(sh.store);
+  for (int j = 0; j < 12; j++) {
+    outer.instance(picture.get(), translate(40.0 * j, 0));
+  }
+  outer.close();
+  GSHSCENE_Pick_Context * nested = nullptr;
+  ASSERT_EQ(gshscene_pick_context_create(nullptr, outer.list(), nullptr, 0, &nested), GSHSCENE_OK);
+  for (int round = 0; round < 2; round++) {
+    for (int j = 0; j < 12; j++) {
+      for (int k = 0; k < 10; k++) {
+        GSHSCENE_Pick_Params q = ask(40.0 * j + 2.0 * k, 20);
+        PickHolder h;
+        ASSERT_EQ(gshscene_pick_context_pick(nested, &q, &h.pick), GSHSCENE_OK);
+        EXPECT_EQ(summarize(h.pick), pick_list(outer.list(), q)) << j << "," << k;
+        EXPECT_EQ(gshscene_pick_count(h.pick), (size_t)1);
+      }
+    }
+  }
+  EXPECT_EQ(gshscene_pick_context_cached(nested, nullptr), (size_t)120);
+  gshscene_pick_context_destroy(nested);
 }
 
 TEST(Pick, AStrokeAlignedInsideIsABandInsideTheShape) {
