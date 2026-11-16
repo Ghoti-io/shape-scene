@@ -155,7 +155,7 @@ void gshscene_node_init(GSHSCENE_Node_Kind kind, GSHSCENE_Node * node) {
 int gshscene_group_pushes(const GSHSCENE_Node * group, uint32_t context) {
   return group->opacity < 1.0 || group->composite != (uint32_t)GSHSCENE_COMPOSITE_SRC_OVER ||
          !gshscene_color_space_is_target(&group->blend_space) || group->ordering != (uint32_t)GSHSCENE_ORDER_FLAT ||
-         !gshscene_group_pdf_default(group->isolation, group->knockout, group->soft_mask, group->filter) ||
+         !gshscene_group_pdf_default(group->isolation, group->knockout, group->soft_mask, group->filter, group->filter_mode) ||
          context != (uint32_t)GSHSCENE_ORDER_FLAT;
 }
 
@@ -226,7 +226,7 @@ GSHSCENE_Result gshscene_node_canonical(const GSHSCENE_Store * store, const GSHS
     case GSHSCENE_NODE_GROUP: {
       /* The rules of a list's group push, so that a node and its emitted item agree. */
       GSHSCENE_Group group = {in->opacity, in->blend_space, in->ordering, in->composite, in->isolation, in->knockout,
-          in->soft_mask, in->soft_mask_map, in->filter};
+          in->soft_mask, in->soft_mask_map, in->filter, in->filter_mode};
       GSHSCENE_Group canonical;
       result = gshscene_list_canonical_group(store, &group, &canonical);
       if (result != GSHSCENE_OK) {
@@ -240,6 +240,7 @@ GSHSCENE_Result gshscene_node_canonical(const GSHSCENE_Store * store, const GSHS
       node.knockout = canonical.knockout;
       node.soft_mask = canonical.soft_mask;
       node.filter = canonical.filter;
+      node.filter_mode = canonical.filter_mode;
       if (canonical.soft_mask) {
         node.soft_mask_map = canonical.soft_mask_map;
       }
@@ -359,7 +360,8 @@ int gshscene_props_equal(const GSHSCENE_Node * a, const GSHSCENE_Node * b) {
       if (gshgeom_f64_bits(a->opacity) != gshgeom_f64_bits(b->opacity) || a->clip != b->clip ||
           !gshscene_space_equal(&a->blend_space, &b->blend_space) || a->composite != b->composite ||
           a->ordering != b->ordering || a->isolation != b->isolation || a->knockout != b->knockout ||
-          a->soft_mask != b->soft_mask || !map_equal(&a->soft_mask_map, &b->soft_mask_map) || a->filter != b->filter) {
+          a->soft_mask != b->soft_mask || !map_equal(&a->soft_mask_map, &b->soft_mask_map) || a->filter != b->filter ||
+          a->filter_mode != b->filter_mode) {
         return 0;
       }
       return a->clip == NULL || (a->clip_rule == b->clip_rule && map_equal(&a->clip_map, &b->clip_map));
@@ -554,7 +556,7 @@ void gshscene_node_hash(GSHGEOM_Hash * h, const GSHSCENE_Node_Rec * node) {
       gshgeom_hash_u64(h, gshgeom_map_hash(&p->map));
       gshgeom_hash_f64(h, p->opacity);
       gshscene_space_hash(h, &p->blend_space);
-      gshscene_group_hash_composite(h, p->composite, p->isolation, p->knockout, p->soft_mask, &p->soft_mask_map, p->filter);
+      gshscene_group_hash_composite(h, p->composite, p->isolation, p->knockout, p->soft_mask, &p->soft_mask_map, p->filter, p->filter_mode);
       gshgeom_hash_u32(h, p->ordering);
       gshgeom_hash_i32(h, p->layer);
       gshgeom_hash_f64(h, p->depth);

@@ -405,7 +405,9 @@ def scripted():
     def flt(count, k0, k1, v, region, group):
         return bytes([OP["INTERN_FILTER"], count, k0, k1, v, region, group])
     out["scripted-filters.bin"] = bytes(bytearray([0xFF, 0xFF]) + flt(1, 8, 0, 1, 1, 0) + flt(2, 8, 1, 2, 1, 0) + flt(1, 8, 0, 1, 0, 2)
-                                         + flt(1, 0, 0, 1, 1, 0) + flt(1, 8, 0, 4, 1, 0) + flt(2, 3, 5, 1, 2, 1) + flt(1, 2, 0, 0, 3, 0))
+                                         + flt(1, 0, 0, 1, 1, 0) + flt(1, 8, 0, 4, 1, 0) + flt(2, 3, 5, 1, 2, 1) + flt(1, 2, 0, 0, 3, 0)
+                                         # group 3: a backdrop-filter group, recorded; group 4: a mode past the enum and a backdrop with no filter or in a knockout group
+                                         + flt(1, 8, 0, 1, 1, 3) + flt(1, 8, 0, 1, 1, 4))
     # A fill painted with a hatch (mode 0), and one whose pen has no width, which draws nothing and is noticed (the same picks but the width).
     out["scripted-hatch-fill.bin"] = bytes(bytearray([0xFF, 0xFF, OP["LIST_CREATE"]]) + bytes([OP["INTERN_HATCH"], 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 2, 0, 0]))
     out["scripted-hatch-fill-no-width.bin"] = bytes(bytearray([0xFF, 0xFF, OP["LIST_CREATE"]]) + bytes([OP["INTERN_HATCH"], 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]))

@@ -529,7 +529,9 @@ typedef struct GSHSCENE_Sink_Caps {
   /**
    * The `GSHSCENE_FILTER_NATIVE_*` bits (filter.h, D-FL11): the primitives (bit `kind`) and the features of a group's filter a sink
    * draws; 0, none.  Without ::GSHSCENE_CAP_GROUP_FILTER every filtered group is refused, `FILTER`, whatever this says.  A filter needing a primitive or a feature it lacks is refused, `FILTER_PRIMITIVE`,
-   * the missing bits in `second`; one whose group's map is not axis aligned, without `CANONICAL_SPACE`, `FILTER_MAP`.
+   * the missing bits in `second`, and so is a group whose filter is applied to the backdrop (::GSHSCENE_FILTER_MODE_BACKDROP) when `BACKDROP` is missing;
+   * one whose group's map is not axis aligned, without `CANONICAL_SPACE`, `FILTER_MAP`.  A sink that claims `BACKDROP` may still refuse a backdrop group where the enclosing
+   * group is not an isolated layer, at the render, `FILTER_BACKDROP` (D-FL15).
    */
   uint32_t filter_native;
   uint8_t _reserved[4];       ///< Zero.

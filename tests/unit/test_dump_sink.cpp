@@ -4499,6 +4499,77 @@ TEST(DumpSink, AFilteredGroupIsRecordedOrRefusedByWhatTheSinkApplies) {
   EXPECT_STREQ(gshscene_reason_string(GSHSCENE_REASON_FILTER_MAP), "filter-map");
 }
 
+// D-FL13: a backdrop group is refused by name by a sink that lacks `BACKDROP` (a filter sink without it still draws the own-content
+// group, and a sink without the flag refuses with `FILTER` as before), and the record of the group that is drawn says `fmode=1`.
+TEST(DumpSink, ABackdropFilterIsRecordedOrRefusedByTheBackdropBit) {
+  Scene s;
+  GSHSCENE_Filter_Input prev = {GSHSCENE_FILTER_INPUT_PREVIOUS, 0};
+  GSHSCENE_Filter_Primitive blur{};
+  blur.kind = GSHSCENE_FILTER_GAUSSIAN_BLUR;
+  blur.input_count = 1;
+  blur.inputs = &prev;
+  blur.sx = 2;
+  blur.sy = 2;
+  GSHSCENE_Filter f{};
+  f.region_mode = GSHSCENE_FILTER_REGION_AUTO;
+  f.color_space = GSHSCENE_FILTER_SPACE_LINEAR_RGB;
+  f.primitive_count = 1;
+  f.primitives = &blur;
+  const GSHSCENE_Resource * filter = nullptr;
+  ASSERT_EQ(gshscene_store_intern_filter(s.store, &f, &filter), GSHSCENE_OK);
+  s.held.push_back(filter);
+  struct Want {
+    const char * name;
+    uint32_t mode;
+    int variant;  // 0 every bit, 1 no BACKDROP bit, 2 no flag
+    GSHSCENE_Reason reason;  // 0: drawn
+    size_t second;
+  };
+  const Want wants[] = {
+      {"backdrop, every bit", GSHSCENE_FILTER_MODE_BACKDROP, 0, (GSHSCENE_Reason)0, 0},
+      {"backdrop, no backdrop bit", GSHSCENE_FILTER_MODE_BACKDROP, 1, GSHSCENE_REASON_FILTER_PRIMITIVE,
+          (size_t)GSHSCENE_FILTER_NATIVE_BACKDROP},
+      {"backdrop, no flag", GSHSCENE_FILTER_MODE_BACKDROP, 2, GSHSCENE_REASON_FILTER, 0},
+      {"own content, no backdrop bit", GSHSCENE_FILTER_MODE_OWN, 1, (GSHSCENE_Reason)0, 0},
+  };
+  for (const Want & w : wants) {
+    GSHSCENE_List * l = s.open();
+    GSHSCENE_Group g{};
+    g.opacity = 1.0;
+    g.filter = filter;
+    g.filter_mode = w.mode;
+    ASSERT_EQ(gshscene_list_group_push(l, &g, 0, 0.0), GSHSCENE_OK) << w.name;
+    ASSERT_EQ(gshscene_list_fill(l, s.sq(2, 2, 8), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0.0), GSHSCENE_OK) << w.name;
+    ASSERT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK) << w.name;
+    ASSERT_EQ(gshscene_list_close(l), GSHSCENE_OK) << w.name;
+    GSHSCENE_Dump_Sink_Config c = config_default();
+    for (GSHSCENE_Sink_Caps * caps : {&c.raster_caps, &c.stream_caps}) {
+      if (w.variant == 1) {
+        caps->filter_native &= ~GSHSCENE_FILTER_NATIVE_BACKDROP;
+      } else if (w.variant == 2) {
+        caps->flags &= ~GSHSCENE_CAP_GROUP_FILTER;
+      }
+    }
+    SinkRef sink(make_with(c, nullptr, nullptr));
+    auto stream = make_stream(GSHSCENE_UNIT_MILLIMETER);
+    ReportRef report;
+    Rendered r = render_job(sink.sink, request_for(l, *stream, report.report));
+    ASSERT_EQ(r.result, GSHSCENE_OK) << w.name;
+    auto got = sinkconf::entries(report.report);
+    const bool recorded = stream->bytes.find(" fmode=1") != std::string::npos;
+    if (w.reason == 0) {
+      EXPECT_TRUE(got.empty()) << w.name;
+      EXPECT_EQ(recorded, w.mode == GSHSCENE_FILTER_MODE_BACKDROP) << w.name << "\n" << stream->bytes;
+    } else {
+      ASSERT_EQ(got.size(), 1u) << w.name;
+      EXPECT_EQ(got[0].reason, w.reason) << w.name;
+      EXPECT_EQ(got[0].second, w.second) << w.name;
+      EXPECT_FALSE(recorded) << w.name << ": a refused group's block is skipped";
+    }
+  }
+  EXPECT_STREQ(gshscene_reason_string(GSHSCENE_REASON_FILTER_BACKDROP), "filter-backdrop");
+}
+
 int main(int argc, char ** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

@@ -85,7 +85,7 @@ TEST(ClipUnion, KindAndStringAndCapsArePinned) {
   EXPECT_EQ((int)GSHSCENE_REASON_CLIP_UNION, 41);
   EXPECT_EQ((int)GSHSCENE_REASON_UNION_OVERLAP, 42);
   EXPECT_EQ((int)GSHSCENE_REASON_UNION_INNER, 45);
-  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 49);
+  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 50);
   EXPECT_STREQ(gshscene_reason_string(GSHSCENE_REASON_CLIP_UNION), "clip-union");
   EXPECT_STREQ(gshscene_reason_string(GSHSCENE_REASON_UNION_OVERLAP), "union-overlap");
   EXPECT_STREQ(gshscene_reason_string(GSHSCENE_REASON_UNION_INNER), "union-inner");

@@ -1531,7 +1531,7 @@ even `d` as two boxes of width `d` offset by half a pixel and one of width `d + 
 4096 table, matrix and kernel values over the filter, 256 merge inputs, 16 octaves, magnitudes to 65536.
 
 **D-FL11 Capabilities and refusals.** `GSHSCENE_CAP_GROUP_FILTER` (bit 23) is the flag; `filter_native` in the caps names what the sink draws: bit
-`kind` for each primitive (1 to 17), `REGION_AUTO`, `CANONICAL_SPACE`, `EDGE_DUPLICATE_WRAP`. The planning pass refuses a filtered group, after the
+`kind` for each primitive (1 to 17), `REGION_AUTO`, `CANONICAL_SPACE`, `EDGE_DUPLICATE_WRAP`, `BACKDROP`. The planning pass refuses a filtered group, after the
 soft mask's refusals, with `FILTER` (46) when the flag is missing, `FILTER_PRIMITIVE` (47, the missing bits in `second`) when a primitive or a
 feature is, and `FILTER_MAP` (48) when the group's composed map is not axis aligned and `CANONICAL_SPACE` is missing. A refused group's block is
 skipped (S24) and is never drawn as an unfiltered group. The test sink claims all of it and records the group's filter by handle.
@@ -1549,6 +1549,29 @@ space at the pixel center mapped back; `DIFFUSE_LIGHTING` and `SPECULAR_LIGHTING
 result is clipped to its subregion (default: the union of its inputs' subregions, else the filter region). A filter's result is clipped to its region
 and composited as the group's result: the opacity, the soft mask and the clips apply to the filtered result, through the group's composite (FL20).
 A filtered group is picked by its content, never by its filtered result (FL24).
+
+**D-FL13 The backdrop slot (`backdrop-filter`, FL22).** A group's `filter_mode` (`GSHSCENE_Filter_Mode`, `list.h`) is `OWN` (0, the default: the filter
+takes the group's own result) or `BACKDROP` (1: it takes the **backdrop under the group**). A nonzero mode needs a filter and the same group the filter
+needs (isolated, not knockout), `ERR_INVALID` otherwise, and a value past `COUNT` is `ERR_INVALID`. The retained scene's group node carries the field
+(`GSHSCENE_Node.filter_mode`), emission passes it to the list's group push, and a copy keeps it. A group in the default mode is hashed and dumped as
+before; a `BACKDROP` group sets bit 3 (`8`) of its flags byte and its dump line gains ` fmode=1` after ` filter=<hash>`. A sink claims it with
+`GSHSCENE_FILTER_NATIVE_BACKDROP` (bit 27 of `filter_native`), which the planning pass adds to what a backdrop group needs (`gshscene_filter_required`
+reads the resource, not the group): a sink without `CAP_GROUP_FILTER` refuses the group `FILTER`, one with it and without the bit `FILTER_PRIMITIVE` with
+the bit in `second`; a backdrop group is never drawn as a group that filters its own content.
+
+**D-FL14 What a backdrop group does.** At its push the sink takes the layer of the enclosing context as it stands, over the whole render region (the
+nearest isolated group's layer, or for the root the target's own pixels under the list's earlier items: Filter Effects 2's backdrop root), weighs it
+by the coverage of the clips in force, runs the filter over that image in the enclosing layer's color space with the group's composed map, and replaces the
+layer by `P' = (1 - w) P + w F`, `P` the layer's pixel, `F` the filter's result and `w` the clips' coverage times the group's opacity times its soft mask's
+value (FL20: the result is what clip, mask and opacity act on). The group's own content is then drawn and popped as any group's, unfiltered, over the
+replaced backdrop, with its own blend space and composite. The replacement is not a source-over of `F` (a translucent `F` over `P` would count the
+backdrop twice).
+
+**D-FL15 Where a backdrop group is refused.** Under a non-isolated or knockout parent, or one with a knockout ancestor, the enclosing layer carries the parent's
+own backdrop and group channels beside its pixels, and replacing a pixel would leave them describing another image: the sink refuses the group
+`FILTER_BACKDROP` (49) at the render, where the enclosing group is known (the planning pass cannot see the enclosing group of an instance's picture); its block
+is skipped. A sink that cannot say what the backdrop is inside a pattern's tile refuses the use painted with the pattern. `vector` has no CSS box model and
+does not lower `backdrop-filter`.
 
 ## Gradients (normative; color-paint story P1)
 

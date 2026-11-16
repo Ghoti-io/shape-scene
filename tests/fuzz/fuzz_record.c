@@ -132,7 +132,7 @@ enum {
   OUT_PATTERN_FILL_INVALID, OUT_PATTERN_NOTICE, OUT_PATTERN_NODE, OUT_PATTERN_DAMAGE, OUT_PATTERN_NO_DAMAGE,
   OUT_PATTERN_EMITTED, OUT_HATCH_INTERNED, OUT_HATCH_INVALID, OUT_HATCH_UNSUPPORTED, OUT_HATCH_LIMIT, OUT_HATCH_HIT,
   OUT_HATCH_NEAR, OUT_HATCH_FILL, OUT_HATCH_NOTICE, OUT_HATCH_FILL_REFUSED, OUT_FILTER_INTERNED, OUT_FILTER_INVALID, OUT_FILTER_LIMIT, OUT_FILTER_HIT,
-  OUT_FILTER_NEAR, OUT_FILTER_GROUP, OUT_FILTER_GROUP_INVALID, OUT_COUNT
+  OUT_FILTER_NEAR, OUT_FILTER_GROUP, OUT_FILTER_GROUP_INVALID, OUT_FILTER_BACKDROP, OUT_COUNT
 };
 
 static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limit", "edit limit", "publish limit",
@@ -168,7 +168,7 @@ static const char * const outcome_names[OUT_COUNT] = {"list limit", "intern limi
     "a hatch past HX2's bounds refused", "a hatch found again", "a hatch told apart from its nearest neighbor",
     "a fill painted with a hatch recorded", "a hatch fill that draws nothing noticed", "a hatch paint refused where it does not go",
     "a filter interned", "a filter refused as invalid", "a filter past FL's bounds refused", "a filter found again",
-    "a filter told apart from its nearest neighbor", "a group recorded with a filter", "a filtered group refused as invalid"};
+    "a filter told apart from its nearest neighbor", "a group recorded with a filter", "a filtered group refused as invalid", "a backdrop-filter group recorded and told from the own-content group"};
 
 static unsigned long outcomes[OUT_COUNT];
 
@@ -1589,7 +1589,7 @@ static void filter_primitive(GSHSCENE_Filter_Primitive * p, unsigned kind, doubl
 
 static void fuzz_filter(S * s) {
   static const double vals[6] = {0.0, 1.5, 2.0, -1.0, 0x1p65, (double)NAN};
-  unsigned count = 1 + pick(s, 3), k0 = pick(s, 19), k1 = pick(s, 19), vsel = pick(s, 6), region = pick(s, 4), grp = pick(s, 3);
+  unsigned count = 1 + pick(s, 3), k0 = pick(s, 19), k1 = pick(s, 19), vsel = pick(s, 6), region = pick(s, 4), grp = pick(s, 5);
   static const GSHSCENE_Filter_Input two[2] = {{GSHSCENE_FILTER_INPUT_SOURCE_GRAPHIC, 0}, {GSHSCENE_FILTER_INPUT_RESULT, 0}};
   /* two entries: a displacement map takes two inputs whatever `count` says, and must not read past the array */
   static const GSHSCENE_Filter_Input one[2] = {{GSHSCENE_FILTER_INPUT_PREVIOUS, 0}, {GSHSCENE_FILTER_INPUT_PREVIOUS, 0}};
@@ -1657,6 +1657,36 @@ static void fuzz_filter(S * s) {
       grpd.isolation = GSHSCENE_ISOLATION_NON_ISOLATED;
       CHECK(gshscene_list_group_push(list, &grpd, 0, 0.0) == GSHSCENE_ERR_INVALID);
       outcomes[OUT_FILTER_GROUP_INVALID]++;
+    } else if (grp == 4) {
+      /* D-FL13: a mode past the enum, a backdrop with no filter, and a backdrop in a knockout group are refused; the list holds nothing */
+      grpd.filter_mode = GSHSCENE_FILTER_MODE_COUNT;
+      CHECK(gshscene_list_group_push(list, &grpd, 0, 0.0) == GSHSCENE_ERR_INVALID);
+      grpd.filter_mode = GSHSCENE_FILTER_MODE_BACKDROP;
+      grpd.filter = NULL;
+      CHECK(gshscene_list_group_push(list, &grpd, 0, 0.0) == GSHSCENE_ERR_INVALID);
+      grpd.filter = made;
+      grpd.knockout = 1;
+      CHECK(gshscene_list_group_push(list, &grpd, 0, 0.0) == GSHSCENE_ERR_INVALID);
+      CHECK(gshscene_list_count(list) == 0);
+      outcomes[OUT_FILTER_GROUP_INVALID]++;
+    } else if (grp == 3) {
+      /* D-FL13: the backdrop group is recorded and is not the own-content group of the same filter */
+      grpd.filter_mode = GSHSCENE_FILTER_MODE_BACKDROP;
+      GSHSCENE_List * own = NULL;
+      if (gshscene_list_group_push(list, &grpd, 0, 0.0) == GSHSCENE_OK) {
+        CHECK(gshscene_list_group_pop(list) == GSHSCENE_OK && gshscene_list_close(list) == GSHSCENE_OK);
+        if (gshscene_list_create(NULL, &s->limits, s->store, &own) == GSHSCENE_OK) {
+          grpd.filter_mode = GSHSCENE_FILTER_MODE_OWN;
+          if (gshscene_list_group_push(own, &grpd, 0, 0.0) == GSHSCENE_OK && gshscene_list_group_pop(own) == GSHSCENE_OK &&
+              gshscene_list_close(own) == GSHSCENE_OK) {
+            CHECK(gshscene_list_hash(own) != gshscene_list_hash(list) && !gshscene_list_equal(own, list));
+            const GSHSCENE_Item * it = NULL;
+            CHECK(gshscene_list_item(list, 0, &it) == GSHSCENE_OK && it->group.filter_mode == GSHSCENE_FILTER_MODE_BACKDROP);
+            outcomes[OUT_FILTER_BACKDROP]++;
+          }
+          gshscene_list_destroy(own);
+        }
+      }
     } else if (gshscene_list_group_push(list, &grpd, 0, 0.0) == GSHSCENE_OK) {
       CHECK(gshscene_list_group_pop(list) == GSHSCENE_OK && gshscene_list_close(list) == GSHSCENE_OK);
       GSHSCENE_List * plain = NULL;

@@ -1895,7 +1895,8 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
       break;
     }
     case GSHSCENE_ITEM_GROUP_PUSH: {
-      if (gshscene_group_pdf_default(item->group.isolation, item->group.knockout, item->group.soft_mask, item->group.filter)) {
+      if (gshscene_group_pdf_default(item->group.isolation, item->group.knockout, item->group.soft_mask, item->group.filter,
+              item->group.filter_mode)) {
         snprintf(run->line, LINE_BYTES, " G opacity=%016" PRIx64 " composite=%u\n", gshgeom_f64_bits(item->group.opacity),
             (unsigned)item->group.composite);
       } else {
@@ -1912,6 +1913,10 @@ static GSHSCENE_Result unit(Run * run, const GSHSCENE_Item * item, const size_t 
           /* FL12: the filter's content hash follows the mask and its placement, before the line's end. */
           size_t at = strlen(run->line) - 1;
           snprintf(run->line + at, LINE_BYTES - at, " filter=%016" PRIx64 "\n", gshscene_resource_hash(item->group.filter));
+          if (item->group.filter_mode != 0) {
+            at = strlen(run->line) - 1; /* D-FL13: a backdrop filter says so after the hash */
+            snprintf(run->line + at, LINE_BYTES - at, " fmode=%u\n", (unsigned)item->group.filter_mode);
+          }
         }
       }
       emit_text(run, run->line, &failed);

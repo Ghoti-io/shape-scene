@@ -144,7 +144,7 @@
  * every ID, layer, flag and rule in decimal, a `<space>` as `P:T:<gamma hex>`:
  *
  * - `G id=I parent=P flags=F key=K map=H opacity=X blend=<space> composite=N order=N layer=L depth=D clip=C children=LIST`
- *   (with ` isolation=N knockout=N mask=<hash>` after `order=N` when one of them is not the default)
+ *   (with ` isolation=N knockout=N mask=<hash>` after `order=N` when one of them is not the default, then ` filter=<hash>` and ` fmode=1` for a backdrop filter)
  * - `S id=I parent=P flags=F key=K res=KIND:H map=H rule=R paint=PK r g b a space=<space> entry=E resource=G layer=L depth=D`
  * - `K id=I parent=P flags=F key=K res=KIND:H style=H map=H rule=R paint=PK r g b a space=<space> entry=E resource=G layer=L depth=D`
  *   (a stroke); a shape or a stroke whose `antialias` is not the default ends with ` aa=N`
@@ -233,6 +233,8 @@ typedef struct GSHSCENE_Node {
   GSHGEOM_Map soft_mask_map;
   /** Group: the filter's slot (D-FL1): NULL, or a filter resource of the scene's store, which the node holds.  Else NULL. */
   const GSHSCENE_Resource * filter;
+  /** Group with a filter: a ::GSHSCENE_Filter_Mode (D-FL13), what the filter is applied to.  Else 0. */
+  uint32_t filter_mode;
   const GSHSCENE_Resource * clip;    ///< Group: a path or glyph run clipping the group, or NULL.  Else NULL.
   GSHGEOM_Map clip_map;              ///< Group with a clip: the clip's placement in the group's own space.  Else the identity.
   GSHGEOM_Fill_Rule clip_rule;       ///< Group with a clip: its rule.  Else nonzero.

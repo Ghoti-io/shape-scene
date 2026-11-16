@@ -5070,6 +5070,31 @@ def _object_text(obj):
     return "\n".join(out)
 
 
+# A group's filter mode (D-FL13, FL22): its range and its need of a filter, the field kept by the canonical form, the hash bit, the
+# equality of a list's items and a node, the dump of a list, of a version and of the dump sink, the emission, the planning bit and the
+# reason's name.  Run alone with PLANT_ONLY='^fm-'.
+FM = ["testFilterbackdrop"]
+FMD = ["testFilterbackdrop", "testDump_sink"]
+PLANTS_FM = [
+    ('fm-range', 'src', LS, 'group->filter_mode >= (uint32_t)GSHSCENE_FILTER_MODE_COUNT ||', 'group->filter_mode > (uint32_t)GSHSCENE_FILTER_MODE_COUNT ||', FM),
+    ('fm-needs-filter', 'src', LS, '(group->filter_mode != 0 && !group->filter)) {', '0) {', FM),
+    ('fm-canonical', 'src', LS, '  out->filter_mode = group->filter_mode;\n', '', FM),
+    ('fm-hash-bit', 'src', LS, '(filter_mode == (uint32_t)GSHSCENE_FILTER_MODE_BACKDROP ? 8u : 0u)', '0u', FM),
+    ('fm-dump', 'src', LS, '  if (written >= 0 && filter_mode != 0) {', '  if (0) {', FM),
+    ('fm-list-equal', 'src', LS, 'a->group.filter == b->group.filter && a->group.filter_mode == b->group.filter_mode;', 'a->group.filter == b->group.filter;', FM),
+    ('fm-node-canonical', 'src', ND, '      node.filter_mode = canonical.filter_mode;\n', '', FM),
+    ('fm-node-input', 'src', ND, 'in->soft_mask, in->soft_mask_map, in->filter, in->filter_mode};', 'in->soft_mask, in->soft_mask_map, in->filter, 0};', FM),
+    ('fm-node-equal', 'src', ND, '          a->filter_mode != b->filter_mode) {', '          0) {', FM),
+    ('fm-node-hash', 'src', ND, 'p->soft_mask, &p->soft_mask_map, p->filter, p->filter_mode);', 'p->soft_mask, &p->soft_mask_map, p->filter, 0);', FM),
+    ('fm-emit', 'src', EM, '        {0}, p->filter, p->filter_mode};', '        {0}, p->filter, 0};', FM),
+    ('fm-version-dump', 'src', VS, '&p->soft_mask_map, p->filter, p->filter_mode) < 0 ||', '&p->soft_mask_map, p->filter, 0) < 0 ||', FM),
+    ('fm-plan-bit', 'src', SK, '(item->group.filter_mode == (uint32_t)GSHSCENE_FILTER_MODE_BACKDROP ? GSHSCENE_FILTER_NATIVE_BACKDROP : 0u)', '0u', FMD),
+    ('fm-sink-record', 'src', DS, '          if (item->group.filter_mode != 0) {', '          if (0) {', FMD),
+    ('fm-reason-name', 'src', RP, '      return "filter-backdrop";', '      return "filter-map";', ["testReport", "testDump_sink"]),
+]
+PLANTS += PLANTS_FM
+
+
 def object_equivalence(plant):
     pid, kind, fname, old, new, _tests = plant
     if kind not in ("src", "srcl") or fname.endswith(".h"):

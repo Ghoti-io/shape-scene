@@ -155,6 +155,8 @@ const char * gshscene_reason_string(GSHSCENE_Reason reason) {
       return "filter-primitive";
     case GSHSCENE_REASON_FILTER_MAP:
       return "filter-map";
+    case GSHSCENE_REASON_FILTER_BACKDROP:
+      return "filter-backdrop";
     case GSHSCENE_REASON_ANTIALIAS:
       return "antialias";
     case GSHSCENE_REASON_PATTERN_OVERFLOW:

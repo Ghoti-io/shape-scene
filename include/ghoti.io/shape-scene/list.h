@@ -214,7 +214,7 @@
  * `F res=<kind>:<hash> map=<hash> rule=N paint=N <r> <g> <b> <a> space=<space> entry=E resource=<hash> layer=N depth=<hex>`,
  * `C res=<kind>:<hash> map=<hash> rule=N layer=N depth=<hex>`, `c`,
  * `G opacity=<hex> blend=<space> composite=N order=N layer=N depth=<hex>` (with ` isolation=N knockout=N
- * mask=<hash>` after `order=N` when one of them is not the default, T1), `g`,
+ * mask=<hash>` after `order=N` when one of them is not the default, T1, then ` filter=<hash>` and, for a filter applied to the backdrop, ` fmode=1`, D-FL13), `g`,
  * `I res=<kind>:<hash> map=<hash> layer=N depth=<hex>`,
  * `K res=<kind>:<hash> style=<hash> map=<hash> paint=N <r> <g> <b> <a> space=<space> entry=E resource=<hash> layer=N depth=<hex>`
  * (a stroke; a fill and a stroke end with ` aa=N` when their `antialias` is not the default, AA6), `P source=N code=N approx=N box=<x0> <y0> <x1> <y1>|- map=<hash> layer=N depth=<hex>` (a placeholder; the
@@ -350,6 +350,18 @@ typedef enum GSHSCENE_Antialias {
   GSHSCENE_ANTIALIAS_COUNT     ///< Closes the enum.
 } GSHSCENE_Antialias;
 
+/**
+ * @brief What a group's filter takes as its source (D-FL13, FL22).  The values are pinned (they are hashed).
+ *
+ * Zero is the default, so a zero-filled group filters its own content as it always did.  A value at or past
+ * ::GSHSCENE_FILTER_MODE_COUNT is ::GSHSCENE_ERR_INVALID, and a nonzero value without a filter is too.
+ */
+typedef enum GSHSCENE_Filter_Mode {
+  GSHSCENE_FILTER_MODE_OWN = 0,      ///< The default: the group's own content is the filter's source, and its result is what the group composites (FL9, FL20).
+  GSHSCENE_FILTER_MODE_BACKDROP = 1, ///< FL22, `backdrop-filter`: the backdrop under the group is the source; the group's own content is drawn unfiltered over the result.  A sink without `GSHSCENE_FILTER_NATIVE_BACKDROP` refuses the group.
+  GSHSCENE_FILTER_MODE_COUNT         ///< Closes the enum.
+} GSHSCENE_Filter_Mode;
+
 /** @brief The properties of a group. */
 typedef struct GSHSCENE_Group {
   double opacity;                   ///< Finite, in `[0, 1]`: the group's result is scaled by it before it is composited.
@@ -380,6 +392,16 @@ typedef struct GSHSCENE_Group {
    * carried.
    */
   const GSHSCENE_Resource * filter;
+  /**
+   * A ::GSHSCENE_Filter_Mode (D-FL13): what @p filter is applied to.  `OWN` (0, the default) is the group's own result.
+   * `BACKDROP` (FL22) is the backdrop: at the group's push, the content of the enclosing context accumulated so far, clipped by the
+   * clips in force, is filtered; the result replaces that content wherever the clips, the group's soft mask and its opacity weigh,
+   * and the group's own content is then drawn and composited over it unfiltered.  Nonzero needs a filter, an isolated group and no
+   * knockout (::GSHSCENE_ERR_INVALID otherwise, as for `OWN`).  A sink that does not claim ::GSHSCENE_FILTER_NATIVE_BACKDROP
+   * refuses a backdrop group (`FILTER_PRIMITIVE`); one that claims it refuses (`FILTER_BACKDROP`) a backdrop group whose enclosing
+   * group is non-isolated or knockout at the render, where the context is known (D-FL14).
+   */
+  uint32_t filter_mode;
 } GSHSCENE_Group;
 
 /**

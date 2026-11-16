@@ -318,13 +318,14 @@ GSHSCENE_API GSHSCENE_Result gshscene_store_intern_filter(
 GSHSCENE_API GSHSCENE_Result gshscene_resource_filter(const GSHSCENE_Resource * resource, GSHSCENE_Filter * out);
 
 /** @name What a filter needs of a sink (D-FL11): `GSHSCENE_Sink_Caps.filter_native`
- *  Bit `kind` for each ::GSHSCENE_Filter_Kind drawn (bits 1 to 17), and the three features below.
+ *  Bit `kind` for each ::GSHSCENE_Filter_Kind drawn (bits 1 to 17), and the four features below.
  *  @{ */
 #define GSHSCENE_FILTER_NATIVE_REGION_AUTO (UINT32_C(1) << 24)       ///< A filter whose region is `AUTO` (FL3).
 #define GSHSCENE_FILTER_NATIVE_CANONICAL_SPACE (UINT32_C(1) << 25)   ///< A filter on a group whose map has a rotation (not a multiple of 90 degrees) or a shear (D-FL8).
 #define GSHSCENE_FILTER_NATIVE_EDGE_DUPLICATE_WRAP (UINT32_C(1) << 26) ///< A blur or convolution whose edge mode is `DUPLICATE` or `WRAP` (D-FL9).
-/** Every bit a filter can require (the kinds 1 to 17 and the three features). */
-#define GSHSCENE_FILTER_NATIVE_ALL ((UINT32_C(0x3fffe)) | GSHSCENE_FILTER_NATIVE_REGION_AUTO | GSHSCENE_FILTER_NATIVE_CANONICAL_SPACE | GSHSCENE_FILTER_NATIVE_EDGE_DUPLICATE_WRAP)
+#define GSHSCENE_FILTER_NATIVE_BACKDROP (UINT32_C(1) << 27)          ///< A group whose filter's source is the backdrop under it (FL22, D-FL13): the planning pass adds it for a `BACKDROP` group, not ::gshscene_filter_required.
+/** Every bit a filter can require (the kinds 1 to 17 and the four features). */
+#define GSHSCENE_FILTER_NATIVE_ALL ((UINT32_C(0x3fffe)) | GSHSCENE_FILTER_NATIVE_REGION_AUTO | GSHSCENE_FILTER_NATIVE_CANONICAL_SPACE | GSHSCENE_FILTER_NATIVE_EDGE_DUPLICATE_WRAP | GSHSCENE_FILTER_NATIVE_BACKDROP)
 /** @} */
 
 /**

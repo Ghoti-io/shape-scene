@@ -384,7 +384,9 @@ GSHSCENE_Disposition gshscene_caps_disposition_unit(const GSHSCENE_Sink_Caps * c
     }
     if (item->group.filter) {
       /* D-FL11: the primitives and features the filter needs and the sink lacks, named; then the map (D-FL8). */
-      const uint32_t lacks = gshscene_filter_required(item->group.filter) & ~caps->filter_native;
+      const uint32_t lacks = (gshscene_filter_required(item->group.filter) |
+          (item->group.filter_mode == (uint32_t)GSHSCENE_FILTER_MODE_BACKDROP ? GSHSCENE_FILTER_NATIVE_BACKDROP : 0u)) &
+          ~caps->filter_native;
       if (lacks) {
         d.entry_class = GSHSCENE_ENTRY_REFUSED;
         d.reason = GSHSCENE_REASON_FILTER_PRIMITIVE;

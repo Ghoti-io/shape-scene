@@ -93,7 +93,7 @@
  * `C res=<kind>:<hash> map=<hash> rule=N box=<x0> <y0> <x1> <y1>` (a clip push),
  * `c` (a clip pop), `G opacity=<hex> composite=N` (a group push; with ` isolation=N knockout=N mask=<hash>` when a
  * configuration claims PDF's group fields and the group sets one, T1, and ` maskmap=<hash>`, the hash of the mask's
- * placement, when it names a mask, MK13), `g` (a group pop),
+ * placement, when it names a mask, MK13, then ` filter=<hash>` and, for a filter applied to the backdrop, ` fmode=1`, D-FL13), `g` (a group pop),
  * `I res=picture:<hash>` (an instance),
  * `P class=N reason=N source=N code=N approx=N map=<hash> box=<x0> <y0> <x1> <y1>` (a placeholder, list.h PH1: the
  * class and reason the planning pass wrote for it, PH3, in every configuration whatever its caps claim; `map` the
