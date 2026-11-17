@@ -177,6 +177,7 @@ typedef enum GSHSCENE_Resource_Kind {
   GSHSCENE_RESOURCE_CLIP_UNION = 14, ///< A clip union: the union of several shapes, which a clip push and a group's clip name (clip_union.h, CU6).
   GSHSCENE_RESOURCE_WIDTH_PROFILE = 15, ///< A width profile: a stroke style's width as a function of the position along each subpath (stroke.h, SW1 to SW9).
   GSHSCENE_RESOURCE_FILTER = 16,   ///< A filter: a region and a graph of primitives that processes a group's result (filter.h, FL1).
+  GSHSCENE_RESOURCE_LINETYPE = 17, ///< A linetype: a DXF dash pattern whose elements may carry text or a shape; a stroke style names one (stroke.h, LT1 to LT8).
   GSHSCENE_RESOURCE_KIND_COUNT     ///< Closes the enum.
 } GSHSCENE_Resource_Kind;
 
@@ -255,6 +256,7 @@ typedef struct GSHSCENE_Glyph_Run {
 #define GSHSCENE_BYTES_PER_COLOR ((size_t)48)    ///< Added for each entry of a palette.
 #define GSHSCENE_BYTES_PER_STOP ((size_t)96)     ///< Added for each stop of a gradient.
 #define GSHSCENE_BYTES_PER_WIDTH_STOP ((size_t)16) ///< Added for each stop of a width profile.
+#define GSHSCENE_BYTES_PER_LINETYPE_ELEMENT ((size_t)80) ///< Added for each element of a linetype (its strings are added by their length).
 #define GSHSCENE_BYTES_PER_DASH ((size_t)16)     ///< Added for each dash of a stroke style's canonical array (SK12).
 #define GSHSCENE_BYTES_PER_TRANSFER_PIECE ((size_t)112) ///< Added for each piece of a mask's stitching transfer (MK4).
 #define GSHSCENE_BYTES_PER_TRANSFER_SAMPLE ((size_t)8)  ///< Added for each sample of a mask's tables (MK4).

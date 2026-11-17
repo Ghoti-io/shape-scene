@@ -121,6 +121,14 @@ struct GSHSCENE_Resource {
       double max_factor;           /* the largest factor, for a stroke's bounds */
     } profile;
     struct {
+      GSHSCENE_Linetype_Element * elements; /* element_count of them, their strings in `pool` */
+      char * pool;                          /* the name, the description and every element's strings */
+      const char * name;
+      const char * description;             /* NULL for none */
+      size_t element_count;
+      int complex;                          /* an element is TEXT or SHAPE (LT5) */
+    } linetype;
+    struct {
       GSHSCENE_Filter f;          /* canonical (FL1); the arrays point into the arena below, the images are retained */
       uint8_t * arena;            /* the primitives, their inputs and their tables, one block */
       uint8_t * canon;            /* the canonical string (FL12): the content's one definition */
@@ -383,6 +391,11 @@ int gshscene_image_paint_singular(const GSHSCENE_Resource * resource);
 
 /** Whether a clip union resource has the canonical content @p source (clip_union.c Source). */
 int gshscene_clip_union_matches(const GSHSCENE_Resource * resource, const void * source);
+
+/** The linetype resource (linetype.c, LT1 to LT3): equality with a probe's source, freeing it, and the payload of its dump (negative on failure). */
+int gshscene_linetype_matches(const GSHSCENE_Resource * resource, const void * source);
+void gshscene_linetype_free(GSHSCENE_Resource * resource);
+int gshscene_linetype_dump(const GSHSCENE_Resource * resource, FILE * out);
 
 /** The width profile resource (width_profile.c, SW1): equality with a probe's source, freeing its stops, and the payload of its dump (negative on failure). */
 int gshscene_width_profile_matches(const GSHSCENE_Resource * resource, const void * source);

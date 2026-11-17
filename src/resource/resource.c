@@ -72,6 +72,8 @@ const char * gshscene_resource_kind_string(GSHSCENE_Resource_Kind kind) {
       return "width-profile";
     case GSHSCENE_RESOURCE_FILTER:
       return "filter";
+    case GSHSCENE_RESOURCE_LINETYPE:
+      return "linetype";
     case GSHSCENE_RESOURCE_KIND_COUNT:
       break;
   }
@@ -248,6 +250,8 @@ int gshscene_resource_matches(const GSHSCENE_Resource * resource, const GSHSCENE
       return gshscene_width_profile_matches(resource, probe->source);
     case GSHSCENE_RESOURCE_FILTER:
       return gshscene_filter_matches(resource, probe->source);
+    case GSHSCENE_RESOURCE_LINETYPE:
+      return gshscene_linetype_matches(resource, probe->source);
     case GSHSCENE_RESOURCE_HATCH:
       return gshscene_hatch_matches(resource, probe->source);
     case GSHSCENE_RESOURCE_PLANE:
@@ -311,6 +315,9 @@ void gshscene_resource_free_content(GSHSCENE_Resource * resource) {
       break;
     case GSHSCENE_RESOURCE_FILTER:
       gshscene_filter_free(resource);
+      break;
+    case GSHSCENE_RESOURCE_LINETYPE:
+      gshscene_linetype_free(resource);
       break;
     case GSHSCENE_RESOURCE_HATCH:
       gshscene_hatch_free(resource);
@@ -891,6 +898,11 @@ GSHSCENE_Result gshscene_resource_dump(const GSHSCENE_Resource * resource, FILE 
       break;
     case GSHSCENE_RESOURCE_WIDTH_PROFILE:
       if (gshscene_width_profile_dump(resource, out) < 0) {
+        return GSHSCENE_ERR_IO;
+      }
+      break;
+    case GSHSCENE_RESOURCE_LINETYPE:
+      if (gshscene_linetype_dump(resource, out) < 0) {
         return GSHSCENE_ERR_IO;
       }
       break;

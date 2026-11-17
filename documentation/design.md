@@ -1062,6 +1062,27 @@ walk hands a stroke to the same leaf callback as a shape, which reads the kind.
 paint order gives (SVG's `paint-order`; markers are items of their own). A front end that needs them composited as one
 (an element's opacity) wraps them in a group, as now. Nothing new is defined: it is SVG's and PDF's semantics exactly.
 
+## Linetypes (normative; LT1 to LT8)
+
+A linetype is an interned resource: a name, an optional description and a list of elements, DXF's LTYPE table record as plain data. An
+element is a dash (positive length, pen down), a space (positive length, pen up), a dot (zero length), or a text or shape carried
+along the line (a string, the name of a text style or shape file, a scale, a rotation with its mode, and an offset).
+
+- **LT1 Content.** Kinds and rotation modes have pinned values because they are hashed. Two linetypes of equal content are one handle.
+- **LT2 Validity** is decided element by element, before any bound: the name is non-empty and free of control characters; at least one
+  element is a dash; a dash or space has a positive length; a dot has none; a text or shape has non-empty text and style and a positive
+  scale; an element of a kind that does not use a field has it zero or NULL. A rule that is broken is `INVALID`.
+- **LT3 Bounds** come after validity: at most `min(max_resource_elements, 65535)` elements, strings of at most 255 bytes, values inside
+  the stroke bands, a rotation within 2^40; a bound that is broken is `LIMIT`. Negative zero is positive zero everywhere.
+- **LT4 A style names a linetype.** The style's own dash fields must then be empty, the dash offset zero and the scope the default. Read
+  back, the style's dashes are the linetype's simple elements lowered by the DXF rule (a space before the first dash becomes the
+  offset), so any sink that draws dashes draws the simple part with no knowledge of the resource.
+- **LT5 Text and shapes** are the `GSHSCENE_STROKE_NATIVE_LINETYPE` feature. A style whose linetype carries one requires it.
+- **LT6 Hash.** The linetype's handle enters the style's hash only when a style names one, so no earlier hash changes.
+- **LT7 Expansion cannot draw text.** A sink that expands strokes still refuses a style that needs LINETYPE (`STROKE_STYLE`): an
+  outline of the stroke has no place for glyphs. The simple elements are never refused for lack of the feature.
+- **LT8 Copy.** A copy into another store carries the linetype and the style that names it, checked against the destination's limits.
+
 ## Width profiles (normative; SW1 to SW9)
 
 A **width profile** is a resource of kind 15 (`"width-profile"`): `count` stops of `{position, factor}`, interned by `gshscene_store_intern_width_profile`

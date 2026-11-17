@@ -353,6 +353,13 @@ static GSHSCENE_Result copy_into(GSHSCENE_Store * dst, const GSHSCENE_Resource *
     if (r == GSHSCENE_OK) {
       s.width_profile = copy_held(dst, s.width_profile, &held, &r); /* the profile a style names is copied first */
     }
+    if (r == GSHSCENE_OK && s.linetype) {
+      s.linetype = copy_held(dst, s.linetype, &held, &r); /* so is its linetype, and the dash fields it lowered are cleared */
+      s.dash_count = 0;
+      s.dashes = NULL;
+      s.dash_offset = 0.0;
+      s.dash_scope = GSHSCENE_STROKE_DASH_PER_SUBPATH;
+    }
     if (r == GSHSCENE_OK) {
       r = gshscene_store_intern_stroke_style(dst, &s, out);
     }
@@ -361,6 +368,14 @@ static GSHSCENE_Result copy_into(GSHSCENE_Store * dst, const GSHSCENE_Resource *
   case GSHSCENE_RESOURCE_PLANE:
     r = gshscene_store_intern_plane(dst, out);
     break;
+  case GSHSCENE_RESOURCE_LINETYPE: {
+    GSHSCENE_Linetype lt;
+    r = gshscene_resource_linetype(from, &lt);
+    if (r == GSHSCENE_OK) {
+      r = gshscene_store_intern_linetype(dst, &lt, out);
+    }
+    break;
+  }
   case GSHSCENE_RESOURCE_WIDTH_PROFILE: {
     const GSHSCENE_Width_Stop * stops = NULL;
     size_t count = 0;

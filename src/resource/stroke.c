@@ -104,6 +104,13 @@ static GSHSCENE_Result valid(const GSHSCENE_Store * store, const GSHSCENE_Stroke
       return GSHSCENE_ERR_INVALID;
     }
   }
+  if (in->linetype) {
+    /* LT4: a linetype is the pattern, so the style's own dash fields must say nothing. */
+    if (in->linetype->kind != GSHSCENE_RESOURCE_LINETYPE || in->linetype->store != store || in->dash_count != 0 ||
+        in->dash_offset != 0.0 || in->dash_scope != (uint32_t)GSHSCENE_STROKE_DASH_PER_SUBPATH) {
+      return GSHSCENE_ERR_INVALID;
+    }
+  }
   return GSHSCENE_OK;
 }
 
@@ -161,6 +168,7 @@ static void canonical(const GSHSCENE_Stroke_Style * in, size_t count, double * d
     out->dash_scope = GSHSCENE_STROKE_DASH_PER_SUBPATH;
   }
   out->width_profile = in->width_profile;
+  out->linetype = in->linetype;
 }
 
 /* --- hash and equality ------------------------------------------------------------- */
@@ -185,6 +193,9 @@ static uint64_t content_hash(const GSHSCENE_Stroke_Style * s) {
     gshgeom_hash_f64(&h, s->dashes[i]);
   }
   gshgeom_hash_u64(&h, s->width_profile ? gshscene_resource_hash(s->width_profile) : 0);
+  if (s->linetype) {
+    gshgeom_hash_u64(&h, gshscene_resource_hash(s->linetype)); /* only when named: every hash from before is unchanged (LT6) */
+  }
   return gshgeom_hash_value(&h);
 }
 
@@ -199,7 +210,7 @@ int gshscene_stroke_matches(const GSHSCENE_Resource * resource, const void * sou
       !same_bits(a->miter_limit, b->miter_limit) || a->cap != b->cap || a->degenerate != b->degenerate ||
       a->alignment != b->alignment || a->alignment_rule != b->alignment_rule || a->dash_scope != b->dash_scope ||
       !same_bits(a->dash_offset, b->dash_offset) || a->dash_count != b->dash_count ||
-      a->width_profile != b->width_profile) {
+      a->width_profile != b->width_profile || a->linetype != b->linetype) {
     return 0;
   }
   for (size_t i = 0; i < a->dash_count; i++) {
@@ -229,12 +240,14 @@ static GSHSCENE_Result build_stroke(GSHSCENE_Store * store, const void * source,
   resource->u.stroke.s = *s;
   resource->u.stroke.s.dashes = resource->u.stroke.dashes;
   gshscene_resource_retain(s->width_profile); /* the style names it: held until the style goes */
+  gshscene_resource_retain(s->linetype);
   *out = resource;
   return GSHSCENE_OK;
 }
 
 void gshscene_stroke_free(GSHSCENE_Resource * resource) {
   gshscene_resource_release(resource->u.stroke.s.width_profile);
+  gshscene_resource_release(resource->u.stroke.s.linetype);
   gshscene_free(&resource->store->alloc, resource->u.stroke.dashes);
 }
 
@@ -247,17 +260,56 @@ GSHSCENE_Result gshscene_store_intern_stroke_style(
   if (result != GSHSCENE_OK) {
     return result;
   }
+  /* LT4: a linetype's simple elements are lowered to dashes (SG30) so that every sink draws them; its text and shapes are the LINETYPE feature. */
+  GSHSCENE_Stroke_Style lowered;
+  double * lowered_dashes = NULL;
+  if (style->linetype) {
+    const GSHSCENE_Linetype_Element * el = style->linetype->u.linetype.elements;
+    size_t n = style->linetype->u.linetype.element_count;
+    double * signed_elements = gshscene_alloc(&store->alloc, n * sizeof *signed_elements);
+    lowered_dashes = gshscene_alloc(&store->alloc, (n + 2) * sizeof *lowered_dashes);
+    if (!signed_elements || !lowered_dashes) {
+      gshscene_free(&store->alloc, signed_elements);
+      gshscene_free(&store->alloc, lowered_dashes);
+      return GSHSCENE_ERR_OOM;
+    }
+    size_t m = 0;
+    for (size_t i = 0; i < n; i++) {
+      if (el[i].kind == (uint32_t)GSHSCENE_LINETYPE_DASH) {
+        signed_elements[m++] = el[i].length;
+      } else if (el[i].kind == (uint32_t)GSHSCENE_LINETYPE_SPACE) {
+        signed_elements[m++] = -el[i].length;
+      } else if (el[i].kind == (uint32_t)GSHSCENE_LINETYPE_DOT) {
+        signed_elements[m++] = 0.0;
+      } /* text and shapes occupy no length */
+    }
+    size_t lowered_count = 0;
+    double lowered_offset = 0.0;
+    GSHGEOM_Result gr = gshgeom_stroke_dashes_from_dxf(signed_elements, m, 1.0, lowered_dashes, n + 2, &lowered_count, &lowered_offset);
+    gshscene_free(&store->alloc, signed_elements);
+    if (gr != GSHGEOM_OK) {
+      gshscene_free(&store->alloc, lowered_dashes);
+      return gr == GSHGEOM_ERR_LIMIT ? GSHSCENE_ERR_LIMIT : GSHSCENE_ERR_INVALID;
+    }
+    lowered = *style;
+    lowered.dash_count = lowered_count;
+    lowered.dashes = lowered_count ? lowered_dashes : NULL;
+    lowered.dash_offset = lowered_offset;
+    style = &lowered;
+  }
   /* SK2's bounds, after every other check; the count is the canonical one (an odd array doubled). */
   size_t count = canonical_dash_count(style);
   size_t most = store->limits.max_resource_elements < GSHSCENE_STROKE_DASHES_MAX ? store->limits.max_resource_elements
                                                                                  : GSHSCENE_STROKE_DASHES_MAX;
   if (!bounded(style) || count > most) {
+    gshscene_free(&store->alloc, lowered_dashes);
     return GSHSCENE_ERR_LIMIT;
   }
   double * dashes = NULL;
   if (count) {
     dashes = gshscene_alloc(&store->alloc, count * sizeof *dashes);
     if (!dashes) {
+      gshscene_free(&store->alloc, lowered_dashes);
       return GSHSCENE_ERR_OOM;
     }
   }
@@ -267,6 +319,7 @@ GSHSCENE_Result gshscene_store_intern_stroke_style(
       gshscene_sat_add(GSHSCENE_BYTES_BASE, gshscene_sat_mul(count, GSHSCENE_BYTES_PER_DASH)), &s, build_stroke};
   result = gshscene_store_intern(store, &probe, out);
   gshscene_free(&store->alloc, dashes);
+  gshscene_free(&store->alloc, lowered_dashes);
   return result;
 }
 
@@ -351,6 +404,9 @@ int gshscene_stroke_dump(const GSHSCENE_Resource * resource, FILE * out) {
           HEX(gshgeom_f64_bits(s->miter_limit)), (unsigned)s->cap, (unsigned)s->degenerate, (unsigned)s->alignment,
           (unsigned)s->alignment_rule, (unsigned)s->dash_scope, HEX(gshgeom_f64_bits(s->dash_offset)),
           HEX(s->dash_count), HEX(s->width_profile ? gshscene_resource_hash(s->width_profile) : 0)) < 0) {
+    return -1;
+  }
+  if (s->linetype && fprintf(out, "linetype %016llx\n", HEX(gshscene_resource_hash(s->linetype))) < 0) {
     return -1;
   }
   for (size_t i = 0; i < s->dash_count; i++) {
@@ -705,6 +761,9 @@ uint32_t gshscene_stroke_required(const GSHSCENE_Item * item, const GSHGEOM_Map 
   }
   if (s->width_profile) {
     need |= GSHSCENE_STROKE_NATIVE_WIDTH_PROFILE;
+  }
+  if (s->linetype && s->linetype->u.linetype.complex) {
+    need |= GSHSCENE_STROKE_NATIVE_LINETYPE; /* text or a shape along the line: no expansion draws it (LT5) */
   }
   if (s->degenerate == (uint32_t)GSHSCENE_STROKE_DEGENERATE_DRAW && s->cap != (uint32_t)GSHSCENE_STROKE_CAP_BUTT) {
     need |= GSHSCENE_STROKE_NATIVE_DEGENERATE_DRAW; /* with a butt cap a degenerate subpath draws nothing either way */

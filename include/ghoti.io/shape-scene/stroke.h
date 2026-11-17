@@ -355,6 +355,13 @@ typedef struct GSHSCENE_Stroke_Style {
   uint32_t dash_scope;            ///< A ::GSHSCENE_Dash_Scope; read only with dashes.
   uint32_t alignment;             ///< A ::GSHSCENE_Alignment.
   GSHGEOM_Fill_Rule alignment_rule; ///< The rule of the region inside and outside alignment clip to (D10); read only off center.
+  /**
+   * NULL, or a linetype of the store (LT1 to LT8): the dash pattern of the stroke, which may carry text and shapes.  Mutually
+   * exclusive with `dashes`, `dash_offset` and `dash_scope` (they must be zero, zero and per-subpath: ::GSHSCENE_ERR_INVALID), since
+   * the linetype is the pattern.  Read back, the style's dash fields are the linetype's simple elements lowered to dashes (LT4), which
+   * is what every sink draws; a style read back is therefore not interned again as it is, its dash fields are cleared first.
+   */
+  const GSHSCENE_Resource * linetype;
   const GSHSCENE_Resource * width_profile; ///< NULL (constant width), or a width profile of the store (SW1 to SW14): the width is `width` times its factor, with any join, cap, dash array and alignment.
 } GSHSCENE_Stroke_Style;
 
@@ -386,7 +393,12 @@ typedef struct GSHSCENE_Stroke_Style {
 #define GSHSCENE_STROKE_NATIVE_ALIGN_EVEN_ODD (UINT32_C(1) << 14)     ///< Alignment by even-odd.
 #define GSHSCENE_STROKE_NATIVE_DEGENERATE_DRAW (UINT32_C(1) << 15)    ///< A subpath of zero length drawn as SVG 2's dot.
 #define GSHSCENE_STROKE_NATIVE_WIDTH_PROFILE (UINT32_C(1) << 16)      ///< A width that varies along the subpath (SW1 to SW14): a stroke of varying width.
-#define GSHSCENE_STROKE_NATIVE_ALL ((UINT32_C(1) << 17) - 1)          ///< Every feature defined.
+/**
+ * Text or a shape carried along the stroke by a complex linetype (LT5).  No expansion can draw it (a stroke's outline has no
+ * text), so a sink without this bit refuses the stroke even when it expands (`STROKE_STYLE`), never drawing it without the text.
+ */
+#define GSHSCENE_STROKE_NATIVE_LINETYPE (UINT32_C(1) << 17)
+#define GSHSCENE_STROKE_NATIVE_ALL ((UINT32_C(1) << 18) - 1)          ///< Every feature defined.
 /** @} */
 
 /** @brief Fill @p style with SK1's defaults.  NULL is ignored. */
@@ -404,6 +416,59 @@ GSHSCENE_API void gshscene_stroke_style_init(GSHSCENE_Stroke_Style * style);
  */
 GSHSCENE_API GSHSCENE_Result gshscene_store_intern_stroke_style(GSHSCENE_Store * store,
     const GSHSCENE_Stroke_Style * style, const GSHSCENE_Resource ** out);
+
+
+/** @brief What an element of a linetype is (LT1).  The values are pinned (they are hashed). */
+typedef enum GSHSCENE_Linetype_Kind {
+  GSHSCENE_LINETYPE_DASH = 0,  ///< A pen-down length: `length` > 0.
+  GSHSCENE_LINETYPE_SPACE = 1, ///< A pen-up length: `length` > 0.
+  GSHSCENE_LINETYPE_DOT = 2,   ///< A dot: `length` 0.
+  GSHSCENE_LINETYPE_TEXT = 3,  ///< Text along the line (DXF's text element): `text` (UTF-8), `style`, `scale`, `rotation`, offsets.  `length` 0.
+  GSHSCENE_LINETYPE_SHAPE = 4, ///< A shape along the line (DXF's shape element): `text` the shape's name, `style` its file or style.  `length` 0.
+  GSHSCENE_LINETYPE_KIND_COUNT
+} GSHSCENE_Linetype_Kind;
+
+/** @brief How a text or shape element is turned (LT1, DXF's R, A and U). */
+typedef enum GSHSCENE_Linetype_Rotation {
+  GSHSCENE_LINETYPE_ROTATE_RELATIVE = 0, ///< Relative to the line's direction.
+  GSHSCENE_LINETYPE_ROTATE_ABSOLUTE = 1, ///< Relative to the x axis.
+  GSHSCENE_LINETYPE_ROTATE_UPRIGHT = 2,  ///< Always upright.
+  GSHSCENE_LINETYPE_ROTATE_COUNT
+} GSHSCENE_Linetype_Rotation;
+
+/** @brief One element of a linetype (LT1).  The fields a kind does not use must be 0 / NULL (LT2). */
+typedef struct GSHSCENE_Linetype_Element {
+  uint32_t kind;          ///< A ::GSHSCENE_Linetype_Kind.
+  double length;          ///< DASH, SPACE: a length in the style's width space, in `[2^-64, 2^64]`; else 0.
+  const char * text;      ///< TEXT: the string; SHAPE: the shape's name.  Not empty, at most 255 bytes, no control character.  NULL otherwise.
+  const char * style;     ///< TEXT: the text style's name; SHAPE: the shape file's name.  Same rules.  NULL otherwise.
+  double scale;           ///< TEXT, SHAPE: positive, in the bands; else 0.
+  double rotation;        ///< TEXT, SHAPE: degrees, finite, magnitude at most 2^40; else 0.
+  uint32_t rotation_mode; ///< TEXT, SHAPE: a ::GSHSCENE_Linetype_Rotation; else 0.
+  double offset_x;        ///< TEXT, SHAPE: the offset from the pen, along the line; else 0.
+  double offset_y;        ///< TEXT, SHAPE: the offset across it; else 0.
+} GSHSCENE_Linetype_Element;
+
+/** @brief A linetype (LT1): DXF's LTYPE table record as plain data. */
+typedef struct GSHSCENE_Linetype {
+  const char * name;                           ///< Not empty, at most 255 bytes, no control character.
+  const char * description;                    ///< NULL or at most 255 bytes of the same kind.
+  size_t element_count;                        ///< At least 1, at most `min(max_resource_elements, 65535)`.
+  const GSHSCENE_Linetype_Element * elements;  ///< At least one DASH.  Read back: the resource's copy.
+} GSHSCENE_Linetype;
+
+/**
+ * @brief Intern a linetype (LT1 to LT3): checked as given (`INVALID`: NULL, an empty name or an element's missing string, a kind or a
+ *   rotation mode out of range, a non-finite number, a length that is not positive for a DASH or a SPACE, a field a kind does not use
+ *   that is not 0 or NULL, a control character in a string, no DASH), then the bounds (`LIMIT`: more elements than allowed, a string
+ *   over 255 bytes, a length, scale or offset outside `[2^-64, 2^64]`, a rotation past 2^40).  Equal content is one handle; a `-0` is a
+ *   `+0`.  The element counts of each kind and the strings are copied.  @p out is a borrowed reference as the other interns' are.
+ */
+GSHSCENE_API GSHSCENE_Result gshscene_store_intern_linetype(
+    GSHSCENE_Store * store, const GSHSCENE_Linetype * linetype, const GSHSCENE_Resource ** out);
+
+/** @brief Read a linetype back (valid while a handle is held); ::GSHSCENE_ERR_INVALID for NULL or another kind. */
+GSHSCENE_API GSHSCENE_Result gshscene_resource_linetype(const GSHSCENE_Resource * resource, GSHSCENE_Linetype * out);
 
 /** @brief One stop of a width profile (the geometry library's, SW1): a position along a subpath in model units and a factor. */
 typedef GSHGEOM_Width_Stop GSHSCENE_Width_Stop;

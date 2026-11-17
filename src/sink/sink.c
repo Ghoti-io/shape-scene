@@ -410,9 +410,15 @@ GSHSCENE_Disposition gshscene_caps_disposition_unit(const GSHSCENE_Sink_Caps * c
   }
   /* S20, SK11: the features the stroke requires and the sink does not emit, unless it expands; after every other
    * refusal and before any approximation, which would otherwise hide it. */
-  if (item->kind == GSHSCENE_ITEM_STROKE && !(caps->flags & GSHSCENE_CAP_STROKE_EXPAND)) {
+  if (item->kind == GSHSCENE_ITEM_STROKE) {
     uint32_t missing =
         gshscene_stroke_required(item, instance_maps, instance_count, target_map) & ~caps->stroke_native;
+    /* LT5: a complex linetype's text or shape is drawn by no expansion, so a sink that expands still refuses it. */
+    if (!(caps->flags & GSHSCENE_CAP_STROKE_EXPAND)) {
+      /* every missing feature refuses */
+    } else {
+      missing &= GSHSCENE_STROKE_NATIVE_LINETYPE;
+    }
     if (missing) {
       d.entry_class = GSHSCENE_ENTRY_REFUSED;
       d.reason = GSHSCENE_REASON_STROKE_STYLE;
