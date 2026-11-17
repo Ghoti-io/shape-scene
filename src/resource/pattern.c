@@ -305,8 +305,9 @@ static void scan_tile(const GSHSCENE_List * list, int * foreground, uint32_t * p
       }
     } else if (item->kind == GSHSCENE_ITEM_INSTANCE) {
       scan_tile(gshscene_resource_picture(item->resource), foreground, palette_need);
-    } else if (item->kind == GSHSCENE_ITEM_GROUP_PUSH && item->group.soft_mask) {
-      scan_tile(gshscene_resource_picture(item->group.soft_mask->u.mask.m.picture), foreground, palette_need);
+    } else if (item->kind == GSHSCENE_ITEM_GROUP_PUSH && gshscene_group_picture(item->group.soft_mask, item->group.filter)) {
+      scan_tile(gshscene_resource_picture(gshscene_group_picture(item->group.soft_mask, item->group.filter)), foreground,
+          palette_need);
     }
   }
 }

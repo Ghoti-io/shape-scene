@@ -287,8 +287,9 @@ static size_t item_picture_depth(const GSHSCENE_Item * item) {
       item->paint.kind == GSHSCENE_PAINT_PATTERN) {
     return item->paint.resource->u.pattern.depth;
   }
-  if (item->kind == GSHSCENE_ITEM_GROUP_PUSH && item->group.soft_mask) {
-    return item->group.soft_mask->u.mask.m.picture->u.picture.depth;
+  if (item->kind == GSHSCENE_ITEM_GROUP_PUSH) {
+    const GSHSCENE_Resource * picture = gshscene_group_picture(item->group.soft_mask, item->group.filter);
+    return picture ? picture->u.picture.depth : 0; /* FL25: a filter's picture counts as a mask's does */
   }
   return 0;
 }
@@ -537,6 +538,10 @@ static GSHSCENE_Result canonical_group(const GSHSCENE_Store * store, const GSHSC
   if (group->filter &&
       (group->filter->kind != GSHSCENE_RESOURCE_FILTER || group->filter->store != store ||
           group->isolation != (uint32_t)GSHSCENE_ISOLATION_ISOLATED || group->knockout)) {
+    return GSHSCENE_ERR_INVALID;
+  }
+  /* FL25: a filter with a picture and a soft mask would name two pictures at one push; a front end nests two groups instead. */
+  if (group->soft_mask && group->filter && group->filter->u.filter.f.picture) {
     return GSHSCENE_ERR_INVALID;
   }
   /* MK6: the mask's placement; a zero-filled map is the identity, and only a group with a mask may place one. */

@@ -506,6 +506,18 @@ GSHSCENE_Result gshscene_list_copy(
 /** The deepest picture the list's instances name (0 for none); the list is not NULL. */
 size_t gshscene_list_picture_depth(const GSHSCENE_List * list);
 
+/**
+ * The picture a group's pop draws besides its content: its soft mask's picture (MK1) or, when it has none, the picture of its
+ * filter (FL25).  A group has at most one of them (the list refuses a mask on a group whose filter has a picture), so a unit's chain
+ * `[... , i, j]` through a group's push names exactly one picture.  NULL for neither.
+ */
+static inline const GSHSCENE_Resource * gshscene_group_picture(const GSHSCENE_Resource * soft_mask, const GSHSCENE_Resource * filter) {
+  if (soft_mask) {
+    return soft_mask->u.mask.m.picture;
+  }
+  return filter ? filter->u.filter.f.picture : NULL;
+}
+
 /** Close a list whose items are already in paint order (a version's emission): no permutation, ties as recorded. */
 GSHSCENE_Result gshscene_list_close_ordered(GSHSCENE_List * list);
 

@@ -102,9 +102,10 @@ int gshscene_expansion_next(
     return 0;
   }
   const GSHSCENE_List * picture = item->kind == GSHSCENE_ITEM_INSTANCE ? gshscene_resource_picture(item->resource) : NULL;
-  if (walk->plan && item->kind == GSHSCENE_ITEM_GROUP_PUSH && item->group.soft_mask) {
-    /* MK9: the planning pass alone enters a mask's picture, as the unit after the group's push; its content follows. */
-    picture = gshscene_resource_picture(item->group.soft_mask->u.mask.m.picture);
+  if (walk->plan && item->kind == GSHSCENE_ITEM_GROUP_PUSH && gshscene_group_picture(item->group.soft_mask, item->group.filter)) {
+    /* MK9, FL25: the planning pass alone enters a mask's picture (or, when the group has none, its filter's), as the unit after
+     * the group's push; its content follows. */
+    picture = gshscene_resource_picture(gshscene_group_picture(item->group.soft_mask, item->group.filter));
   }
   if (walk->plan && (item->kind == GSHSCENE_ITEM_FILL || item->kind == GSHSCENE_ITEM_STROKE) &&
       item->paint.kind == GSHSCENE_PAINT_PATTERN && item->paint.resource &&
@@ -1131,13 +1132,14 @@ static GSHSCENE_Result plan(GSHSCENE_Job * job, size_t * refused) {
       }
     }
     if (item->kind == GSHSCENE_ITEM_INSTANCE ||
-        (item->kind == GSHSCENE_ITEM_GROUP_PUSH && item->group.soft_mask)) {
-      /* An instance's picture is drawn under its map, a mask's under the group's placement of it (MK6): the chain T I_1 .. I_k Q. */
-      int is_mask = item->kind == GSHSCENE_ITEM_GROUP_PUSH;
-      maps[outer] = is_mask ? item->group.soft_mask_map : item->map;
+        (item->kind == GSHSCENE_ITEM_GROUP_PUSH && gshscene_group_picture(item->group.soft_mask, item->group.filter))) {
+      /* An instance's picture is drawn under its map, a mask's under the group's placement of it (MK6): the chain T I_1 .. I_k Q.
+       * A filter's picture is placed by its instances' maps alone (FL25), so the group's level is the identity. */
+      int is_group = item->kind == GSHSCENE_ITEM_GROUP_PUSH;
+      maps[outer] = is_group && item->group.soft_mask ? item->group.soft_mask_map : item->map; /* a group's own map is the identity */
       base[count] = outer + 1;
       const GSHSCENE_List * picture = gshscene_resource_picture(
-          is_mask ? item->group.soft_mask->u.mask.m.picture : item->resource);
+          is_group ? gshscene_group_picture(item->group.soft_mask, item->group.filter) : item->resource);
       memcpy(key, chain, count * sizeof *chain); /* key[count] is written by plan_ties */
       result = plan_ties(report, picture, key, count + 1);
       if (result != GSHSCENE_OK) {

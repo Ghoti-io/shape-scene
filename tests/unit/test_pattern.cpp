@@ -1787,7 +1787,7 @@ TEST(PatternScene, AChangedForegroundDamagesTheFillsWhoseTileOrTintReadsItAndNoO
   Ref reads_nested = d.pattern(nested_tile.get());
   Ref reads_tint = d.pattern(nullptr, 1.0, true);
   Ref reads_stroke = d.pattern(stroke_tile.get());
-  Ref via_mask, via_gradient, via_outer;
+  Ref via_mask, via_filter, via_gradient, via_outer;
   {
     // A tile whose group is masked by a picture that reads the foreground.
     Ref mask(known_mask(d.s.store(), fg_tile.get(), 0));
@@ -1799,6 +1799,32 @@ TEST(PatternScene, AChangedForegroundDamagesTheFillsWhoseTileOrTintReadsItAndNoO
       EXPECT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);
     }));
     via_mask = d.pattern(tile.get());
+    // A tile whose group's filter draws a slot whose picture reads the foreground (FL25).
+    Ref slots(make_picture(d.s.store(), [&](GSHSCENE_List * l) {
+      EXPECT_EQ(gshscene_list_instance(l, fg_tile.get(), nullptr, 0, 0.0), GSHSCENE_OK);
+    }));
+    GSHSCENE_Filter_Primitive prim;
+    std::memset(&prim, 0, sizeof prim);
+    prim.kind = GSHSCENE_FILTER_IMAGE;
+    prim.use_picture = 1;
+    GSHSCENE_Filter fdesc;
+    std::memset(&fdesc, 0, sizeof fdesc);
+    fdesc.region_mode = GSHSCENE_FILTER_REGION_AUTO;
+    fdesc.color_space = GSHSCENE_FILTER_SPACE_LINEAR_RGB;
+    fdesc.primitive_count = 1;
+    fdesc.primitives = &prim;
+    fdesc.picture = slots.get();
+    const GSHSCENE_Resource * fres = nullptr;
+    ASSERT_EQ(gshscene_store_intern_filter(d.s.store(), &fdesc, &fres), GSHSCENE_OK);
+    Ref fref(fres);
+    GSHSCENE_Group filtered = make_group(1.0);
+    filtered.filter = fres;
+    Ref ftile(make_picture(d.s.store(), [&](GSHSCENE_List * l) {
+      EXPECT_EQ(gshscene_list_group_push(l, &filtered, 0, 0.0), GSHSCENE_OK);
+      EXPECT_EQ(gshscene_list_fill(l, d.sq.get(), nullptr, GSHGEOM_FILL_NONZERO, nullptr, 0, 0), GSHSCENE_OK);
+      EXPECT_EQ(gshscene_list_group_pop(l), GSHSCENE_OK);
+    }));
+    via_filter = d.pattern(ftile.get());
     // A tile whose fill is painted with a gradient that has a foreground stop.
     GSHSCENE_Gradient_Stop stops[2];
     stops[0].offset = 0.0;
@@ -1835,6 +1861,7 @@ TEST(PatternScene, AChangedForegroundDamagesTheFillsWhoseTileOrTintReadsItAndNoO
   EXPECT_TRUE(damages(d, reads_tint.get(), false)) << "the tint";
   EXPECT_TRUE(damages(d, reads_stroke.get(), false)) << "a stroke's paint in the tile";
   EXPECT_TRUE(damages(d, via_mask.get(), false)) << "through a mask's picture in the tile";
+  EXPECT_TRUE(damages(d, via_filter.get(), false)) << "through a filter's picture in the tile";
   EXPECT_TRUE(damages(d, via_gradient.get(), false)) << "through a gradient's stop in the tile";
   EXPECT_TRUE(damages(d, via_outer.get(), false)) << "through a pattern in the tile";
   // A foreground change does not touch the palette's readers: the pattern whose tile reads the palette is not damaged by it.

@@ -4319,10 +4319,10 @@ PLANTS += [
     ('mk-emit-order-swapped', 'src', EM, '      if (gshgeom_map_compose(base, &p->soft_mask_map, &g.soft_mask_map) != GSHGEOM_OK) {', '      if (gshgeom_map_compose(&p->soft_mask_map, base, &g.soft_mask_map) != GSHGEOM_OK) {', MG + ["testEmit"]),
     ('mk-emit-no-mask-guard', 'src', EM, '    if (p->soft_mask) {\n      /* MK6: the mask\'s placement is composed with the group\'s accumulated map exactly as the clip\'s is. */', '    if (1) {\n      /* MK6: the mask\'s placement is composed with the group\'s accumulated map exactly as the clip\'s is. */', MG + ["testEmit"]),
     # MK12: the picture depth counts a mask exactly as an instance
-    ('mk-depth-list', 'src', LS, '    return item->group.soft_mask->u.mask.m.picture->u.picture.depth;', '    return 0;', MG),
-    ('mk-depth-list-plus-one', 'src', LS, '    return item->group.soft_mask->u.mask.m.picture->u.picture.depth;', '    return item->group.soft_mask->u.mask.m.picture->u.picture.depth + 1;', MG),
-    ('mk-depth-node', 'src', VA, '  m->pic = node->p.soft_mask ? node->p.soft_mask->u.mask.m.picture->u.picture.depth : 0;', '  m->pic = 0;', MG),
-    ('mk-depth-node-plus-one', 'src', VA, '  m->pic = node->p.soft_mask ? node->p.soft_mask->u.mask.m.picture->u.picture.depth : 0;', '  m->pic = node->p.soft_mask ? node->p.soft_mask->u.mask.m.picture->u.picture.depth + 1 : 0;', MG),
+    ('mk-depth-list', 'src', LS, '    return picture ? picture->u.picture.depth : 0; /* FL25: a filter\'s picture counts as a mask\'s does */', '    (void)picture;\n    return 0;', MG),
+    ('mk-depth-list-plus-one', 'src', LS, '    return picture ? picture->u.picture.depth : 0; /* FL25: a filter\'s picture counts as a mask\'s does */', '    return picture ? picture->u.picture.depth + 1 : 0;', MG),
+    ('mk-depth-node', 'src', VA, '    m->pic = aux ? aux->u.picture.depth : 0;', '    (void)aux;\n    m->pic = 0;', MG),
+    ('mk-depth-node-plus-one', 'src', VA, '    m->pic = aux ? aux->u.picture.depth : 0;', '    m->pic = aux ? aux->u.picture.depth + 1 : 0;', MG),
     ('mk-hdr-max-pieces', 'hdr', HMK, '#define GSHSCENE_MASK_MAX_PIECES ((size_t)256)', '#define GSHSCENE_MASK_MAX_PIECES ((size_t)257)', MT),
     ('mk-hdr-max-samples', 'hdr', HMK, '#define GSHSCENE_MASK_MAX_SAMPLES ((size_t)4096)', '#define GSHSCENE_MASK_MAX_SAMPLES ((size_t)4097)', MT),
     ('mk-hdr-max-exponent', 'hdr', HMK, '#define GSHSCENE_MASK_MAX_EXPONENT 65536.0', '#define GSHSCENE_MASK_MAX_EXPONENT 65537.0', MT),
@@ -5093,6 +5093,36 @@ PLANTS_FM = [
     ('fm-reason-name', 'src', RP, '      return "filter-backdrop";', '      return "filter-map";', ["testReport", "testDump_sink"]),
 ]
 PLANTS += PLANTS_FM
+
+# FL25: a filter's picture and the slots its IMAGE primitives draw (filter.h); hand-planted, tests tests/unit/test_filter_picture.cpp
+FPT = ["testFilter_picture"]
+FLC = "src/resource/filter.c"
+CP = "src/resource/copy.c"
+IN = "src/internal.h"
+PLANTS += [
+    ('fp-slot-range', 'src', FLC, 'p->slot >= gshscene_list_count(gshscene_resource_picture(f->picture))', 'p->slot > gshscene_list_count(gshscene_resource_picture(f->picture))', FPT),
+    ('fp-slot-needs-picture', 'src', FLC, 'p->rendering != 0 || !f->picture ||', 'p->rendering != 0 ||', FPT),
+    ('fp-slot-with-image', 'src', FLC, 'if (p->image || p->placement.dim != 0 || p->rendering != 0', 'if (p->placement.dim != 0 || p->rendering != 0', FPT),
+    ('fp-slot-with-placement', 'src', FLC, 'if (p->image || p->placement.dim != 0 || p->rendering != 0', 'if (p->image || p->rendering != 0', FPT),
+    ('fp-slot-with-rendering', 'src', FLC, 'if (p->image || p->placement.dim != 0 || p->rendering != 0', 'if (p->image || p->placement.dim != 0', FPT),
+    ('fp-use-range', 'src', FLC, 'if (p->use_picture > 1u) {', 'if (p->use_picture > 2u) {', FPT),
+    ('fp-image-with-slot', 'src', FLC, 'if (p->slot != 0 || !p->image ||', 'if (!p->image ||', FPT),
+    ('fp-picture-unused', 'src', FLC, '  if (!used || f->picture->kind != GSHSCENE_RESOURCE_PICTURE', '  if (f->picture->kind != GSHSCENE_RESOURCE_PICTURE', FPT),
+    ('fp-picture-store', 'src', FLC, 'f->picture->kind != GSHSCENE_RESOURCE_PICTURE || f->picture->store != store', 'f->picture->kind != GSHSCENE_RESOURCE_PICTURE || (f->picture->store != store && store == NULL)', FPT),
+    ('fp-picture-instances', 'src', FLC, 'item->kind != GSHSCENE_ITEM_INSTANCE) {\n      return 0;', 'item->kind == 99) {\n      return 0;', FPT),
+    ('fp-hash-slot', 'src', FLC, '      put32(o, p->slot);', '      put32(o, 0);', FPT),
+    ('fp-hash-picture', 'src', FLC, '    put64(&o, gshscene_resource_hash(f->picture)); /* FL25 */', '', FPT),
+    ('fp-equal-picture', 'src', FLC, '  return resource->u.filter.f.picture == want->filter->picture;', '  return 1;', FPT),
+    ('fp-retain', 'src', FLC, '  gshscene_resource_retain(in->picture);', '', FPT),
+    ('fp-release', 'src', FLC, '  gshscene_resource_release(f->picture);\n', '', FPT),
+    ('fp-copy-picture', 'src', CP, '      f.picture = copy_held(dst, f.picture, &held, &r); /* FL25 */', '', FPT),
+    ('fp-required', 'src', FLC, '  if (f->picture) {\n    need |= GSHSCENE_FILTER_NATIVE_PICTURE;\n  }', '', FPT),
+    ('fp-all-bit', 'hdr', "include/ghoti.io/shape-scene/filter.h", ' | GSHSCENE_FILTER_NATIVE_BACKDROP | GSHSCENE_FILTER_NATIVE_PICTURE)', ' | GSHSCENE_FILTER_NATIVE_BACKDROP)', FPT + ["testDump_sink"]),
+    ('fp-mask-conflict', 'src', LS, '  if (group->soft_mask && group->filter && group->filter->u.filter.f.picture) {', '  if (0) {', FPT),
+    ('fp-group-picture-filter', 'src', IN, '  return filter ? filter->u.filter.f.picture : NULL;', '  return filter ? NULL : NULL;', FPT),
+    ('fp-plan-walk', 'src', SK, '    picture = gshscene_resource_picture(gshscene_group_picture(item->group.soft_mask, item->group.filter));\n  }', '  }', FPT),
+    ('fp-scan-tile', 'src', "src/resource/pattern.c", '    } else if (item->kind == GSHSCENE_ITEM_GROUP_PUSH && gshscene_group_picture(item->group.soft_mask, item->group.filter)) {', '    } else if (item->kind == GSHSCENE_ITEM_GROUP_PUSH && item->group.soft_mask) {', FPT + ["testPattern"]),
+]
 
 
 def object_equivalence(plant):

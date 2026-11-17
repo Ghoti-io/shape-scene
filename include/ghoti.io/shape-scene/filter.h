@@ -24,7 +24,7 @@
  * The filter: what a group's filter slot names.  A filter is a region and a directed acyclic graph of primitives (Filter Effects
  * Module Level 1: offset, flood, merge, blend, composite, color matrix, component transfer, Gaussian blur, drop shadow, morphology,
  * convolve matrix, tile, image, displacement map, turbulence, diffuse and specular lighting) that processes the group's result at
- * its pop (FL1 to FL24).  This header defines the resource, its validity, canonical form, hash and dump (FL1 to FL6, FL12) and what a
+ * its pop (FL1 to FL25).  This header defines the resource, its validity, canonical form, hash and dump (FL1 to FL6, FL12) and what a
  * sink needs to draw one (FL5, D-FL11); what each primitive computes is in `documentation/design.md` and is drawn by a sink.
  *
  * ### The content (FL1, FL2)
@@ -58,8 +58,10 @@
  * `u32` x and y channel), noise (`u32` octaves, `f64` seed, `u32` stitch), lighting (`f64` surface scale, constant, the light: `u8` kind,
  * `f64` azimuth, elevation, three position, three points-at, spot exponent, `u8` has cone, `f64` cone angle), specular (`f64` exponent),
  * kernel unit length (two `f64`) and image (`u64` its content hash, the placement as `u32` dimension, `u32` kind and the `f64` entries
- * row by row each with its translation, `u32` rendering); every `f64` a `-0` spelled `+0`.  The hash is FNV-1a over `u32` 1, `u32`
- * 16, `u64` the string's length and its bytes; equality compares the strings and an image's handle.  The dump is a line
+ * row by row each with its translation, `u32` rendering; a primitive that draws a slot of the filter's picture writes `u64` 0 for the
+ * hash, the identity placement, `u32` 0xFFFFFFFF for the rendering and `u32` the slot); after the last primitive, only for a filter
+ * with a picture, `u64` the picture's content hash (FL25); every `f64` a `-0` spelled `+0`.  The hash is FNV-1a over `u32` 1, `u32`
+ * 16, `u64` the string's length and its bytes; equality compares the strings and the handles of the images and of the picture.  The dump is a line
  * `filter region=M x=<hex> y=<hex> w=<hex> h=<hex> cspace=C primitives=N` and a line `fp i=I kind=K cspace=C sub=<mask> <hex> <hex> <hex>
  * <hex> in=<kind>:<index>,... params=<hash of the primitive's own canonical bytes>`, never an image's samples.
  */
@@ -281,7 +283,9 @@ typedef struct GSHSCENE_Filter_Primitive {
   GSHSCENE_Filter_Light light;        ///< Lighting.
   const GSHSCENE_Resource * image;    ///< `IMAGE`: an image resource of the same store; retained.
   GSHGEOM_Map placement;              ///< `IMAGE`: the image's space to the group's user space; a zero-filled map is the identity.
-  uint32_t rendering;                 ///< `IMAGE`: a ::GSHSCENE_Image_Filter of the image paint's list.
+  uint32_t rendering;                 ///< `IMAGE`: a ::GSHSCENE_Image_Filter of the image paint's list; zero for a picture slot.
+  uint32_t use_picture;               ///< `IMAGE`: 0 or 1; 1 draws item @p slot of the filter's picture instead of an image (FL25).
+  uint32_t slot;                      ///< `IMAGE` with `use_picture`: the index of an instance item of the filter's picture; zero otherwise.
 } GSHSCENE_Filter_Primitive;
 
 /** @brief The content of a filter (FL1). */
@@ -291,6 +295,7 @@ typedef struct GSHSCENE_Filter {
   uint32_t color_space;                    ///< `LINEAR_RGB` or `SRGB`; the filter's default for a primitive.
   size_t primitive_count;                  ///< At least 1, at most ::GSHSCENE_FILTER_MAX_PRIMITIVES.
   const GSHSCENE_Filter_Primitive * primitives; ///< `primitive_count` of them.
+  const GSHSCENE_Resource * picture;       ///< A picture resource of the same store, retained, whose items are all instances; NULL unless an `IMAGE` primitive uses a slot of it, and then not NULL (FL25).
 } GSHSCENE_Filter;
 
 /**
@@ -318,14 +323,15 @@ GSHSCENE_API GSHSCENE_Result gshscene_store_intern_filter(
 GSHSCENE_API GSHSCENE_Result gshscene_resource_filter(const GSHSCENE_Resource * resource, GSHSCENE_Filter * out);
 
 /** @name What a filter needs of a sink (D-FL11): `GSHSCENE_Sink_Caps.filter_native`
- *  Bit `kind` for each ::GSHSCENE_Filter_Kind drawn (bits 1 to 17), and the four features below.
+ *  Bit `kind` for each ::GSHSCENE_Filter_Kind drawn (bits 1 to 17), and the features below.
  *  @{ */
 #define GSHSCENE_FILTER_NATIVE_REGION_AUTO (UINT32_C(1) << 24)       ///< A filter whose region is `AUTO` (FL3).
 #define GSHSCENE_FILTER_NATIVE_CANONICAL_SPACE (UINT32_C(1) << 25)   ///< A filter on a group whose map has a rotation (not a multiple of 90 degrees) or a shear (D-FL8).
 #define GSHSCENE_FILTER_NATIVE_EDGE_DUPLICATE_WRAP (UINT32_C(1) << 26) ///< A blur or convolution whose edge mode is `DUPLICATE` or `WRAP` (D-FL9).
 #define GSHSCENE_FILTER_NATIVE_BACKDROP (UINT32_C(1) << 27)          ///< A group whose filter's source is the backdrop under it (FL22, D-FL13): the planning pass adds it for a `BACKDROP` group, not ::gshscene_filter_required.
-/** Every bit a filter can require (the kinds 1 to 17 and the four features). */
-#define GSHSCENE_FILTER_NATIVE_ALL ((UINT32_C(0x3fffe)) | GSHSCENE_FILTER_NATIVE_REGION_AUTO | GSHSCENE_FILTER_NATIVE_CANONICAL_SPACE | GSHSCENE_FILTER_NATIVE_EDGE_DUPLICATE_WRAP | GSHSCENE_FILTER_NATIVE_BACKDROP)
+#define GSHSCENE_FILTER_NATIVE_PICTURE (UINT32_C(1) << 28)           ///< A filter with a picture, whose `IMAGE` primitives draw its slots (FL25): the sink draws the picture's instances into layers of its own.
+/** Every bit a filter can require (the kinds 1 to 17 and the five features). */
+#define GSHSCENE_FILTER_NATIVE_ALL ((UINT32_C(0x3fffe)) | GSHSCENE_FILTER_NATIVE_REGION_AUTO | GSHSCENE_FILTER_NATIVE_CANONICAL_SPACE | GSHSCENE_FILTER_NATIVE_EDGE_DUPLICATE_WRAP | GSHSCENE_FILTER_NATIVE_BACKDROP | GSHSCENE_FILTER_NATIVE_PICTURE)
 /** @} */
 
 /**

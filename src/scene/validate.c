@@ -194,7 +194,10 @@ static GSHSCENE_Result visit_group(Check * c, size_t index, size_t level, Memo *
   m->exp = 2 * wrappers;
   m->occ = 1;
   /* MK12: a soft mask names a picture the emitted list draws, so it counts toward the nesting as an instance's does. */
-  m->pic = node->p.soft_mask ? node->p.soft_mask->u.mask.m.picture->u.picture.depth : 0;
+  {
+    const GSHSCENE_Resource * aux = gshscene_group_picture(node->p.soft_mask, node->p.filter); /* FL25 with MK12 */
+    m->pic = aux ? aux->u.picture.depth : 0;
+  }
   for (size_t i = 0; i < node->child_count; i++) {
     size_t j = gshscene_nodes_find(c->nodes, c->count, node->children[i]);
     if (j == GSHSCENE_NONE || c->nodes[j]->parent != node->id) {

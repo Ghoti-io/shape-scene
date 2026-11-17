@@ -464,7 +464,7 @@ typedef struct GSHSCENE_Target {
  */
 #define GSHSCENE_CAP_CLIP_UNION_INNER (UINT32_C(1) << 22)
 /**
- * A sink applies a group's filter (filter.h, FL1 to FL24, D-FL11): the group's result is processed by the filter's primitives at its pop.  The
+ * A sink applies a group's filter (filter.h, FL1 to FL25, D-FL11): the group's result is processed by the filter's primitives at its pop.  The
  * primitives it draws are `filter_native`'s bits (a missing one refuses the group, `FILTER_PRIMITIVE`, the missing bits in `second`); without
  * this flag the planning pass refuses every filtered group, `FILTER`, whatever `filter_native` says.
  */

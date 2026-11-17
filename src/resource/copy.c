@@ -384,6 +384,9 @@ static GSHSCENE_Result copy_into(GSHSCENE_Store * dst, const GSHSCENE_Resource *
       prims[i].image = copy_held(dst, f.primitives[i].image, &held, &r);
     }
     if (r == GSHSCENE_OK) {
+      f.picture = copy_held(dst, f.picture, &held, &r); /* FL25 */
+    }
+    if (r == GSHSCENE_OK) {
       f.primitives = prims;
       r = gshscene_store_intern_filter(dst, &f, out);
     }

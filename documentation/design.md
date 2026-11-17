@@ -1487,7 +1487,7 @@ names it, as a writer emits an `SMask` once; its raster-like configuration claim
 toolpath-like one claims neither, so a mask is refused `SOFT_MASK`. `tests/sink_conformance.h` runs the cases for these
 against every sink.
 
-## Filters (normative; FL1 to FL24)
+## Filters (normative; FL1 to FL25)
 
 A **filter** processes a group's result at its pop: a region and a directed acyclic graph of primitives (Filter Effects Module Level 1: offset,
 flood, merge, blend, composite, color matrix, component transfer, Gaussian blur, drop shadow, morphology, convolve matrix, tile, image,
@@ -1549,6 +1549,20 @@ space at the pixel center mapped back; `DIFFUSE_LIGHTING` and `SPECULAR_LIGHTING
 result is clipped to its subregion (default: the union of its inputs' subregions, else the filter region). A filter's result is clipped to its region
 and composited as the group's result: the opacity, the soft mask and the clips apply to the filtered result, through the group's composite (FL20).
 A filtered group is picked by its content, never by its filtered result (FL24).
+
+**FL25 A filter's picture and its slots.** An `IMAGE` primitive draws either an image (a raster resource, placed and filtered as an image paint is) or
+a **slot** of the filter's picture: `use_picture` is 1 and `slot` indexes an item of `GSHSCENE_Filter.picture`, a picture resource of the same store
+whose items are all instances (Filter Effects 1, `feImage` of an element: the element is drawn as a `use` of it would be). The instance's map places
+the element (the front end folds the subregion's `x`, `y` and the element's transform into it); the primitive's `placement` and `rendering` stay zero
+and an image is not named. The picture is present exactly when a primitive draws a slot, and a slot past the picture, an item that is not an instance,
+a picture of another store or of another kind is `ERR_INVALID`. The picture is part of the filter's content: its hash is appended to the canonical
+string only when there is one (so no earlier filter's hash moves), the slot is written in the primitive's image group with the hash `0` and the
+rendering `0xFFFFFFFF` (no image has either), and equality compares the picture's handle. A sink that draws slots claims
+`GSHSCENE_FILTER_NATIVE_PICTURE`; `gshscene_filter_required` asks for it. A filter's picture counts exactly as a mask's does (MK12): it is the picture
+the group's push names (`gshscene_group_picture`), it counts toward the list's picture depth, the scene's validation, the pattern scan for
+foreground and palette reads, and the planning pass enters it after the push (chain `[... , i, j]`, the group's level placed by the identity, so the
+instances' own maps are the whole placement). A group has at most one such picture: a soft mask and a filter with a picture on one group is
+`ERR_INVALID`, and a front end nests two groups (the mask on the outer one) instead.
 
 **D-FL13 The backdrop slot (`backdrop-filter`, FL22).** A group's `filter_mode` (`GSHSCENE_Filter_Mode`, `list.h`) is `OWN` (0, the default: the filter
 takes the group's own result) or `BACKDROP` (1: it takes the **backdrop under the group**). A nonzero mode needs a filter and the same group the filter

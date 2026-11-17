@@ -175,7 +175,8 @@ static int unused_zero(const GSHSCENE_Filter_Primitive * p, uint32_t used) {
   if (!(used & G_KUL) && !(zero_d(p->kernel_unit_length[0]) && zero_d(p->kernel_unit_length[1]))) {
     return 0;
   }
-  if (!(used & G_IMAGE) && !(p->image == NULL && p->placement.dim == 0 && p->rendering == 0)) {
+  if (!(used & G_IMAGE) &&
+      !(p->image == NULL && p->placement.dim == 0 && p->rendering == 0 && p->use_picture == 0 && p->slot == 0)) {
     return 0;
   }
   return 1;
@@ -275,7 +276,7 @@ static int check_light(const GSHSCENE_Filter_Light * l, Tally * t) {
 }
 
 /** The primitive's own fields (FL6), after the common ones.  0 for invalid. */
-static int check_params(const GSHSCENE_Store * store, const GSHSCENE_Filter_Primitive * p, Tally * t) {
+static int check_params(const GSHSCENE_Store * store, const GSHSCENE_Filter * f, const GSHSCENE_Filter_Primitive * p, Tally * t) {
   const uint32_t used = groups_of(p->kind, p->mode);
   if (!unused_zero(p, used)) {
     return 0;
@@ -413,17 +414,52 @@ static int check_params(const GSHSCENE_Store * store, const GSHSCENE_Filter_Prim
     }
   }
   if (used & G_IMAGE) {
-    if (!p->image || p->image->kind != GSHSCENE_RESOURCE_IMAGE || p->image->store != store ||
-        p->rendering >= (uint32_t)GSHSCENE_IMAGE_FILTER_COUNT) {
+    if (p->use_picture > 1u) {
       return 0;
     }
-    if (p->placement.dim == 3) {
+    if (p->use_picture) {
+      /* FL25: a slot of the filter's picture; no image, no placement (the slot's instance map places it), no rendering. */
+      if (p->image || p->placement.dim != 0 || p->rendering != 0 || !f->picture ||
+          p->slot >= gshscene_list_count(gshscene_resource_picture(f->picture))) {
+        return 0;
+      }
+    } else {
+      if (p->slot != 0 || !p->image || p->image->kind != GSHSCENE_RESOURCE_IMAGE || p->image->store != store ||
+          p->rendering >= (uint32_t)GSHSCENE_IMAGE_FILTER_COUNT) {
+        return 0;
+      }
+    }
+    if (p->use_picture) {
+      /* nothing to check on the placement */
+    } else if (p->placement.dim == 3) {
       t->unsupported = 1;
     } else if (p->placement.dim != 0) {
       GSHGEOM_Map canonical;
       if (gshscene_list_canonical_map(&p->placement, &canonical) != GSHSCENE_OK || canonical.dim != 2) {
         return 0;
       }
+    }
+  }
+  return 1;
+}
+
+/** FL25: the picture is present exactly when a primitive draws a slot of it, is of this store, and holds only instances. */
+static int picture_ok(const GSHSCENE_Store * store, const GSHSCENE_Filter * f, size_t look) {
+  int used = 0;
+  for (size_t i = 0; i < look; i++) {
+    used |= f->primitives[i].kind == GSHSCENE_FILTER_IMAGE && f->primitives[i].use_picture != 0;
+  }
+  if (!f->picture) {
+    return 1; /* a slot without a picture was refused with its primitive */
+  }
+  if (!used || f->picture->kind != GSHSCENE_RESOURCE_PICTURE || f->picture->store != store) {
+    return 0;
+  }
+  const GSHSCENE_List * list = gshscene_resource_picture(f->picture);
+  for (size_t i = 0; i < gshscene_list_count(list); i++) {
+    const GSHSCENE_Item * item = NULL;
+    if (gshscene_list_item(list, i, &item) != GSHSCENE_OK || item->kind != GSHSCENE_ITEM_INSTANCE) {
+      return 0;
     }
   }
   return 1;
@@ -483,9 +519,12 @@ static GSHSCENE_Result check(const GSHSCENE_Store * store, const GSHSCENE_Filter
         return GSHSCENE_ERR_INVALID;
       }
     }
-    if (!check_params(store, p, tally)) {
+    if (!check_params(store, f, p, tally)) {
       return GSHSCENE_ERR_INVALID;
     }
+  }
+  if (!picture_ok(store, f, look)) {
+    return GSHSCENE_ERR_INVALID;
   }
   if (tally->values > GSHSCENE_FILTER_MAX_VALUES) {
     tally->limit = 1;
@@ -667,9 +706,18 @@ static void put_primitive(Out * o, const GSHSCENE_Filter_Primitive * p) {
     putf(o, p->kernel_unit_length[1]);
   }
   if (used & G_IMAGE) {
-    put64(o, gshscene_resource_hash(p->image));
-    put_map(o, &p->placement);
-    put32(o, p->rendering);
+    if (p->use_picture) {
+      GSHGEOM_Map identity;
+      gshgeom_map_identity(2, &identity);
+      put64(o, 0);
+      put_map(o, &identity);
+      put32(o, UINT32_MAX);
+      put32(o, p->slot);
+    } else {
+      put64(o, gshscene_resource_hash(p->image));
+      put_map(o, &p->placement);
+      put32(o, p->rendering);
+    }
   }
 }
 
@@ -686,6 +734,9 @@ static size_t serialize(const GSHSCENE_Filter * f, uint8_t * buf) {
   put64(&o, (uint64_t)f->primitive_count);
   for (size_t i = 0; i < f->primitive_count; i++) {
     put_primitive(&o, &f->primitives[i]);
+  }
+  if (f->picture) {
+    put64(&o, gshscene_resource_hash(f->picture)); /* FL25 */
   }
   return o.n;
 }
@@ -720,7 +771,7 @@ int gshscene_filter_matches(const GSHSCENE_Resource * resource, const void * sou
       return 0;
     }
   }
-  return 1;
+  return resource->u.filter.f.picture == want->filter->picture;
 }
 
 static GSHSCENE_Result build(GSHSCENE_Store * store, const void * source, GSHSCENE_Resource ** out) {
@@ -803,7 +854,9 @@ static GSHSCENE_Result build(GSHSCENE_Store * store, const void * source, GSHSCE
     }
     if (used & G_IMAGE) {
       gshscene_resource_retain(q->image);
-      if (q->placement.dim == 0) {
+      if (q->use_picture) {
+        /* FL25: the placement stays zero (the slot's instance places it), so a copy re-interns the same content */
+      } else if (q->placement.dim == 0) {
         gshgeom_map_identity(2, &q->placement);
       } else {
         (void)gshscene_list_canonical_map(&in->primitives[i].placement, &q->placement);
@@ -812,6 +865,7 @@ static GSHSCENE_Result build(GSHSCENE_Store * store, const void * source, GSHSCE
   }
   resource->u.filter.f = *in;
   resource->u.filter.f.primitives = prims;
+  gshscene_resource_retain(in->picture);
   for (int i = 0; i < 4; i++) {
     resource->u.filter.f.region[i] = in->region[i] == 0.0 ? 0.0 : in->region[i];
   }
@@ -829,6 +883,7 @@ void gshscene_filter_free(GSHSCENE_Resource * resource) {
       gshscene_resource_release(f->primitives[i].image);
     }
   }
+  gshscene_resource_release(f->picture);
   gshscene_free(&resource->store->alloc, resource->u.filter.arena);
   gshscene_free(&resource->store->alloc, resource->u.filter.canon);
 }
@@ -877,6 +932,9 @@ uint32_t gshscene_filter_required(const GSHSCENE_Resource * resource) {
   uint32_t need = 0;
   if (f->region_mode == (uint32_t)GSHSCENE_FILTER_REGION_AUTO) {
     need |= GSHSCENE_FILTER_NATIVE_REGION_AUTO;
+  }
+  if (f->picture) {
+    need |= GSHSCENE_FILTER_NATIVE_PICTURE;
   }
   for (size_t i = 0; i < f->primitive_count; i++) {
     const GSHSCENE_Filter_Primitive * p = &f->primitives[i];
