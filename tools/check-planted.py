@@ -4985,6 +4985,8 @@ HPAT = "include/ghoti.io/shape-scene/pattern.h"
 PLANTS += [
     ('pov-hdr-cap-bit', 'hdr', HS, '#define GSHSCENE_CAP_PATTERN_OVERFLOW (UINT32_C(1) << 21)', '#define GSHSCENE_CAP_PATTERN_OVERFLOW (UINT32_C(1) << 20)', POT + ["testAntialias"]),
     ('pov-hdr-reason', 'hdr', HRP, '  GSHSCENE_REASON_PATTERN_OVERFLOW = 44,', '  GSHSCENE_REASON_PATTERN_OVERFLOW = 54,', POT + ["testReport"]),
+    ('rg-report-name', 'src', 'src/sink/report.c', '      return "region";', '      return "regions";', ["testReport"]),
+    ('rg-reason-value', 'hdr', 'include/ghoti.io/shape-scene/report.h', '  GSHSCENE_REASON_REGION = 50, ', '  GSHSCENE_REASON_REGION = 60, ', ["testReport"]),
     ('pov-report-name', 'src', 'src/sink/report.c', '      return "pattern-overflow";', '      return "pattern_overflow";', POT + ["testReport"]),
     ('pov-check', 'src', PAT_C, 'in->has_tint > 1u || in->overflow > 1u) {', 'in->has_tint > 1u || in->overflow > 2u) {', POT),
     ('pov-store', 'src', PAT_C, '  out->overflow = in->overflow;\n', '', POT),

@@ -45,7 +45,7 @@ TEST(Report, EveryClassAndReasonHasItsOwnString) {
       "face-unbound", "palette-entry", "gradient", "interpolation-space", "map-not-invertible", "gradient-degenerate",
       "group-isolation", "group-knockout", "soft-mask", "stroke-style", "stroke-zero-width",
       "stroke-centerline", "placeholder", "image", "image-filter", "image-filter-space", "mask-feature", "pattern",
-      "pattern-degenerate", "pattern-resampled", "hatch", "hatch-degenerate", "clip-union", "union-overlap", "antialias", "pattern-overflow", "union-inner", "filter", "filter-primitive", "filter-map", "filter-backdrop"};
+      "pattern-degenerate", "pattern-resampled", "hatch", "hatch-degenerate", "clip-union", "union-overlap", "antialias", "pattern-overflow", "union-inner", "filter", "filter-primitive", "filter-map", "filter-backdrop", "region"};
   ASSERT_EQ(sizeof names / sizeof names[0], (size_t)GSHSCENE_REASON_COUNT - 1);
   for (int r = GSHSCENE_REASON_ITEM_KIND; r < GSHSCENE_REASON_COUNT; r++) {
     EXPECT_STREQ(gshscene_reason_string((GSHSCENE_Reason)r), names[r - 1]) << r;
@@ -103,7 +103,8 @@ TEST(Report, ThePinnedValuesArePinned) {
   EXPECT_EQ((int)GSHSCENE_REASON_FILTER_PRIMITIVE, 47);
   EXPECT_EQ((int)GSHSCENE_REASON_FILTER_MAP, 48);
   EXPECT_EQ((int)GSHSCENE_REASON_FILTER_BACKDROP, 49);
-  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 50);
+  EXPECT_EQ((int)GSHSCENE_REASON_REGION, 50);
+  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 51);
 }
 
 TEST(Report, ThePlaceholderRegistryIsPinnedAndNamed) {

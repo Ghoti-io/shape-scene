@@ -134,10 +134,10 @@ TEST(Face, TheKindsAndConstantsArePinned) {
   EXPECT_EQ((int)GSHSCENE_REASON_GLYPH_UNAVAILABLE, 18);
   EXPECT_EQ((int)GSHSCENE_REASON_FACE_UNBOUND, 19);
   EXPECT_EQ((int)GSHSCENE_REASON_PALETTE_ENTRY, 20);
-  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 50)
+  EXPECT_EQ((int)GSHSCENE_REASON_COUNT, 51)
       << "S19 (color-paint story P3) added three refusals of PDF's group fields, SK11 and SK8 (strokes story S1) two, "
          "S20's refusal of a stroked run (strokes story S4) one, the placeholder (color-paint story P5, PH4) one, and S21's image "
-         "refusal and two approximations (masks-images-patterns story I2) three, and M1's refusal of a mask feature one, and a pattern's refusal, notice and approximation three, and AA5's approximation of an item that asks for no antialiasing one, and PT15's approximation of a pattern that overflows its cell one, and CI5's refusal of a union with a clipped member one, and the filter's three refusals (D-FL11), and a backdrop filter's refusal in a non-isolated group (D-FL14)";
+         "refusal and two approximations (masks-images-patterns story I2) three, and M1's refusal of a mask feature one, and a pattern's refusal, notice and approximation three, and AA5's approximation of an item that asks for no antialiasing one, and PT15's approximation of a pattern that overflows its cell one, and CI5's refusal of a union with a clipped member one, and the filter's three refusals (D-FL11), and a backdrop filter's refusal in a non-isolated group (D-FL14), and `REGION` (a sink's refusal of a region its format cannot state)";
   EXPECT_STREQ(gshscene_reason_string(GSHSCENE_REASON_HINT_ROUTE), "hint-route");
   EXPECT_STREQ(gshscene_reason_string(GSHSCENE_REASON_HINT_SIZE), "hint-size");
   EXPECT_STREQ(gshscene_reason_string(GSHSCENE_REASON_HINT_NO_PROGRAM), "hint-no-program");

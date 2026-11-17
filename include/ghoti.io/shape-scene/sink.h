@@ -87,7 +87,9 @@
  * with it too), the entry of each run from a font's route (::gshscene_glyph_route:
  * a run-level `HINT_STATUS`, or a refusal, D6), the `NOTICE` of each gradient
  * fill that draws nothing (S17) and of each stroke that draws nothing (S20), and
- * every depth tie of the list as `RESOLVED_AMBIGUITY`.  A
+ * every depth tie of the list as `RESOLVED_AMBIGUITY`.  What only the geometry decides, the sink reports while it draws: a writer whose
+ * format cannot state the region a fill or stroke covers (a loop set its hatch would draw as another region) refuses the item,
+ * `REGION`, and never writes the neighboring region.  A
  * refused push or instance skips its whole block.  Best effort returns
  * ::GSHSCENE_OK.  With ::GSHSCENE_RENDER_STRICT a planned refusal is
  * ::GSHSCENE_ERR_REFUSED before the sink is called, so the target is untouched; a

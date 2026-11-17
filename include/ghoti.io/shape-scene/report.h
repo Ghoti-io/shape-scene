@@ -191,6 +191,7 @@ typedef enum GSHSCENE_Reason {
   GSHSCENE_REASON_FILTER_PRIMITIVE = 47, ///< Refused, per group: the filter needs a primitive or a feature the sink's `filter_native` lacks; `second` names the missing `GSHSCENE_FILTER_NATIVE_*` bits (D-FL11).
   GSHSCENE_REASON_FILTER_MAP = 48,    ///< Refused, per group: the group's composed map has a rotation or a shear and the sink does not filter in canonical space (D-FL8).
   GSHSCENE_REASON_FILTER_BACKDROP = 49, ///< Refused, per group: a backdrop filter (FL22) in a group that is non-isolated or knockout, where the backdrop is not one image the sink can replace (D-FL14).  Decided by the sink at the render; the planning pass cannot see the enclosing group of an instance's picture.
+  GSHSCENE_REASON_REGION = 50,        ///< Refused, per fill or stroke: the sink's format cannot state the region the item covers exactly (a fill rule its fills lack where it would change the region, a union of overlapping pieces under translucency).  Decided by the sink at the render, from the geometry; the planning pass cannot see it.  Never approximated: the item is skipped.
   GSHSCENE_REASON_COUNT               ///< Closes the enum.
 } GSHSCENE_Reason;
 

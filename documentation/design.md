@@ -1587,6 +1587,8 @@ own backdrop and group channels beside its pixels, and replacing a pixel would l
 is skipped. A sink that cannot say what the backdrop is inside a pattern's tile refuses the use painted with the pattern. `vector` has no CSS box model and
 does not lower `backdrop-filter`.
 
+`REGION` (50) is the other reason only a sink can find: a writer whose format cannot state the region a fill or stroke covers refuses the item at the render, from its geometry, and skips it; the planning pass cannot see it, `APPROXIMATED` is never used for it, and under strict it stops the render at the item as any refusal while drawing does. The DXF writer is the first user (its HATCH is a set of closed, simple, separate loops filled by odd parity).
+
 ## Gradients (normative; color-paint story P1)
 
 In real arithmetic, as N1 to N14. Each rule is in `paint.h` too; tests, plants, the oracle and the vectors cite them.
