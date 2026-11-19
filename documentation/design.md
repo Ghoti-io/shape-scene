@@ -1565,8 +1565,8 @@ the text of the header.
 (`floor(v + 1/2)`); `FLOOD` is the premultiplied color times its opacity over the subregion; `MERGE` is source-over in order; `BLEND` and
 `COMPOSITE` use the group blend functions and Porter-Duff operators of the waist, and `ARITHMETIC` is `k1 i1 i2 + k2 i1 + k3 i2 + k4` on
 premultiplied components clamped to `[0, 1]`, the color clamped to alpha; `COLOR_MATRIX` and `COMPONENT_TRANSFER` act on un-premultiplied color
-and clamp; `DROP_SHADOW` is the offset blur of the alpha, colored, under the source; `TURBULENCE` is the standard's reference implementation in user
-space at the pixel center mapped back; `DIFFUSE_LIGHTING` and `SPECULAR_LIGHTING` are the standard's Sobel normals and light vectors. A primitive's
+and clamp; `DROP_SHADOW` is the offset blur of the alpha, colored, under the source; `TURBULENCE` is the standard's reference implementation at the pixel center mapped back, in the group's space: its frequency is per unit of that space and
+its lattice is anchored at the point `dx, dy` (where the user space's origin lies in it), so a document scaled by a viewBox draws the noise it would at its own size; `DIFFUSE_LIGHTING` and `SPECULAR_LIGHTING` are the standard's Sobel normals and light vectors. A primitive's
 result is clipped to its subregion (default: the union of its inputs' subregions, else the filter region). A filter's result is clipped to its region
 and composited as the group's result: the opacity, the soft mask and the clips apply to the filtered result, through the group's composite (FL20).
 A filtered group is picked by its content, never by its filtered result (FL24).

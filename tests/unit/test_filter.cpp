@@ -380,6 +380,32 @@ TEST(Filter, ALimitIsReportedAfterEveryInvalidField) {
   EXPECT_EQ(intern_filter(sh.store, filter_of({c})), GSHSCENE_OK);
 }
 
+TEST(Filter, ATurbulencesOriginIsPartOfItsIdentityAndMustBeFinite) {
+  // FL18: the origin of a turbulence's noise (dx, dy) is read by the primitive, so two that differ only in it are two filters; the offset's
+  // fields stay unused, and so zero, for a kind that does not read them.
+  StoreHolder sh;
+  GSHSCENE_Filter_Primitive a = prim(GSHSCENE_FILTER_TURBULENCE);
+  a.sx = 0.01;
+  a.sy = 0.01;
+  a.octaves = 1;
+  GSHSCENE_Filter_Primitive b = a;
+  b.dx = 12.5;
+  Ref ra, rb, rc;
+  ASSERT_EQ(intern_filter(sh.store, filter_of({a}), &ra), GSHSCENE_OK);
+  ASSERT_EQ(intern_filter(sh.store, filter_of({b}), &rb), GSHSCENE_OK);
+  ASSERT_EQ(intern_filter(sh.store, filter_of({a}), &rc), GSHSCENE_OK);
+  EXPECT_NE(ra.get(), rb.get()) << "the origin is read";
+  EXPECT_EQ(ra.get(), rc.get());
+  GSHSCENE_Filter back;
+  ASSERT_EQ(gshscene_resource_filter(rb.get(), &back), GSHSCENE_OK);
+  EXPECT_EQ(back.primitives[0].dx, 12.5);
+  b.dx = std::numeric_limits<double>::infinity();
+  EXPECT_NE(intern_filter(sh.store, filter_of({b})), GSHSCENE_OK);
+  GSHSCENE_Filter_Primitive flood = prim(GSHSCENE_FILTER_FLOOD);
+  flood.dx = 1.0;
+  EXPECT_NE(intern_filter(sh.store, filter_of({flood})), GSHSCENE_OK) << "a flood does not read an origin";
+}
+
 TEST(Filter, TablesMatricesAndLightsAreCopiedAndRead) {
   StoreHolder sh;
   std::vector<double> table = {0.0, 0.25, 1.0};

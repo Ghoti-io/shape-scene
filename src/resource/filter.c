@@ -44,7 +44,7 @@
 /* --- the field groups of a kind (FL2, FL6) --------------------------------------------------------------------------- */
 
 enum {
-  G_OFFSET = 1u << 0,   /* dx, dy */
+  G_OFFSET = 1u << 0,   /* dx, dy: an offset's, a turbulence's origin */
   G_COLOR = 1u << 1,    /* color */
   G_OPACITY = 1u << 2,  /* opacity */
   G_MODE = 1u << 3,     /* mode */
@@ -93,7 +93,7 @@ static uint32_t groups_of(uint32_t kind, uint32_t mode) {
     case GSHSCENE_FILTER_DISPLACEMENT_MAP:
       return G_DISP;
     case GSHSCENE_FILTER_TURBULENCE:
-      return G_MODE | G_SXY | G_NOISE;
+      return G_OFFSET | G_MODE | G_SXY | G_NOISE;
     case GSHSCENE_FILTER_DIFFUSE_LIGHTING:
       return G_COLOR | G_LIGHT | G_KUL;
     case GSHSCENE_FILTER_SPECULAR_LIGHTING:

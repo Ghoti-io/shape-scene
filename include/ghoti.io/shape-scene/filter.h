@@ -51,7 +51,7 @@
  * Format 1.  The content is one **canonical byte string**, little-endian: `u32` format (1), `u32` kind 16, `u32` region mode, four
  * `f64` the region, `u8` the filter's color space, `u64` the primitive count, then for each primitive `u8` kind, `u8` color space,
  * `u64` the input count and per input `u8` kind and `u32` index, `u8` the subregion mask and four `f64`, then the groups of fields
- * its kind uses in the order offset (`f64` dx, dy), color (four `f64`, `u8` primaries, `u8` transfer, `f64` gamma), opacity (`f64`),
+ * its kind uses in the order offset (`f64` dx, dy; also a turbulence's origin), color (four `f64`, `u8` primaries, `u8` transfer, `f64` gamma), opacity (`f64`),
  * mode (`u32`), arithmetic (four `f64`, for `COMPOSITE` `ARITHMETIC` only), values (`u64` count, `f64` each), the four transfers
  * (`u8` type, `u64` count, `f64` each entry, `f64` slope, intercept, amplitude, exponent, offset), deviation (`f64` sx, sy), edge
  * (`u32`), convolution (`u32` order x and y, target x and y, `f64` divisor, bias, `u32` preserve alpha), displacement (`f64` scale,
@@ -251,8 +251,8 @@ typedef struct GSHSCENE_Filter_Primitive {
   const GSHSCENE_Filter_Input * inputs; ///< `input_count` of them; NULL for none.
   uint32_t subregion_mask;            ///< Bit 0 `x`, bit 1 `y`, bit 2 `width`, bit 3 `height`: which of @p subregion are given (FL4).
   double subregion[4];                ///< `x, y, width, height`, user space; a given width or height is `>= 0`; zero where not given.
-  double dx;                          ///< `OFFSET`, `DROP_SHADOW`.
-  double dy;                          ///< `OFFSET`, `DROP_SHADOW`.
+  double dx;                          ///< `OFFSET`, `DROP_SHADOW`; `TURBULENCE`: where the origin of the standard's user space lies in the group's space (the point the noise lattice is anchored at; zero for none).
+  double dy;                          ///< The y of the same.
   GSHSCENE_Color color;               ///< `FLOOD`, `DROP_SHADOW`, the lighting color: straight, in its own space (zero: the target's).
   double opacity;                     ///< `FLOOD`, `DROP_SHADOW`: in `[0, 1]`.
   uint32_t mode;                      ///< `BLEND`: a ::GSHSCENE_Composite blend mode of P3's list (the 16 of the standard); `COMPOSITE`: a ::GSHSCENE_Filter_Composite_Op; `COLOR_MATRIX`: a ::GSHSCENE_Filter_Matrix_Type; `MORPHOLOGY`: a ::GSHSCENE_Filter_Morphology_Op; `TURBULENCE`: a ::GSHSCENE_Filter_Noise.
@@ -260,7 +260,7 @@ typedef struct GSHSCENE_Filter_Primitive {
   size_t value_count;                 ///< `COLOR_MATRIX`: 20 for `MATRIX`, 1 for `SATURATE` and `HUE_ROTATE`, 0 otherwise; `CONVOLVE_MATRIX`: `order_x * order_y`.
   const double * values;              ///< Those values; NULL for none.
   GSHSCENE_Filter_Transfer transfer[4]; ///< `COMPONENT_TRANSFER`: R, G, B, A.
-  double sx;                          ///< `GAUSSIAN_BLUR`, `DROP_SHADOW`: `stdDeviation` x; `MORPHOLOGY`: `rx`; `TURBULENCE`: `baseFrequency` x.  Nonnegative.
+  double sx;                          ///< `GAUSSIAN_BLUR`, `DROP_SHADOW`: `stdDeviation` x; `MORPHOLOGY`: `rx`; `TURBULENCE`: `baseFrequency` x, cycles per unit of the group's space (the user space's frequency divided by its scale).  Nonnegative.
   double sy;                          ///< The y of the same.
   uint32_t edge_mode;                 ///< `GAUSSIAN_BLUR`, `CONVOLVE_MATRIX`: a ::GSHSCENE_Filter_Edge.
   uint32_t order_x;                   ///< `CONVOLVE_MATRIX`: at least 1.
